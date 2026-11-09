@@ -263,6 +263,12 @@ time.sleep(1)
 vnc = rfb.Vnc()
 print(f"display {vnc.width}x{vnc.height}, shots in {SHOTS}", flush=True)
 shot("desktop")
+# After a boot the image's login item leaves an "App Background Activity" notice at the top
+# right, over the window's right end. Swipe it away as a person would; on a clear desktop
+# this does nothing. Low on the notice, below the "screen is being controlled" one that
+# connecting puts over its top.
+vnc.drag(SCREEN[0] - 120, 135, SCREEN[0] - 1, 135, 15)
+time.sleep(1)
 
 # First paint: the first launch of an install, then three more.
 paints = []

@@ -1,0 +1,167 @@
+# The two binaries of the first app. See docs/first-app.md.
+
+import("//build/config/mac/mac_sdk.gni")
+import("//tools/grit/repack.gni")
+
+assert(is_mac, "The first app is Mac only so far")
+
+declare_args() {
+  project_b_go = "/opt/homebrew/bin/go"
+}
+
+# The Go core as a static archive. Only the main binary links it, so child processes
+# never start a Go runtime.
+action("go_core") {
+  script = "build_go.py"
+  outputs = [ "$target_gen_dir/libcore.a" ]
+  depfile = "$target_gen_dir/core.d"
+  args = [
+    project_b_go,
+    rebase_path("$target_gen_dir/libcore.a", root_build_dir),
+    rebase_path(depfile, root_build_dir),
+    mac_deployment_target,
+  ]
+}
+
+source_set("go_core_lib") {
+  public_deps = [ ":go_core" ]
+  libs = [ "$target_gen_dir/libcore.a" ]
+  frameworks = [
+    "CoreFoundation.framework",
+    "Security.framework",
+  ]
+}
+
+# Shared by both binaries. Nothing here may reference Go.
+source_set("common") {
+  sources = [
+    "common/content_client.cc",
+    "common/content_client.h",
+    "common/main_delegate.cc",
+    "common/main_delegate.h",
+  ]
+  deps = [
+    "//base",
+    "//content/public/app",
+    "//content/public/common",
+    "//ui/base",
+  ]
+}
+
+# The C++ adapter. Each function is thin and forwards to the Go core.
+source_set("browser") {
+  sources = [
+    "abi/pb_abi.h",
+    "abi/pb_exports.h",
+    "browser/browser_context.cc",
+    "browser/browser_context.h",
+    "browser/browser_main_parts.h",
+    "browser/browser_main_parts.mm",
+    "browser/content_browser_client.cc",
+    "browser/content_browser_client.h",
+    "browser/driver.h",
+    "browser/driver.mm",
+    "browser/engine.cc",
+    "browser/engine.h",
+    "browser/mac_app.h",
+    "browser/mac_app.mm",
+    "browser/navigation_gate.cc",
+    "browser/navigation_gate.h",
+    "browser/page_tab.cc",
+    "browser/page_tab.h",
+    "browser/shell_page.cc",
+    "browser/shell_page.h",
+    "browser/window.h",
+    "browser/window_mac.mm",
+    "browser_main_delegate.cc",
+    "browser_main_delegate.h",
+  ]
+  deps = [
+    ":common",
+    ":go_core_lib",
+    "//base",
+    "//components/embedder_support:user_agent",
+    "//components/input",
+    "//components/viz/common",
+    "//content/public/app",
+    "//content/public/browser",
+    "//content/public/common",
+    "//net",
+    "//services/network/public/mojom",
+    "//skia",
+    "//third_party/blink/public/common",
+    "//ui/base",
+    "//ui/display",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gfx/codec",
+    "//ui/latency",
+    "//url",
+  ]
+  frameworks = [
+    "AppKit.framework",
+    "Cocoa.framework",
+  ]
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
+}
+
+repack("pak") {
+  sources = [
+    "$root_gen_dir/content/content_resources.pak",
+    "$root_gen_dir/mojo/public/js/mojo_bindings_resources.pak",
+    "$root_gen_dir/net/net_resources.pak",
+    "$root_gen_dir/third_party/blink/public/resources/blink_resources.pak",
+    "$root_gen_dir/third_party/blink/public/resources/blink_scaled_resources_100_percent.pak",
+    "$root_gen_dir/third_party/blink/public/strings/blink_strings_en-US.pak",
+    "$root_gen_dir/ui/resources/ui_resources_100_percent.pak",
+    "$root_gen_dir/ui/strings/app_locale_settings_en-US.pak",
+    "$root_gen_dir/ui/strings/ax_strings_en-US.pak",
+    "$root_gen_dir/ui/strings/ui_strings_en-US.pak",
+  ]
+  deps = [
+    "//content:content_resources",
+    "//mojo/public/js:resources",
+    "//net:net_resources",
+    "//third_party/blink/public:resources",
+    "//third_party/blink/public:scaled_resources_100_percent",
+    "//third_party/blink/public/strings",
+    "//ui/resources",
+    "//ui/strings",
+  ]
+  output = "$root_out_dir/project_b.pak"
+}
+
+group("engine") {
+  deps = [
+    ":project_b",
+    ":project_b_helper",
+  ]
+}
+
+# Main process: content plus Go.
+executable("project_b") {
+  sources = [ "app/main.cc" ]
+  deps = [
+    ":browser",
+    ":pak",
+    "//base",
+    "//content/public/app",
+  ]
+  data_deps = [
+    ":project_b_helper",
+    "//tools/v8_context_snapshot",
+  ]
+}
+
+# Child processes: the same content, no Go.
+executable("project_b_helper") {
+  sources = [ "app/helper_main.cc" ]
+  deps = [
+    ":common",
+    ":pak",
+    "//base",
+    "//content/public/app",
+    "//sandbox/mac:seatbelt",
+  ]
+  data_deps = [ "//tools/v8_context_snapshot" ]
+}

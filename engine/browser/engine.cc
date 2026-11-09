@@ -12,6 +12,7 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/reload_type.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/page_tab.h"
@@ -42,6 +43,21 @@ int64_t CallCreateTab() {
 void CallLoadURL(int64_t tab, const char* url) {
   CheckMainThread();
   g_engine->LoadURL(tab, url);
+}
+
+void CallGoBack(int64_t tab) {
+  CheckMainThread();
+  g_engine->GoBack(tab);
+}
+
+void CallGoForward(int64_t tab) {
+  CheckMainThread();
+  g_engine->GoForward(tab);
+}
+
+void CallReload(int64_t tab) {
+  CheckMainThread();
+  g_engine->Reload(tab);
 }
 
 void CallSetPageBounds(double x,
@@ -113,6 +129,9 @@ const PBEngineCalls* Engine::Calls() {
   static const PBEngineCalls calls = {
       .create_tab = CallCreateTab,
       .load_url = CallLoadURL,
+      .go_back = CallGoBack,
+      .go_forward = CallGoForward,
+      .reload = CallReload,
       .set_page_bounds = CallSetPageBounds,
       .set_shell_regions = CallSetShellRegions,
       .focus_page = CallFocusPage,
@@ -173,6 +192,29 @@ void Engine::LoadURL(int64_t tab, const char* url) {
   params.transition_type = ui::PageTransitionFromInt(
       ui::PAGE_TRANSITION_TYPED | ui::PAGE_TRANSITION_FROM_ADDRESS_BAR);
   it->second->contents()->GetController().LoadURLWithParams(params);
+}
+
+void Engine::GoBack(int64_t tab) {
+  auto it = tabs_.find(tab);
+  if (it != tabs_.end() && it->second->contents()->GetController().CanGoBack()) {
+    it->second->contents()->GetController().GoBack();
+  }
+}
+
+void Engine::GoForward(int64_t tab) {
+  auto it = tabs_.find(tab);
+  if (it != tabs_.end() &&
+      it->second->contents()->GetController().CanGoForward()) {
+    it->second->contents()->GetController().GoForward();
+  }
+}
+
+void Engine::Reload(int64_t tab) {
+  auto it = tabs_.find(tab);
+  if (it != tabs_.end()) {
+    it->second->contents()->GetController().Reload(content::ReloadType::NORMAL,
+                                                   /*check_for_repost=*/false);
+  }
 }
 
 void Engine::FocusPage() {

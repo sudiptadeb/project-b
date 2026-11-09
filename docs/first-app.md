@@ -56,6 +56,8 @@ fresher one follows.
 - Gates cover the top-level navigation only: not iframes, subresources, WebSockets or
   WebTransport. `isAllowedUrl` doesn't see those yet.
 - Gates answer immediately; holding a navigation for a prompt isn't built.
+- A back or forward restored from the back-forward cache skips the gates, because content
+  runs no navigation start for it. A page allowed earlier stays reachable that way.
 - One tab. `target=_blank` and `window.open` don't open anything.
 - No downloads, permissions, dialogs, autofill or extensions.
 - Mac only. Windows needs checking, because Go's cgo there wants mingw.

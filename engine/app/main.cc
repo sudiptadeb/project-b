@@ -13,6 +13,7 @@ int main(int argc, const char** argv) {
       .navigation_starting = PBNavigationStarting,
       .navigation_finished = PBNavigationFinished,
       .navigation_failed = PBNavigationFailed,
+      .history_changed = PBHistoryChanged,
       .title_changed = PBTitleChanged,
       .loading_changed = PBLoadingChanged,
       .page_crashed = PBPageCrashed,

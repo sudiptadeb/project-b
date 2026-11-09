@@ -46,6 +46,12 @@ func (m *Manager) Handle(msg []byte) {
 		m.send(map[string]any{"t": "snapshot", "engine": m.eng.Name(), "tab": m.tabs.Active()})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
+	case "back":
+		m.tabs.Back()
+	case "forward":
+		m.tabs.Forward()
+	case "reload":
+		m.tabs.Reload()
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "regions":

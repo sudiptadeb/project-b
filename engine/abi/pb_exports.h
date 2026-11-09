@@ -21,6 +21,7 @@ void PBShellMessage(const char* json, size_t length);
 int PBNavigationStarting(int64_t tab, const char* url);
 void PBNavigationFinished(int64_t tab, const char* url);
 void PBNavigationFailed(int64_t tab, const char* url, const char* reason);
+void PBHistoryChanged(int64_t tab, int can_go_back, int can_go_forward);
 void PBTitleChanged(int64_t tab, const char* title);
 void PBLoadingChanged(int64_t tab, int loading);
 void PBPageCrashed(int64_t tab);

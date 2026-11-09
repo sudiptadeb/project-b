@@ -22,6 +22,8 @@ type Engine struct {
 	nextTab  engine.TabID
 	tab      engine.TabID
 	navSeq   int
+	history  []string // The committed URLs of the one tab.
+	pos      int      // The current one in history, or -1 before the first.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu      sync.Mutex
@@ -34,7 +36,7 @@ type Engine struct {
 }
 
 // New returns an engine. Call Run to start its main thread.
-func New() *Engine { return &Engine{queue: make(chan func(), 4096)} }
+func New() *Engine { return &Engine{queue: make(chan func(), 4096), pos: -1} }
 
 // Run is the main loop. It never returns.
 func (e *Engine) Run() {
@@ -55,6 +57,24 @@ func (e *Engine) CreateTab() engine.TabID {
 }
 
 func (e *Engine) LoadURL(tab engine.TabID, u string) { e.navigate(tab, u) }
+
+func (e *Engine) GoBack(tab engine.TabID) {
+	if e.pos > 0 {
+		e.moveTo(tab, e.pos-1)
+	}
+}
+
+func (e *Engine) GoForward(tab engine.TabID) {
+	if e.pos < len(e.history)-1 {
+		e.moveTo(tab, e.pos+1)
+	}
+}
+
+func (e *Engine) Reload(tab engine.TabID) {
+	if e.pos >= 0 {
+		e.moveTo(tab, e.pos)
+	}
+}
 
 func (e *Engine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
 	e.mu.Lock()
@@ -115,9 +135,22 @@ func (e *Engine) Fire(kind, value string) {
 	})
 }
 
-// navigate behaves like a real load: gates first, then later the commit, unless a
-// newer navigation replaced it.
+// navigate is a new page: it replaces whatever was ahead of the current one.
 func (e *Engine) navigate(tab engine.TabID, u string) {
+	e.load(tab, u, func() {
+		e.history = append(e.history[:e.pos+1], u)
+		e.pos = len(e.history) - 1
+	})
+}
+
+// moveTo loads a page already in the history.
+func (e *Engine) moveTo(tab engine.TabID, pos int) {
+	e.load(tab, e.history[pos], func() { e.pos = pos })
+}
+
+// load behaves like a real load: gates first, then later the commit, unless a newer
+// navigation replaced it.
+func (e *Engine) load(tab engine.TabID, u string, commit func()) {
 	e.navSeq++
 	seq := e.navSeq
 	if !e.listener.NavigationStarting(tab, u) {
@@ -131,7 +164,9 @@ func (e *Engine) navigate(tab engine.TabID, u string) {
 			if seq != e.navSeq {
 				return
 			}
+			commit()
 			e.setCurrent(u)
+			e.listener.HistoryChanged(tab, e.pos > 0, e.pos < len(e.history)-1)
 			e.listener.NavigationFinished(tab, u)
 			e.listener.TitleChanged(tab, "Mock "+hostOf(u))
 			e.listener.LoadingChanged(tab, false)

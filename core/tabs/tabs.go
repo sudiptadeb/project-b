@@ -17,6 +17,9 @@ type Tab struct {
 	Blocked bool         `json:"blocked"`
 	Crashed bool         `json:"crashed"`
 	Error   string       `json:"error,omitempty"`
+
+	CanGoBack    bool `json:"canGoBack"`
+	CanGoForward bool `json:"canGoForward"`
 }
 
 // Gate runs before a navigation. Returning false blocks it, and later gates don't run.
@@ -78,6 +81,27 @@ func (m *Manager) Navigate(text string) {
 	m.eng.LoadURL(m.active, u)
 }
 
+// Back moves the active tab back in its history.
+func (m *Manager) Back() {
+	if t := m.tabs[m.active]; t != nil && t.CanGoBack {
+		m.eng.GoBack(m.active)
+	}
+}
+
+// Forward moves the active tab forward in its history.
+func (m *Manager) Forward() {
+	if t := m.tabs[m.active]; t != nil && t.CanGoForward {
+		m.eng.GoForward(m.active)
+	}
+}
+
+// Reload reloads the active tab.
+func (m *Manager) Reload() {
+	if t := m.tabs[m.active]; t != nil && t.URL != "" {
+		m.eng.Reload(m.active)
+	}
+}
+
 // HandleNavigationStarting runs the gates and records the result.
 func (m *Manager) HandleNavigationStarting(id engine.TabID, u string) bool {
 	t := m.tabs[id]
@@ -103,7 +127,9 @@ func (m *Manager) HandleNavigationFinished(id engine.TabID, u string) {
 	if t == nil {
 		return
 	}
-	t.URL, t.Error = u, ""
+	// A page restored from the back-forward cache never reports a start, so a commit
+	// has to clear what an earlier navigation left behind.
+	t.URL, t.Error, t.Blocked, t.Crashed = u, "", false, false
 	for _, f := range m.onFinished {
 		f(*t)
 	}
@@ -117,6 +143,16 @@ func (m *Manager) HandleNavigationFailed(id engine.TabID, u, reason string) {
 		return
 	}
 	t.URL, t.Error, t.Loading = u, reason, false
+	m.changed(t)
+}
+
+// HandleHistoryChanged records whether the tab can go back and forward.
+func (m *Manager) HandleHistoryChanged(id engine.TabID, canGoBack, canGoForward bool) {
+	t := m.tabs[id]
+	if t == nil || (t.CanGoBack == canGoBack && t.CanGoForward == canGoForward) {
+		return
+	}
+	t.CanGoBack, t.CanGoForward = canGoBack, canGoForward
 	m.changed(t)
 }
 

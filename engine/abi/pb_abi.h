@@ -17,6 +17,9 @@
 typedef struct PBEngineCalls {
   int64_t (*create_tab)(void);
   void (*load_url)(int64_t tab, const char* url);
+  void (*go_back)(int64_t tab);
+  void (*go_forward)(int64_t tab);
+  void (*reload)(int64_t tab);
   // view_w and view_h are the window size the shell measured against.
   void (*set_page_bounds)(double x,
                           double y,
@@ -46,6 +49,7 @@ typedef struct PBGoCalls {
   int (*navigation_starting)(int64_t tab, const char* url);
   void (*navigation_finished)(int64_t tab, const char* url);
   void (*navigation_failed)(int64_t tab, const char* url, const char* reason);
+  void (*history_changed)(int64_t tab, int can_go_back, int can_go_forward);
   void (*title_changed)(int64_t tab, const char* title);
   void (*loading_changed)(int64_t tab, int loading);
   void (*page_crashed)(int64_t tab);

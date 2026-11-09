@@ -61,6 +61,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await settle(page);
   await page.screenshot({ path: path.join(out, '1-empty.png') });
 
+  const back = page.getByRole('button', { name: 'Back' });
+  const forward = page.getByRole('button', { name: 'Forward' });
+  const reload = page.getByRole('button', { name: 'Reload' });
+  check('opens with nothing to go back to or reload', (await back.isDisabled()) && (await forward.isDisabled()) && (await reload.isDisabled()));
+
   let r = await regions();
   check('opens empty with only the bar as shell', r.regions.length === 1 && (await bar.inputValue()) === '', JSON.stringify(r));
   check('page sits below the bar, inside the frame', r.bounds.y === r.regions[0].h && r.bounds.x === 10 && r.bounds.w === 1100 - 20 && r.bounds.y + r.bounds.h === 700 - 10, JSON.stringify(r));
@@ -82,11 +87,23 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await visit('https://example.org/', 'https://example.org/');
   check('address bar shows the final URL', (await bar.inputValue()) === 'https://example.org/');
 
-  await page.getByRole('button', { name: 'Go', exact: true }).waitFor();
-  await bar.fill('https://go.dev/learn');
-  await page.getByRole('button', { name: 'Go', exact: true }).click();
+  // Back, forward and reload.
+  check('back is on and forward is off after new pages', (await back.isEnabled()) && (await forward.isDisabled()) && (await reload.isEnabled()));
+  await back.click();
   await loaded('https://go.dev/learn');
-  check('Go button navigates', true);
+  check('back returns to the previous page', await forward.isEnabled());
+  await forward.click();
+  await loaded('https://example.org/');
+  check('forward returns to the next page', await forward.isDisabled());
+  await reload.click();
+  await mock.getByText('Loading', { exact: true }).waitFor();
+  await loaded('https://example.org/');
+  check('reload loads the page again', (await bar.inputValue()) === 'https://example.org/');
+  await back.click();
+  await loaded('https://go.dev/learn');
+  await visit('https://example.org/', 'https://example.org/');
+  await page.waitForFunction(() => document.querySelector('[aria-label=Forward]').disabled);
+  check('a new page drops what was ahead', await forward.isDisabled());
 
   // Suggestions come from real history, over the page.
   await bar.click();
@@ -103,7 +120,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const over = await regions(`?x=${box.x + 20}&y=${box.y + 10}`);
   check('the box extends over the page', box.y + box.height > r.bounds.y + 40, JSON.stringify({ box, bounds: r.bounds }));
   check('a click on the box goes to the shell', over.hitShell === true);
-  const beside = await regions(`?x=${box.x + box.width + 40}&y=${box.y + 10}`);
+  const beside = await regions(`?x=${box.x - 40}&y=${box.y + 10}`);
   check('a click beside the box goes to the page', beside.hitShell === false);
 
   // Bar and list behave as one UI.

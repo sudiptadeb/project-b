@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import NavButtons from './NavButtons.vue';
 import { send } from './bridge.js';
 import { setHandlers, state } from './state.js';
 
@@ -139,6 +140,7 @@ watch(
 
 <template>
   <form class="bar" @submit.prevent="go()">
+    <NavButtons />
     <div class="field" :class="{ open }">
       <input
         ref="input"
@@ -175,7 +177,6 @@ watch(
         </li>
       </ul>
     </div>
-    <button type="submit" @mousedown.prevent>Go</button>
     <div class="progress" :class="{ on: state.tab.loading }"></div>
   </form>
 </template>
@@ -185,10 +186,9 @@ watch(
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
   height: 59px;
   margin: 0 10px;
-  padding: 0 12px;
+  padding: 0 20.4px 0 0;
   background: var(--bar);
   border-radius: 16.8px 16.8px 0 0;
 }
@@ -234,24 +234,6 @@ input::placeholder {
   color: var(--danger);
   font-size: 12px;
   font-weight: 600;
-}
-
-button {
-  flex: none;
-  height: 35px;
-  min-width: 64px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #ffffff;
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-button:hover {
-  filter: brightness(0.92);
 }
 
 .list {

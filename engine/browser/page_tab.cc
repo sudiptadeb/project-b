@@ -7,6 +7,7 @@
 #include "components/input/native_web_keyboard_event.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
 #include "net/base/net_errors.h"
@@ -33,9 +34,18 @@ void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
   if (!handle->IsInPrimaryMainFrame()) {
     return;
   }
+  content::NavigationController& controller = contents_->GetController();
+  Go().history_changed(id_, controller.CanGoBack(), controller.CanGoForward());
+
   const std::string& url = handle->GetURL().spec();
   if (handle->HasCommitted() && !handle->IsErrorPage()) {
     Go().navigation_finished(id_, url.c_str());
+    // A page coming back from history already has its title, and may not set it again.
+    content::NavigationEntry* entry = controller.GetLastCommittedEntry();
+    if (entry && !entry->GetTitle().empty()) {
+      Engine::Get()->window()->SetTitle(entry->GetTitle());
+      Go().title_changed(id_, base::UTF16ToUTF8(entry->GetTitle()).c_str());
+    }
     return;
   }
   // ERR_ABORTED is a navigation replaced by a newer one, which isn't a failure.

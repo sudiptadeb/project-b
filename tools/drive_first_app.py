@@ -25,7 +25,8 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
-BAR_Y = 71  # The middle of the address bar, below the tab strip.
+BAR_Y = 71  # The middle of the address bar and the buttons, below the tab strip.
+BACK_X, FORWARD_X, RELOAD_X = 35, 73, 109
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -206,6 +207,26 @@ def main():
     app.wait(f"{VALUE}.includes('iana.org')", 30)
     print(app.cmd("capture", os.path.join(OUT, "2-page.png")), flush=True)
 
+    # Back, forward and reload, through the real buttons.
+    disabled = lambda name: app.js(f"document.querySelector('[aria-label={name}]').disabled")
+    check("back is on and forward is off after new pages", not disabled("Back") and disabled("Forward"))
+    app.cmd("click", BACK_X, BAR_Y)
+    app.wait(f"location.href==={json.dumps(URL_A)}", 30, page=True)
+    app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
+    check("back returns to the previous page", True)
+    app.wait("!document.querySelector('[aria-label=Forward]').disabled", 10)
+    check("forward is on after going back", True)
+    app.wait("document.querySelector('.tab .title').textContent.includes('Example Domain')", 10)
+    check("the tab's title comes back with the page", True)
+    app.cmd("click", FORWARD_X, BAR_Y)
+    app.wait("location.href.includes('iana.org')", 30, page=True)
+    app.wait(f"{VALUE}.includes('iana.org')", 10)
+    check("forward returns to the next page", True)
+    app.js("(()=>{window.__before_reload=1;return 1})()", page=True)
+    app.cmd("click", RELOAD_X, BAR_Y)
+    app.wait("document.readyState==='complete'&&!window.__before_reload", 30, page=True)
+    check("reload loads the page again", True)
+
     # Suggestions over the page, from real history.
     focus_bar(app)
     app.cmd("type", "exam")
@@ -261,9 +282,6 @@ def main():
     # Tab off the end of the shell moves into the page.
     focus_bar(app)
     app.cmd("key", "tab")
-    time.sleep(0.1)
-    check("tab moves to the Go button", app.js("document.activeElement.tagName") == "BUTTON", app.js("document.activeElement.tagName"))
-    app.cmd("key", "tab")
     try:
         app.wait("document.hasFocus()", 5, page=True)
         check("tab past the end of the shell moves into the page", True)
@@ -289,6 +307,15 @@ def main():
     time.sleep(0.4)
     check("a blocked URL stays out of history", app.js(OPTIONS) == 0, app.js(OPTIONS))
     leave_bar(app)
+
+    # A page restored from the back-forward cache never reports a start, so its commit
+    # has to clear the Blocked chip.
+    app.cmd("click", BACK_X, BAR_Y)
+    try:
+        app.wait("document.querySelector('.status')===null", 30)
+        check("going back clears the blocked chip", True)
+    except TimeoutError as e:
+        check("going back clears the blocked chip", False, e)
 
     # Key press to paint, measured inside the shell. Not a display measurement.
     focus_bar(app)

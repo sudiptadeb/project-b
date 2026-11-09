@@ -11,6 +11,9 @@ package main
 
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
+static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
+static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_forward(tab); }
+static inline void call_reload(const PBEngineCalls* c, int64_t tab) { c->reload(tab); }
 static inline void call_set_page_bounds(const PBEngineCalls* c, double x, double y, double w, double h, double vw, double vh) { c->set_page_bounds(x, y, w, h, vw, vh); }
 static inline void call_set_shell_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_shell_regions(rects, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
@@ -50,6 +53,12 @@ func (e *nativeEngine) LoadURL(tab engine.TabID, url string) {
 	defer C.free(unsafe.Pointer(c))
 	C.call_load_url(e.calls, C.int64_t(tab), c)
 }
+
+func (e *nativeEngine) GoBack(tab engine.TabID) { C.call_go_back(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) GoForward(tab engine.TabID) { C.call_go_forward(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) Reload(tab engine.TabID) { C.call_reload(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
 	C.call_set_page_bounds(e.calls, C.double(r.X), C.double(r.Y), C.double(r.W), C.double(r.H), C.double(viewW), C.double(viewH))
@@ -135,6 +144,11 @@ func PBNavigationFinished(tab C.int64_t, url *C.char) {
 //export PBNavigationFailed
 func PBNavigationFailed(tab C.int64_t, url, reason *C.char) {
 	theApp.NavigationFailed(engine.TabID(tab), C.GoString(url), C.GoString(reason))
+}
+
+//export PBHistoryChanged
+func PBHistoryChanged(tab C.int64_t, canGoBack, canGoForward C.int) {
+	theApp.HistoryChanged(engine.TabID(tab), canGoBack != 0, canGoForward != 0)
 }
 
 //export PBTitleChanged

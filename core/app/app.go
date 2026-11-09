@@ -63,6 +63,10 @@ func (a *App) NavigationFailed(tab engine.TabID, url, reason string) {
 	a.Tabs.HandleNavigationFailed(tab, url, reason)
 }
 
+func (a *App) HistoryChanged(tab engine.TabID, canGoBack, canGoForward bool) {
+	a.Tabs.HandleHistoryChanged(tab, canGoBack, canGoForward)
+}
+
 func (a *App) TitleChanged(tab engine.TabID, title string) { a.Tabs.HandleTitleChanged(tab, title) }
 
 func (a *App) LoadingChanged(tab engine.TabID, loading bool) {

@@ -51,6 +51,9 @@ class Engine {
 
   int64_t CreateTab();
   void LoadURL(int64_t tab, const char* url);
+  void GoBack(int64_t tab);
+  void GoForward(int64_t tab);
+  void Reload(int64_t tab);
   void FocusPage();
   void SendToShell(const char* json, size_t length);
 

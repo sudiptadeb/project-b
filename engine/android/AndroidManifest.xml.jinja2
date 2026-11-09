@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Follows content/shell/android/shell_apk/AndroidManifest.xml.jinja2. The services are the child
+     processes: same APK, same content library, and none of the Go library. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{{ manifest_package }}">
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:name="dev.projectb.browser.BrowserApplication"
+        android:label="Project B"
+        android:icon="@drawable/icon"
+        android:allowBackup="false"
+        android:extractNativeLibs="true"
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
+        android:zygotePreloadName="org.chromium.content_public.app.ZygotePreload"
+        android:zygotePreloadNativeLib="lib{{ library_name }}.so"
+        android:theme="@style/Window">
+        <activity
+            android:name="dev.projectb.browser.BrowserActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        {% set num_sandboxed_services = 40 %}
+        <meta-data android:name="org.chromium.content.browser.NUM_SANDBOXED_SERVICES"
+                   android:value="{{ num_sandboxed_services }}" />
+        {% for i in range(num_sandboxed_services) %}
+        <service android:name="org.chromium.content.app.SandboxedProcessService{{ i }}"
+                 android:process=":sandboxed_process{{ i }}"
+                 {% if (i == 0) %}
+                 android:useAppZygote="true"
+                 {% endif %}
+                 android:isolatedProcess="true"
+                 android:exported="false" />
+        {% endfor %}
+
+        {% set num_privileged_services = 5 %}
+        <meta-data android:name="org.chromium.content.browser.NUM_PRIVILEGED_SERVICES"
+                   android:value="{{ num_privileged_services }}" />
+        {% for i in range(num_privileged_services) %}
+        <service android:name="org.chromium.content.app.PrivilegedProcessService{{ i }}"
+                 android:process=":privileged_process{{ i }}"
+                 android:isolatedProcess="false"
+                 android:exported="false" />
+        {% endfor %}
+    </application>
+</manifest>

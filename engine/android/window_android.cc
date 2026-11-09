@@ -1,0 +1,275 @@
+// The window on Android: one SurfaceView and one compositor drawing the shell's layer over the
+// shown page's. Android can't blend two SurfaceViews, so unlike the Mac there's one surface here
+// and not a view per page. Touches still go by views: see BrowserWindow.java.
+
+#include <string>
+#include <vector>
+
+#include "base/android/jni_android.h"
+#include "base/android/jni_array.h"
+#include "base/android/jni_string.h"
+#include "base/android/scoped_java_ref.h"
+#include "base/check.h"
+#include "base/memory/raw_ptr.h"
+#include "cc/slim/layer.h"
+#include "cc/slim/solid_color_layer.h"
+#include "content/public/browser/android/compositor.h"
+#include "content/public/browser/android/compositor_client.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/web_contents.h"
+#include "project_b/engine/abi/pb_abi.h"
+#include "project_b/engine/browser/browser_main_parts.h"
+#include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/page_tab.h"
+#include "project_b/engine/browser/window.h"
+#include "third_party/skia/include/core/SkColor.h"
+#include "ui/android/view_android.h"
+#include "ui/android/window_android.h"
+#include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/size.h"
+
+// Must come after all headers that specialize FromJniType() / ToJniType().
+#include "project_b/engine/android/jni_headers/BrowserWindow_jni.h"
+
+using base::android::AttachCurrentThread;
+using base::android::JavaRef;
+using base::android::ScopedJavaGlobalRef;
+
+namespace project_b {
+
+// The native side of BrowserWindow.java.
+class BrowserWindow : public content::CompositorClient {
+ public:
+  BrowserWindow(JNIEnv* env,
+                const JavaRef<jobject>& obj,
+                ui::WindowAndroid* window_android)
+      : java_(env, obj), root_(cc::slim::SolidColorLayer::Create()) {
+    root_->SetBackgroundColor(SkColors::kWhite);
+    root_->SetIsDrawable(true);
+    compositor_.reset(content::Compositor::Create(this, window_android));
+    compositor_->SetRootLayer(root_);
+  }
+
+  const JavaRef<jobject>& java() const { return java_; }
+
+  // Children draw in order: the shown page first, the shell last, on top.
+  void SetShell(content::WebContents* contents) {
+    root_->AddChild(contents->GetNativeView()->GetLayer());
+  }
+
+  // Only the shown page's layer is in the tree.
+  void ShowPage(content::WebContents* contents) {
+    if (shown_) {
+      shown_->GetNativeView()->GetLayer()->RemoveFromParent();
+    }
+    shown_ = contents;
+    root_->InsertChild(contents->GetNativeView()->GetLayer(), 0);
+  }
+
+  void RemovePage(content::WebContents* contents) {
+    if (shown_ == contents) {
+      contents->GetNativeView()->GetLayer()->RemoveFromParent();
+      shown_ = nullptr;
+    }
+  }
+
+  // Where nothing else draws: before the shell's first frame, and under a crashed page.
+  void SetColor(uint32_t rgb) {
+    root_->SetBackgroundColor(SkColor4f::FromColor(SkColorSetRGB(
+        (rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff)));
+  }
+
+  void ListenForState(base::RepeatingCallback<void(const Window::State&)> cb) {
+    on_state_ = std::move(cb);
+    ReportState();
+  }
+
+  // Called from Java.
+  void SurfaceCreated(JNIEnv* env) { surface_format_ = 0; }
+
+  void SurfaceDestroyed(JNIEnv* env) {
+    compositor_->PreserveChildSurfaceControls();
+    compositor_->SetSurface(nullptr, false, nullptr);
+    surface_format_ = 0;
+  }
+
+  void SurfaceChanged(JNIEnv* env,
+                      int32_t format,
+                      int32_t width,
+                      int32_t height,
+                      const JavaRef<jobject>& surface) {
+    if (surface_format_ != format) {
+      surface_format_ = format;
+      compositor_->SetSurface(surface, /*can_be_used_with_surface_control=*/true,
+                              nullptr);
+    }
+    gfx::Size size(width, height);
+    compositor_->SetWindowBounds(size);
+    root_->SetBounds(size);
+  }
+
+  void SizeChanged(JNIEnv* env, double width, double height) {
+    size_ = gfx::SizeF(width, height);
+    ReportState();
+  }
+
+  void ContentsMoved(JNIEnv* env,
+                     const JavaRef<jobject>& jcontents,
+                     int32_t left,
+                     int32_t top,
+                     int32_t width,
+                     int32_t height) {
+    content::WebContents* contents =
+        content::WebContents::FromJavaWebContents(jcontents);
+    ui::ViewAndroid* view = contents->GetNativeView();
+    view->GetLayer()->SetPosition(gfx::PointF(left, top));
+    view->OnPhysicalBackingSizeChanged(gfx::Size(width, height));
+  }
+
+  // The phone's back key is the shell's back button while the tab has somewhere to go back to.
+  bool BackKey(JNIEnv* env) {
+    PageTab* tab = Engine::Get()->active_tab();
+    if (!tab || !tab->contents()->GetController().CanGoBack()) {
+      return false;
+    }
+    hooks::Args args;
+    args.Str(R"({"t":"back"})");
+    hooks::Fire(PB_EVENT_SHELL_MESSAGE, args);
+    return true;
+  }
+
+  void Stop(JNIEnv* env) { Go().stop(); }
+
+ private:
+  // A phone's window fills the screen and never moves, which is what full screen means to the
+  // window manager: nothing drags. There are no window buttons and the corners are square.
+  void ReportState() {
+    if (on_state_ && !size_.IsEmpty()) {
+      on_state_.Run({.size = size_,
+                     .controls = gfx::RectF(),
+                     .corner_radius = 0,
+                     .full_screen = true});
+    }
+  }
+
+  ScopedJavaGlobalRef<jobject> java_;
+  scoped_refptr<cc::slim::SolidColorLayer> root_;
+  std::unique_ptr<content::Compositor> compositor_;
+  raw_ptr<content::WebContents> shown_ = nullptr;
+  gfx::SizeF size_;
+  base::RepeatingCallback<void(const Window::State&)> on_state_;
+  int surface_format_ = 0;
+};
+
+namespace {
+BrowserWindow* g_browser_window = nullptr;
+}  // namespace
+
+static int64_t JNI_BrowserWindow_Start(JNIEnv* env,
+                                       const JavaRef<jobject>& obj,
+                                       const JavaRef<jobject>& jwindow_android,
+                                       int64_t go_table,
+                                       const JavaRef<jstring>& jblocked_hosts) {
+  SetGo(reinterpret_cast<const PBGoCalls*>(go_table));
+  g_browser_window = new BrowserWindow(
+      env, obj, ui::WindowAndroid::FromJavaWindowAndroid(jwindow_android));
+  BrowserMainParts::Get()->StartApp(
+      base::android::ConvertJavaStringToUTF8(env, jblocked_hosts));
+  return reinterpret_cast<intptr_t>(g_browser_window);
+}
+
+struct Window::Impl {
+  uint32_t frame_rgb = 0;
+  bool has_frame = false;
+};
+
+Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
+  CHECK(g_browser_window);
+}
+
+Window::~Window() = default;
+
+// Android put the activity's window on screen before content started.
+void Window::Show() {}
+
+void Window::Close() {
+  Java_BrowserWindow_close(AttachCurrentThread(), g_browser_window->java());
+}
+
+// A phone shows no window title.
+void Window::SetTitle(const std::u16string& title) {}
+
+void Window::SetShellContents(content::WebContents* contents) {
+  g_browser_window->SetShell(contents);
+  Java_BrowserWindow_setShell(AttachCurrentThread(), g_browser_window->java(),
+                              contents->GetJavaWebContents());
+}
+
+void Window::AddPageContents(content::WebContents* contents) {
+  Java_BrowserWindow_addPage(AttachCurrentThread(), g_browser_window->java(),
+                             contents->GetJavaWebContents());
+}
+
+void Window::ShowPageContents(content::WebContents* contents) {
+  g_browser_window->ShowPage(contents);
+  Java_BrowserWindow_showPage(AttachCurrentThread(), g_browser_window->java(),
+                              contents->GetJavaWebContents());
+}
+
+void Window::RemovePageContents(content::WebContents* contents) {
+  g_browser_window->RemovePage(contents);
+  Java_BrowserWindow_removePage(AttachCurrentThread(), g_browser_window->java(),
+                                contents->GetJavaWebContents());
+}
+
+// The frame's band is the shell's own edge strips here: with square corners there is no curve
+// for the window to draw over the page.
+void Window::SetLayout(Layout layout) {
+  JNIEnv* env = AttachCurrentThread();
+  if (!impl_->has_frame || layout.frame_rgb != impl_->frame_rgb) {
+    impl_->has_frame = true;
+    impl_->frame_rgb = layout.frame_rgb;
+    g_browser_window->SetColor(layout.frame_rgb);
+    Java_BrowserWindow_setFrameColor(env, g_browser_window->java(),
+                                     static_cast<int32_t>(layout.frame_rgb));
+  }
+
+  std::vector<double> flat;
+  flat.reserve(layout.regions.size() * 5);
+  for (const Region& r : layout.regions) {
+    flat.push_back(r.rect.x());
+    flat.push_back(r.rect.y());
+    flat.push_back(r.rect.width());
+    flat.push_back(r.rect.height());
+    flat.push_back(static_cast<double>(r.area));
+  }
+  const gfx::RectF& page = layout.page;
+  Java_BrowserWindow_setLayout(env, g_browser_window->java(),
+                               layout.viewport.width(), layout.viewport.height(),
+                               page.x(), page.y(), page.width(), page.height(),
+                               base::android::ToJavaDoubleArray(env, flat));
+}
+
+void Window::ListenForState(
+    base::RepeatingCallback<void(const State&)> on_change) {
+  g_browser_window->ListenForState(std::move(on_change));
+}
+
+void Window::Minimize() {
+  Java_BrowserWindow_minimize(AttachCurrentThread(), g_browser_window->java());
+}
+
+// A phone's window always fills the screen, so there is nothing to zoom or make full screen.
+void Window::Zoom() {}
+
+void Window::ToggleFullScreen() {}
+
+bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
+  return false;
+}
+
+}  // namespace project_b
+
+DEFINE_JNI(BrowserWindow)

@@ -1,0 +1,230 @@
+# The first app on Android, on real content. See docs/android.md. Only this file is loaded on
+# Android: ../BUILD.gn is the Mac's.
+
+import("//build/config/android/config.gni")
+import("//build/config/android/rules.gni")
+import("//third_party/jni_zero/jni_zero.gni")
+import("//tools/grit/repack.gni")
+
+declare_args() {
+  project_b_go = "/usr/local/go/bin/go"
+}
+
+manifest = "$target_gen_dir/AndroidManifest.xml"
+library_name = "project_b_content"
+
+generate_jni("jni_headers") {
+  sources = [ "java/dev/projectb/browser/BrowserWindow.java" ]
+}
+
+source_set("browser") {
+  sources = [
+    "../browser/browser_context.cc",
+    "../browser/browser_context.h",
+    "../browser/browser_main_parts.h",
+    "../browser/content_browser_client.cc",
+    "../browser/content_browser_client.h",
+    "../browser/engine.cc",
+    "../browser/engine.h",
+    "../browser/go.cc",
+    "../browser/go.h",
+    "../browser/hooks.cc",
+    "../browser/hooks.h",
+    "../browser/hooks_gen.cc",
+    "../browser/hooks_gen.h",
+    "../browser/page_tab.cc",
+    "../browser/page_tab.h",
+    "../browser/shell_page.cc",
+    "../browser/shell_page.h",
+    "../browser/window.h",
+    "../browser_main_delegate.cc",
+    "../browser_main_delegate.h",
+    "../common/content_client.cc",
+    "../common/content_client.h",
+    "../common/main_delegate.cc",
+    "../common/main_delegate.h",
+    "browser_main_parts_android.cc",
+    "descriptors.h",
+    "window_android.cc",
+  ]
+  deps = [
+    ":jni_headers",
+    "//base",
+    "//cc/slim",
+    "//components/embedder_support:user_agent",
+    "//components/input",
+    "//components/version_info:version_info_with_user_agent",
+    "//components/viz/common",
+    "//content/public/app",
+    "//content/public/browser",
+    "//content/public/common",
+    "//net",
+    "//services/network/public/cpp",
+    "//services/network/public/mojom",
+    "//skia",
+    "//third_party/blink/public/common",
+    "//third_party/blink/public/mojom:mojom_platform",
+    "//ui/android",
+    "//ui/base",
+    "//ui/display",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gfx/codec",
+    "//ui/latency",
+    "//url",
+  ]
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
+}
+
+repack("pak") {
+  sources = [
+    "$root_gen_dir/content/content_resources.pak",
+    "$root_gen_dir/mojo/public/js/mojo_bindings_resources.pak",
+    "$root_gen_dir/net/net_resources.pak",
+    "$root_gen_dir/third_party/blink/public/resources/blink_resources.pak",
+    "$root_gen_dir/third_party/blink/public/resources/blink_scaled_resources_100_percent.pak",
+    "$root_gen_dir/third_party/blink/public/strings/blink_strings_en-US.pak",
+    "$root_gen_dir/ui/resources/ui_resources_100_percent.pak",
+    "$root_gen_dir/ui/strings/app_locale_settings_en-US.pak",
+    "$root_gen_dir/ui/strings/ax_strings_en-US.pak",
+    "$root_gen_dir/ui/strings/ui_strings_en-US.pak",
+  ]
+  deps = [
+    "//content:content_resources",
+    "//mojo/public/js:resources",
+    "//net:net_resources",
+    "//third_party/blink/public:resources",
+    "//third_party/blink/public:scaled_resources_100_percent",
+    "//third_party/blink/public/strings",
+    "//ui/resources",
+    "//ui/strings",
+  ]
+  output = "$root_out_dir/project_b.pak"
+}
+
+android_assets("assets") {
+  sources = [ "$root_out_dir/project_b.pak" ]
+  renaming_sources = [
+    "../../shell/dist/index.html",
+    "../../shell/dist/shell.css",
+    "../../shell/dist/shell.js",
+  ]
+  renaming_destinations = [
+    "shell/index.html",
+    "shell/shell.css",
+    "shell/shell.js",
+  ]
+  disable_compression = true
+  deps = [
+    ":pak",
+    "//gin:v8_snapshot_assets",
+    "//third_party/icu:icu_assets",
+  ]
+}
+
+# On every process's list, through shared_libraries below: content and the C++ adapter.
+shared_library_with_jni("libproject_b_content") {
+  sources = [ "library_loader.cc" ]
+  deps = [
+    ":browser",
+    "//base",
+    "//content/public/app",
+  ]
+  configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
+  configs += [ "//build/config/android:hide_all_but_jni" ]
+  java_targets = [ ":project_b_apk" ]
+  # We link far less Java and native code than Chrome, so each side refers to parts of the other
+  # that aren't there. Those parts are never called.
+  add_stubs_for_missing_jni = true
+  remove_uncalled_jni = true
+}
+
+# The Go core. Off every list, through loadable_modules below, so only the explicit load in
+# GoCore.java brings it into a process.
+action("go_core") {
+  script = "build_go.py"
+  outputs = [ "$root_out_dir/libcore.so" ]
+  depfile = "$target_gen_dir/core.d"
+  args = [
+    project_b_go,
+    rebase_path("$root_out_dir/libcore.so", root_build_dir),
+    rebase_path(depfile, root_build_dir),
+    rebase_path("//third_party/llvm-build/Release+Asserts/bin/clang", root_build_dir),
+    rebase_path("//third_party/android_toolchain/ndk", root_build_dir),
+    "$default_min_sdk_version",
+  ]
+}
+
+# Go's functions as a table for Java to carry across.
+shared_library("project_b_go") {
+  sources = [ "go_table.c" ]
+  deps = [ ":go_core" ]
+  libs = [ "$root_out_dir/libcore.so" ]
+  configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
+  configs += [ "//build/config/android:hide_all_but_jni" ]
+}
+
+jinja_template("manifest") {
+  input = "AndroidManifest.xml.jinja2"
+  output = manifest
+  variables = [
+    "manifest_package=dev.projectb.browser",
+    "library_name=$library_name",
+  ]
+}
+
+android_resources("resources") {
+  sources = [
+    "res/drawable/icon.xml",
+    "res/values/styles.xml",
+  ]
+}
+
+android_library("java") {
+  resources_package = "dev.projectb.browser"
+  deps = [
+    ":resources",
+    "//base:base_java",
+    "//base:process_launcher_java",
+    "//build/android:build_java",
+    "//components/embedder_support/android:content_view_java",
+    "//content/public/android:content_java",
+    "//media/capture/video/android:capture_java",
+    "//net/android:net_java",
+    "//third_party/androidx:androidx_annotation_annotation_java",
+    "//third_party/jni_zero:jni_zero_java",
+    "//ui/android:ui_java",
+  ]
+  srcjar_deps = [ ":jni_headers" ]
+  sources = [
+    "java/dev/projectb/browser/BrowserActivity.java",
+    "java/dev/projectb/browser/BrowserApplication.java",
+    "java/dev/projectb/browser/BrowserWindow.java",
+    "java/dev/projectb/browser/GoCore.java",
+  ]
+}
+
+android_apk("project_b_apk") {
+  apk_name = "ProjectB"
+  android_manifest = manifest
+  android_manifest_dep = ":manifest"
+  # Android 15 and later force edge to edge from 35 up, and the shell doesn't handle insets yet.
+  target_sdk_version = 34
+  shared_libraries = [ ":libproject_b_content" ]
+  loadable_modules = [
+    "$root_out_dir/libcore.so",
+    "$root_out_dir/libproject_b_go.so",
+  ]
+  srcjar_deps = [ ":libproject_b_content__jni_registration" ]
+  deps = [
+    ":assets",
+    ":go_core",
+    ":java",
+    ":project_b_go",
+    "//base:base_java",
+    "//content/public/android:content_java",
+    "//media/capture/video/android:capture_java",
+    "//net/android:net_java",
+    "//ui/android:ui_java",
+  ]
+}

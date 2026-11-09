@@ -19,6 +19,7 @@ import (
 
 	"projectb/app"
 	"projectb/mockengine"
+	"projectb/update"
 )
 
 //go:embed mock_page.html
@@ -30,13 +31,30 @@ func main() {
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
 	block := flag.String("block", "", "comma-separated blocked hosts")
+	// The updater runs for real against a manifest when given a version to be, the bundle
+	// it is "installed" as, and the manifest. Without a version it stays off, as it does
+	// for a binary running from a build directory. The mock has no signing key, so it
+	// checks only the version the bundle says it is.
+	version := flag.String("version", "", "the version this build is")
+	releases := flag.String("releases", "", "the release manifest URL or path")
+	appPath := flag.String("app", "", "the installed bundle to replace on relaunch")
 	flag.Parse()
 
 	e := mockengine.New()
 	var a *app.App
 	started := make(chan struct{})
 	e.Post(func() {
-		a = app.Start(e, app.Config{ProfileDir: *profile, BlockedHosts: strings.Split(*block, ",")})
+		a = app.Start(e, app.Config{
+			ProfileDir:   *profile,
+			BlockedHosts: strings.Split(*block, ","),
+			Update: update.Config{
+				Project:  "project-b",
+				Version:  *version,
+				Releases: *releases,
+				StateDir: filepath.Join(*profile, "updates"),
+				App:      *appPath,
+			},
+		})
 		e.SetListener(a)
 		close(started)
 	})

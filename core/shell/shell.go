@@ -10,6 +10,7 @@ import (
 	"projectb/prefs"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/update"
 	"projectb/window"
 )
 
@@ -31,11 +32,12 @@ type Manager struct {
 	suggest *suggest.Manager
 	window  *window.Manager
 	prefs   *prefs.Manager
+	update  *update.Manager
 }
 
 // New returns a manager.
-func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p}
+func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager) *Manager {
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u}
 }
 
 // Handle takes one command from the shell.
@@ -55,6 +57,7 @@ func (m *Manager) Handle(msg []byte) {
 			"controls":     m.window.Controls(),
 			"cornerRadius": m.window.CornerRadius(),
 			"tabLayout":    m.prefs.TabLayout(),
+			"update":       m.update.State(),
 		})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
@@ -72,6 +75,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.tabs.Activate(engine.TabID(c.ID))
 	case "setTabLayout":
 		m.prefs.SetTabLayout(c.Text)
+	case "relaunch":
+		m.update.Relaunch()
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "regions":
@@ -102,6 +107,12 @@ func (m *Manager) TabsChanged() {
 // TabLayoutChanged tells the shell where the tabs go now.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+// UpdateChanged tells the shell what the updater is doing: nothing, downloading, ready to
+// relaunch, or failed.
+func (m *Manager) UpdateChanged(s update.State) {
+	m.send(map[string]any{"t": "update", "update": s})
 }
 
 // WindowControlsChanged tells the shell where the native window controls now are and

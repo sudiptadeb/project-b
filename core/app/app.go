@@ -10,6 +10,7 @@ import (
 	"projectb/shell"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/update"
 	"projectb/window"
 )
 
@@ -17,6 +18,7 @@ import (
 type Config struct {
 	ProfileDir   string
 	BlockedHosts []string
+	Update       update.Config
 }
 
 // App holds the managers and is the engine's listener: each function only forwards.
@@ -27,6 +29,7 @@ type App struct {
 	Policy  *policy.Manager
 	Window  *window.Manager
 	Prefs   *prefs.Manager
+	Update  *update.Manager
 	Shell   *shell.Manager
 }
 
@@ -40,7 +43,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs = tabs.New(e)
 	a.Window = window.New()
 	a.Prefs = prefs.New(cfg.ProfileDir)
-	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs)
+	a.Update = update.New(cfg.Update, e.Post, e.CloseWindow)
+	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
@@ -50,14 +54,19 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnEmpty(e.CloseWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
+	a.Update.OnChanged(a.Shell.UpdateChanged)
 
 	a.History.Load(nil)
 	a.Tabs.Create()
+	a.Update.Start()
 	return a
 }
 
 // Stop flushes what's pending. Call it on the way out.
-func (a *App) Stop() { a.History.Close() }
+func (a *App) Stop() {
+	a.Update.Stop()
+	a.History.Close()
+}
 
 func (a *App) ShellMessage(msg []byte) { a.Shell.Handle(msg) }
 

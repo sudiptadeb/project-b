@@ -31,6 +31,8 @@ import "C"
 import (
 	"encoding/json"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -40,7 +42,46 @@ import (
 	"projectb/app"
 	"projectb/content"
 	"projectb/engine"
+	"projectb/update"
 )
+
+// Where releases are published and how to recognise one of ours. The project and the URL
+// are the ones in amarit.json at the repo root, which tools/release.sh publishes with; the
+// key is the certificate tools/package.sh signs with (its SHA-1, as in the trust profile).
+const (
+	releaseProject  = "project-b"
+	releaseManifest = "https://github.com/sudiptadeb/project-b/releases/latest/download/releases.json"
+	signingLeafSHA1 = "59b20dfe02ee393a05173eec84daa8c662c845be"
+)
+
+// updateConfig describes this build to the updater. A binary running from a build directory
+// rather than an installed bundle has no version, and never updates.
+func updateConfig(profileDir string) update.Config {
+	exe, err := os.Executable()
+	if err != nil {
+		return update.Config{}
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	bundle := update.BundleOf(exe)
+	if bundle == "" {
+		return update.Config{}
+	}
+	version, err := update.Version(bundle)
+	if err != nil {
+		log.Printf("update: %v; updates are off", err)
+		return update.Config{}
+	}
+	return update.Config{
+		Project:  releaseProject,
+		Version:  version,
+		Releases: releaseManifest,
+		StateDir: filepath.Join(profileDir, "updates"),
+		App:      bundle,
+		Verify:   update.SignedBy(signingLeafSHA1),
+	}
+}
 
 // nativeEngine is the real engine: every method calls the C++ adapter.
 type nativeEngine struct {
@@ -138,7 +179,8 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 	if s := C.GoString(blockedHosts); s != "" {
 		blocked = strings.Split(s, ",")
 	}
-	theApp = app.Start(native, app.Config{ProfileDir: C.GoString(profileDir), BlockedHosts: blocked})
+	profile := C.GoString(profileDir)
+	theApp = app.Start(native, app.Config{ProfileDir: profile, BlockedHosts: blocked, Update: updateConfig(profile)})
 	content.Wire(hooks, theApp)
 }
 

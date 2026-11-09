@@ -63,7 +63,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   let r = await regions();
   check('opens empty with only the bar as shell', r.regions.length === 1 && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('page sits below the bar', r.bounds.y === r.regions[0].h && r.bounds.h === 700 - r.regions[0].h, JSON.stringify(r));
+  check('page sits below the bar, inside the frame', r.bounds.y === r.regions[0].h && r.bounds.x === 10 && r.bounds.w === 1100 - 20 && r.bounds.y + r.bounds.h === 700 - 10, JSON.stringify(r));
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
   // before the commit would correctly replace this one.

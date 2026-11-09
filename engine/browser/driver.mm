@@ -270,11 +270,14 @@ void Run(const std::string& line) {
                    .GetNativeNSView()
                    .frame;
     NSSize c = TheWindow().contentView.bounds.size;
+    NSRect zoom = [TheWindow() standardWindowButton:NSWindowZoomButton].frame;
     Reply(id, base::StringPrintf(
                   "{\"reported\":[%g,%g,%g,%g],\"frame\":[%g,%g,%g,%g],"
-                  "\"content\":[%g,%g]}",
+                  "\"content\":[%g,%g],\"titlebar\":%g,\"buttonsEnd\":%g}",
                   b.x(), b.y(), b.width(), b.height(), f.origin.x, f.origin.y,
-                  f.size.width, f.size.height, c.width, c.height));
+                  f.size.width, f.size.height, c.width, c.height,
+                  c.height - TheWindow().contentLayoutRect.size.height,
+                  NSMaxX(zoom)));
   } else if (cmd == "shellhidden") {
     Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView().hidden =
         parts[2] == "1";

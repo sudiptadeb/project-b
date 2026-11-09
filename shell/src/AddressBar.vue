@@ -138,12 +138,13 @@ watch(
 </script>
 
 <template>
-  <form v-shell class="bar" @submit.prevent="go()">
+  <form class="bar" @submit.prevent="go()">
     <div class="field" :class="{ open }">
       <input
         ref="input"
         v-model="text"
         aria-label="Address"
+        placeholder="Search DuckDuckGo or type a URL"
         role="combobox"
         :aria-expanded="open"
         aria-controls="suggestions"
@@ -184,10 +185,12 @@ watch(
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
+  gap: 12px;
+  height: 59px;
+  margin: 0 10px;
+  padding: 0 12px;
+  background: var(--bar);
+  border-radius: 16.8px 16.8px 0 0;
 }
 
 .field {
@@ -196,14 +199,13 @@ watch(
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 36px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
+  height: 35px;
+  border-radius: 6px;
+  background: var(--surface);
 }
 
 .field:focus-within {
-  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 input {
@@ -212,11 +214,18 @@ input {
   height: 100%;
   padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   outline: none;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+input::placeholder {
+  color: inherit;
+  opacity: 1;
 }
 
 .status {
@@ -229,30 +238,35 @@ input {
 
 button {
   flex: none;
-  height: 38px;
+  height: 35px;
+  min-width: 64px;
   padding: 0 16px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--accent);
   color: #ffffff;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.92);
 }
 
 .list {
   position: absolute;
-  top: calc(100% + 4px);
-  left: -1px;
-  right: -1px;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
   z-index: 10;
   margin: 0;
-  padding: 4px;
+  padding: 6px;
   list-style: none;
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 
 li {
@@ -264,7 +278,7 @@ li {
 }
 
 li.active {
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 
 .title,
@@ -272,6 +286,11 @@ li.active {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .url {
@@ -282,7 +301,7 @@ li.active {
 .progress {
   position: absolute;
   left: 0;
-  bottom: -1px;
+  bottom: 0;
   height: 2px;
   width: 0;
   background: var(--accent);

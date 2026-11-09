@@ -25,6 +25,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
+BAR_Y = 71  # The middle of the address bar, below the tab strip.
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -120,7 +121,7 @@ def box(app):
 
 def focus_bar(app):
     """Clicks the bar and waits until it really has focus and everything is selected."""
-    app.cmd("click", 400, 26)
+    app.cmd("click", 400, BAR_Y)
     app.wait(f"document.hasFocus()&&document.activeElement==={INPUT}&&{INPUT}.selectionStart===0&&{INPUT}.selectionEnd==={VALUE}.length")
 
 
@@ -186,8 +187,12 @@ def main():
     app.wait("document.querySelector('form').getBoundingClientRect().height>0")
     time.sleep(0.3)
     print("bounds", app.cmd("bounds"), flush=True)
-    check("bar belongs to the shell", app.cmd("hit", 400, 26) == "shell")
+    check("bar belongs to the shell", app.cmd("hit", 400, BAR_Y) == "shell")
     check("below the bar belongs to the page", app.cmd("hit", 400, 300) == "page")
+    window = json.loads(app.cmd("bounds"))
+    print("title bar", window["titlebar"], "window buttons end at", window["buttonsEnd"], flush=True)
+    check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 42, window)
+    check("the window buttons end before the tab", window["buttonsEnd"] < 92, window)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -314,7 +319,8 @@ def main():
     final_frame = json.loads(app.cmd("bounds"))
     time.sleep(0.3)
     settled = json.loads(app.cmd("bounds"))
-    check("a burst of resizes ends in the right place", settled["frame"] == [0, 0, settled["content"][0], settled["content"][1] - settled["reported"][1]], settled)
+    r = settled["reported"]
+    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 10 and r[2] == settled["content"][0] - 20, settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
     app.cmd("resize", 1100, 700)
     time.sleep(0.3)

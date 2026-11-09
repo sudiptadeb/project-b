@@ -1,43 +1,46 @@
 <script setup>
 import AddressBar from './AddressBar.vue';
 import PageView from './PageView.vue';
+import TabStrip from './TabStrip.vue';
 </script>
 
 <template>
   <div class="app">
-    <AddressBar />
+    <header v-shell class="top">
+      <TabStrip />
+      <AddressBar />
+    </header>
     <PageView />
   </div>
 </template>
 
 <style>
+/* Colours from the Ulaa Browser design, Personal mode. */
 :root {
-  --bg: #ffffff;
-  --bg-hover: #eff6ff;
-  --text: #1e293b;
-  --muted: #64748b;
-  --line: #e2e8f0;
-  --accent: #2563eb;
-  --danger: #dc2626;
-  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --frame: #0faaaa;
+  --bar: #e2f2f2;
+  --accent: #0faaaa;
+  --hover: #e2f2f2;
+  --surface: #ffffff;
+  --text: #1f1f1f;
+  --muted: #5c6270;
+  --line: #e2e2e2;
+  --danger: #ea3323;
+  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e293b;
-    --bg-hover: #334155;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --line: #334155;
-    --accent: #60a5fa;
-    --danger: #f87171;
-  }
+  -webkit-font-smoothing: antialiased;
 }
 
 .app {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
+}
+
+.top {
+  position: relative;
+  z-index: 1;
+  flex: none;
 }
 </style>

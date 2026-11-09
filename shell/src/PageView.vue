@@ -14,9 +14,13 @@ onMounted(() => setPageElement(el.value));
 </template>
 
 <style scoped>
+/* The shadow paints the frame everywhere except this box, which stays a hole in the shell
+   that the page shows through. */
 .page-view {
   flex: 1;
   min-height: 0;
+  margin: 0 10px 10px;
+  box-shadow: 0 0 0 100vmax var(--frame);
 }
 
 iframe {

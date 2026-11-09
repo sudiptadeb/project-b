@@ -198,30 +198,31 @@ watch(
 </template>
 
 <style scoped>
+/* The same height as the icon buttons beside it, so one line of controls runs through
+   the row with 4px of bar above and below. The Ulaa design's omnibox has no border: the
+   white fill on the tinted bar is the edge. The focus ring stays inside the bar. */
 .field {
   position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 28px;
+  height: 24px;
   margin: 0;
-  border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
   box-sizing: border-box;
 }
 
 .field:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
 
 input {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 0;
   border-radius: 6px;
   outline: none;

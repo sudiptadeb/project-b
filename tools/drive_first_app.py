@@ -404,14 +404,14 @@ def main():
     # follows it, one frame width inside. Real full screen, which needs a display, has
     # square corners and no controls; the radius comes back with the window.
     radius = lambda: float(app.js("getComputedStyle(document.documentElement).getPropertyValue('--window-radius')").replace("px", ""))
-    inner = lambda: float(app.js("getComputedStyle(document.querySelector('.rounding')).borderTopLeftRadius").replace("px", ""))
+    native = lambda: json.loads(app.cmd("frame"))  # The border the window itself draws.
     windowed = radius()
-    print("window corner radius", windowed, "inner", inner(), flush=True)
-    check("the frame takes the window's corner radius from the engine", windowed > 0 and inner() == windowed, (windowed, inner()))
+    print("window corner radius", windowed, "native frame", native(), flush=True)
+    check("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": "#0faaaa"}, (windowed, native()))
     app.cmd("fullscreen")
     try:
         app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
-        check("real full screen reports square corners and no controls", inner() == 0 and app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == 12, (inner(), radius()))
+        check("real full screen reports square corners and no controls", native()["radius"] == 0 and app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == 12, (native(), radius()))
         time.sleep(1)  # A toggle sent while macOS is still in its transition is dropped.
         app.cmd("fullscreen")
         app.wait(f"getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='{windowed:g}px'", 20)

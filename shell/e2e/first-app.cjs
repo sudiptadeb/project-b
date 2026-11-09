@@ -206,12 +206,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // The engine also says how round the window's corners are; the frame's inner edge
   // follows, one frame width inside.
   const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
-  const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('.rounding')).borderTopLeftRadius);
-  check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '26px' && (await innerRadius()) === '26px', `${await windowRadius()} ${await innerRadius()}`);
+  check('the shell hears the window\'s corner radius from the engine', (await windowRadius()) === '26px', await windowRadius());
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
-  check('in full screen the corners are square', (await windowRadius()) === '0px' && (await innerRadius()) === '0px', `${await windowRadius()} ${await innerRadius()}`);
+  check('in full screen the corners are square', (await windowRadius()) === '0px', await windowRadius());
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);

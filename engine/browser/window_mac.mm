@@ -229,6 +229,8 @@ struct Window::Impl {
     }
     last_controls = controls;
     last_radius = radius;
+    // The frame band the container draws follows the window's curve.
+    container.layer.cornerRadius = radius;
     on_controls.Run(controls, radius);
   }
 };
@@ -341,7 +343,11 @@ void Window::SetFrame(uint32_t rgb, double width) {
                                         blue:(rgb & 0xff) / 255.0
                                        alpha:1];
   impl_->window.backgroundColor = color;
+  // A layer's border is drawn above its sublayers, so this band sits over the page and
+  // the shell alike; its corners take the window's radius in ReportControls.
   impl_->container.layer.backgroundColor = color.CGColor;
+  impl_->container.layer.borderColor = color.CGColor;
+  impl_->container.layer.borderWidth = width;
 }
 
 void Window::SetDragRegions(std::vector<gfx::RectF> regions) {

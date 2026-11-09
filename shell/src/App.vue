@@ -11,8 +11,8 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
 
 // The frame's colour and width and the window's corner radius come from the managers
 // and become CSS variables on the root: the shell paints its bands in the colour and
-// width the window paints natively, so there is one source for both, and whatever
-// meets the window's curve derives its radius from the reported one.
+// width the window paints natively, so there is one source for both. The curve over the
+// corners is the window's own border, drawn by the engine.
 watchEffect(() => {
   document.documentElement.style.setProperty('--frame', state.windowColor);
   document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
@@ -34,9 +34,6 @@ watchEffect(() => {
       <div v-drag class="edge right"></div>
     </div>
     <div v-drag class="edge bottom"></div>
-    <!-- macOS rounds the window, and the page underneath is square: this border, with the
-         window's own radius, is the frame's curve over the corners. Nothing else. -->
-    <div class="rounding" aria-hidden="true"></div>
   </div>
 </template>
 
@@ -90,17 +87,6 @@ watchEffect(() => {
 
 .edge.bottom {
   height: var(--frame-width);
-}
-
-.rounding {
-  position: absolute;
-  inset: 0;
-  /* Above every component, so a square surface in a corner sits under the curve. The
-     suggestion list never reaches the frame, so nothing of use is covered. */
-  z-index: 2;
-  border: var(--frame-width) solid var(--frame);
-  border-radius: var(--window-radius, 0px);
-  pointer-events: none;
 }
 
 

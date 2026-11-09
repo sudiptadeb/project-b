@@ -45,7 +45,8 @@ class Window {
   void SetDragRegions(std::vector<gfx::RectF> regions);
   // The frame, 0xRRGGBB and a width in points: the colour the window paints wherever
   // nothing else does, before the shell's first paint and wherever it lags a live
-  // resize, and the width of the band the shell paints with it.
+  // resize, and the band the window draws over everything around its edge, rounded
+  // with its own corner radius, so the page's square corners never show at the curve.
   void SetFrame(uint32_t rgb, double width);
 
   // Reports where the native window controls are, in shell coordinates, and the

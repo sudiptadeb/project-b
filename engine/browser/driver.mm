@@ -341,6 +341,16 @@ void Run(const std::string& line) {
     Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
                                  int(c.greenComponent * 255 + 0.5),
                                  int(c.blueComponent * 255 + 0.5)));
+  } else if (cmd == "frame") {
+    // The band the window's content view draws over everything, and its curve.
+    CALayer* layer = TheWindow().contentView.layer;
+    NSColor* c = [[NSColor colorWithCGColor:layer.borderColor]
+        colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+    Reply(id, base::StringPrintf("{\"radius\":%g,\"width\":%g,\"color\":\"#%02x%02x%02x\"}",
+                                 layer.cornerRadius, layer.borderWidth,
+                                 int(c.redComponent * 255 + 0.5),
+                                 int(c.greenComponent * 255 + 0.5),
+                                 int(c.blueComponent * 255 + 0.5)));
   } else if (cmd == "title") {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {

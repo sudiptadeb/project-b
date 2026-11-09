@@ -1,7 +1,10 @@
 #include "project_b/engine/browser/page_tab.h"
 
+#include <cstdlib>
 #include <string>
 
+#include "base/base64.h"
+#include "base/functional/bind.h"
 #include "base/process/kill.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/input/native_web_keyboard_event.h"
@@ -15,8 +18,10 @@
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/codec/png_codec.h"
 
 namespace project_b {
 
@@ -45,10 +50,14 @@ void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
   const std::string& url = handle->GetURL().spec();
   if (handle->HasCommitted() && !handle->IsErrorPage()) {
     Go().navigation_finished(id_, url.c_str());
-    // A page coming back from history already has its title, and may not set it again.
+    // A page coming back from history already has its title and icon, and may not
+    // announce them again.
     content::NavigationEntry* entry = controller.GetLastCommittedEntry();
     if (entry && !entry->GetTitle().empty()) {
       TitleWasSet(entry);
+    }
+    if (!contents_->GetFaviconURLs().empty()) {
+      FetchFavicon(contents_->GetFaviconURLs());
     }
     return;
   }
@@ -79,6 +88,74 @@ void PageTab::TitleWasSet(content::NavigationEntry* entry) {
 void PageTab::PrimaryMainFrameRenderProcessGone(
     base::TerminationStatus status) {
   Go().page_crashed(id_);
+}
+
+void PageTab::DidUpdateFaviconURL(
+    content::RenderFrameHost* render_frame_host,
+    const std::vector<blink::mojom::FaviconURLPtr>& candidates,
+    blink::mojom::FaviconUpdateReason reason) {
+  FetchFavicon(candidates);
+}
+
+// The page's plain favicon, preferring one declared at a small size. Touch icons are
+// for home screens and much bigger than a tab row wants.
+void PageTab::FetchFavicon(
+    const std::vector<blink::mojom::FaviconURLPtr>& candidates) {
+  const blink::mojom::FaviconURL* best = nullptr;
+  for (const auto& candidate : candidates) {
+    if (candidate->icon_type != blink::mojom::FaviconIconType::kFavicon ||
+        !candidate->icon_url.is_valid()) {
+      continue;
+    }
+    bool small = false;
+    for (const gfx::Size& size : candidate->icon_sizes) {
+      small = small || size.width() <= 32;
+    }
+    if (!best || small) {
+      best = candidate.get();
+    }
+  }
+  const int request = ++favicon_request_;
+  if (!best) {
+    Go().favicon_changed(id_, "");
+    return;
+  }
+  contents_->DownloadImage(
+      best->icon_url, /*is_favicon=*/true, gfx::Size(32, 32),
+      /*max_bitmap_size=*/128, /*bypass_cache=*/false,
+      base::BindOnce(&PageTab::OnFaviconDownloaded, weak_factory_.GetWeakPtr(),
+                     request));
+}
+
+void PageTab::OnFaviconDownloaded(int request,
+                                  int id,
+                                  int http_status_code,
+                                  const GURL& image_url,
+                                  const std::vector<SkBitmap>& bitmaps,
+                                  const std::vector<gfx::Size>& sizes) {
+  if (request != favicon_request_) {
+    return;
+  }
+  // The one nearest 32px, which the row shows at 16px on a 2x screen.
+  const SkBitmap* best = nullptr;
+  for (const SkBitmap& bitmap : bitmaps) {
+    if (bitmap.empty()) {
+      continue;
+    }
+    if (!best || std::abs(bitmap.width() - 32) < std::abs(best->width() - 32)) {
+      best = &bitmap;
+    }
+  }
+  std::optional<std::vector<uint8_t>> png;
+  if (best) {
+    png = gfx::PNGCodec::EncodeBGRASkBitmap(*best, /*discard_transparency=*/false);
+  }
+  if (!png) {
+    Go().favicon_changed(id_, "");
+    return;
+  }
+  const std::string data_url = "data:image/png;base64," + base::Base64Encode(*png);
+  Go().favicon_changed(id_, data_url.c_str());
 }
 
 content::WebContents* PageTab::OpenURLFromTab(

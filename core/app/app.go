@@ -81,6 +81,10 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 
 func (a *App) PageCrashed(tab engine.TabID) { a.Tabs.HandlePageCrashed(tab) }
 
+func (a *App) FaviconChanged(tab engine.TabID, dataURL string) {
+	a.Tabs.HandleFaviconChanged(tab, dataURL)
+}
+
 func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
 }

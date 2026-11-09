@@ -238,6 +238,8 @@ func (e *Engine) Fire(kind, value string) {
 				e.listener.PageCrashed(e.shown)
 				e.publishPage(e.shown, t.state, t.current)
 			}
+		case "favicon":
+			e.listener.FaviconChanged(e.shown, value)
 		case "open":
 			// What a page's target=_blank or window.open does: the engine makes the
 			// tab, tells the app, then loads it.

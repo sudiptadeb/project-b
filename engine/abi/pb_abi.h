@@ -73,6 +73,8 @@ typedef struct PBGoCalls {
   void (*title_changed)(int64_t tab, const char* title);
   void (*loading_changed)(int64_t tab, int loading);
   void (*page_crashed)(int64_t tab);
+  // The page's icon as a data: URL, or "" for none.
+  void (*favicon_changed)(int64_t tab, const char* data_url);
   // A page opened a tab. The adapter already made it, hidden.
   void (*tab_opened)(int64_t opener, int64_t tab, const char* url, int foreground);
   void (*shortcut)(int shortcut);

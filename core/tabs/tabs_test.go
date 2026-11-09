@@ -101,6 +101,20 @@ func TestATabAPageOpensIsShownOnlyInTheForeground(t *testing.T) {
 	}
 }
 
+func TestFaviconFollowsThePage(t *testing.T) {
+	m := New(&fakeEngine{})
+	id := m.Create()
+	m.HandleNavigationStarting(id, "https://a.test/")
+	m.HandleFaviconChanged(id, "data:image/png;base64,AAAA")
+	if m.Active().Favicon == "" {
+		t.Fatal("favicon not recorded")
+	}
+	m.HandleNavigationStarting(id, "https://b.test/")
+	if m.Active().Favicon != "" {
+		t.Fatal("a new page keeps the old page's favicon")
+	}
+}
+
 func TestNormalizeInput(t *testing.T) {
 	for in, want := range map[string]string{
 		"":                      "",

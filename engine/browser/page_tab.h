@@ -3,9 +3,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
+#include "base/memory/weak_ptr.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/gfx/geometry/size.h"
 
 namespace project_b {
 
@@ -29,6 +33,20 @@ class PageTab : public content::WebContentsObserver,
   void TitleWasSet(content::NavigationEntry* entry) override;
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
+  void DidUpdateFaviconURL(
+      content::RenderFrameHost* render_frame_host,
+      const std::vector<blink::mojom::FaviconURLPtr>& candidates,
+      blink::mojom::FaviconUpdateReason reason) override;
+
+  // Fetches the best of the page's icon candidates and hands it to Go as a PNG data
+  // URL, or "" when there is none to show.
+  void FetchFavicon(const std::vector<blink::mojom::FaviconURLPtr>& candidates);
+  void OnFaviconDownloaded(int request,
+                           int id,
+                           int http_status_code,
+                           const GURL& image_url,
+                           const std::vector<SkBitmap>& bitmaps,
+                           const std::vector<gfx::Size>& sizes);
 
   // content::WebContentsDelegate:
   content::WebContents* OpenURLFromTab(
@@ -52,6 +70,9 @@ class PageTab : public content::WebContentsObserver,
 
   const int64_t id_;
   std::unique_ptr<content::WebContents> contents_;
+  // Counts favicon fetches, so a slow one for an earlier page is dropped.
+  int favicon_request_ = 0;
+  base::WeakPtrFactory<PageTab> weak_factory_{this};
 };
 
 }  // namespace project_b

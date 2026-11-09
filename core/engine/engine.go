@@ -96,6 +96,9 @@ type Listener interface {
 	TitleChanged(tab TabID, title string)
 	LoadingChanged(tab TabID, loading bool)
 	PageCrashed(tab TabID)
+	// FaviconChanged carries the page's icon as a data: URL, or "" when the page has
+	// none the engine could fetch.
+	FaviconChanged(tab TabID, dataURL string)
 
 	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
 	// has already created it, hidden; the app decides whether to show it.

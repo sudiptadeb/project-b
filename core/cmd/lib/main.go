@@ -188,6 +188,11 @@ func PBLoadingChanged(tab C.int64_t, loading C.int) {
 //export PBPageCrashed
 func PBPageCrashed(tab C.int64_t) { theApp.PageCrashed(engine.TabID(tab)) }
 
+//export PBFaviconChanged
+func PBFaviconChanged(tab C.int64_t, dataURL *C.char) {
+	theApp.FaviconChanged(engine.TabID(tab), C.GoString(dataURL))
+}
+
 //export PBTabOpened
 func PBTabOpened(opener, tab C.int64_t, url *C.char, foreground C.int) {
 	theApp.TabOpened(engine.TabID(opener), engine.TabID(tab), C.GoString(url), foreground != 0)

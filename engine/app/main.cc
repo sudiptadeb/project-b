@@ -17,6 +17,7 @@ int main(int argc, const char** argv) {
       .title_changed = PBTitleChanged,
       .loading_changed = PBLoadingChanged,
       .page_crashed = PBPageCrashed,
+      .favicon_changed = PBFaviconChanged,
       .tab_opened = PBTabOpened,
       .shortcut = PBShortcutPressed,
       .window_controls_changed = PBWindowControlsChanged,

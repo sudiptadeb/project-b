@@ -19,6 +19,8 @@ type Tab struct {
 	Blocked bool         `json:"blocked"`
 	Crashed bool         `json:"crashed"`
 	Error   string       `json:"error,omitempty"`
+	// Favicon is a data: URL, or "" when the page has none.
+	Favicon string `json:"favicon,omitempty"`
 
 	CanGoBack    bool `json:"canGoBack"`
 	CanGoForward bool `json:"canGoForward"`
@@ -221,7 +223,7 @@ func (m *Manager) HandleNavigationStarting(id engine.TabID, u string) bool {
 			return false
 		}
 	}
-	t.Blocked, t.Title = false, ""
+	t.Blocked, t.Title, t.Favicon = false, "", ""
 	m.changed(t)
 	return true
 }
@@ -271,6 +273,16 @@ func (m *Manager) HandleTitleChanged(id engine.TabID, title string) {
 	for _, f := range m.onTitle {
 		f(*t)
 	}
+	m.changed(t)
+}
+
+// HandleFaviconChanged records the page's icon.
+func (m *Manager) HandleFaviconChanged(id engine.TabID, dataURL string) {
+	t := m.tabs[id]
+	if t == nil || t.Favicon == dataURL {
+		return
+	}
+	t.Favicon = dataURL
 	m.changed(t)
 }
 

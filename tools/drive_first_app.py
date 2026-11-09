@@ -404,6 +404,12 @@ def main():
     app.wait(f"{ACTIVE_ROW_TITLE}.includes('Example Domains')", 10)
     titles = app.js(ROW_TITLES)
     check("each tab keeps its own title", titles[0] == "Example Domain" and titles[1] == "Example Domains", titles)
+    try:
+        app.wait("document.querySelector('[role=tab]:nth-child(2) img')&&document.querySelector('[role=tab]:nth-child(2) img').naturalWidth>0", 15)
+        check("a real favicon from the page shows on its row", True)
+    except TimeoutError as e:
+        check("a real favicon from the page shows on its row", False, e)
+    check("a page without a favicon shows none", app.js("document.querySelector('[role=tab]:nth-child(1) img')===null"))
     app.js("(()=>{window.__vis=[];document.addEventListener('visibilitychange',()=>window.__vis.push(document.visibilityState));return 1})()", page=True)
     click(app, "[role=tab]")
     app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)

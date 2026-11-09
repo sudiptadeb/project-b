@@ -220,6 +220,15 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await mock.getByText('tab 1', { exact: true }).waitFor();
   check('the page view shows the active tab', true);
 
+  // Favicons come from the page; a tab without one shows none.
+  check('a tab with no favicon shows no icon', (await page.locator('[role=tab] img').count()) === 0);
+  await mock.getByRole('button', { name: 'Favicon' }).click();
+  await page.locator('[role=tab][aria-selected=true] img').waitFor();
+  check('the favicon the page gives shows on its row only', (await page.locator('[role=tab] img').count()) === 1);
+  await visit('https://example.org/', 'https://example.org/');
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab] img').length === 0);
+  check('a new page drops the old favicon', true);
+
   // The page opens a tab.
   await mock.getByRole('button', { name: 'Open in new tab' }).click();
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);

@@ -77,10 +77,13 @@ func (m *Manager) OnListChanged(f func()) { m.onList = append(m.onList, f) }
 func (m *Manager) OnEmpty(f func()) { m.onEmpty = append(m.onEmpty, f) }
 
 // Create opens a new tab at the end, on the blank page, and makes it active.
-func (m *Manager) Create() engine.TabID {
+func (m *Manager) Create() engine.TabID { return m.Open(BlankURL) }
+
+// Open opens a new tab at the end, loading u, and makes it active.
+func (m *Manager) Open(u string) engine.TabID {
 	id := m.eng.CreateTab()
 	m.add(id)
-	m.eng.LoadURL(id, BlankURL)
+	m.eng.LoadURL(id, u)
 	m.Activate(id)
 	return id
 }

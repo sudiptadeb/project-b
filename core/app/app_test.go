@@ -376,3 +376,25 @@ func TestTheSettingsPageReadsAndSetsPrefs(t *testing.T) {
 		t.Fatalf("prefs.json = %s", b)
 	}
 }
+
+// The shell's settings button opens the settings page in a new, active tab.
+func TestOpenSettingsOpensItInANewActiveTab(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"openSettings"}`)
+	r.waitForTab(func(tab map[string]any) bool {
+		return tab["id"] == float64(2) && tab["url"] == "chrome://settings/" && tab["loading"] == false
+	})
+	r.shell(`{"t":"ready"}`)
+	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if len(snap["tabs"].([]any)) != 2 || snap["active"] != float64(2) {
+		t.Fatalf("snapshot = %v", snap)
+	}
+	// A settings page can't ask for it.
+	r.fromTab(2, `{"t":"openSettings"}`)
+	r.shell(`{"t":"ready"}`)
+	snap = r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if len(snap["tabs"].([]any)) != 2 {
+		t.Fatalf("snapshot = %v", snap)
+	}
+}

@@ -154,7 +154,6 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   await stopServer();
   await startServer();
   const atStart = manifests;
-  errors.length = 0; // Stopping the server breaks the event streams, as it should.
   await shell.goto(base + '/');
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
   await bar.fill('chrome://settings/');
@@ -162,6 +161,7 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   await mockShows('chrome://settings/');
   await settings.goto(base + '/tab/1/');
   await until(async () => (await settings.locator('.version').textContent()) === '0.2.0');
+  errors.length = 0; // Stopping the server broke the old pages' event streams, as it should.
   check('after a restart the switch is still off', !(await settings.getByRole('switch', { name: 'Automatic updates' }).isChecked()));
   await sleep(3500);
   check('and the update manager made no check of its own', manifests === atStart, `${atStart} -> ${manifests}`);
@@ -170,6 +170,24 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   await settings.getByRole('switch', { name: 'Automatic updates' }).check();
   check('turning it on again saves it', await until(() => prefsFile().autoUpdate === true));
   check('and the timer checks again, as at launch', await until(() => manifests === atStart + 2, 4000), `${atStart} -> ${manifests}`);
+
+  // The toolbar's settings button opens the page in a new, active tab, in both layouts.
+  const openFromToolbar = async (n) => {
+    await shell.getByRole('button', { name: 'Settings', exact: true }).click();
+    await shell.waitForFunction((n) => document.querySelectorAll('[role=tab]').length === n, n);
+    const active = await shell.locator('[role=tab]').nth(n - 1).getAttribute('aria-selected');
+    return active === 'true' && (await mockShows('chrome://settings/')) && (await bar.inputValue()) === 'chrome://settings/';
+  };
+  check('the toolbar\'s settings button opens settings in a new, active tab', await openFromToolbar(2));
+  await shell.screenshot({ path: path.join(out, 'settings-button-vertical.png'), clip: { x: 0, y: 0, width: 1100, height: 60 } });
+  await shell.getByRole('button', { name: 'Tabs on top' }).click();
+  await shell.locator('.strip').waitFor();
+  check('and with the tabs on top', await openFromToolbar(3));
+  await shell.screenshot({ path: path.join(out, 'settings-button-horizontal.png'), clip: { x: 0, y: 0, width: 1100, height: 100 } });
+  const right = await shell.evaluate(() => [document.querySelector('[aria-label=Settings]').getBoundingClientRect().right, window.innerWidth]);
+  check('it sits at the right end of the bar, inside the frame and the end gap', right[0] === right[1] - 4 - 8, JSON.stringify(right));
+  await shell.getByRole('button', { name: 'Tabs on the side' }).click();
+  await shell.locator('nav').waitFor();
 
   await settings.emulateMedia({ colorScheme: 'dark' });
   await settings.screenshot({ path: path.join(out, 'settings-dark.png') });

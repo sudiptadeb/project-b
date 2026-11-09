@@ -102,6 +102,8 @@ func (m *Manager) Handle(from engine.TabID, msg []byte) {
 		m.tabs.Reload()
 	case "newTab":
 		m.tabs.Create()
+	case "openSettings":
+		m.tabs.Open(SettingsURL)
 	case "closeTab":
 		m.tabs.Close(engine.TabID(c.ID))
 	case "activateTab":

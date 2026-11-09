@@ -226,6 +226,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // The frame colour has one owner: Go gave it to the window and to the shell.
   const frame = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
   check('the window and the shell paint the frame colour Go owns', frame === '#0faaaa' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
+  check('the window already had the frame colour when it went on screen', (await regions()).shownColor === frame, (await regions()).shownColor);
 
   // The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
   const rootStyle = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return [s.overflow, s.overscrollBehaviorY, document.scrollingElement.scrollHeight - window.innerHeight]; });

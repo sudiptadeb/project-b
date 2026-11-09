@@ -376,6 +376,9 @@ void Run(const std::string& line) {
     Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
                                  int(c.greenComponent * 255 + 0.5),
                                  int(c.blueComponent * 255 + 0.5)));
+  } else if (cmd == "showncolor") {
+    // What the window painted when it first went on screen.
+    Reply(id, base::StringPrintf("#%06x", Engine::Get()->window()->shown_rgb()));
   } else if (cmd == "frame") {
     // The band the window's content view draws over everything, and its curve.
     CALayer* layer = TheWindow().contentView.layer;

@@ -47,14 +47,12 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   RegisterShellWebUI(browser_context_.get());
   InstallMainMenu();
 
-  // The window shows first, so something is on screen before any renderer has started.
   window_ = std::make_unique<Window>(base::BindOnce(
       [](base::OnceClosure* quit) {
         content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
                                                      std::move(*quit));
       },
       &quit_));
-  window_->Show();
 
   shell_ = std::make_unique<ShellPage>(browser_context_.get());
   window_->SetShellView(shell_->contents()->GetNativeView());
@@ -65,6 +63,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
+  // Go has given the window its frame, so its first frame on screen is already the
+  // frame colour. It still shows before any renderer has drawn.
+  window_->Show();
   window_->ListenForControls(
       base::BindRepeating([](const gfx::RectF& r, double corner_radius) {
         hooks::Args args;

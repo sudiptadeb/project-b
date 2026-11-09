@@ -26,6 +26,7 @@ class Window {
   Window& operator=(const Window&) = delete;
   ~Window();
 
+  // Puts the window on screen. Call it once SetFrame has been called.
   void Show();
   void Close();
   void SetTitle(const std::u16string& title);
@@ -62,6 +63,8 @@ class Window {
   void ForceKeyForDriver();
   gfx::RectF page_bounds() const;
   size_t ignored_stale_bounds() const;
+  // The colour the window painted when Show put it on screen, 0xRRGGBB.
+  uint32_t shown_rgb() const;
 
  private:
   struct Impl;

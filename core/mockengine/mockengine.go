@@ -57,12 +57,13 @@ type Engine struct {
 	full        bool // Full screen, so there are no window controls.
 
 	// Written on the main thread, read by the dev server's goroutines.
-	mu      sync.Mutex
-	regions []engine.Rect
-	drag    []engine.Rect
-	bounds  engine.Rect
-	closed  bool
-	hidden  []engine.TabID // Tabs told they are hidden since the last ShowTab.
+	mu         sync.Mutex
+	regions    []engine.Rect
+	drag       []engine.Rect
+	bounds     engine.Rect
+	closed     bool
+	hidden     []engine.TabID // Tabs told they are hidden since the last ShowTab.
+	shownColor string
 
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
@@ -81,8 +82,12 @@ func (e *Engine) Run() {
 }
 
 // SetListener sets who hears the engine's events, and reports the window controls to
-// it, as the real engine does right after it starts.
+// it, as the real engine does right after it starts. That is also when the real engine
+// puts its window on screen, so the colour the window has now is its first frame's.
 func (e *Engine) SetListener(l engine.Listener) {
+	e.mu.Lock()
+	e.shownColor = e.windowColor
+	e.mu.Unlock()
 	e.listener = l
 	e.reportControls()
 }
@@ -186,6 +191,13 @@ func (e *Engine) WindowColor() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.windowColor
+}
+
+// ShownColor is the colour the window painted when it went on screen.
+func (e *Engine) ShownColor() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.shownColor
 }
 
 func (e *Engine) SetDragRegions(rects []engine.Rect) {

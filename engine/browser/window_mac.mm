@@ -171,6 +171,7 @@ struct Window::Impl {
   PBWindowDelegate* __strong delegate;
   gfx::RectF page_bounds;
   size_t ignored_stale_bounds = 0;
+  uint32_t shown_rgb = 0;
   base::RepeatingCallback<void(const gfx::RectF&, double)> on_controls;
   gfx::RectF last_controls;
   double last_radius = -1;
@@ -274,6 +275,11 @@ Window::~Window() {
 }
 
 void Window::Show() {
+  NSColor* color = [impl_->window.backgroundColor
+      colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+  impl_->shown_rgb = uint32_t(std::lround(color.redComponent * 255)) << 16 |
+                     uint32_t(std::lround(color.greenComponent * 255)) << 8 |
+                     uint32_t(std::lround(color.blueComponent * 255));
   [impl_->window makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
 }
@@ -394,6 +400,10 @@ gfx::RectF Window::page_bounds() const {
 
 size_t Window::ignored_stale_bounds() const {
   return impl_->ignored_stale_bounds;
+}
+
+uint32_t Window::shown_rgb() const {
+  return impl_->shown_rgb;
 }
 
 }  // namespace project_b

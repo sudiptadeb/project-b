@@ -471,6 +471,7 @@ def main():
     # The frame colour has one owner: Go gave it to the window and to the shell.
     frame = app.js("getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()")
     check("the window and the shell paint the frame colour Go owns", frame == "#0faaaa" and app.cmd("color") == frame, (frame, app.cmd("color")))
+    check("the window already had the frame colour when it went on screen", app.cmd("showncolor") == frame, app.cmd("showncolor"))
 
     # The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
     root = app.js("(()=>{const s=getComputedStyle(document.documentElement);return [s.overflow,s.overscrollBehaviorY,document.scrollingElement.scrollHeight-window.innerHeight]})()")

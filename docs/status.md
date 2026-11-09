@@ -9,6 +9,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.
 - [devtools.md](devtools.md): the DevTools endpoint, as Chrome opens it, for ChromeDriver and CDP.
+- [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
 
 ## Daily commands
 
@@ -42,14 +43,13 @@ Installed copies pick it up within a minute and offer a relaunch; see [updates.m
 
 The build Mac's agent sessions have no display, so `drive_first_app.py` calls views directly
 and its pictures are composites without the native window buttons. Dragging, zoom, real
-full screen and tearing need a person, or the macOS VM.
+full screen and tearing need a person, or the macOS VM in `tools/vm/`, which needs someone
+logged in to the Mac's desktop once after each boot.
 
 ## Branches not on main
 
 - `android`: a WebView APK and `docs/android.md`, with real content being built. Predates tabs
   and hooks, so it needs updating before merging.
-- `vm-tests`: a macOS VM with real clicks and keys, in `tools/vm/`. It can't start until
-  someone logs in to the Mac's desktop once, and its checks are uncalibrated.
 
 ## Open decisions
 

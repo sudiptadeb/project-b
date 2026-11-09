@@ -331,6 +331,13 @@ def still():
     return window() == home
 
 
+def address():
+    """The address field's text, as pixels. Which page is showing, without depending on how far
+    the page has drawn: a first visit can wait seconds on fonts for some of its languages."""
+    vnc.move(*NEUTRAL, 0.3)
+    return crop(vnc.image(), PX + AFTER_BUTTONS + 120, PY + TOP - 7, 400, 14)
+
+
 # Real clicks at title-bar height, tabs on the side.
 blank = page()
 vnc.click(PX + 500, PY + TOP)
@@ -339,6 +346,7 @@ vnc.type("example.com")
 vnc.key("return")
 time.sleep(PAGE_LOAD)
 example = page()
+example_at = address()
 shot("vertical-example")
 check("a click reaches the address bar", changed(blank, example) > 0.001 and still(), f"page changed {changed(blank, example):.3f}")
 
@@ -355,17 +363,21 @@ vnc.type("iana.org/help/example-domains")
 vnc.key("return")
 time.sleep(PAGE_LOAD)
 iana = page()
-check("a second page loads", changed(example, iana) > 0.001, f"page changed {changed(example, iana):.3f}")
+iana_at = address()
+check("a second page loads", changed(example, iana) > 0.001 and changed(example_at, iana_at) > 0.01,
+      f"page changed {changed(example, iana):.3f}, address {changed(example_at, iana_at):.3f}")
 
 vnc.click(PX + AFTER_BUTTONS + 40, PY + TOP)
 time.sleep(PAGE_LOAD)
-back = page()
+page()
+back = address()
 shot("after-back")
-check("a click reaches the back button", changed(back, example) < 0.01 and still(), f"differs from first page {changed(back, example):.3f}")
+check("a click reaches the back button", changed(back, example_at) < 0.01 and still(), f"address differs from the first page's by {changed(back, example_at):.3f}")
 vnc.click(PX + AFTER_BUTTONS + 68, PY + TOP)
 time.sleep(PAGE_LOAD)
-forward = page()
-check("a click reaches the forward button", changed(forward, iana) < 0.01 and still(), f"differs from the second page {changed(forward, iana):.3f}")
+page()
+forward = address()
+check("a click reaches the forward button", changed(forward, iana_at) < 0.01 and still(), f"address differs from the second page's by {changed(forward, iana_at):.3f}")
 
 # Suggestions: Cmd+L from the page, type, pick one with a real click over the page.
 vnc.click(*NEUTRAL)
@@ -380,7 +392,9 @@ shot("suggestions")
 check("Cmd+L and typing shows suggestions over the page", changed(before, listed) > 0.05, f"changed {changed(before, listed):.3f}")
 vnc.click(PX + 500, PY + TOP + 38)
 time.sleep(PAGE_LOAD)
-check("a click picks a suggestion", changed(page(), example) < 0.01, f"differs from example.com {changed(page(), example):.3f}")
+page()
+picked = address()
+check("a click picks a suggestion", changed(picked, example_at) < 0.01, f"address differs from example.com's by {changed(picked, example_at):.3f}")
 
 # Tabs by key, compared by what the sidebar shows.
 SIDE = (8, 36, 180, 300)
@@ -409,7 +423,8 @@ two = side()
 shot("two-tabs")
 vnc.click(PX + 100, PY + 78)
 time.sleep(1)
-check("a click reaches a tab in the sidebar", changed(page(), example) < 0.01)
+shown = address()
+check("a click reaches a tab in the sidebar", changed(shown, example_at) < 0.01, f"address differs from example.com's by {changed(shown, example_at):.3f}")
 vnc.click(PX + 100, PY + 110)
 time.sleep(1)
 vnc.key("cmd+t")

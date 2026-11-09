@@ -240,6 +240,10 @@ def main():
     check("window title follows the tab", "Example" in app.cmd("title"), app.cmd("title"))
     visit(app, URL_B)
     app.wait(f"{VALUE}.includes('iana.org')", 30)
+    # A hook added in Go only: content's load progress reaches the shell's bar.
+    progress = json.loads(app.cmd("stats", timeout=60))["go"]["hooks"].get("WebContentsObserver.LoadProgressChanged", 0)
+    check("the load progress hook, carried by Go alone, fired in the real app", progress > 0, progress)
+    check("the progress bar shows the page's real load progress", app.js("document.querySelector('.progress').style.width") == "100%", app.js("document.querySelector('.progress').style.width"))
     print(app.cmd("capture", os.path.join(OUT, "2-page.png")), flush=True)
 
     # Back, forward and reload, through the real buttons.

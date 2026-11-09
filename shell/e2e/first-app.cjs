@@ -87,6 +87,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await visit('https://go.dev/learn', 'https://go.dev/learn');
   await visit('https://example.org/', 'https://example.org/');
   check('address bar shows the final URL', (await bar.inputValue()) === 'https://example.org/');
+  check('the progress bar shows the page\'s real load progress', (await page.$eval('.progress', (el) => el.style.width)) === '100%');
 
   // Back, forward and reload.
   check('back is on and forward is off after new pages', (await back.isEnabled()) && (await forward.isDisabled()) && (await reload.isEnabled()));

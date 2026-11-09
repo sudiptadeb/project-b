@@ -83,6 +83,10 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 	a.Tabs.HandleLoadingChanged(tab, loading)
 }
 
+func (a *App) LoadProgressChanged(tab engine.TabID, progress float64) {
+	a.Tabs.HandleLoadProgressChanged(tab, progress)
+}
+
 func (a *App) PageCrashed(tab engine.TabID) { a.Tabs.HandlePageCrashed(tab) }
 
 func (a *App) FaviconChanged(tab engine.TabID, dataURL string) {

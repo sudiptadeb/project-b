@@ -95,6 +95,8 @@ type Listener interface {
 	HistoryChanged(tab TabID, canGoBack, canGoForward bool)
 	TitleChanged(tab TabID, title string)
 	LoadingChanged(tab TabID, loading bool)
+	// LoadProgressChanged says how far the page's load has got, 0 to 1.
+	LoadProgressChanged(tab TabID, progress float64)
 	PageCrashed(tab TabID)
 	// FaviconChanged carries the page's icon as a data: URL, or "" when the page has
 	// none the engine could fetch.

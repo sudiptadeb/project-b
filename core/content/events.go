@@ -5,19 +5,19 @@ import "projectb/engine"
 // The adapter's own events: things our C++ does that content has no hook for. The
 // numbers and value layouts match PBEvent in engine/abi/pb_abi.h.
 const (
-	eventShellMessage         Hook = 1
-	eventTabOpened            Hook = 2
-	eventFaviconChanged       Hook = 3
+	eventShellMessage          Hook = 1
+	eventTabOpened             Hook = 2
+	eventFaviconChanged        Hook = 3
 	eventWindowControlsChanged Hook = 4
-	eventPing                 Hook = 5
+	eventPing                  Hook = 5
 )
 
 var eventNames = map[Hook]string{
-	eventShellMessage:         "engine.ShellMessage",
-	eventTabOpened:            "engine.TabOpened",
-	eventFaviconChanged:       "engine.FaviconChanged",
+	eventShellMessage:          "engine.ShellMessage",
+	eventTabOpened:             "engine.TabOpened",
+	eventFaviconChanged:        "engine.FaviconChanged",
 	eventWindowControlsChanged: "engine.WindowControlsChanged",
-	eventPing:                 "engine.Ping",
+	eventPing:                  "engine.Ping",
 }
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.

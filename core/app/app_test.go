@@ -108,6 +108,14 @@ func TestVisitBecomesSuggestion(t *testing.T) {
 	}
 }
 
+func TestLoadProgressIsReportedOnTheTab(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"navigate","text":"https://example.com/"}`)
+	r.waitForTab(func(tab map[string]any) bool { return tab["progress"] == 0.5 && tab["loading"] == true })
+	r.waitForTab(func(tab map[string]any) bool { return tab["progress"] == 1.0 })
+}
+
 func TestHistorySurvivesRestart(t *testing.T) {
 	dir := t.TempDir()
 	r := start(t, dir)

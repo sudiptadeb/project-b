@@ -16,9 +16,11 @@ type Tab struct {
 	URL     string       `json:"url"`
 	Title   string       `json:"title"`
 	Loading bool         `json:"loading"`
-	Blocked bool         `json:"blocked"`
-	Crashed bool         `json:"crashed"`
-	Error   string       `json:"error,omitempty"`
+	// Progress is how far the load has got, 0 to 1.
+	Progress float64 `json:"progress"`
+	Blocked  bool    `json:"blocked"`
+	Crashed  bool    `json:"crashed"`
+	Error    string  `json:"error,omitempty"`
 	// Favicon is a data: URL, or "" when the page has none.
 	Favicon string `json:"favicon,omitempty"`
 
@@ -223,7 +225,7 @@ func (m *Manager) HandleNavigationStarting(id engine.TabID, u string) bool {
 			return false
 		}
 	}
-	t.Blocked, t.Title, t.Favicon = false, "", ""
+	t.Blocked, t.Title, t.Favicon, t.Progress = false, "", "", 0
 	m.changed(t)
 	return true
 }
@@ -293,6 +295,16 @@ func (m *Manager) HandleLoadingChanged(id engine.TabID, loading bool) {
 		return
 	}
 	t.Loading = loading
+	m.changed(t)
+}
+
+// HandleLoadProgressChanged records how far the load has got.
+func (m *Manager) HandleLoadProgressChanged(id engine.TabID, progress float64) {
+	t := m.tabs[id]
+	if t == nil || t.Progress == progress {
+		return
+	}
+	t.Progress = progress
 	m.changed(t)
 }
 

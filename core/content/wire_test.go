@@ -1,6 +1,7 @@
 package content
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -49,8 +50,8 @@ type recorder struct {
 	allow bool
 }
 
-func (r *recorder) note(s string)              { r.got = append(r.got, s) }
-func (r *recorder) ShellMessage(msg []byte)    { r.note("shell " + string(msg)) }
+func (r *recorder) note(s string)           { r.got = append(r.got, s) }
+func (r *recorder) ShellMessage(msg []byte) { r.note("shell " + string(msg)) }
 func (r *recorder) NavigationStarting(tab engine.TabID, url string) bool {
 	r.note("starting " + url)
 	return r.allow
@@ -72,12 +73,15 @@ func (r *recorder) LoadingChanged(tab engine.TabID, loading bool) {
 		r.note("loaded")
 	}
 }
-func (r *recorder) PageCrashed(tab engine.TabID)                 { r.note("crashed") }
+func (r *recorder) LoadProgressChanged(tab engine.TabID, progress float64) {
+	r.note(fmt.Sprintf("progress %.2f", progress))
+}
+func (r *recorder) PageCrashed(tab engine.TabID)                    { r.note("crashed") }
 func (r *recorder) FaviconChanged(tab engine.TabID, dataURL string) { r.note("favicon " + dataURL) }
 func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	r.note("opened " + url)
 }
-func (r *recorder) Shortcut(s engine.Shortcut)              { r.note("shortcut") }
+func (r *recorder) Shortcut(s engine.Shortcut)             { r.note("shortcut") }
 func (r *recorder) WindowControlsChanged(rect engine.Rect) { r.note("controls") }
 
 func wired(t *testing.T) (*Hooks, *recorder, map[Hook]bool) {
@@ -173,6 +177,15 @@ func TestReservedKeysBecomeShortcuts(t *testing.T) {
 	}
 	if s := shortcutFor(NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: WebInputEventModifiersControlKey | WebInputEventModifiersShiftKey, WindowsKeyCode: KeyboardCodeTab}); s != engine.ShortcutPreviousTab {
 		t.Fatalf("Ctrl+Shift+Tab = %v", s)
+	}
+}
+
+func TestLoadProgressReachesTheListener(t *testing.T) {
+	h, r, _ := wired(t)
+	h.Dispatch(ObserverLoadProgressChanged, pack(WebContents{ID: 2}, 0.4))
+	h.Dispatch(ObserverLoadProgressChanged, pack(WebContents{ID: 0}, 0.9))
+	if !reflect.DeepEqual(r.got, []string{"progress 0.40"}) {
+		t.Fatalf("got %v", r.got)
 	}
 }
 

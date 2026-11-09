@@ -57,6 +57,11 @@ func Wire(h *Hooks, l engine.Listener) {
 			l.LoadingChanged(engine.TabID(c.ID), false)
 		}
 	})
+	h.Observer.OnLoadProgressChanged(func(c WebContents, progress float64) {
+		if c.ID != 0 {
+			l.LoadProgressChanged(engine.TabID(c.ID), progress)
+		}
+	})
 	h.Observer.OnTitleWasSet(func(c WebContents, entry NavigationEntry) {
 		if c.ID != 0 {
 			l.TitleChanged(engine.TabID(c.ID), c.Title)

@@ -44,7 +44,8 @@ function switchLayout() {
     </button>
     <div v-if="titleBar" v-drag class="space" :style="{ width: controls.right }"></div>
     <div v-else class="space" style="width: 4px"></div>
-    <div class="progress" :class="{ on: activeTab.loading }"></div>
+    <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
+    <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
   </header>
 </template>
 
@@ -78,18 +79,12 @@ function switchLayout() {
   left: 0;
   bottom: 0;
   height: 2px;
-  width: 0;
   background: var(--accent);
+  opacity: 0;
+  transition: width 0.15s ease-out;
 }
 
 .progress.on {
-  width: 100%;
-  animation: load 1s ease-in-out infinite;
-  transform-origin: left;
-}
-
-@keyframes load {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  opacity: 1;
 }
 </style>

@@ -5,30 +5,23 @@
 
 #include "base/base64.h"
 #include "base/functional/bind.h"
-#include "base/process/kill.h"
-#include "base/strings/utf_string_conversions.h"
-#include "components/input/native_web_keyboard_event.h"
-#include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/navigation_controller.h"
-#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
-#include "net/base/net_errors.h"
 #include "project_b/engine/browser/engine.h"
-#include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/window.h"
-#include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
 #include "ui/base/window_open_disposition.h"
-#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/codec/png_codec.h"
 
 namespace project_b {
 
 PageTab::PageTab(int64_t id, std::unique_ptr<content::WebContents> contents)
-    : content::WebContentsObserver(contents.get()),
+    : WebContentsObserverHooks(contents.get()),
       id_(id),
       contents_(std::move(contents)) {
+  hooks::TagTab(contents_.get(), id_);
   contents_->SetDelegate(this);
 }
 
@@ -40,54 +33,20 @@ PageTab::~PageTab() {
   contents_.reset();
 }
 
+// A page coming back from history already has its icon and may not announce it again.
 void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
-  if (!handle->IsInPrimaryMainFrame()) {
-    return;
+  if (handle->IsInPrimaryMainFrame() && handle->HasCommitted() &&
+      !handle->IsErrorPage() && !contents_->GetFaviconURLs().empty()) {
+    FetchFavicon(contents_->GetFaviconURLs());
   }
-  content::NavigationController& controller = contents_->GetController();
-  Go().history_changed(id_, controller.CanGoBack(), controller.CanGoForward());
-
-  const std::string& url = handle->GetURL().spec();
-  if (handle->HasCommitted() && !handle->IsErrorPage()) {
-    Go().navigation_finished(id_, url.c_str());
-    // A page coming back from history already has its title and icon, and may not
-    // announce them again.
-    content::NavigationEntry* entry = controller.GetLastCommittedEntry();
-    if (entry && !entry->GetTitle().empty()) {
-      TitleWasSet(entry);
-    }
-    if (!contents_->GetFaviconURLs().empty()) {
-      FetchFavicon(contents_->GetFaviconURLs());
-    }
-    return;
-  }
-  // ERR_ABORTED is a navigation replaced by a newer one, which isn't a failure.
-  if (handle->GetNetErrorCode() != net::OK &&
-      handle->GetNetErrorCode() != net::ERR_ABORTED) {
-    Go().navigation_failed(id_, url.c_str(),
-                           net::ErrorToString(handle->GetNetErrorCode()).c_str());
-  }
-}
-
-void PageTab::DidStartLoading() {
-  Go().loading_changed(id_, 1);
-}
-
-void PageTab::DidStopLoading() {
-  Go().loading_changed(id_, 0);
+  WebContentsObserverHooks::DidFinishNavigation(handle);
 }
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {
-  const std::u16string& title = contents_->GetTitle();
   if (Engine::Get()->active_tab() == this) {
-    Engine::Get()->window()->SetTitle(title);
+    Engine::Get()->window()->SetTitle(contents_->GetTitle());
   }
-  Go().title_changed(id_, base::UTF16ToUTF8(title).c_str());
-}
-
-void PageTab::PrimaryMainFrameRenderProcessGone(
-    base::TerminationStatus status) {
-  Go().page_crashed(id_);
+  WebContentsObserverHooks::TitleWasSet(entry);
 }
 
 void PageTab::DidUpdateFaviconURL(
@@ -117,7 +76,10 @@ void PageTab::FetchFavicon(
   }
   const int request = ++favicon_request_;
   if (!best) {
-    Go().favicon_changed(id_, "");
+    hooks::Args args;
+    args.Int(id_);
+    args.Str("");
+    hooks::Fire(PB_EVENT_FAVICON_CHANGED, args);
     return;
   }
   contents_->DownloadImage(
@@ -150,12 +112,10 @@ void PageTab::OnFaviconDownloaded(int request,
   if (best) {
     png = gfx::PNGCodec::EncodeBGRASkBitmap(*best, /*discard_transparency=*/false);
   }
-  if (!png) {
-    Go().favicon_changed(id_, "");
-    return;
-  }
-  const std::string data_url = "data:image/png;base64," + base::Base64Encode(*png);
-  Go().favicon_changed(id_, data_url.c_str());
+  hooks::Args args;
+  args.Int(id_);
+  args.Str(png ? "data:image/png;base64," + base::Base64Encode(*png) : "");
+  hooks::Fire(PB_EVENT_FAVICON_CHANGED, args);
 }
 
 content::WebContents* PageTab::OpenURLFromTab(
@@ -168,8 +128,8 @@ content::WebContents* PageTab::OpenURLFromTab(
     // navigation, so the gate finds it.
     PageTab* tab = Engine::Get()->AdoptTab(content::WebContents::Create(
         content::WebContents::CreateParams(source->GetBrowserContext())));
-    Go().tab_opened(id_, tab->id(), params.url.spec().c_str(),
-                    params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+    Engine::TabOpened(id_, tab->id(), params.url,
+                      params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
     target = tab->contents();
   }
   base::WeakPtr<content::NavigationHandle> handle =
@@ -192,19 +152,9 @@ content::WebContents* PageTab::AddNewContents(
     bool user_gesture,
     bool* was_blocked) {
   PageTab* tab = Engine::Get()->AdoptTab(std::move(new_contents));
-  Go().tab_opened(id_, tab->id(), target_url.spec().c_str(),
-                  disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+  Engine::TabOpened(id_, tab->id(), target_url,
+                    disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
   return tab->contents();
-}
-
-content::KeyboardEventProcessingResult PageTab::PreHandleKeyboardEvent(
-    content::WebContents* source,
-    const input::NativeWebKeyboardEvent& event) {
-  if (PBShortcut shortcut = Engine::ShortcutFor(event)) {
-    Go().shortcut(shortcut);
-    return content::KeyboardEventProcessingResult::HANDLED;
-  }
-  return content::KeyboardEventProcessingResult::NOT_HANDLED;
 }
 
 bool PageTab::HandleKeyboardEvent(content::WebContents* source,
@@ -215,6 +165,10 @@ bool PageTab::HandleKeyboardEvent(content::WebContents* source,
 bool PageTab::TakeFocus(content::WebContents* source, bool reverse) {
   Engine::Get()->FocusShellForTraversal(reverse);
   return true;
+}
+
+content::WebContents* PageTab::hook_contents() const {
+  return contents_.get();
 }
 
 }  // namespace project_b

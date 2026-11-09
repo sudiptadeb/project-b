@@ -13,24 +13,12 @@ extern "C" {
 
 void PBStart(const PBEngineCalls* calls,
              const char* profile_dir,
-             const char* blocked_hosts);
+             const char* blocked_hosts,
+             const char* hook_table);
 void PBStop(void);
 void PBRunPosted(void);
+int PBHook(int32_t hook, const PBValue* args, size_t count, PBValue* result);
 
-void PBShellMessage(const char* json, size_t length);
-int PBNavigationStarting(int64_t tab, const char* url);
-void PBNavigationFinished(int64_t tab, const char* url);
-void PBNavigationFailed(int64_t tab, const char* url, const char* reason);
-void PBHistoryChanged(int64_t tab, int can_go_back, int can_go_forward);
-void PBTitleChanged(int64_t tab, const char* title);
-void PBLoadingChanged(int64_t tab, int loading);
-void PBPageCrashed(int64_t tab);
-void PBFaviconChanged(int64_t tab, const char* data_url);
-void PBTabOpened(int64_t opener, int64_t tab, const char* url, int foreground);
-void PBShortcutPressed(int shortcut);
-void PBWindowControlsChanged(double x, double y, double w, double h);
-
-void PBPing(void);
 void PBForceGC(void);
 int PBRecoverNilDeref(void);
 char* PBGoStats(void);

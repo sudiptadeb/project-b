@@ -14,6 +14,8 @@
 #include "project_b/engine/browser/driver.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
@@ -61,9 +63,15 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   shell_->Load();
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
-             command_line->GetSwitchValueASCII("block").c_str());
+             command_line->GetSwitchValueASCII("block").c_str(),
+             hooks::kTableHash);
   window_->ListenForControls(base::BindRepeating([](const gfx::RectF& r) {
-    Go().window_controls_changed(r.x(), r.y(), r.width(), r.height());
+    hooks::Args args;
+    args.Double(r.x());
+    args.Double(r.y());
+    args.Double(r.width());
+    args.Double(r.height());
+    hooks::Fire(PB_EVENT_WINDOW_CONTROLS_CHANGED, args);
   }));
 
   if (command_line->HasSwitch("pb-driver")) {

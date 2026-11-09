@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "content/public/browser/content_browser_client.h"
+#include "project_b/engine/browser/hooks_gen.h"
 
 namespace project_b {
 
-// The general counter: content asks this object questions. Each answer is short or
-// forwards to someone who knows.
-class ContentBrowserClient : public content::ContentBrowserClient {
+// The general counter: content asks this object questions. The generated base carries
+// them to Go; what is answered here needs content's objects or runs before Go starts.
+class ContentBrowserClient : public ContentBrowserClientHooks {
  public:
   ContentBrowserClient();
   ContentBrowserClient(const ContentBrowserClient&) = delete;

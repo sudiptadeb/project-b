@@ -14,8 +14,6 @@
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
-#include "components/input/native_web_keyboard_event.h"
-#include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -26,7 +24,7 @@
 #include "content/public/browser/web_ui_controller_factory.h"
 #include "content/public/browser/web_ui_message_handler.h"
 #include "project_b/engine/browser/engine.h"
-#include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/window.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -49,8 +47,9 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
 
  private:
   void OnMessage(const base::ListValue& args) {
-    const std::string& json = args[0].GetString();
-    Go().shell_message(json.data(), json.size());
+    hooks::Args hook_args;
+    hook_args.Str(args[0].GetString());
+    hooks::Fire(PB_EVENT_SHELL_MESSAGE, hook_args);
   }
 };
 
@@ -228,16 +227,6 @@ void ShellPage::PrimaryMainFrameRenderProcessGone(
   contents_->GetController().Reload(content::ReloadType::NORMAL, false);
 }
 
-content::KeyboardEventProcessingResult ShellPage::PreHandleKeyboardEvent(
-    content::WebContents* source,
-    const input::NativeWebKeyboardEvent& event) {
-  if (PBShortcut shortcut = Engine::ShortcutFor(event)) {
-    Go().shortcut(shortcut);
-    return content::KeyboardEventProcessingResult::HANDLED;
-  }
-  return content::KeyboardEventProcessingResult::NOT_HANDLED;
-}
-
 bool ShellPage::HandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
@@ -247,6 +236,10 @@ bool ShellPage::HandleKeyboardEvent(
 bool ShellPage::TakeFocus(content::WebContents* source, bool reverse) {
   Engine::Get()->FocusPageForTraversal(reverse);
   return true;
+}
+
+content::WebContents* ShellPage::hook_contents() const {
+  return contents_.get();
 }
 
 }  // namespace project_b

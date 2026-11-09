@@ -1,7 +1,7 @@
 // Command lib is the Go core as a c-archive, linked statically into the main binary.
-// It implements engine.Engine on the C function table and forwards the adapter's
-// calls to app.App. Nothing else in core/ touches cgo, so everything else still builds
-// and tests with no C++.
+// It implements engine.Engine on the C function table and hands every event from the
+// adapter to the content package. Nothing else in core/ touches cgo, so everything
+// else still builds and tests with no C++.
 package main
 
 /*
@@ -23,12 +23,14 @@ static inline void call_set_drag_regions(const PBEngineCalls* c, const double* r
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
+static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
 */
 import "C"
 
 import (
 	"encoding/json"
+	"log"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -36,6 +38,7 @@ import (
 	"unsafe"
 
 	"projectb/app"
+	"projectb/content"
 	"projectb/engine"
 )
 
@@ -119,18 +122,24 @@ func (e *nativeEngine) Post(fn func()) {
 
 var (
 	native *nativeEngine
+	hooks  *content.Hooks
 	theApp *app.App
 )
 
 //export PBStart
-func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts *C.char) {
+func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char) {
+	if table := C.GoString(hookTable); table != content.TableHash {
+		log.Fatalf("the library's hook table is %s, Go's is %s: regenerate with tools/gen_hooks.py and rebuild", table, content.TableHash)
+	}
 	// The table is C memory that lives as long as the process.
 	native = &nativeEngine{calls: calls}
+	hooks = content.New(func(h content.Hook) { C.call_set_hook_subscribed(native.calls, C.int32_t(h), 1) })
 	var blocked []string
 	if s := C.GoString(blockedHosts); s != "" {
 		blocked = strings.Split(s, ",")
 	}
 	theApp = app.Start(native, app.Config{ProfileDir: C.GoString(profileDir), BlockedHosts: blocked})
+	content.Wire(hooks, theApp)
 }
 
 //export PBStop
@@ -147,69 +156,31 @@ func PBRunPosted() {
 	}
 }
 
-//export PBShellMessage
-func PBShellMessage(msg *C.char, length C.size_t) {
-	theApp.ShellMessage(C.GoBytes(unsafe.Pointer(msg), C.int(length)))
-}
-
-//export PBNavigationStarting
-func PBNavigationStarting(tab C.int64_t, url *C.char) C.int {
-	if theApp.NavigationStarting(engine.TabID(tab), C.GoString(url)) {
-		return 1
-	}
-	return 0
-}
-
-//export PBNavigationFinished
-func PBNavigationFinished(tab C.int64_t, url *C.char) {
-	theApp.NavigationFinished(engine.TabID(tab), C.GoString(url))
-}
-
-//export PBNavigationFailed
-func PBNavigationFailed(tab C.int64_t, url, reason *C.char) {
-	theApp.NavigationFailed(engine.TabID(tab), C.GoString(url), C.GoString(reason))
-}
-
-//export PBHistoryChanged
-func PBHistoryChanged(tab C.int64_t, canGoBack, canGoForward C.int) {
-	theApp.HistoryChanged(engine.TabID(tab), canGoBack != 0, canGoForward != 0)
-}
-
-//export PBTitleChanged
-func PBTitleChanged(tab C.int64_t, title *C.char) {
-	theApp.TitleChanged(engine.TabID(tab), C.GoString(title))
-}
-
-//export PBLoadingChanged
-func PBLoadingChanged(tab C.int64_t, loading C.int) {
-	theApp.LoadingChanged(engine.TabID(tab), loading != 0)
-}
-
-//export PBPageCrashed
-func PBPageCrashed(tab C.int64_t) { theApp.PageCrashed(engine.TabID(tab)) }
-
-//export PBFaviconChanged
-func PBFaviconChanged(tab C.int64_t, dataURL *C.char) {
-	theApp.FaviconChanged(engine.TabID(tab), C.GoString(dataURL))
-}
-
-//export PBTabOpened
-func PBTabOpened(opener, tab C.int64_t, url *C.char, foreground C.int) {
-	theApp.TabOpened(engine.TabID(opener), engine.TabID(tab), C.GoString(url), foreground != 0)
-}
-
-//export PBShortcutPressed
-func PBShortcutPressed(s C.int) { theApp.Shortcut(engine.Shortcut(s)) }
-
-//export PBWindowControlsChanged
-func PBWindowControlsChanged(x, y, w, h C.double) {
-	theApp.WindowControlsChanged(engine.Rect{X: float64(x), Y: float64(y), W: float64(w), H: float64(h)})
-}
-
-// PBPing does nothing. The driver times it to measure the boundary.
+// PBHook is every event from the adapter. The values are copied out of C memory before
+// anything runs, and a string answer is malloc'd for the adapter to free.
 //
-//export PBPing
-func PBPing() {}
+//export PBHook
+func PBHook(id C.int32_t, args *C.PBValue, count C.size_t, result *C.PBValue) C.int {
+	values := make([]content.Value, int(count))
+	for i, a := range unsafe.Slice(args, int(count)) {
+		values[i].I = int64(a.i)
+		values[i].D = float64(a.d)
+		if a.len > 0 {
+			values[i].S = C.GoStringN(a.s, C.int(a.len))
+		}
+	}
+	v, ok := hooks.Dispatch(content.Hook(id), values)
+	if !ok {
+		return 0
+	}
+	result.i = C.int64_t(v.I)
+	result.d = C.double(v.D)
+	if v.S != "" {
+		result.s = C.CString(v.S)
+		result.len = C.size_t(len(v.S))
+	}
+	return 1
+}
 
 // PBForceGC runs a full collection. The driver times it on the main thread.
 //
@@ -252,6 +223,7 @@ func PBGoStats() *C.char {
 		"numGC":       m.NumGC,
 		"maxPauseUs":  maxPauseNs / 1000,
 		"cgoCalls":    runtime.NumCgoCall(),
+		"hooks":       hooks.Counts(),
 	})
 	return C.CString(string(b))
 }

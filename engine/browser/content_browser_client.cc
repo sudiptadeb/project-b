@@ -7,9 +7,6 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "project_b/engine/browser/browser_main_parts.h"
-#include "project_b/engine/browser/engine.h"
-#include "project_b/engine/browser/navigation_gate.h"
-#include "project_b/engine/browser/page_tab.h"
 
 namespace project_b {
 
@@ -28,16 +25,11 @@ base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
   return dir.Append(FILE_PATH_LITERAL("project_b_helper"));
 }
 
+// Every navigation gets the generated throttle, whose hooks cross to Go only when Go
+// subscribed to them (core/content/wire.go decides which navigations it gates).
 void ContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationThrottleRegistry& registry) {
-  content::NavigationHandle& handle = registry.GetNavigationHandle();
-  if (!handle.IsInPrimaryMainFrame()) {
-    return;
-  }
-  // The shell's own navigation isn't a tab, so it has no gate.
-  if (PageTab* tab = Engine::Get()->TabFor(handle.GetWebContents())) {
-    registry.AddThrottle(std::make_unique<NavigationGate>(registry, tab->id()));
-  }
+  registry.AddThrottle(std::make_unique<NavigationThrottleHooks>(registry));
 }
 
 std::string ContentBrowserClient::GetUserAgent() {

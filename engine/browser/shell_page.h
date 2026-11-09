@@ -5,8 +5,8 @@
 #include <string>
 
 #include "base/time/time.h"
-#include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "project_b/engine/browser/hooks_gen.h"
 
 namespace content {
 class BrowserContext;
@@ -20,7 +20,7 @@ void RegisterShellWebUI(content::BrowserContext* browser_context);
 // The shell: one transparent page covering the window. It talks to the Go core with
 // chrome.send, and the core answers by calling window.__shellReceive.
 class ShellPage : public content::WebContentsObserver,
-                  public content::WebContentsDelegate {
+                  public WebContentsDelegateHooks {
  public:
   explicit ShellPage(content::BrowserContext* browser_context);
   ShellPage(const ShellPage&) = delete;
@@ -43,9 +43,7 @@ class ShellPage : public content::WebContentsObserver,
       base::TerminationStatus status) override;
 
   // content::WebContentsDelegate:
-  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
-      content::WebContents* source,
-      const input::NativeWebKeyboardEvent& event) override;
+  content::WebContents* hook_contents() const override;
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;

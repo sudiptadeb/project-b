@@ -28,6 +28,8 @@
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
@@ -196,13 +198,36 @@ void Eval(const std::string& id, content::WebContents* contents, const std::stri
       /*world_id=*/0);
 }
 
-void Stats(const std::string& id) {
+// Nanoseconds per call of fn, over a million calls.
+template <typename Fn>
+double PerCall(Fn fn) {
   const int kCalls = 1000000;
   const base::TimeTicks start = base::TimeTicks::Now();
   for (int i = 0; i < kCalls; i++) {
-    Go().ping();
+    fn();
   }
-  const double ns = (base::TimeTicks::Now() - start).InMicrosecondsF() * 1000 / kCalls;
+  return (base::TimeTicks::Now() - start).InMicrosecondsF() * 1000 / kCalls;
+}
+
+void Stats(const std::string& id) {
+  // The bare crossing: a hook with no values.
+  const double ns = PerCall([] {
+    PBValue unused;
+    Go().hook(PB_EVENT_PING, nullptr, 0, &unused);
+  });
+  // A generated hook nobody subscribed to: the check and content's own call.
+  PageTab* tab = Engine::Get()->active_tab();
+  WebContentsObserverHooks* observer = tab;
+  const double hook_off_ns = PerCall([observer] {
+    observer->DidChangeVisibleSecurityState();
+  });
+  // The same hook subscribed: the tab's state copied and crossing to Go, which decodes
+  // it and finds no handler.
+  hooks::SetSubscribed(hooks::kWebContentsObserver_DidChangeVisibleSecurityState, true);
+  const double hook_on_ns = PerCall([observer] {
+    observer->DidChangeVisibleSecurityState();
+  });
+  hooks::SetSubscribed(hooks::kWebContentsObserver_DidChangeVisibleSecurityState, false);
 
   char* go = Go().go_stats();
   std::string go_stats(go);
@@ -210,10 +235,12 @@ void Stats(const std::string& id) {
 
   NSWindow* window = TheWindow();
   Reply(id, base::StringPrintf(
-                "{\"cgoCallNs\":%.1f,\"firstPaintMs\":%lld,\"go\":%s,"
+                "{\"cgoCallNs\":%.1f,\"hookOffNs\":%.1f,\"hookOnNs\":%.1f,"
+                "\"firstPaintMs\":%lld,\"go\":%s,"
                 "\"key\":%d,\"main\":%d,\"visible\":%d,\"occlusionVisible\":%d,"
                 "\"ignoredStaleBounds\":%zu}",
-                ns, Engine::Get()->shell()->first_paint().InMilliseconds(),
+                ns, hook_off_ns, hook_on_ns,
+                Engine::Get()->shell()->first_paint().InMilliseconds(),
                 go_stats.c_str(), window.isKeyWindow, window.isMainWindow,
                 window.isVisible,
                 (window.occlusionState & NSWindowOcclusionStateVisible) != 0,

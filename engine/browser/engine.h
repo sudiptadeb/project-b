@@ -7,15 +7,12 @@
 
 #include "base/memory/raw_ptr.h"
 #include "project_b/engine/abi/pb_abi.h"
+#include "url/gurl.h"
 
 namespace content {
 class BrowserContext;
 class WebContents;
 }  // namespace content
-
-namespace input {
-struct NativeWebKeyboardEvent;
-}
 
 namespace project_b {
 
@@ -35,8 +32,8 @@ class Engine {
   ~Engine();
 
   static Engine* Get();
-  // The reserved key combination this event is, or PB_SHORTCUT_NONE.
-  static PBShortcut ShortcutFor(const input::NativeWebKeyboardEvent& event);
+  // Tells Go a page opened a tab, which the adapter already made.
+  static void TabOpened(int64_t opener, int64_t tab, const GURL& url, bool foreground);
 
   // The table handed to Go. Lives as long as the process.
   static const PBEngineCalls* Calls();
@@ -45,7 +42,6 @@ class Engine {
   ShellPage* shell() const { return shell_; }
   // The tab whose page is shown.
   PageTab* active_tab() const;
-  PageTab* TabFor(content::WebContents* contents) const;
 
   void FocusShellForTraversal(bool reverse);
   void FocusPageForTraversal(bool reverse);

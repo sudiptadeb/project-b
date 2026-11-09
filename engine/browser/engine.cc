@@ -8,18 +8,16 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/task/single_thread_task_runner.h"
-#include "components/input/native_web_keyboard_event.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/reload_type.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
+#include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
-#include "third_party/blink/public/common/input/web_input_event.h"
-#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "url/gurl.h"
@@ -121,6 +119,11 @@ void CallSendToShell(const char* json, size_t length) {
   g_engine->SendToShell(json, length);
 }
 
+void CallSetHookSubscribed(int32_t hook, int on) {
+  CheckMainThread();
+  hooks::SetSubscribed(hook, on != 0);
+}
+
 // The one call that any thread may make.
 void CallPostWakeup() {
   content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
@@ -147,36 +150,13 @@ Engine* Engine::Get() {
 }
 
 // static
-PBShortcut Engine::ShortcutFor(const input::NativeWebKeyboardEvent& event) {
-  if (event.GetType() != blink::WebInputEvent::Type::kRawKeyDown) {
-    return PB_SHORTCUT_NONE;
-  }
-  const int modifiers = event.GetModifiers() & blink::WebInputEvent::kKeyModifiers;
-  const int key = event.windows_key_code;
-  if (modifiers == blink::WebInputEvent::kMetaKey) {
-    switch (key) {
-      case ui::VKEY_L:
-        return PB_SHORTCUT_FOCUS_ADDRESS_BAR;
-      case ui::VKEY_T:
-        return PB_SHORTCUT_NEW_TAB;
-      case ui::VKEY_W:
-        return PB_SHORTCUT_CLOSE_TAB;
-      default:
-        if (key >= ui::VKEY_1 && key <= ui::VKEY_9) {
-          return static_cast<PBShortcut>(PB_SHORTCUT_TAB_1 + (key - ui::VKEY_1));
-        }
-        return PB_SHORTCUT_NONE;
-    }
-  }
-  if (key == ui::VKEY_TAB && modifiers == blink::WebInputEvent::kControlKey) {
-    return PB_SHORTCUT_NEXT_TAB;
-  }
-  if (key == ui::VKEY_TAB &&
-      modifiers == (blink::WebInputEvent::kControlKey |
-                    blink::WebInputEvent::kShiftKey)) {
-    return PB_SHORTCUT_PREVIOUS_TAB;
-  }
-  return PB_SHORTCUT_NONE;
+void Engine::TabOpened(int64_t opener, int64_t tab, const GURL& url, bool foreground) {
+  hooks::Args args;
+  args.Int(opener);
+  args.Int(tab);
+  args.Str(url.spec());
+  args.Bool(foreground);
+  hooks::Fire(PB_EVENT_TAB_OPENED, args);
 }
 
 // static
@@ -196,6 +176,7 @@ const PBEngineCalls* Engine::Calls() {
       .focus_page = CallFocusPage,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,
+      .set_hook_subscribed = CallSetHookSubscribed,
       .post_wakeup = CallPostWakeup,
   };
   return &calls;
@@ -204,15 +185,6 @@ const PBEngineCalls* Engine::Calls() {
 PageTab* Engine::active_tab() const {
   auto it = tabs_.find(active_tab_);
   return it == tabs_.end() ? nullptr : it->second.get();
-}
-
-PageTab* Engine::TabFor(content::WebContents* contents) const {
-  for (const auto& [id, tab] : tabs_) {
-    if (tab->contents() == contents) {
-      return tab.get();
-    }
-  }
-  return nullptr;
 }
 
 void Engine::FocusShellForTraversal(bool reverse) {

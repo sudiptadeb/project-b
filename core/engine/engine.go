@@ -24,7 +24,7 @@ func (r Rect) Contains(x, y float64) bool {
 }
 
 // Shortcut is a key combination the engine keeps from pages and hands to the app.
-// The numbers match PBShortcut in engine/abi/pb_abi.h.
+// Which keys those are is decided in Go (core/content/wire.go for the real engine).
 type Shortcut int
 
 const (

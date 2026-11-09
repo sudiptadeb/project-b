@@ -1,6 +1,11 @@
-// The boundary between the Go core and the C++ adapter: plain C, ids and strings.
+// The boundary between the Go core and the C++ adapter: plain C, ids and values.
 // Content's types never cross it, and each side only holds a table of the other's
 // functions, so the library has no link-time reference to Go.
+//
+// Everything the adapter tells Go goes through one call, hook: a number and a flat
+// list of values. The numbers are the adapter's own events below (PBEvent) and
+// content's hooks from 100 up, generated into engine/browser/hooks_gen.h and
+// core/content/hooks_gen.go by tools/gen_hooks.py.
 //
 // Threading: every call in both directions happens on the main thread, except
 // post_wakeup, which any thread may call.
@@ -13,18 +18,25 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Key combinations the engine keeps from pages and hands to the app. Matches
-// engine.Shortcut in core/engine/engine.go.
-typedef enum PBShortcut {
-  PB_SHORTCUT_NONE = 0,
-  PB_SHORTCUT_FOCUS_ADDRESS_BAR = 1,
-  PB_SHORTCUT_NEW_TAB = 2,
-  PB_SHORTCUT_CLOSE_TAB = 3,
-  PB_SHORTCUT_NEXT_TAB = 4,
-  PB_SHORTCUT_PREVIOUS_TAB = 5,
-  // PB_SHORTCUT_TAB_1 + n picks the tab at position n; the ninth picks the last.
-  PB_SHORTCUT_TAB_1 = 6,
-} PBShortcut;
+// One value in a hook's argument list or answer. Which field is used follows from the
+// hook; the generated code on both sides agrees. A string answer from Go is malloc'd
+// and the adapter frees it.
+typedef struct PBValue {
+  int64_t i;      // integers, booleans, enums, ids
+  double d;       // floating point
+  const char* s;  // UTF-8 text, not NUL-terminated
+  size_t len;
+} PBValue;
+
+// The adapter's own events, which are not content hooks. Their values are listed
+// beside each. Matches core/content/events.go.
+typedef enum PBEvent {
+  PB_EVENT_SHELL_MESSAGE = 1,           // s: json
+  PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground
+  PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
+  PB_EVENT_WINDOW_CONTROLS_CHANGED = 4, // d: x, d: y, d: w, d: h
+  PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
+} PBEvent;
 
 // What Go can ask the adapter to do. Handed over once, at start.
 typedef struct PBEngineCalls {
@@ -51,6 +63,8 @@ typedef struct PBEngineCalls {
   void (*focus_page)(void);
   void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);
+  // Lets a content hook cross to Go, or stops it. Unsubscribed hooks never cross.
+  void (*set_hook_subscribed)(int32_t hook, int on);
   // Asks the main thread to call run_posted soon.
   void (*post_wakeup)(void);
 } PBEngineCalls;
@@ -58,32 +72,20 @@ typedef struct PBEngineCalls {
 // What the adapter can tell the Go core. The main binary fills it in from Go's exports
 // (pb_exports.h) and hands it to ProjectBMain. Helpers have no Go and no table.
 typedef struct PBGoCalls {
+  // hook_table is the hash of the generated hook list the adapter was built with; Go
+  // refuses a library whose list differs from its own.
   void (*start)(const PBEngineCalls* calls,
                 const char* profile_dir,
-                const char* blocked_hosts);
+                const char* blocked_hosts,
+                const char* hook_table);
   void (*stop)(void);
   void (*run_posted)(void);
 
-  void (*shell_message)(const char* json, size_t length);
-  // Returns 1 to allow the navigation and 0 to block it.
-  int (*navigation_starting)(int64_t tab, const char* url);
-  void (*navigation_finished)(int64_t tab, const char* url);
-  void (*navigation_failed)(int64_t tab, const char* url, const char* reason);
-  void (*history_changed)(int64_t tab, int can_go_back, int can_go_forward);
-  void (*title_changed)(int64_t tab, const char* title);
-  void (*loading_changed)(int64_t tab, int loading);
-  void (*page_crashed)(int64_t tab);
-  // The page's icon as a data: URL, or "" for none.
-  void (*favicon_changed)(int64_t tab, const char* data_url);
-  // A page opened a tab. The adapter already made it, hidden.
-  void (*tab_opened)(int64_t opener, int64_t tab, const char* url, int foreground);
-  void (*shortcut)(int shortcut);
-  // Where the native window controls are, in window coordinates with y from the top.
-  // All zero when there are none to leave space for.
-  void (*window_controls_changed)(double x, double y, double w, double h);
+  // Every event: the adapter's own (PBEvent) and content's hooks. Returns 1 when Go
+  // answered and result holds the answer, 0 to let content do its default.
+  int (*hook)(int32_t hook, const PBValue* args, size_t count, PBValue* result);
 
   // Development only, used by the driver to measure the boundary.
-  void (*ping)(void);
   void (*force_gc)(void);
   // Returns 1 if a nil dereference in Go was recovered as a normal panic.
   int (*recover_nil_deref)(void);

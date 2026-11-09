@@ -6,16 +6,15 @@
 #include <vector>
 
 #include "base/memory/weak_ptr.h"
-#include "content/public/browser/web_contents_delegate.h"
-#include "content/public/browser/web_contents_observer.h"
+#include "project_b/engine/browser/hooks_gen.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/geometry/size.h"
 
 namespace project_b {
 
-// One tab's connection to content. Everything content says goes straight to Go.
-class PageTab : public content::WebContentsObserver,
-                public content::WebContentsDelegate {
+// One tab's connection to content. The generated bases carry every hook to Go; what is
+// overridden here needs content's objects first, and still calls the base after.
+class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks {
  public:
   PageTab(int64_t id, std::unique_ptr<content::WebContents> contents);
   PageTab(const PageTab&) = delete;
@@ -28,11 +27,7 @@ class PageTab : public content::WebContentsObserver,
  private:
   // content::WebContentsObserver:
   void DidFinishNavigation(content::NavigationHandle* handle) override;
-  void DidStartLoading() override;
-  void DidStopLoading() override;
   void TitleWasSet(content::NavigationEntry* entry) override;
-  void PrimaryMainFrameRenderProcessGone(
-      base::TerminationStatus status) override;
   void DidUpdateFaviconURL(
       content::RenderFrameHost* render_frame_host,
       const std::vector<blink::mojom::FaviconURLPtr>& candidates,
@@ -48,7 +43,8 @@ class PageTab : public content::WebContentsObserver,
                            const std::vector<SkBitmap>& bitmaps,
                            const std::vector<gfx::Size>& sizes);
 
-  // content::WebContentsDelegate:
+  // content::WebContentsDelegate: these hand over content's objects, so they stay here.
+  content::WebContents* hook_contents() const override;
   content::WebContents* OpenURLFromTab(
       content::WebContents* source,
       const content::OpenURLParams& params,
@@ -61,9 +57,6 @@ class PageTab : public content::WebContentsObserver,
       const blink::mojom::WindowFeatures& window_features,
       bool user_gesture,
       bool* was_blocked) override;
-  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
-      content::WebContents* source,
-      const input::NativeWebKeyboardEvent& event) override;
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;

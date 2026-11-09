@@ -350,6 +350,19 @@ def main():
     check("the main process is project_b", any(r["type"] == "main" and r["exe"] == "project_b" for r in table))
     children = [r for r in table if r["type"] != "main"]
     check("every child process is the helper", children and all(r["exe"] == "project_b_helper" for r in children), children)
+
+    # Binaries: Go only in the main one, content only in the library.
+    macos = os.path.dirname(BIN)
+    helper = os.path.join(macos, "project_b_helper")
+    library = os.path.join(macos, "../Frameworks/libproject_b_content.dylib")
+    if not os.path.exists(library):
+        library = os.path.join(macos, "libproject_b_content.dylib")
+    nm = lambda *args: subprocess.run(["nm", *args], capture_output=True, text=True).stdout
+    check("the helper has no Go", "_cgo" not in nm(helper) and "runtime." not in nm(helper))
+    check("the library has no Go", "_cgo" not in nm(library) and "runtime." not in nm(library))
+    check("the main binary has no content", "__ZN7content" not in nm(BIN) and "__ZN5blink" not in nm(BIN))
+    exports = nm("-gU", library).split()
+    check("the library exports only ProjectBMain", [e for e in exports if e.startswith("_")] == ["_ProjectBMain"], exports[:12])
     final = json.loads(app.cmd("stats", timeout=60))
     print("stats", json.dumps(final), flush=True)
 

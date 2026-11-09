@@ -13,7 +13,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
-#include "project_b/engine/abi/pb_exports.h"
+#include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
@@ -79,7 +79,7 @@ void CallSendToShell(const char* json, size_t length) {
 // The one call that any thread may make.
 void CallPostWakeup() {
   content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
-                                               base::BindOnce(&PBRunPosted));
+                                               base::BindOnce(Go().run_posted));
 }
 
 }  // namespace
@@ -138,7 +138,7 @@ PageTab* Engine::TabFor(content::WebContents* contents) const {
 
 void Engine::FocusAddressBar() {
   shell_->contents()->Focus();
-  PBFocusAddressBarRequested();
+  Go().focus_address_bar_requested();
 }
 
 void Engine::FocusShellForTraversal(bool reverse) {

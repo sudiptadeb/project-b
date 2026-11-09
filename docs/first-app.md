@@ -11,12 +11,20 @@ fed by real history extends below the bar, over the page.
 | `core/mockengine`, `core/cmd/dev` | Mock engine and dev server | No |
 | `shell/` | Vue 3 shell | No |
 | `core/cmd/lib` | The cgo layer: the Go core as a c-archive | Links into the main binary |
-| `engine/` | C++ adapter on Chromium's content layer | Yes |
+| `engine/` | C++ adapter on Chromium's content layer, built into the library | Yes |
 
-## Two binaries
+## One library, two binaries
 
-- `project_b` is the main process: content plus Go, linked statically.
-- `project_b_helper` runs every child: the same content, with no Go.
+- `libproject_b_content.dylib` holds content, Blink, V8, the network stack and the C++
+  adapter. It exports one function, `ProjectBMain`.
+- `project_b` is the main process: Go, and a `main` that hands Go's functions to
+  `ProjectBMain`.
+- `project_b_helper` runs every child: a `main` that calls `ProjectBMain` with no Go.
+
+Both binaries link the library when they load, through `@rpath`, so our code never calls
+`dlopen`. Chromium's own `content_shell` and Chrome do load theirs by hand. The adapter
+has to live in the library, because outside a component build content exports nothing a
+binary could link against.
 
 Go's runtime starts by itself when a binary linked with it loads, so "linked but
 unused" isn't possible in a child. Content asks `GetChildProcessPath` which program to
@@ -24,10 +32,12 @@ launch, and we answer with the helper.
 
 ## The boundary
 
-`engine/abi/pb_abi.h` is plain C, ids and strings. Go calls C++ through a function table
-handed over at start, and C++ calls Go through exported functions
-(`engine/abi/pb_exports.h`). Every call is on the main thread, except `post_wakeup`.
-Mojo and content's types stay inside the adapter.
+`engine/abi/pb_abi.h` is plain C, ids and strings. Each side holds a table of the other's
+functions: `PBEngineCalls` for Go calling C++, handed over at start, and `PBGoCalls` for
+C++ calling Go, which `app/main.cc` fills from Go's exports (`engine/abi/pb_exports.h`).
+So the library has no link-time reference to Go, and the helper has nothing to resolve.
+Every call is on the main thread, except `post_wakeup`. Mojo and content's types stay
+inside the adapter.
 
 ## The window
 
@@ -66,9 +76,10 @@ driver, not read back from the window.
 |---|---|
 | Full build | 3,192 s (53 min), about 37,800 steps, 32 cores |
 | Adapter change to running | 5 to 31 s |
-| `project_b` / `project_b_helper` | 399 MB / 396 MB, `symbol_level = 0` |
-| Go symbols in main / helper | 1,889 / 0 |
-| cgo call, C++ to Go | 34 to 51 ns |
+| Library / `project_b` / `project_b_helper`, unstripped, decimal MB | 415 / 2.6 / 0.03, `symbol_level = 0` |
+| Go symbols in main / helper / library | 1,911 / 0 / 0 |
+| Content symbols in main / helper | 0 / 0 |
+| cgo call, C++ to Go | 34 to 54 ns |
 | Forced full GC blocking the main thread | median 181 us, max 743 us, 20 runs |
 | First paint, process start to shell paint | 1.05 to 1.5 s at best; up to 10.6 s from the OS issue below |
 | Key press to next frames, inside the shell | median 8.6 to 12.1 ms, max about 33 ms, 26 keys |
@@ -92,8 +103,12 @@ driver, not read back from the window.
   panic. With `--disable-in-process-stack-traces` it recovers normally. Content only
   enables that dumper in non-official builds, and what Crashpad does in an official build
   isn't tested. A C++ crash on the main thread is still caught and dumped by Chromium.
-- **Two binaries cost about 400 MB of duplicated code.** Sharing it would take a shared
-  library, which we chose not to use for Go but could use for content alone.
+- **Sharing content took about 270 MB out of the app.** With two full binaries, the
+  installed app was 572 MB and the DMG 153 MB. With the library they're 305 MB and 82 MB.
+- **Sharing doesn't change what each process reports.** RSS and dirty footprint are the
+  same either way, because RSS counts shared pages in every process. The main process keeps
+  39 MB of the app's code resident, and that used to be a separate copy, so about 39 MB is
+  the most physical memory this can save. The real saving wasn't measured.
 - **Content has a native screen requirement** the reference example skips: on Mac without
   `display::ScopedNativeScreen`, creating the first view hits a CHECK.
 
@@ -104,37 +119,41 @@ driver, not read back from the window.
 - AppKit's own event dispatch: real mouse, real keyboard, input methods.
 - Crashpad and official builds. Crashpad isn't in this build.
 - Double-clicking the app. `open` fails from a session with no display, and fails the same
-  way for Calculator. The 35 checks start the binary inside the mounted DMG directly.
+  way for Calculator. The 39 checks start the binary inside the mounted DMG directly.
 - Windows and Linux.
 
 ## Packaging
 
-`tools/package.sh` makes `build/project-b.dmg`: `Project B.app` with its data files inside,
-and a link to Applications. Inside an app, Chromium looks under the "framework bundle". We
-have no framework, so `MainDelegate` points it at `Contents`, which gives
-`Contents/Resources` and `Contents/Libraries`.
+`tools/package.sh` makes `build/project-b.dmg`: `Project B.app` with the two binaries in
+`Contents/MacOS`, the library in `Contents/Frameworks`, its data files inside, and a link to
+Applications. Inside an app, Chromium looks under the "framework bundle". We have no
+framework, so `MainDelegate` points it at `Contents`, which gives `Contents/Resources` and
+`Contents/Libraries`.
 
-The app is signed ad hoc, not notarized. Gatekeeper blocks a copy downloaded by a browser
-until its quarantine flag is removed; `curl` doesn't set the flag.
+The app is signed with our own key (`tools/signing-setup.sh`), not notarized. Gatekeeper
+blocks a copy downloaded by a browser until its quarantine flag is removed; `curl` doesn't
+set the flag. The script also makes a profile a Mac can install to allow that key, and
+whether it gets a browser download past Gatekeeper on a real Mac isn't confirmed yet.
 
-Sizes in decimal MB, for one arm64 binary:
+Sizes in decimal MB, for arm64:
 
 | Binary | File | Code (`__TEXT`) | Symbols (`__LINKEDIT`) |
-|---|---|---:|---:|
-| `project_b`, `out/pb` | 418 | 260 | 149 |
-| `project_b`, stripped, in the DMG | 270 | 260 | |
+|---|---:|---:|---:|
+| Library, `out/pb` | 415 | 258 | 149 |
+| Library, stripped, in the DMG | 270 | | |
+| `project_b`, stripped, in the DMG | 2.3 | | |
+| `project_b_helper`, in the DMG | 0.04 | | |
 | Ulaa Framework 155, official, a whole browser | 249 | 234 | 2 |
 | Chrome for Testing 153 framework | 246 | | |
 
 `out/pb` isn't a debug build, but a non-official build keeps its symbols, has DCHECKs on and
-skips link-time optimisation. The DMG is 153 MB. The installed app is 572 MB against 376 MB
-for Chrome for Testing, because we carry content twice and Chrome shares one framework with
-thin helpers.
+skips link-time optimisation. The DMG is 82 MB. The installed app is 305 MB against 376 MB
+for Chrome for Testing.
 
 ## Commands
 
     tools/fetch-chromium.sh                # fresh Chromium 155, once
-    tools/build.sh                         # both binaries, out/pb
+    tools/build.sh                         # the library and both binaries, out/pb
     RELEASE=1 OUT=out/rel tools/build.sh   # official-style build, takes hours
     tools/package.sh                       # build/project-b.dmg; OUT=out/rel for the release
     python3 tools/drive_first_app.py       # real app, results in build/real; PB_BIN picks another binary

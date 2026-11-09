@@ -12,12 +12,14 @@ APP="$STAGE/Project B.app"
 MACOS=$APP/Contents/MacOS
 RESOURCES=$APP/Contents/Resources
 LIBRARIES=$APP/Contents/Libraries
+FRAMEWORKS=$APP/Contents/Frameworks
 SIGNING=$HOME/PW_TOOLS/project-b-signing     # tools/signing-setup.sh makes it
 
 rm -rf "$STAGE" "$DMG"
-mkdir -p "$MACOS" "$RESOURCES/shell" "$LIBRARIES"
+mkdir -p "$MACOS" "$RESOURCES/shell" "$LIBRARIES" "$FRAMEWORKS"
 
 cp "$FROM/project_b" "$FROM/project_b_helper" "$MACOS/"
+cp "$FROM/libproject_b_content.dylib" "$FRAMEWORKS/"
 cp "$FROM/project_b.pak" "$FROM/icudtl.dat" "$FROM/snapshot_blob.bin" "$FROM"/v8_context_snapshot.*.bin "$RESOURCES/"
 cp "$FROM"/shell/* "$RESOURCES/shell/"
 cp "$FROM/libEGL.dylib" "$FROM/libGLESv2.dylib" "$FROM/libvk_swiftshader.dylib" "$FROM/libvulkan.dylib" \
@@ -44,7 +46,7 @@ PLIST
 
 # Symbol names are about a third of a non-official binary and do nothing at run time.
 # Stripping breaks the linker's signature. rcodesign signs everything in the bundle again.
-strip -x "$MACOS/project_b" "$MACOS/project_b_helper" "$LIBRARIES"/*.dylib 2>/dev/null
+strip -x "$MACOS/project_b" "$MACOS/project_b_helper" "$FRAMEWORKS"/*.dylib "$LIBRARIES"/*.dylib 2>/dev/null
 "$SIGNING/rcodesign" sign \
     --p12-file "$SIGNING/identity.p12" \
     --p12-password-file <(grep '^PROJECT_B_SIGNING_P12_PASSWORD=' "$HOME/PW_TOOLS/lab-secrets.env" | cut -d= -f2- | tr -d '\n') \
@@ -55,7 +57,22 @@ codesign --verify --deep --strict "$APP"
 codesign --verify -R="certificate leaf = H\"$(cat "$SIGNING/identity.sha1")\"" "$APP"
 
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -quiet -volname "Project B" -srcfolder "$STAGE" -format ULMO -ov "$DMG"
+# hdiutil create -srcfolder gives up with "Resource busy" when its temporary volume is slow
+# to unmount, so we mount and unmount it ourselves. Its -hfs makehybrid avoids the mount but
+# adds an attribute that fails strict signature checks.
+RAW=$ROOT/build/project-b-rw.dmg
+MOUNT=$ROOT/build/package-mount
+mkdir -p "$MOUNT"
+hdiutil create -quiet -size "$(( $(du -sk "$STAGE" | cut -f1) / 1024 + 64 ))m" -fs HFS+ -volname "Project B" -ov "$RAW"
+hdiutil attach -quiet -nobrowse -noverify -mountpoint "$MOUNT" "$RAW"
+ditto "$STAGE" "$MOUNT"
+for attempt in 1 2 3 4 5 6; do
+    hdiutil detach -quiet "$MOUNT" && break
+    sleep 5
+done
+hdiutil convert -quiet "$RAW" -format ULMO -ov -o "$DMG"
+rm -f "$RAW"
+rmdir "$MOUNT"
 hdiutil verify -quiet "$DMG"
 
 du -sh "$APP" "$DMG"

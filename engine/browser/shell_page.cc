@@ -25,8 +25,8 @@
 #include "content/public/browser/web_ui_controller.h"
 #include "content/public/browser/web_ui_controller_factory.h"
 #include "content/public/browser/web_ui_message_handler.h"
-#include "project_b/engine/abi/pb_exports.h"
 #include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/window.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -50,7 +50,7 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
  private:
   void OnMessage(const base::ListValue& args) {
     const std::string& json = args[0].GetString();
-    PBShellMessage(json.data(), json.size());
+    Go().shell_message(json.data(), json.size());
   }
 };
 

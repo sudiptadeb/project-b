@@ -1,4 +1,5 @@
-# The two binaries of the first app. See docs/first-app.md.
+# The first app: one library holding content and the C++ adapter, and two thin binaries
+# that load it. See docs/first-app.md.
 
 import("//build/config/mac/mac_sdk.gni")
 import("//tools/grit/repack.gni")
@@ -32,7 +33,7 @@ source_set("go_core_lib") {
   ]
 }
 
-# Shared by both binaries. Nothing here may reference Go.
+# What every process needs from the adapter.
 source_set("common") {
   sources = [
     "common/content_client.cc",
@@ -48,11 +49,11 @@ source_set("common") {
   ]
 }
 
-# The C++ adapter. Each function is thin and forwards to the Go core.
+# The C++ adapter. Each function is thin and forwards to the Go core, through the table
+# in browser/go.h, so nothing here links to Go.
 source_set("browser") {
   sources = [
     "abi/pb_abi.h",
-    "abi/pb_exports.h",
     "browser/browser_context.cc",
     "browser/browser_context.h",
     "browser/browser_main_parts.h",
@@ -63,6 +64,8 @@ source_set("browser") {
     "browser/driver.mm",
     "browser/engine.cc",
     "browser/engine.h",
+    "browser/go.cc",
+    "browser/go.h",
     "browser/mac_app.h",
     "browser/mac_app.mm",
     "browser/navigation_gate.cc",
@@ -78,7 +81,6 @@ source_set("browser") {
   ]
   deps = [
     ":common",
-    ":go_core_lib",
     "//base",
     "//components/embedder_support:user_agent",
     "//components/input",
@@ -138,25 +140,15 @@ group("engine") {
   ]
 }
 
-# Main process: content plus Go.
-executable("project_b") {
-  sources = [ "app/main.cc" ]
+# Content and the C++ adapter. Both binaries link this at load time and call its one
+# export, ProjectBMain. Everything else in it stays hidden.
+shared_library("project_b_content") {
+  sources = [
+    "abi/pb_main.h",
+    "project_b_main.cc",
+  ]
   deps = [
     ":browser",
-    ":pak",
-    "//base",
-    "//content/public/app",
-  ]
-  data_deps = [
-    ":project_b_helper",
-    "//tools/v8_context_snapshot",
-  ]
-}
-
-# Child processes: the same content, no Go.
-executable("project_b_helper") {
-  sources = [ "app/helper_main.cc" ]
-  deps = [
     ":common",
     ":pak",
     "//base",
@@ -164,4 +156,38 @@ executable("project_b_helper") {
     "//sandbox/mac:seatbelt",
   ]
   data_deps = [ "//tools/v8_context_snapshot" ]
+  ldflags = [
+    "-Wl,-exported_symbol,_ProjectBMain",
+    "-Wl,-install_name,@rpath/libproject_b_content.dylib",
+  ]
+}
+
+# Where the binaries find the library: Contents/Frameworks in the app, or beside them in
+# the build folder.
+config("finds_content_library") {
+  ldflags = [
+    "-Wl,-rpath,@executable_path/../Frameworks",
+    "-Wl,-rpath,@executable_path",
+  ]
+}
+
+# Main process: Go, and the library for everything else.
+executable("project_b") {
+  sources = [
+    "abi/pb_exports.h",
+    "app/main.cc",
+  ]
+  configs += [ ":finds_content_library" ]
+  deps = [
+    ":go_core_lib",
+    ":project_b_content",
+  ]
+  data_deps = [ ":project_b_helper" ]
+}
+
+# Child processes: the library, no Go.
+executable("project_b_helper") {
+  sources = [ "app/helper_main.cc" ]
+  configs += [ ":finds_content_library" ]
+  deps = [ ":project_b_content" ]
 }

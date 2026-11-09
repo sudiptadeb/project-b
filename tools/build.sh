@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the first app's two binaries. Flat on purpose; safe to re-run.
+# Builds the first app's library and two binaries. Flat on purpose; safe to re-run.
 # RELEASE=1 OUT=out/rel tools/build.sh makes an official-style build: no DCHECKs, link-time
 # optimisation, no symbols. It takes hours and can't be rebuilt quickly.
 set -uo pipefail
@@ -57,5 +57,5 @@ echo "=== $(date '+%F %T') build rc=$RC in $(( $(date +%s) - START ))s"
 
 mkdir -p "$OUT/shell"
 cp -f "$ROOT/shell/dist/"* "$OUT/shell/"
-ls -la "$OUT/project_b" "$OUT/project_b_helper" 2>/dev/null
+ls -la "$OUT/project_b" "$OUT/project_b_helper" "$OUT/libproject_b_content.dylib" 2>/dev/null
 echo "RESULT=ok $(date '+%F %T')"

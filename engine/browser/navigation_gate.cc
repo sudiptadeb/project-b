@@ -1,7 +1,7 @@
 #include "project_b/engine/browser/navigation_gate.h"
 
 #include "content/public/browser/navigation_handle.h"
-#include "project_b/engine/abi/pb_exports.h"
+#include "project_b/engine/browser/go.h"
 
 namespace project_b {
 
@@ -27,7 +27,7 @@ const char* NavigationGate::GetNameForLogging() {
 
 content::NavigationThrottle::ThrottleCheckResult NavigationGate::Ask() {
   const std::string& url = navigation_handle()->GetURL().spec();
-  return PBNavigationStarting(tab_, url.c_str()) ? PROCEED : BLOCK_REQUEST;
+  return Go().navigation_starting(tab_, url.c_str()) ? PROCEED : BLOCK_REQUEST;
 }
 
 }  // namespace project_b

@@ -10,10 +10,10 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/web_contents.h"
-#include "project_b/engine/abi/pb_exports.h"
 #include "project_b/engine/browser/browser_context.h"
 #include "project_b/engine/browser/driver.h"
 #include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
@@ -60,8 +60,8 @@ int BrowserMainParts::PreMainMessageLoopRun() {
                                      shell_.get());
   shell_->Load();
 
-  PBStart(Engine::Calls(), ProfileDir().value().c_str(),
-          command_line->GetSwitchValueASCII("block").c_str());
+  Go().start(Engine::Calls(), ProfileDir().value().c_str(),
+             command_line->GetSwitchValueASCII("block").c_str());
 
   if (command_line->HasSwitch("pb-driver")) {
     StartDriver(command_line->GetSwitchValuePath("pb-driver"));
@@ -75,7 +75,7 @@ void BrowserMainParts::WillRunMainMessageLoop(
 }
 
 void BrowserMainParts::PostMainMessageLoopRun() {
-  PBStop();
+  Go().stop();
   engine_.reset();
   shell_.reset();
   window_.reset();

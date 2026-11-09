@@ -26,8 +26,8 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
-#include "project_b/engine/abi/pb_exports.h"
 #include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
@@ -161,11 +161,11 @@ void Stats(const std::string& id) {
   const int kCalls = 1000000;
   const base::TimeTicks start = base::TimeTicks::Now();
   for (int i = 0; i < kCalls; i++) {
-    PBPing();
+    Go().ping();
   }
   const double ns = (base::TimeTicks::Now() - start).InMicrosecondsF() * 1000 / kCalls;
 
-  char* go = PBGoStats();
+  char* go = Go().go_stats();
   std::string go_stats(go);
   free(go);
 
@@ -286,11 +286,11 @@ void Run(const std::string& line) {
                   Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid()));
   } else if (cmd == "gc") {
     const base::TimeTicks start = base::TimeTicks::Now();
-    PBForceGC();
+    Go().force_gc();
     Reply(id, base::StringPrintf(
                   "%.1f", (base::TimeTicks::Now() - start).InMicrosecondsF()));
   } else if (cmd == "gopanic") {
-    Reply(id, PBRecoverNilDeref() ? "recovered" : "not recovered");
+    Reply(id, Go().recover_nil_deref() ? "recovered" : "not recovered");
   } else if (cmd == "segv") {
     Reply(id, "ok");
     volatile int* nothing = nullptr;

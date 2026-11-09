@@ -10,8 +10,8 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
 #include "net/base/net_errors.h"
-#include "project_b/engine/abi/pb_exports.h"
 #include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -35,34 +35,34 @@ void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
   }
   const std::string& url = handle->GetURL().spec();
   if (handle->HasCommitted() && !handle->IsErrorPage()) {
-    PBNavigationFinished(id_, url.c_str());
+    Go().navigation_finished(id_, url.c_str());
     return;
   }
   // ERR_ABORTED is a navigation replaced by a newer one, which isn't a failure.
   if (handle->GetNetErrorCode() != net::OK &&
       handle->GetNetErrorCode() != net::ERR_ABORTED) {
-    PBNavigationFailed(id_, url.c_str(),
+    Go().navigation_failed(id_, url.c_str(),
                        net::ErrorToString(handle->GetNetErrorCode()).c_str());
   }
 }
 
 void PageTab::DidStartLoading() {
-  PBLoadingChanged(id_, 1);
+  Go().loading_changed(id_, 1);
 }
 
 void PageTab::DidStopLoading() {
-  PBLoadingChanged(id_, 0);
+  Go().loading_changed(id_, 0);
 }
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {
   const std::u16string& title = contents_->GetTitle();
   Engine::Get()->window()->SetTitle(title);
-  PBTitleChanged(id_, base::UTF16ToUTF8(title).c_str());
+  Go().title_changed(id_, base::UTF16ToUTF8(title).c_str());
 }
 
 void PageTab::PrimaryMainFrameRenderProcessGone(
     base::TerminationStatus status) {
-  PBPageCrashed(id_);
+  Go().page_crashed(id_);
 }
 
 content::WebContents* PageTab::OpenURLFromTab(

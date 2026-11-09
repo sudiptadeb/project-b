@@ -81,7 +81,9 @@ const busy = computed(() => update.state.check === 'checking' || update.state.ph
             <input
               type="checkbox"
               role="switch"
+              class="switch"
               :checked="prefs.autoUpdate"
+              :aria-checked="String(prefs.autoUpdate)"
               @change="send({ t: 'setAutoUpdate', on: $event.target.checked })"
             />
           </label>
@@ -179,6 +181,48 @@ h2 {
 .choice input,
 input[type='checkbox'] {
   margin: 0;
+}
+
+/* A switch drawn on the checkbox, which keeps its keys and its meaning; Chromium 155 has the
+   native one only behind a flag. Off is an outline, on is the system accent. */
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border: 1px solid var(--muted);
+  border-radius: 10px;
+  box-sizing: border-box;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms;
+}
+
+.switch:checked {
+  border-color: AccentColor;
+  background: AccentColor;
+}
+
+.switch:checked::before {
+  background: AccentColorText;
+  transform: translateX(16px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid AccentColor;
+  outline-offset: 2px;
 }
 
 .status {

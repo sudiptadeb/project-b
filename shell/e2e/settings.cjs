@@ -98,7 +98,18 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   await until(async () => await radio(settings, 'Vertical').isChecked());
   check('the settings page shows the current layout', (await radio(settings, 'Vertical').isChecked()) && !(await radio(settings, 'Horizontal').isChecked()));
   check('it shows the running version', (await settings.locator('.version').textContent()) === '0.2.0', await settings.locator('.version').textContent());
-  check('it shows automatic updates on, the default', await settings.getByRole('switch', { name: 'Automatic updates' }).isChecked());
+  const autoUpdate = (p) => p.getByRole('switch', { name: 'Automatic updates' });
+  check('it shows automatic updates on, the default', await autoUpdate(settings).isChecked());
+  const switchAttrs = await autoUpdate(settings).evaluate((e) => [e.type, e.getAttribute('role'), e.getAttribute('aria-checked')].join(' '));
+  check('the control is a checkbox with role="switch" and aria-checked', switchAttrs === 'checkbox switch true', switchAttrs);
+  const edges = await settings.evaluate(() => {
+    const box = (e) => e.getBoundingClientRect();
+    const sw = box(document.querySelector('[role=switch]'));
+    const label = box(document.querySelector('[role=switch]').closest('.row').querySelector('.label'));
+    const button = box([...document.querySelectorAll('button')].find((b) => b.textContent === 'Check for updates'));
+    return [sw.right, button.right, sw.top + sw.height / 2, label.top + label.height / 2];
+  });
+  check('the switch sits at the right edge, with the button above, level with its label', edges[0] === edges[1] && edges[2] === edges[3], JSON.stringify(edges));
   await settings.screenshot({ path: path.join(out, 'settings-light.png') });
 
   // Changing it there goes through the prefs manager: saved, and the shell follows.
@@ -148,10 +159,18 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   check('Check asks the update manager, which says it is up to date', await until(async () => (await status.textContent()) === 'Up to date'), await status.textContent());
   check('one check reached the release server', manifests === before + 1, `${before} -> ${manifests}`);
 
-  // Automatic updates off: saved, and the manager's timer stops. It stays off after a
-  // restart; a check asked for still runs; on again, the timer starts as at launch.
-  await settings.getByRole('switch', { name: 'Automatic updates' }).uncheck();
-  check('turning automatic updates off saves it', await until(() => prefsFile().autoUpdate === false), JSON.stringify(prefsFile()));
+  // Automatic updates off, from the keyboard: saved, and the manager's timer stops. It stays
+  // off after a restart; a check asked for still runs; on again, the timer starts as at launch.
+  await settings.getByRole('button', { name: 'Check for updates' }).focus();
+  await settings.keyboard.press('Tab');
+  const ring = await autoUpdate(settings).evaluate((e) => {
+    const s = getComputedStyle(e);
+    return [e === document.activeElement, e.matches(':focus-visible'), s.outlineStyle, s.outlineWidth].join(' ');
+  });
+  check('Tab reaches the switch and shows a focus ring', ring === 'true true solid 2px', ring);
+  await settings.keyboard.press('Space');
+  check('Space turns automatic updates off and saves it', await until(() => prefsFile().autoUpdate === false), JSON.stringify(prefsFile()));
+  check('and the switch says it is off', await until(async () => (await autoUpdate(settings).getAttribute('aria-checked')) === 'false' && !(await autoUpdate(settings).isChecked())));
   await second.close();
   await stopServer();
   await startServer();
@@ -164,13 +183,14 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   await settings.goto(base + '/tab/1/');
   await until(async () => (await settings.locator('.version').textContent()) === '0.2.0');
   errors.length = 0; // Stopping the server broke the old pages' event streams, as it should.
-  check('after a restart the switch is still off', !(await settings.getByRole('switch', { name: 'Automatic updates' }).isChecked()));
+  check('after a restart the switch is still off', !(await autoUpdate(settings).isChecked()) && (await autoUpdate(settings).getAttribute('aria-checked')) === 'false');
   await sleep(3500);
   check('and the update manager made no check of its own', manifests === atStart, `${atStart} -> ${manifests}`);
   await settings.getByRole('button', { name: 'Check for updates' }).click();
   check('a check asked for still runs', await until(async () => manifests === atStart + 1 && (await status.textContent()) === 'Up to date'), `${manifests} ${await status.textContent()}`);
-  await settings.getByRole('switch', { name: 'Automatic updates' }).check();
-  check('turning it on again saves it', await until(() => prefsFile().autoUpdate === true));
+  await autoUpdate(settings).check();
+  check('turning it on again with a click saves it', await until(() => prefsFile().autoUpdate === true));
+  check('and the switch says it is on', await until(async () => (await autoUpdate(settings).getAttribute('aria-checked')) === 'true'));
   check('and the timer checks again, as at launch', await until(() => manifests === atStart + 2, 4000), `${atStart} -> ${manifests}`);
 
   // The toolbar's settings button opens the page in a new, active tab, in both layouts.

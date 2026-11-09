@@ -1,0 +1,377 @@
+#!/usr/bin/env python3
+"""Runs the first app with real Chromium and tests it through real NSEvents.
+
+The driver asks the window's own hitTest:, sets first responder and hands the event to
+the view, because [window sendEvent:] delivers nothing without a GUI session. Content's
+view checks the same hitTest: before accepting the event. AppKit's own dispatch isn't
+exercised. Run it from the repo root:
+
+    python3 tools/drive_first_app.py
+
+Results go to build/real/. Each screenshot is what content rendered, drawn shell over
+page by the driver. It is not read back from the window.
+"""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+BIN = os.path.join(ROOT, "chromium/src/out/pb/project_b")
+OUT = os.path.join(ROOT, "build/real")
+BLOCKED = "blocked.test"
+URL_A = "https://example.com/"
+URL_B = "https://www.iana.org/help/example-domains"
+
+failures = 0
+
+
+def check(name, ok, detail=""):
+    global failures
+    print(("ok   " if ok else "FAIL ") + name + ("" if ok or detail == "" else " -> " + str(detail)), flush=True)
+    if not ok:
+        failures += 1
+
+
+class App:
+    def __init__(self, profile, extra=()):
+        self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
+        os.mkfifo(self.fifo)
+        self.log = open(os.path.join(OUT, "app.log"), "a")
+        self.replies = {}
+        self.cond = threading.Condition()
+        self.next = 0
+        self.started = time.time()
+        self.proc = subprocess.Popen(
+            [BIN, f"--profile={profile}", f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+        )
+        threading.Thread(target=self._read, daemon=True).start()
+        self.wait_reply("start", 60)
+        self.writer = open(self.fifo, "w", buffering=1)
+
+    def _read(self):
+        for line in self.proc.stdout:
+            self.log.write(line)
+            self.log.flush()
+            m = re.match(r"PBDRIVER (\S+) (.*)$", line.rstrip("\n"))
+            if m:
+                with self.cond:
+                    self.replies[m.group(1)] = m.group(2)
+                    self.cond.notify_all()
+        with self.cond:
+            self.replies["exit"] = "exit"
+            self.cond.notify_all()
+
+    def wait_reply(self, key, timeout=20):
+        deadline = time.time() + timeout
+        with self.cond:
+            while key not in self.replies:
+                if "exit" in self.replies and key != "exit":
+                    raise RuntimeError(f"app exited waiting for {key}")
+                left = deadline - time.time()
+                if left <= 0:
+                    raise TimeoutError(key)
+                self.cond.wait(left)
+            return self.replies.pop(key)
+
+    def cmd(self, *parts, timeout=20):
+        self.next += 1
+        key = str(self.next)
+        self.writer.write(" ".join([key, *map(str, parts)]) + "\n")
+        self.writer.flush()
+        return self.wait_reply(key, timeout)
+
+    def js(self, expr, page=False):
+        r = self.cmd("evalpage" if page else "eval", expr.replace("\n", " "))
+        return json.loads(r) if r != "" else None
+
+    def wait(self, expr, timeout=15, page=False):
+        deadline = time.time() + timeout
+        last = None
+        while time.time() < deadline:
+            last = self.js(expr, page)
+            if last:
+                return last
+            time.sleep(0.05)
+        raise TimeoutError(f"{expr} last={last}")
+
+    def close(self):
+        self.cmd("close")
+        self.proc.wait(timeout=30)
+
+
+INPUT = "document.querySelector('input')"
+VALUE = INPUT + ".value"
+OPTIONS = "document.querySelectorAll('[role=option]').length"
+ACTIVE = "document.querySelectorAll('li.active').length"
+TAB_READY = "!document.querySelector('.progress.on')"
+
+
+def box(app):
+    return app.js("(()=>{const r=document.querySelector('#suggestions').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()")
+
+
+def focus_bar(app):
+    """Clicks the bar and waits until it really has focus and everything is selected."""
+    app.cmd("click", 400, 26)
+    app.wait(f"document.hasFocus()&&document.activeElement==={INPUT}&&{INPUT}.selectionStart===0&&{INPUT}.selectionEnd==={VALUE}.length")
+
+
+def leave_bar(app):
+    """Escape until the page has focus. focusPage is asynchronous, so wait for it."""
+    deadline = time.time() + 5
+    while not app.js("document.hasFocus()", page=True):
+        if time.time() > deadline:
+            raise TimeoutError("page never got focus")
+        app.cmd("key", "escape")
+        time.sleep(0.1)
+
+
+def visit(app, url):
+    focus_bar(app)
+    app.cmd("type", url)
+    app.wait(f"{VALUE}==={json.dumps(url)}")
+    app.cmd("key", "enter")
+    app.wait(f"{VALUE}.startsWith({json.dumps(url)})&&document.activeElement!=={INPUT}", 30)
+    app.wait(TAB_READY, 30)
+
+
+def process_table(pid):
+    """Our process and its descendants, with thread counts and memory."""
+    ps = subprocess.run(["ps", "-axo", "pid=,ppid=,rss=,command="], capture_output=True, text=True).stdout
+    rows = []
+    for line in ps.splitlines():
+        p, ppid, rss, command = line.split(None, 3)
+        rows.append((int(p), int(ppid), int(rss), command))
+    keep, seen = [], {pid}
+    changed = True
+    while changed:
+        changed = False
+        for row in rows:
+            if row[1] in seen and row[0] not in seen:
+                seen.add(row[0])
+                changed = True
+    for row in rows:
+        if row[0] in seen:
+            threads = len(subprocess.run(["ps", "-M", "-p", str(row[0])], capture_output=True, text=True).stdout.splitlines()) - 1
+            exe = row[3].split()[0].split("/")[-1]
+            kind = re.search(r"--type=(\S+)", row[3])
+            sub = re.search(r"--utility-sub-type=(\S+)", row[3])
+            keep.append({"pid": row[0], "exe": exe, "type": kind.group(1) if kind else "main", "sub": sub.group(1) if sub else "", "threads": threads, "rssMB": round(row[2] / 1024, 1)})
+    return keep
+
+
+def main():
+    if os.path.exists(OUT):
+        shutil.rmtree(OUT)
+    os.makedirs(OUT)
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+
+    t0 = time.time()
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    print(f"shell page answered {time.time() - t0:.2f}s after launch (includes driver polling)", flush=True)
+    stats = json.loads(app.cmd("stats", timeout=60))
+    print("stats", json.dumps(stats), flush=True)
+
+    check("opens empty", app.js(VALUE) == "")
+    check("snapshot says the real engine", app.js("document.querySelector('iframe')===null"))
+    app.wait("document.querySelector('form').getBoundingClientRect().height>0")
+    time.sleep(0.3)
+    print("bounds", app.cmd("bounds"), flush=True)
+    check("bar belongs to the shell", app.cmd("hit", 400, 26) == "shell")
+    check("below the bar belongs to the page", app.cmd("hit", 400, 300) == "page")
+    print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
+
+    # Real pages through the address bar.
+    visit(app, URL_A)
+    check("loads a real page", app.js("location.href", page=True) == URL_A, app.js("location.href", page=True))
+    title = app.wait("document.title", page=True)
+    check("the page's own title reaches the page", "Example" in title, title)
+    time.sleep(0.5)
+    check("window title follows the tab", "Example" in app.cmd("title"), app.cmd("title"))
+    visit(app, URL_B)
+    app.wait(f"{VALUE}.includes('iana.org')", 30)
+    print(app.cmd("capture", os.path.join(OUT, "2-page.png")), flush=True)
+
+    # Suggestions over the page, from real history.
+    focus_bar(app)
+    app.cmd("type", "exam")
+    app.wait(OPTIONS)
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "3-suggestions.png")), flush=True)
+    check("typing shows suggestions from history", app.js(OPTIONS) >= 1, app.js(OPTIONS))
+    check("the suggestion has the real page's title", "Example" in app.js("document.querySelector('[role=option]').innerText"))
+    x, y, w, h = box(app)
+    check("the box belongs to the shell", app.cmd("hit", x + 30, y + h - 6) == "shell")
+    check("beside the box belongs to the page", app.cmd("hit", x + w + 8 if x + w + 8 < 1090 else x / 2, y + h - 6) == "page")
+
+    # Bar and list behave as one UI.
+    app.cmd("key", "down")
+    app.wait(ACTIVE)
+    check("down moves into the list", app.js(VALUE).startswith("https://"), app.js(VALUE))
+    app.cmd("key", "up")
+    app.wait(f"{ACTIVE}===0")
+    check("up from the first item returns to what was typed", app.js(VALUE) == "exam", app.js(VALUE))
+    check("focus never left the address bar", app.js(f"document.activeElement==={INPUT}"))
+
+    # Clicking the page closes the box and focus moves to it.
+    app.js("window.__pageClicks=0", page=True)
+    app.js("(()=>{window.__pageClicks=0;addEventListener('mousedown',()=>window.__pageClicks++);return 1})()", page=True)
+    app.cmd("click", 900, 600)
+    app.wait(f"{OPTIONS}===0")
+    check("clicking the page closes the box", True)
+    check("the click reached the page", app.wait("window.__pageClicks", page=True) == 1)
+    check("page has focus after clicking it", app.js("document.hasFocus()", page=True))
+
+    # A click on the box must not reach the page behind it, and it navigates.
+    focus_bar(app)
+    app.cmd("type", "exam")
+    app.wait(OPTIONS)
+    time.sleep(0.2)
+    x, y, w, h = box(app)
+    app.cmd("click", x + 40, y + 20)
+    app.wait(f"{VALUE}.startsWith('https://example.com')", 30)
+    app.wait(TAB_READY, 30)
+    check("clicking a suggestion navigates, so the shell got the click and not the page", True)
+
+    # Shortcut from the page.
+    app.cmd("click", 900, 600)
+    app.wait(f"document.activeElement!=={INPUT}")
+    app.cmd("key", "cmd+l")
+    try:
+        app.wait(f"document.activeElement==={INPUT}&&document.hasFocus()", 5)
+        check("Cmd+L focuses the address bar from the page", True)
+    except TimeoutError as e:
+        check("Cmd+L focuses the address bar from the page", False, e)
+    leave_bar(app)
+
+    # Tab off the end of the shell moves into the page.
+    focus_bar(app)
+    app.cmd("key", "tab")
+    time.sleep(0.1)
+    check("tab moves to the Go button", app.js("document.activeElement.tagName") == "BUTTON", app.js("document.activeElement.tagName"))
+    app.cmd("key", "tab")
+    try:
+        app.wait("document.hasFocus()", 5, page=True)
+        check("tab past the end of the shell moves into the page", True)
+    except TimeoutError as e:
+        check("tab past the end of the shell moves into the page", False, e)
+
+    # Policy answered synchronously by Go.
+    focus_bar(app)
+    app.cmd("type", "https://www.blocked.test/secret")
+    app.wait(f"{VALUE}==='https://www.blocked.test/secret'")
+    app.cmd("key", "enter")
+    try:
+        app.wait("document.querySelector('.status')&&document.querySelector('.status').innerText==='Blocked'", 10)
+        check("a blocked host is stopped by Go's gate", True)
+    except TimeoutError as e:
+        check("a blocked host is stopped by Go's gate", False, e)
+    check("the page never left the host it was on", "blocked.test" not in app.js("location.host", page=True), app.js("location.host", page=True))
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "4-blocked.png")), flush=True)
+    focus_bar(app)
+    app.cmd("type", "secret")
+    app.wait(f"{VALUE}==='secret'")
+    time.sleep(0.4)
+    check("a blocked URL stays out of history", app.js(OPTIONS) == 0, app.js(OPTIONS))
+    leave_bar(app)
+
+    # Key press to paint, measured inside the shell. Not a display measurement.
+    focus_bar(app)
+    app.js("""(()=>{window.__k=[];const i=document.querySelector('input');
+      i.addEventListener('input',e=>{const t=e.timeStamp;requestAnimationFrame(()=>requestAnimationFrame(()=>window.__k.push(performance.now()-t)))});return 1})()""")
+    for ch in "abcdefghijklmnopqrstuvwxyz":
+        app.cmd("type", ch)
+        time.sleep(0.06)
+    time.sleep(0.2)
+    samples = sorted(app.js("window.__k") or [])
+    if samples:
+        print(f"key to next frames: n={len(samples)} median={samples[len(samples)//2]:.1f}ms max={samples[-1]:.1f}ms", flush=True)
+    leave_bar(app)
+
+    # Resize: does the page follow in step with the shell?
+    before = json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"]
+    results = []
+    for w, h in ((1300, 800), (900, 560), (1100, 700)):
+        app.cmd("resize", w, h)
+        immediately = json.loads(app.cmd("bounds"))
+        time.sleep(0.25)
+        settled = json.loads(app.cmd("bounds"))
+        results.append((w, h, immediately["frame"], settled["frame"], settled["reported"]))
+        check(f"page frame is right straight after resize to {w}x{h}", immediately["frame"] == settled["frame"], (immediately, settled))
+    print("resize", results, flush=True)
+    for i in range(30):
+        app.cmd("resize", 1000 + i * 7, 650 + i * 5)
+    final_frame = json.loads(app.cmd("bounds"))
+    time.sleep(0.3)
+    settled = json.loads(app.cmd("bounds"))
+    check("a burst of resizes ends in the right place", settled["frame"] == [0, 0, settled["content"][0], settled["content"][1] - settled["reported"][1]], settled)
+    print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
+    app.cmd("resize", 1100, 700)
+    time.sleep(0.3)
+
+    # Crash handling, from a healthy page: a blocked tab correctly keeps saying Blocked.
+    visit(app, URL_A)
+    app.cmd("crashpage")
+    try:
+        app.wait("document.querySelector('.status')&&document.querySelector('.status').innerText==='Crashed'", 10)
+        check("a crashed page shows", True)
+    except TimeoutError as e:
+        check("a crashed page shows", False, e)
+    visit(app, URL_A)
+    app.cmd("crashshell")
+    time.sleep(0.2)
+    deadline = time.time() + 15
+    recovered = False
+    while time.time() < deadline:
+        try:
+            if app.js(f"{VALUE}.startsWith('https://example.com')"):
+                recovered = True
+                break
+        except Exception:
+            pass
+        time.sleep(0.1)
+    check("a crashed shell reloads and gets its state back", recovered)
+    check("the page survived the shell crash", "Example" in app.js("document.title", page=True))
+
+    # Processes.
+    table = process_table(app.proc.pid)
+    for row in table:
+        print("process", json.dumps(row), flush=True)
+    check("the main process is project_b", any(r["type"] == "main" and r["exe"] == "project_b" for r in table))
+    children = [r for r in table if r["type"] != "main"]
+    check("every child process is the helper", children and all(r["exe"] == "project_b_helper" for r in children), children)
+    final = json.loads(app.cmd("stats", timeout=60))
+    print("stats", json.dumps(final), flush=True)
+
+    app.close()
+
+    # History survives a restart.
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    time.sleep(1)
+    focus_bar(app)
+    app.cmd("type", "exam")
+    try:
+        app.wait(OPTIONS, 10)
+        check("history survives a restart", True)
+        check("titles survive a restart", "Example" in app.js("document.querySelector('[role=option]').innerText"))
+    except TimeoutError as e:
+        check("history survives a restart", False, e)
+    app.close()
+
+    print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
+    sys.exit(1 if failures else 0)
+
+
+if __name__ == "__main__":
+    main()

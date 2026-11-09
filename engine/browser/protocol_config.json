@@ -1,0 +1,27 @@
+{
+    "use_snake_file_names": true,
+    "use_title_case_methods": true,
+
+    "protocol": {
+        "package": "project_b/engine/browser/protocol",
+        "output": "protocol",
+        "namespace": ["project_b", "protocol"],
+        "options": [
+            {
+                "domain": "Browser",
+                "include": ["getWindowForTarget", "getWindowBounds", "setWindowBounds", "close"],
+                "include_events": []
+            }
+        ]
+    },
+
+    "lib": {
+        "package": "project_b/engine/browser/protocol",
+        "output": "protocol",
+        "protocol_traits": "third_party/inspector_protocol/crdtp/chromium/protocol_traits.h"
+    },
+
+    "crdtp": {
+        "namespace": "crdtp"
+    }
+}

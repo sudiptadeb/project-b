@@ -4,6 +4,7 @@
 #include <string_view>
 #include <utility>
 
+#include "base/check.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
@@ -21,6 +22,7 @@
 #include "net/log/net_log_source.h"
 #include "net/socket/tcp_server_socket.h"
 #include "project_b/engine/browser/browser_main_parts.h"
+#include "project_b/engine/browser/devtools_session.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
@@ -72,16 +74,6 @@ std::optional<uint16_t> ParsePort(std::string_view text) {
   return std::nullopt;
 }
 
-// The pipe closing means the client is done with us, as Chrome takes it.
-void CloseBrowserSoon() {
-  content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE, base::BindOnce([] {
-        if (Engine* engine = Engine::Get()) {
-          engine->CloseWindow();
-        }
-      }));
-}
-
 bool IsShell(content::WebContents* web_contents) {
   Engine* engine = Engine::Get();
   return engine && web_contents &&
@@ -113,6 +105,16 @@ void StartRemoteDebugging() {
         *port == 0 ? ProfileDir() : base::FilePath(),
         /*debug_frontend_dir=*/base::FilePath());
   }
+}
+
+// Chrome's ChromeDevToolsManagerDelegate::CloseBrowserSoon, with our one window.
+void CloseBrowserSoon() {
+  content::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE, base::BindOnce([] {
+        if (Engine* engine = Engine::Get()) {
+          engine->CloseWindow();
+        }
+      }));
 }
 
 void StopRemoteDebugging() {
@@ -168,6 +170,24 @@ std::string DevToolsManagerDelegate::GetTargetType(
 std::optional<bool> DevToolsManagerDelegate::ShouldReportAsTabTarget(
     content::WebContents* web_contents) {
   return IsShell(web_contents) ? std::optional<bool>(false) : std::nullopt;
+}
+
+void DevToolsManagerDelegate::ClientAttached(
+    content::DevToolsAgentHostClientChannel* channel) {
+  CHECK(!sessions_.contains(channel));
+  sessions_.emplace(channel, std::make_unique<DevToolsSession>(channel));
+}
+
+void DevToolsManagerDelegate::ClientDetached(
+    content::DevToolsAgentHostClientChannel* channel) {
+  sessions_.erase(channel);
+}
+
+void DevToolsManagerDelegate::HandleCommand(
+    content::DevToolsAgentHostClientChannel* channel,
+    base::span<const uint8_t> message,
+    NotHandledCallback callback) {
+  sessions_.at(channel)->HandleCommand(message, std::move(callback));
 }
 
 }  // namespace project_b

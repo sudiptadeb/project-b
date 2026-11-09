@@ -2,6 +2,7 @@
 # that load it. See docs/first-app.md.
 
 import("//build/config/mac/mac_sdk.gni")
+import("//third_party/inspector_protocol/inspector_protocol.gni")
 import("//tools/grit/repack.gni")
 
 assert(is_mac, "The first app is Mac only so far")
@@ -49,6 +50,35 @@ source_set("common") {
   ]
 }
 
+# The DevTools commands content leaves to the embedder that we answer: Browser's window
+# commands. Generated from Blink's protocol the way content_shell's are
+# (content/shell/BUILD.gn); browser/protocol_config.json picks the commands.
+inspector_protocol_generate("protocol_sources") {
+  visibility = [ ":browser" ]
+  deps = [ "//third_party/blink/public/devtools_protocol:protocol_version" ]
+  _blink_protocol_path = rebase_path(
+          "$root_gen_dir/third_party/blink/public/devtools_protocol/protocol.json",
+          root_build_dir)
+
+  inspector_protocol_dir = "//third_party/inspector_protocol"
+  out_dir = "$target_gen_dir/browser"
+  config_file = "browser/protocol_config.json"
+  config_values = [ "protocol.path=$_blink_protocol_path" ]
+  use_embedder_types = true
+
+  inputs = [
+    "$root_gen_dir/third_party/blink/public/devtools_protocol/protocol.json",
+    config_file,
+  ]
+
+  # These are relative to out_dir.
+  outputs = [
+    "protocol/browser.cc",
+    "protocol/browser.h",
+    "protocol/protocol.h",
+  ]
+}
+
 # The C++ adapter. Each function is thin and forwards to the Go core, through the table
 # in browser/go.h, so nothing here links to Go.
 source_set("browser") {
@@ -62,6 +92,8 @@ source_set("browser") {
     "browser/content_browser_client.h",
     "browser/devtools.cc",
     "browser/devtools.h",
+    "browser/devtools_session.cc",
+    "browser/devtools_session.h",
     "browser/driver.h",
     "browser/driver.mm",
     "browser/engine.cc",
@@ -83,8 +115,10 @@ source_set("browser") {
     "browser_main_delegate.cc",
     "browser_main_delegate.h",
   ]
+  sources += get_target_outputs(":protocol_sources")
   deps = [
     ":common",
+    ":protocol_sources",
     "//base",
     "//components/embedder_support:user_agent",
     "//components/input",
@@ -99,6 +133,7 @@ source_set("browser") {
     "//skia",
     "//third_party/blink/public/common",
     "//third_party/blink/public/mojom:mojom_platform",
+    "//third_party/inspector_protocol:crdtp",
     "//ui/base",
     "//ui/display",
     "//ui/events",

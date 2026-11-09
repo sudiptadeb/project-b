@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/native_ui_types.h"
@@ -57,6 +58,20 @@ class Window {
       base::RepeatingCallback<void(const gfx::RectF&, double corner_radius)> on_change);
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
+
+  // The window's frame on screen, y measured down from the top of the main screen, and
+  // its state, as Chrome's views report and change them on a Mac
+  // (ui/views/widget/native_widget_mac.mm): maximised is AppKit's zoomed, and Restore
+  // leaves full screen, the Dock and zoom alike. For DevTools' Browser domain.
+  gfx::Rect GetBounds() const;
+  void SetBounds(const gfx::Rect& bounds);
+  bool IsMinimized() const;
+  bool IsMaximized() const;
+  bool IsFullscreen() const;
+  void Minimize();
+  void Maximize();
+  void SetFullscreen(bool fullscreen);
+  void Restore();
 
   gfx::NativeWindow native_window() const;
   // Development only, for the driver.

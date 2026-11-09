@@ -9,6 +9,7 @@
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "ui/gfx/mac/coordinate_conversion.h"
 
 // Answers the OS hit test. Content's own views ask this same question, so a view that
 // loses the answer ignores the event (see shouldIgnoreMouseEvent: in
@@ -376,6 +377,50 @@ bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
     return false;
   }
   return [NSApp.mainMenu performKeyEquivalent:ns_event];
+}
+
+gfx::Rect Window::GetBounds() const {
+  return gfx::ScreenRectFromNSRect(impl_->window.frame);
+}
+
+void Window::SetBounds(const gfx::Rect& bounds) {
+  [impl_->window setFrame:gfx::ScreenRectToNSRect(bounds) display:YES];
+}
+
+bool Window::IsMinimized() const {
+  return impl_->window.miniaturized;
+}
+
+bool Window::IsMaximized() const {
+  return impl_->window.zoomed;
+}
+
+bool Window::IsFullscreen() const {
+  return (impl_->window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+}
+
+void Window::Minimize() {
+  [impl_->window performMiniaturize:nil];
+}
+
+void Window::Maximize() {
+  if (!impl_->window.zoomed) {
+    [impl_->window performZoom:nil];
+  }
+}
+
+void Window::SetFullscreen(bool fullscreen) {
+  if (IsFullscreen() != fullscreen) {
+    [impl_->window toggleFullScreen:nil];
+  }
+}
+
+void Window::Restore() {
+  SetFullscreen(false);
+  [impl_->window deminiaturize:nil];
+  if (impl_->window.zoomed) {
+    [impl_->window performZoom:nil];
+  }
 }
 
 void Window::ForceKeyForDriver() {

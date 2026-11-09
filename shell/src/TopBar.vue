@@ -17,6 +17,10 @@ function switchLayout() {
 
 <template>
   <header v-shell class="top" :class="{ toolbar: !titleBar }">
+    <!-- The frame's bands around the bar are empty shell, so they drag the window. -->
+    <div v-if="titleBar" v-drag class="band top"></div>
+    <div class="row">
+    <div v-drag class="band side"></div>
     <div class="bar">
     <template v-if="titleBar">
       <div v-drag class="space" :style="{ width: controls.left }"></div>
@@ -49,34 +53,47 @@ function switchLayout() {
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
     </div>
+    <div v-drag class="band side"></div>
+    </div>
   </header>
 </template>
 
 <style scoped>
 /* The row starts as frame colour, like every tracked component, and the bar is drawn
-   on it 4px in from the sides. As the title bar it also carries the frame's top band;
-   the window's curve over its corners comes from the rounding border in App.vue. */
+   on it between the frame's side bands. As the title bar it also carries the frame's
+   top band; the window's curve over its corners comes from the rounding border in
+   App.vue. */
 .top {
   position: relative;
   z-index: 1;
   flex: none;
-  padding: var(--frame-width) var(--frame-width) 0;
   background: var(--frame);
+}
+
+.band.top {
+  height: var(--frame-width);
+}
+
+.row {
+  display: flex;
+}
+
+.band.side {
+  flex: none;
+  width: var(--frame-width);
 }
 
 .bar {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0;
   height: 44px;
   background: var(--bar);
 }
 
-/* Under the tab strip the row has no band of its own, and the bar's corners meet the
-   strip with the tabs' radius. */
-.top.toolbar {
-  padding-top: 0;
-}
+/* Under the tab strip the bar's corners meet the strip with the tabs' radius. */
 
 .top.toolbar .bar {
   border-radius: 8px 8px 0 0;

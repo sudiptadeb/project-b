@@ -192,7 +192,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
-  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 6 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 9 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   // The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.

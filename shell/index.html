@@ -6,6 +6,9 @@
 <title>Project B</title>
 <style>
   html, body, #app { height: 100%; margin: 0; background: transparent; }
+  /* The shell is not a page: it never scrolls, and a trackpad swipe over it must not
+     rubber-band it against the window the way macOS bounces a web page. */
+  html, body { overflow: hidden; overscroll-behavior: none; }
 </style>
 </head>
 <body>

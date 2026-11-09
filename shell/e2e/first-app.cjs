@@ -195,6 +195,10 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 6 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
+  // The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
+  const rootStyle = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return [s.overflow, s.overscrollBehaviorY, document.scrollingElement.scrollHeight - window.innerHeight]; });
+  check('the shell document neither scrolls nor bounces', rootStyle[0] === 'hidden' && rootStyle[1] === 'none' && rootStyle[2] === 0, JSON.stringify(rootStyle));
+
   // The engine also says how round the window's corners are; the frame's inner edge
   // follows, one frame width inside.
   const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());

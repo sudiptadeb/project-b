@@ -392,6 +392,10 @@ def main():
     # The window controls stay put through resizes, so the shell's space for them does too.
     check("the controls' space survives resizing", app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
 
+    # The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
+    root = app.js("(()=>{const s=getComputedStyle(document.documentElement);return [s.overflow,s.overscrollBehaviorY,document.scrollingElement.scrollHeight-window.innerHeight]})()")
+    check("the shell document neither scrolls nor bounces", root == ["hidden", "none", 0], root)
+
     # The engine reads the window's corner radius from macOS and the shell's frame
     # follows it, one frame width inside. Real full screen, which needs a display, has
     # square corners and no controls; the radius comes back with the window.

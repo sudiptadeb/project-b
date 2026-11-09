@@ -42,8 +42,7 @@ class ShellPage : public content::WebContentsObserver,
 
  private:
   // content::WebContentsObserver:
-  void RenderFrameHostChanged(content::RenderFrameHost* old_host,
-                              content::RenderFrameHost* new_host) override;
+  void RenderFrameCreated(content::RenderFrameHost* frame) override;
   void DidFirstVisuallyNonEmptyPaint() override;
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
@@ -53,8 +52,6 @@ class ShellPage : public content::WebContentsObserver,
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
-
-  void MakeTransparent();
 
   std::unique_ptr<content::WebContents> contents_;
   base::TimeDelta first_paint_;

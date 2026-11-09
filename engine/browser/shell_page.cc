@@ -252,7 +252,7 @@ ShellPage::ShellPage(content::BrowserContext* browser_context)
           content::WebContents::CreateParams(browser_context))) {
   Observe(contents_.get());
   contents_->SetDelegate(this);
-  MakeTransparent();
+  contents_->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
 }
 
 ShellPage::~ShellPage() {
@@ -268,17 +268,19 @@ void ShellPage::Send(const std::string& json) {
   SendToOurPage(contents_.get(), json);
 }
 
-void ShellPage::MakeTransparent() {
-  contents_->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
-  if (content::RenderWidgetHostView* view =
-          contents_->GetRenderWidgetHostView()) {
+// The shell's view is transparent wherever the shell paints nothing, so the page under
+// it shows. Content treats a view it was never told about as opaque, and the page area
+// then stays white until the shell next paints. The view belongs to the main frame, so
+// it is set as each main frame comes alive: the first one, one after a renderer crash,
+// and any later swap. A frame change is not enough: the first frame is made inside
+// WebContents::Create, before this observes, and the shell loads into that same frame.
+void ShellPage::RenderFrameCreated(content::RenderFrameHost* frame) {
+  if (frame->GetParent()) {
+    return;
+  }
+  if (content::RenderWidgetHostView* view = frame->GetView()) {
     view->SetBackgroundColor(SK_ColorTRANSPARENT);
   }
-}
-
-void ShellPage::RenderFrameHostChanged(content::RenderFrameHost* old_host,
-                                       content::RenderFrameHost* new_host) {
-  MakeTransparent();
 }
 
 void ShellPage::DidFirstVisuallyNonEmptyPaint() {

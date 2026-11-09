@@ -315,6 +315,11 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 	if t == nil {
 		return
 	}
+	// A load asked for while the app is still starting begins once it listens.
+	if e.listener == nil {
+		e.Post(func() { e.load(id, u, commit) })
+		return
+	}
 	t.navSeq++
 	seq := t.navSeq
 	if !e.listener.NavigationStarting(id, u) {
@@ -336,7 +341,7 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 			t.state = "loaded"
 			e.listener.HistoryChanged(id, t.pos > 0, t.pos < len(t.history)-1)
 			e.listener.NavigationFinished(id, u)
-			e.listener.TitleChanged(id, "Mock "+hostOf(u))
+			e.listener.TitleChanged(id, titleOf(u))
 			e.listener.LoadProgressChanged(id, 1)
 			e.listener.LoadingChanged(id, false)
 			e.publishPage(id, t.state, u)
@@ -351,6 +356,15 @@ func (e *Engine) publishPage(id engine.TabID, state, u string) {
 	}
 	b, _ := json.Marshal(map[string]any{"tab": id, "state": state, "url": u})
 	e.Page.Publish(b)
+}
+
+// titleOf is a mock page's title. The blank page has none, so content titles it with
+// its address, as it does any untitled page.
+func titleOf(u string) string {
+	if u == "about:blank" {
+		return u
+	}
+	return "Mock " + hostOf(u)
 }
 
 func hostOf(raw string) string {

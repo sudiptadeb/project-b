@@ -33,6 +33,11 @@ type Gate func(url string) bool
 
 const searchURL = "https://duckduckgo.com/?q="
 
+// BlankURL is what a new tab loads, so its page area holds a real page in content's
+// default colours from the start, rather than no page at all. The tab still reads as
+// empty: no address, titled New Tab, nothing in history.
+const BlankURL = "about:blank"
+
 // Manager owns the tabs.
 type Manager struct {
 	eng    engine.Engine
@@ -71,12 +76,21 @@ func (m *Manager) OnListChanged(f func()) { m.onList = append(m.onList, f) }
 // OnEmpty subscribes to the last tab closing.
 func (m *Manager) OnEmpty(f func()) { m.onEmpty = append(m.onEmpty, f) }
 
-// Create opens a new tab at the end and makes it active.
+// Create opens a new tab at the end, on the blank page, and makes it active.
 func (m *Manager) Create() engine.TabID {
 	id := m.eng.CreateTab()
 	m.add(id)
+	m.eng.LoadURL(id, BlankURL)
 	m.Activate(id)
 	return id
+}
+
+// address is what a tab shows for a URL: nothing for the blank page.
+func address(u string) string {
+	if u == BlankURL {
+		return ""
+	}
+	return u
 }
 
 func (m *Manager) add(id engine.TabID) *Tab {
@@ -203,7 +217,7 @@ func (m *Manager) Reload() {
 // foreground.
 func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground bool) {
 	t := m.add(id)
-	t.URL = u
+	t.URL = address(u)
 	if foreground {
 		m.Activate(id)
 	} else {
@@ -217,7 +231,7 @@ func (m *Manager) HandleNavigationStarting(id engine.TabID, u string) bool {
 	if t == nil {
 		return false
 	}
-	t.URL, t.Error, t.Crashed = u, "", false
+	t.URL, t.Error, t.Crashed = address(u), "", false
 	for _, g := range m.gates {
 		if !g(u) {
 			t.Blocked, t.Loading = true, false
@@ -238,7 +252,7 @@ func (m *Manager) HandleNavigationFinished(id engine.TabID, u string) {
 	}
 	// A page restored from the back-forward cache never reports a start, so a commit
 	// has to clear what an earlier navigation left behind.
-	t.URL, t.Error, t.Blocked, t.Crashed = u, "", false, false
+	t.URL, t.Error, t.Blocked, t.Crashed = address(u), "", false, false
 	for _, f := range m.onFinished {
 		f(*t)
 	}
@@ -251,7 +265,7 @@ func (m *Manager) HandleNavigationFailed(id engine.TabID, u, reason string) {
 	if t == nil {
 		return
 	}
-	t.URL, t.Error, t.Loading = u, reason, false
+	t.URL, t.Error, t.Loading = address(u), reason, false
 	m.changed(t)
 }
 
@@ -265,8 +279,12 @@ func (m *Manager) HandleHistoryChanged(id engine.TabID, canGoBack, canGoForward 
 	m.changed(t)
 }
 
-// HandleTitleChanged records a new title.
+// HandleTitleChanged records a new title. Content titles an untitled page with its
+// address, so the blank page arrives titled about:blank; the tab shows no title.
 func (m *Manager) HandleTitleChanged(id engine.TabID, title string) {
+	if title == BlankURL {
+		title = ""
+	}
 	t := m.tabs[id]
 	if t == nil || t.Title == title {
 		return

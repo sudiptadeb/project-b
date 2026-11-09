@@ -38,6 +38,7 @@
 #include "project_b/engine/browser/window.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkCanvas.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkRect.h"
 #include "ui/gfx/codec/png_codec.h"
@@ -433,6 +434,29 @@ void Run(const std::string& line) {
     Reply(id, "ok");
     volatile int* nothing = nullptr;
     *nothing = 1;
+  } else if (cmd == "pagecolor") {
+    // The colour in the middle of what the shown tab's page view draws, or "none"
+    // when it draws nothing.
+    content::RenderWidgetHostView* view =
+        Engine::Get()->active_tab()->contents()->GetRenderWidgetHostView();
+    if (!view) {
+      Reply(id, "none");
+      return;
+    }
+    view->CopyFromSurface(
+        gfx::Rect(), gfx::Size(), base::Seconds(5),
+        base::BindOnce(
+            [](const std::string& id, const content::CopyFromSurfaceResult& result) {
+              if (!result.has_value() || result->bitmap.empty()) {
+                Reply(id, "none");
+                return;
+              }
+              const SkBitmap& bitmap = result->bitmap;
+              const SkColor c = bitmap.getColor(bitmap.width() / 2, bitmap.height() / 2);
+              Reply(id, base::StringPrintf("#%02x%02x%02x", SkColorGetR(c),
+                                           SkColorGetG(c), SkColorGetB(c)));
+            },
+            id));
   } else if (cmd == "strayshell") {
     Stray() = content::WebContents::Create(content::WebContents::CreateParams(
         Engine::Get()->shell()->contents()->GetBrowserContext()));

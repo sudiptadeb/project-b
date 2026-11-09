@@ -254,6 +254,12 @@ def main():
     over_buttons = app.cmd("hit", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y)
     check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
     print("hit over window buttons:", over_buttons, flush=True)
+    # An empty tab holds the blank page, so its page area is a page in content's own
+    # colours, never the frame colour showing through. The frame colour used to take
+    # over a few seconds in, so this looks after ten.
+    time.sleep(max(0, 10 - (time.time() - app.started)))
+    color = app.cmd("pagecolor")
+    check("ten seconds on, an empty tab's page area is the page's colour, not the frame colour", color not in ("none", "#0faaaa"), color)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -370,6 +376,12 @@ def main():
     app.wait(f"{VALUE}==='secret'")
     time.sleep(0.4)
     check("a blocked URL stays out of history", app.js(OPTIONS) == 0, app.js(OPTIONS))
+    app.cmd("key", "escape")
+    focus_bar(app)
+    app.cmd("type", "blank")
+    app.wait(f"{VALUE}==='blank'")
+    time.sleep(0.4)
+    check("the blank page a new tab holds stays out of history", app.js(OPTIONS) == 0, app.js(OPTIONS))
     leave_bar(app)
 
     # A page restored from the back-forward cache never reports a start, so its commit
@@ -504,6 +516,13 @@ def main():
     app.wait(f"document.hasFocus()&&document.activeElement==={INPUT}", 5)
     check("the new tab focuses the address bar", True)
     check("back and reload follow the new, empty tab", disabled("Back") and disabled("Reload"))
+    color = "none"
+    for _ in range(50):
+        color = app.cmd("pagecolor")
+        if color != "none":
+            break
+        time.sleep(0.1)
+    check("the new tab's page area is the page's colour too", color not in ("none", "#0faaaa"), color)
     app.cmd("type", URL_B)
     app.wait(f"{VALUE}==={json.dumps(URL_B)}")
     app.cmd("key", "enter")

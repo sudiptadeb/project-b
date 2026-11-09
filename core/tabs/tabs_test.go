@@ -132,3 +132,32 @@ func TestNormalizeInput(t *testing.T) {
 		}
 	}
 }
+
+// loads records what the manager asks the engine to load.
+type loads struct {
+	fakeEngine
+	urls []string
+}
+
+func (l *loads) LoadURL(_ engine.TabID, u string) { l.urls = append(l.urls, u) }
+
+func TestANewTabHoldsTheBlankPageAndReadsAsEmpty(t *testing.T) {
+	e := &loads{}
+	m := New(e)
+	id := m.Create()
+	if !slices.Equal(e.urls, []string{BlankURL}) {
+		t.Fatalf("loaded %v", e.urls)
+	}
+	m.HandleNavigationStarting(id, BlankURL)
+	m.HandleNavigationFinished(id, BlankURL)
+	m.HandleTitleChanged(id, BlankURL) // Content's title for an untitled page.
+	if tab := m.Active(); tab.URL != "" || tab.Title != "" {
+		t.Fatalf("the blank page shows as url %q title %q", tab.URL, tab.Title)
+	}
+	m.HandleNavigationStarting(id, "https://example.com/")
+	m.HandleNavigationFinished(id, "https://example.com/")
+	m.HandleTitleChanged(id, "Example Domain")
+	if tab := m.Active(); tab.URL != "https://example.com/" || tab.Title != "Example Domain" {
+		t.Fatalf("a real page shows as url %q title %q", tab.URL, tab.Title)
+	}
+}

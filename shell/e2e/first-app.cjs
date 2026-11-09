@@ -183,6 +183,10 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.keyboard.type('secret');
   await settle(page);
   check('a blocked URL stays out of history', (await options.count()) === 0);
+  await bar.fill('');
+  await page.keyboard.type('blank');
+  await settle(page);
+  check('the blank page a new tab holds stays out of history', (await options.count()) === 0);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
 
@@ -256,6 +260,16 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('New Tab adds a tab and makes it active', (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   check('a new tab has an empty, focused address bar', (await bar.inputValue()) === '' && (await bar.evaluate((el) => el === document.activeElement)));
   await mock.getByText('tab 2', { exact: true }).waitFor();
+  // A new tab holds the blank page, so its page area is a page in the page's own
+  // colours, never the frame colour showing through. It still reads as a new tab.
+  let blank = false;
+  for (let i = 0; i < 100 && !blank; i++) {
+    blank = (await mock.locator('#state').textContent()) === 'Loaded' && (await mock.locator('#url').textContent()) === 'about:blank';
+    if (!blank) await new Promise((r) => setTimeout(r, 30));
+  }
+  const pageColour = await mock.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor);
+  check("a new tab holds the blank page, in the page's colour, not the frame colour", blank && pageColour !== 'rgb(15, 170, 170)', pageColour);
+  check('and reads as a new tab: no address, titled New Tab', (await bar.inputValue()) === '' && (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   r = await regions();
   check('the first tab was told it is hidden', JSON.stringify(r.hidden) === '[1]', JSON.stringify(r.hidden));
   check('back and reload follow the new, empty tab', (await back.isDisabled()) && (await reload.isDisabled()));

@@ -15,10 +15,11 @@ import (
 
 // rig runs the real managers on the mock engine, as the dev server does.
 type rig struct {
-	t   *testing.T
-	e   *mockengine.Engine
-	a   *app.App
-	got <-chan []byte
+	t     *testing.T
+	e     *mockengine.Engine
+	a     *app.App
+	got   <-chan []byte
+	pages <-chan []byte // What the mock page is told to show.
 }
 
 func start(t *testing.T, dir string, blocked ...string) *rig {
@@ -26,7 +27,9 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	e := mockengine.New()
 	got, stop := e.Shell.Subscribe()
 	t.Cleanup(stop)
-	r := &rig{t: t, e: e, got: got}
+	pages, stopPages := e.Page.Subscribe()
+	t.Cleanup(stopPages)
+	r := &rig{t: t, e: e, got: got, pages: pages}
 	ready := make(chan struct{})
 	e.Post(func() {
 		r.a = app.Start(e, app.Config{ProfileDir: dir, BlockedHosts: blocked})
@@ -143,6 +146,29 @@ func TestBlockedURLNeverLoadsOrEntersHistory(t *testing.T) {
 	r.shell(`{"t":"navigate","text":"https://www.blocked.test/x"}`)
 	r.waitForTab(func(tab map[string]any) bool { return tab["blocked"] == true })
 	if items := r.suggestions("blocked"); len(items) != 0 {
+		t.Fatalf("items = %v", items)
+	}
+}
+
+func TestTheFirstTabHoldsTheBlankPage(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	deadline := time.After(5 * time.Second)
+	for loaded := false; !loaded; {
+		select {
+		case b := <-r.pages:
+			loaded = string(b) == `{"state":"loaded","tab":1,"url":"about:blank"}`
+		case <-deadline:
+			t.Fatal("the first tab never loaded the blank page")
+		}
+	}
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	tab := m["tabs"].([]any)[0].(map[string]any)
+	if tab["url"] != "" || tab["title"] != "" {
+		t.Fatalf("the blank page shows as url %q title %q", tab["url"], tab["title"])
+	}
+	if items := r.suggestions("blank"); len(items) != 0 {
 		t.Fatalf("items = %v", items)
 	}
 }

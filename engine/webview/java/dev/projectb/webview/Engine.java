@@ -65,6 +65,14 @@ final class Engine implements ShellView.Host {
         return true;
     }
 
+    void pause() {
+        page.onPause();
+    }
+
+    void resume() {
+        page.onResume();
+    }
+
     // Called from Go, through jni.c.
 
     long createTab() {

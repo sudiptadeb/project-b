@@ -19,6 +19,19 @@ public final class BrowserActivity extends Activity {
         Core.start(engine, new File(getFilesDir(), "profile").getPath(), blocked == null ? "" : blocked);
     }
 
+    // A WebView keeps playing sound and running timers in the background unless told otherwise.
+    @Override
+    protected void onPause() {
+        super.onPause();
+        engine.pause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        engine.resume();
+    }
+
     @Override
     public void onBackPressed() {
         if (!engine.backKey()) {

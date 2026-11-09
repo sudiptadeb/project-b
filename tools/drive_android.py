@@ -4,7 +4,8 @@
 A small local web server is the oracle for what the page received, and the app's own history
 file for what the managers kept. Results and screenshots go to build/android-drive.
 
-    ADB_SERIAL=emulator-5600 APK=build/android/project-b-webview.apk python3 tools/drive_android.py
+    ADB_SERIAL=emulator-5600 python3 tools/drive_android.py            # the WebView build
+    ENGINE=content python3 tools/drive_android.py                      # the content build
 """
 import http.server
 import json
@@ -12,14 +13,17 @@ import os
 import subprocess
 import threading
 import time
+import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SDK = os.path.expanduser("~/Library/Android/sdk")
 ADB = [SDK + "/platform-tools/adb", "-s", os.environ.get("ADB_SERIAL", "emulator-5600")]
-APK = os.environ.get("APK", ROOT + "/build/android/project-b-webview.apk")
-PACKAGE = os.environ.get("PACKAGE", "dev.projectb.webview")
-ACTIVITY = os.environ.get("ACTIVITY", ".BrowserActivity")
-OUT = os.environ.get("OUT", ROOT + "/build/android-drive")
+ENGINE = os.environ.get("ENGINE", "webview")
+APK = ROOT + "/build/android/project-b-%s.apk" % ENGINE
+PACKAGE = {"webview": "dev.projectb.webview", "content": "dev.projectb.browser"}[ENGINE]
+ACTIVITY = ".BrowserActivity"
+PROFILE = {"webview": "files/profile", "content": "app_project_b/profile"}[ENGINE]
+OUT = os.environ.get("OUT", ROOT + "/build/android-drive-" + ENGINE)
 PORT = 8765
 BASE = "localhost:%d" % PORT
 
@@ -114,7 +118,7 @@ def launch(block=""):
 
 
 def history_file():
-    return adb("shell", "cat", "/data/data/%s/files/profile/history.jsonl" % PACKAGE)
+    return adb("shell", "cat", "/data/data/%s/%s/history.jsonl" % (PACKAGE, PROFILE))
 
 
 def visited(url):
@@ -141,6 +145,27 @@ def children():
             out.append((pid, name.split("/")[0]))
             pending = False
     return out
+
+
+def go_library_mappings(pid):
+    """How many executable mappings in a process fall inside libcore.so's stretch of the APK."""
+    start, end = go_library_span()
+    count = 0
+    for line in adb("shell", "cat", "/proc/%s/maps" % pid).splitlines():
+        parts = line.split()
+        if len(parts) >= 6 and "r-xp" in parts[1] and parts[5].endswith("base.apk") and PACKAGE + "-" in parts[5]:
+            offset = int(parts[2], 16)
+            if start <= offset < end:
+                count += 1
+    return count
+
+
+def go_library_span():
+    """Where lib/arm64-v8a/libcore.so sits in the APK, from the zip's own directory."""
+    with zipfile.ZipFile(APK) as z:
+        info = z.getinfo("lib/arm64-v8a/libcore.so")
+    # The stored data begins after the local header, whose name and extra fields vary a little.
+    return info.header_offset, info.header_offset + 64 * 1024 + info.file_size
 
 
 def check(name, ok, detail=""):
@@ -254,15 +279,20 @@ def main():
         if len(parts) == 2 and parts[1] == PACKAGE:
             main_pid = parts[0]
     renderers = children()
-    # Libraries are mapped straight from the APK, so the mapping's name is the APK's.
-    ours = PACKAGE + "-"
+    # Libraries are mapped straight from the APK, so a library shows as a stretch of the APK.
     maps = adb("shell", "cat", "/proc/%s/maps" % main_pid)
-    check("our code is mapped in the app's process", any(ours in l and "r-xp" in l for l in maps.splitlines()),
+    check("the main process has our code mapped", any(PACKAGE + "-" in l and "r-xp" in l for l in maps.splitlines()),
           "pid " + str(main_pid))
+    go_size = go_library_mappings(main_pid)
+    check("Go's library is mapped in the main process", go_size > 0, "%d executable mapping(s)" % go_size)
     for pid, name in renderers:
         rmaps = adb("shell", "cat", "/proc/%s/maps" % pid)
-        check("none of our code in " + name.split(":")[-1], ours not in rmaps and len(rmaps) > 0, "pid " + pid)
-    check("exactly one renderer holds shell and page", len(renderers) == 1, str(renderers))
+        check("Go's library is not in " + name.split(":")[-1], len(rmaps) > 0 and go_library_mappings(pid) == 0, "pid " + pid)
+    if ENGINE == "webview":
+        check("exactly one renderer holds shell and page", len(renderers) == 1, str(renderers))
+    else:
+        check("the shell and the page have separate renderers",
+              sum("sandboxed" in name for _, name in renderers) >= 2, str(renderers))
 
     # Renderer crash: the app lives, the shell comes back from a snapshot, reload recovers.
     go(BASE + "/a")

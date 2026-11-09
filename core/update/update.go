@@ -171,6 +171,7 @@ func (m *Manager) check(ctx context.Context) {
 	m.mu.Lock()
 	m.staged = app
 	m.mu.Unlock()
+	log.Printf("update: %s is staged at %s; ready to relaunch", d.Version, app)
 	m.set(State{Phase: Ready, Version: d.Version})
 }
 

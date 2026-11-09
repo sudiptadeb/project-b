@@ -18,6 +18,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
     node shell/e2e/settings.cjs                # the settings page alone, on the mock
     python3 tools/drive_first_app.py           # real app; PB_BIN picks another binary
     python3 tools/drive_first_app.py settings  # the settings page alone, real app
+    python3 tools/drive_chromedriver.py        # ChromeDriver drives the real app; PB_BIN as above
 
 ## Shipping a build to try
 

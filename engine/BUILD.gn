@@ -86,6 +86,7 @@ source_set("browser") {
     "//base",
     "//components/embedder_support:user_agent",
     "//components/input",
+    "//components/version_info:version_info_with_user_agent",
     "//components/viz/common",
     "//content/public/app",
     "//content/public/browser",

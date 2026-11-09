@@ -24,6 +24,7 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
   base::FilePath GetChildProcessPath(int flags) override;
   void CreateThrottlesForNavigation(
       content::NavigationThrottleRegistry& registry) override;
+  std::string GetProduct() override;
   std::string GetUserAgent() override;
   std::vector<base::FilePath> GetNetworkContextsParentDirectory() override;
 };

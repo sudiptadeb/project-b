@@ -4,6 +4,7 @@
 #include "base/files/file_path.h"
 #include "base/path_service.h"
 #include "components/embedder_support/user_agent_utils.h"
+#include "components/version_info/version_info_with_user_agent.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "project_b/engine/browser/browser_main_parts.h"
@@ -30,6 +31,13 @@ base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
 void ContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationThrottleRegistry& registry) {
   registry.AddThrottle(std::make_unique<NavigationThrottleHooks>(registry));
+}
+
+// What Chrome reports, "Chrome/155.0.8059.41": DevTools' /json/version and
+// Browser.getVersion show it, and ChromeDriver reads the browser's version from it. The
+// user agent pages see comes from GetUserAgent, not from this.
+std::string ContentBrowserClient::GetProduct() {
+  return std::string(version_info::GetProductNameAndVersionForUserAgent());
 }
 
 std::string ContentBrowserClient::GetUserAgent() {

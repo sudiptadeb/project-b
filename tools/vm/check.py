@@ -28,8 +28,8 @@ SCREEN = (1440, 900)
 FRAME = (15, 170, 170)  # --frame and --accent
 BAR = (226, 242, 242)  # --bar
 WHITE = (255, 255, 255)  # --surface
-TOP = 18  # The middle of the top row with the tabs on the side: 4 of frame, half of 28.
-TOP_H = 48  # The same row with the tabs on top.
+BUTTONS_X = (12, 72)  # Where the window buttons belong, left of close to right of zoom.
+BUTTONS_Y = 20  # Their middle, which is also the middle of the top row.
 PAGE_LOAD = 3.0
 ANIMATION = 2.0
 MOVE = (60, 40)
@@ -119,12 +119,15 @@ def lights(img, win):
 
 
 def field_middle(img, win, x):
-    """The address field's vertical middle in window points, from its white at column x.
+    """The address field's vertical middle in window points: the first run of white at column x.
 
-    Only the top row is looked at: a white page starts right below it.
+    Only the first run, because a white page can start right below the field.
     """
-    ys = np.nonzero(near(crop(img, win[0] + x, win[1], 1, 32), WHITE, 6)[:, 0])[0]
-    return None if len(ys) == 0 else (ys.min() + ys.max() + 1) / 2 / vnc.scale
+    ys = np.nonzero(near(crop(img, win[0] + x, win[1], 1, 90), WHITE, 6)[:, 0])[0]
+    if len(ys) == 0:
+        return None
+    last = ys[np.argmax(np.diff(ys, append=ys[-1] + 2) > 1)]
+    return (ys[0] + last + 1) / 2 / vnc.scale
 
 
 def launch():
@@ -222,10 +225,14 @@ L = lights(img, home)
 check("window buttons are visible", L is not None, str(L))
 if L is None:
     sys.exit("no window buttons found: the window isn't active, or the colours need calibrating")
-middle = field_middle(img, home, 500)
-offset = None if middle is None else middle - L["close"][1]
-print(f"buttons' middle y {L['close'][1]:.1f}, address field's {middle}, difference {offset}", flush=True)
-check("buttons sit about 2 above the address row", offset is not None and 1 <= offset <= 3, f"{offset} points")
+buttons = (L["close"][0] - L["close"][2] / 2, L["zoom"][0] + L["zoom"][2] / 2)
+check(f"window buttons run from x {BUTTONS_X[0]} to {BUTTONS_X[1]}",
+      abs(buttons[0] - BUTTONS_X[0]) <= 1 and abs(buttons[1] - BUTTONS_X[1]) <= 1, f"x {buttons[0]} to {buttons[1]}")
+check(f"window buttons' middle is at y {BUTTONS_Y}", abs(L["close"][1] - BUTTONS_Y) <= 1, f"y {L['close'][1]}")
+TOP = field_middle(img, home, 500)
+if TOP is None:
+    sys.exit("no address field found, so nothing below knows where to click")
+check("window buttons centre on the address field", abs(TOP - L["close"][1]) <= 1, f"buttons y {L['close'][1]}, field y {TOP}")
 AFTER_BUTTONS = L["zoom"][0] + L["zoom"][2] / 2 + 8  # Where the shell's first control starts.
 PAGE_V = (260, 60, W - 280, H - 80)  # An inside part of the page, tabs on the side.
 NEUTRAL = (PX + W / 2, PY + H / 2)
@@ -286,7 +293,7 @@ time.sleep(0.8)
 listed = crop(vnc.image(), PX + 300, PY + 34, 400, 60)
 shot("suggestions")
 check("Cmd+L and typing shows suggestions over the page", changed(before, listed) > 0.05, f"changed {changed(before, listed):.3f}")
-vnc.click(PX + 500, PY + 56)
+vnc.click(PX + 500, PY + TOP + 38)
 time.sleep(PAGE_LOAD)
 check("a click picks a suggestion", changed(page(), example) < 0.01, f"differs from example.com {changed(page(), example):.3f}")
 
@@ -351,6 +358,9 @@ img = vnc.image()
 strip = float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME)))
 gone = float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR)))
 check("the layout button puts the tabs on top", strip > 0.9 and gone < 0.2, f"strip {strip:.2f}, shell colour where the sidebar was {gone:.2f}")
+TOP_H = field_middle(img, home, 500)
+if TOP_H is None:
+    sys.exit("no address field found with the tabs on top")
 PAGE_H = (60, 80, W - 120, H - 100)
 content = float(np.mean(near(crop(img, PX + PAGE_H[0], PY + PAGE_H[1], PAGE_H[2], PAGE_H[3]), BAR, 4)))
 edge = float(np.mean(near(crop(img, PX + 1, PY + 100, 2, H - 200), FRAME)))

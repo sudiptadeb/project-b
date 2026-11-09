@@ -3,7 +3,7 @@
 set -eu
 . "$(dirname "$0")/vars.sh"
 
+# The amarit unit stays, exited, for start.sh to restart.
 "$TART" stop "$VM" --timeout 60 || true
-amarit rm "$UNIT" || true
 rm -f "$VNC_URL_FILE"
 "$TART" list

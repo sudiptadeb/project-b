@@ -9,8 +9,14 @@ RUNNING="tart run .* $VM\$"
 
 if ! pgrep -f "$RUNNING" > /dev/null; then
     rm -f "$VNC_URL_FILE"
-    amarit run -force -name "$UNIT" -restart never -dir "$VM_HOME" -env-file "$VM_HOME/vm.env" \
-        "$TART" run --no-graphics --no-audio --no-clipboard "--dir=share:$SHARE:ro" "$VM" > /dev/null
+    # stop.sh keeps the unit: amarit run on a unit removed seconds earlier stops the new
+    # process at once.
+    if amarit ls | awk -v unit="$UNIT" '$1 == unit {found = 1} END {exit !found}'; then
+        amarit restart "$UNIT" > /dev/null
+    else
+        amarit run -force -name "$UNIT" -restart never -dir "$VM_HOME" -env-file "$VM_HOME/vm.env" \
+            "$TART" run --no-graphics --no-audio --no-clipboard "--dir=share:$SHARE:ro" "$VM" > /dev/null
+    fi
     /bin/sleep 3
 fi
 

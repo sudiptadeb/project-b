@@ -96,9 +96,13 @@ none, so a drag across the address field moved the window. The content view clai
 whole title bar from it (`_opaqueRectForWindowMoveWhenInTitlebar`, as Chrome's does), so
 every press there goes through the hit test.
 
-The window goes on screen once Go has given it the frame colour and width, so even its
-first frame has them. Until the shell's first frame, content paints the shell's view
-white over all of it, as it does any view it has no frame for yet. A new tab loads
+The window goes on screen once Go has given it the frame colour and width, but invisible.
+It shows when content reports the shell's first frame presented
+(`DidFirstVisuallyNonEmptyPaint`), the way Chrome keeps a new window invisible until its
+compositor's first frame. Before that frame there is only the frame colour, and the first
+tab's blank page across the whole window until the shell says where the page goes. On the
+Mac Studio those showed for about 0.1 s at each launch: 6 of 20 captures taken 0.2 to 0.4 s
+after the start, and none with the window kept invisible. A new tab loads
 `about:blank`, so every tab has a page view that paints in content's default colour from
 the start. The tab still reads as new: no address, titled New Tab, and `about:blank`
 stays out of history. A crashed page has no view, so the frame colour shows there.

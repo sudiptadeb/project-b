@@ -644,6 +644,10 @@ def main():
     frame = app.js("getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()")
     check("the window and the shell paint the frame colour Go owns", frame == "#0faaaa" and app.cmd("color") == frame, (frame, app.cmd("color")))
     check("the window already had the frame colour when it went on screen", app.cmd("showncolor") == frame, app.cmd("showncolor"))
+    # It goes on screen invisible, and shows at the shell's first frame.
+    stats = json.loads(app.cmd("stats", timeout=60))
+    check("the window is visible once the shell has painted", stats["firstPaintMs"] > 0 and stats["alpha"] == 1,
+          (stats["firstPaintMs"], stats["alpha"]))
 
     # The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
     root = app.js("(()=>{const s=getComputedStyle(document.documentElement);return [s.overflow,s.overscrollBehaviorY,document.scrollingElement.scrollHeight-window.innerHeight]})()")

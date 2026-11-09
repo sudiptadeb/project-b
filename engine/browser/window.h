@@ -31,8 +31,11 @@ class Window {
   Window& operator=(const Window&) = delete;
   ~Window();
 
-  // Puts the window on screen. Call it once SetFrame has been called.
+  // Puts the window on screen, invisible until ShellPainted, so the first thing seen in
+  // it is the shell's first frame. Call it once SetFrame has been called.
   void Show();
+  // The shell's first frame is on screen: the window becomes visible.
+  void ShellPainted();
   void Close();
   void SetTitle(const std::u16string& title);
   void SetShellView(gfx::NativeView view);

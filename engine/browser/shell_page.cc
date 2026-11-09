@@ -283,12 +283,14 @@ void ShellPage::RenderFrameCreated(content::RenderFrameHost* frame) {
   }
 }
 
+// Content reports this once the frame has been presented, so the window can show it.
 void ShellPage::DidFirstVisuallyNonEmptyPaint() {
   if (first_paint_.is_zero()) {
     first_paint_ = base::Time::Now() - base::Process::Current().CreationTime();
     LOG(INFO) << "shell first paint " << first_paint_.InMilliseconds()
               << "ms after process start";
   }
+  Engine::Get()->window()->ShellPainted();
 }
 
 // A dead shell claims nothing, so the page keeps working until the new shell asks

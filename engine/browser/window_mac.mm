@@ -474,8 +474,18 @@ void Window::Show() {
   impl_->shown_rgb = uint32_t(std::lround(color.redComponent * 255)) << 16 |
                      uint32_t(std::lround(color.greenComponent * 255)) << 8 |
                      uint32_t(std::lround(color.blueComponent * 255));
+  // Until the shell's first frame there is nothing to see but the frame colour and a
+  // blank tab in the whole window, before the shell says where the page goes. Chrome
+  // keeps a new window invisible the same way until its compositor's first frame
+  // (kAlphaInsteadOfCATransaction in
+  // components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm).
+  impl_->window.alphaValue = 0;
   [impl_->window makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
+}
+
+void Window::ShellPainted() {
+  impl_->window.alphaValue = 1;
 }
 
 void Window::Close() {

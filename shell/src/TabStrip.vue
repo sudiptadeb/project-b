@@ -74,6 +74,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
   padding: 0 8px 0 12px;
   border-radius: 6px 6px 0 0;
   font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
   box-sizing: border-box;
 }

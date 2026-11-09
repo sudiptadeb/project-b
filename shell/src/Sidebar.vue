@@ -88,6 +88,7 @@ import { state, tabLabel } from './state.js';
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   box-sizing: border-box;

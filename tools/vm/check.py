@@ -238,9 +238,18 @@ PAGE_V = (260, 60, W - 280, H - 80)  # An inside part of the page, tabs on the s
 NEUTRAL = (PX + W / 2, PY + H / 2)
 
 
-def page(box=PAGE_V):
+def page(box=PAGE_V, limit=15):
+    """The page once it has stopped changing for half a second, or as it is after the limit."""
     vnc.move(*NEUTRAL, 0.3)
-    return crop(vnc.image(), PX + box[0], PY + box[1], box[2], box[3])
+    last, since, end = None, time.time(), time.time() + limit
+    while time.time() < end:
+        now = crop(vnc.image(), PX + box[0], PY + box[1], box[2], box[3])
+        if last is None or changed(last, now) > 0.001:
+            last, since = now, time.time()
+        elif time.time() - since >= 0.5:
+            break
+        time.sleep(0.1)
+    return last
 
 
 def still():
@@ -280,7 +289,8 @@ shot("after-back")
 check("a click reaches the back button", changed(back, example) < 0.01 and still(), f"differs from first page {changed(back, example):.3f}")
 vnc.click(PX + AFTER_BUTTONS + 68, PY + TOP)
 time.sleep(PAGE_LOAD)
-check("a click reaches the forward button", changed(page(), iana) < 0.01 and still())
+forward = page()
+check("a click reaches the forward button", changed(forward, iana) < 0.01 and still(), f"differs from the second page {changed(forward, iana):.3f}")
 
 # Suggestions: Cmd+L from the page, type, pick one with a real click over the page.
 vnc.click(*NEUTRAL)

@@ -50,8 +50,10 @@ type recorder struct {
 	allow bool
 }
 
-func (r *recorder) note(s string)           { r.got = append(r.got, s) }
-func (r *recorder) ShellMessage(msg []byte) { r.note("shell " + string(msg)) }
+func (r *recorder) note(s string) { r.got = append(r.got, s) }
+func (r *recorder) ShellMessage(from engine.TabID, msg []byte) {
+	r.note(fmt.Sprintf("message from %d %s", from, msg))
+}
 func (r *recorder) NavigationStarting(tab engine.TabID, url string) bool {
 	r.note("starting " + url)
 	return r.allow
@@ -200,5 +202,14 @@ func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {
 		t.Fatalf("counts %v", h.Counts())
+	}
+}
+
+func TestAMessageCarriesItsSender(t *testing.T) {
+	h, r, _ := wired(t)
+	h.Dispatch(eventShellMessage, []Value{{I: 0}, {S: `{"t":"ready"}`}})
+	h.Dispatch(eventShellMessage, []Value{{I: 3}, {S: `{"t":"prefs"}`}})
+	if !reflect.DeepEqual(r.got, []string{`message from 0 {"t":"ready"}`, `message from 3 {"t":"prefs"}`}) {
+		t.Fatalf("got %v", r.got)
 	}
 }

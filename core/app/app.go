@@ -69,7 +69,7 @@ func (a *App) Stop() {
 	a.History.Close()
 }
 
-func (a *App) ShellMessage(msg []byte) { a.Shell.Handle(msg) }
+func (a *App) ShellMessage(from engine.TabID, msg []byte) { a.Shell.Handle(from, msg) }
 
 func (a *App) NavigationStarting(tab engine.TabID, url string) bool {
 	return a.Tabs.HandleNavigationStarting(tab, url)

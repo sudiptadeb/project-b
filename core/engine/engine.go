@@ -88,7 +88,9 @@ type Engine interface {
 
 // Listener is what an engine tells the app. There is exactly one.
 type Listener interface {
-	ShellMessage(msg []byte)
+	// ShellMessage is a message from one of our own pages. from says which: 0 for the
+	// shell, or the id of the tab the page is in. The engine sets it; the page can't.
+	ShellMessage(from TabID, msg []byte)
 
 	// NavigationStarting fires at the start and on each redirect. Returning false
 	// blocks the navigation.

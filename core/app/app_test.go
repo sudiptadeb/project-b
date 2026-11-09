@@ -41,7 +41,12 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	return r
 }
 
-func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage([]byte(cmd)) }) }
+func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage(0, []byte(cmd)) }) }
+
+// fromTab sends a command as our page in a tab would.
+func (r *rig) fromTab(tab engine.TabID, cmd string) {
+	r.e.Post(func() { r.a.ShellMessage(tab, []byte(cmd)) })
+}
 
 // waitFor reads shell messages until one matches.
 func (r *rig) waitFor(match func(map[string]any) bool) map[string]any {
@@ -300,3 +305,18 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 }
 
 var _ engine.Listener = (*app.App)(nil)
+
+// Only the shell may give the shell's commands. A page in a tab that sends one is
+// dropped: here, a new tab and a navigation.
+func TestATabsPageCannotGiveTheShellsCommands(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.fromTab(1, `{"t":"newTab"}`)
+	r.fromTab(1, `{"t":"navigate","text":"https://evil.test/"}`)
+	r.shell(`{"t":"ready"}`)
+	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	tabs := snap["tabs"].([]any)
+	if len(tabs) != 1 || tabs[0].(map[string]any)["url"] != "" {
+		t.Fatalf("tabs = %v", tabs)
+	}
+}

@@ -40,11 +40,25 @@ func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manag
 	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u}
 }
 
-// Handle takes one command from the shell.
-func (m *Manager) Handle(msg []byte) {
+// fromShell is the sender of a message from the shell. Any other sender is a tab.
+const fromShell engine.TabID = 0
+
+// allowed is the one place that says who may give which command. The engine tags every
+// message with its sender, and the page can't change that. The shell may give any
+// command; a page in a tab may give none.
+func allowed(from engine.TabID, t string) bool {
+	return from == fromShell
+}
+
+// Handle takes one command from one of our pages: the shell, or a page in tab from.
+func (m *Manager) Handle(from engine.TabID, msg []byte) {
 	var c command
 	if err := json.Unmarshal(msg, &c); err != nil {
-		log.Printf("shell: bad message: %v", err)
+		log.Printf("shell: bad message from %d: %v", from, err)
+		return
+	}
+	if !allowed(from, c.T) {
+		log.Printf("shell: dropped %q from tab %d, which may not give it", c.T, from)
 		return
 	}
 	switch c.T {

@@ -192,14 +192,14 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
-  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 7 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 6 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   // The engine also says how round the window's corners are; the frame's inner edge
   // follows, one frame width inside.
   const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
-  const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('header .bar')).borderTopLeftRadius);
-  check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '26px' && (await innerRadius()) === '22px', `${await windowRadius()} ${await innerRadius()}`);
+  const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('.rounding')).borderTopLeftRadius);
+  check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '26px' && (await innerRadius()) === '26px', `${await windowRadius()} ${await innerRadius()}`);
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));

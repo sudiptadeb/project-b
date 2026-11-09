@@ -30,6 +30,9 @@ watchEffect(() => {
       <div v-drag class="edge right"></div>
     </div>
     <div v-drag class="edge bottom"></div>
+    <!-- macOS rounds the window, and the page underneath is square: this border, with the
+         window's own radius, is the frame's curve over the corners. Nothing else. -->
+    <div class="rounding" aria-hidden="true"></div>
   </div>
 </template>
 
@@ -39,9 +42,6 @@ watchEffect(() => {
 :root {
   --frame: #0faaaa;
   --frame-width: 4px;
-  /* The frame's inner edge runs parallel to the window's, so its radius is the window's
-     less the frame's width; 0 when the window has square corners. */
-  --inner-radius: max(0px, calc(var(--window-radius, 0px) - var(--frame-width)));
   --bar: #e2f2f2;
   --accent: #0faaaa;
   /* Icons and the sidebar's New Tab take the design's deeper ink for this mode, so the
@@ -62,6 +62,7 @@ watchEffect(() => {
 
 /* The root has no background: the page shows through wherever nothing is painted. */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -86,6 +87,14 @@ watchEffect(() => {
 
 .edge.bottom {
   height: var(--frame-width);
+}
+
+.rounding {
+  position: absolute;
+  inset: 0;
+  border: var(--frame-width) solid var(--frame);
+  border-radius: var(--window-radius, 0px);
+  pointer-events: none;
 }
 
 /* Every control in the shell is a flat 28px square with a 6px radius. */

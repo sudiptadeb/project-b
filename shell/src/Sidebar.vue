@@ -42,8 +42,7 @@ import { state, tabLabel } from './state.js';
 
 <style scoped>
 /* The sidebar collapses to nothing; the page follows. Frame colour underneath, as for
-   every tracked component; its surface is drawn on top and rounds its bottom corner to
-   the window's curve, so the frame shows evenly there. */
+   every tracked component, with its surface drawn on top. */
 .sidebar {
   flex: none;
   width: 220px;
@@ -63,7 +62,6 @@ import { state, tabLabel } from './state.js';
   height: 100%;
   padding: 8px;
   box-sizing: border-box;
-  border-radius: 0 0 0 var(--inner-radius);
   background: var(--bar);
 }
 

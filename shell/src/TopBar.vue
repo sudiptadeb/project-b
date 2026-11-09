@@ -54,8 +54,8 @@ function switchLayout() {
 
 <style scoped>
 /* The row starts as frame colour, like every tracked component, and the bar is drawn
-   on it 4px in from the sides. As the title bar it also carries the frame's top band,
-   and the bar's top corners follow the window's curve, one frame width inside it. */
+   on it 4px in from the sides. As the title bar it also carries the frame's top band;
+   the window's curve over its corners comes from the rounding border in App.vue. */
 .top {
   position: relative;
   z-index: 1;
@@ -69,7 +69,6 @@ function switchLayout() {
   display: flex;
   align-items: center;
   height: 44px;
-  border-radius: var(--inner-radius) var(--inner-radius) 0 0;
   background: var(--bar);
 }
 

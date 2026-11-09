@@ -152,24 +152,46 @@ def quit_app():
     return False
 
 
-def drags(name, x, y, home):
+def drags(name, x, y, home, expect="moves the window"):
+    """expect is "moves the window", or "resizes the window" for the edges AppKit keeps for itself."""
     win = window()
     vnc.drag(win[0] + x, win[1] + y, win[0] + x + MOVE[0], win[1] + y + MOVE[1])
     time.sleep(0.6)
     now = window()
     moved, resized = (now[0] - win[0], now[1] - win[1]), (now[2] - win[2], now[3] - win[3])
-    check(f"dragging {name} moves the window",
-          abs(moved[0] - MOVE[0]) <= 3 and abs(moved[1] - MOVE[1]) <= 3 and resized == (0, 0),
-          f"moved {moved}, resized {resized}")
+    if expect == "moves the window":
+        ok = abs(moved[0] - MOVE[0]) <= 3 and abs(moved[1] - MOVE[1]) <= 3 and resized == (0, 0)
+    else:
+        ok = resized != (0, 0)
+    check(f"dragging {name} {expect}", ok, f"moved {moved}, resized {resized}")
     set_window(home)
 
 
 def zooms(name, x, y, home):
+    """Zoom grows both ways. Double-clicking a window edge grows just one, so it doesn't count."""
     win = window()
     vnc.dbl(win[0] + x, win[1] + y)
     time.sleep(ANIMATION)
     now = window()
-    check(f"double-clicking {name} zooms", now[2:] != win[2:], f"size {win[2:]} to {now[2:]}")
+    check(f"double-clicking {name} zooms", now[2] > win[2] and now[3] > win[3], f"size {win[2:]} to {now[2:]}")
+    set_window(home)
+
+
+def selects_text(home):
+    """Dragging across text in the address field selects it and leaves the window alone."""
+    vnc.click(PX + 500, PY + TOP)
+    time.sleep(0.4)
+    vnc.type("select these words")
+    time.sleep(0.3)
+    win = window()
+    vnc.drag(win[0] + AFTER_BUTTONS + 130, win[1] + TOP, win[0] + AFTER_BUTTONS + 230, win[1] + TOP)
+    time.sleep(0.6)
+    now = window()
+    shot("address-field-drag")
+    check("dragging across the address field selects text, not the window", now == win, f"window moved from {win} to {now}")
+    vnc.key("esc")
+    vnc.key("esc")
+    time.sleep(0.3)
     set_window(home)
 
 
@@ -355,14 +377,18 @@ if changed(now, one) >= 0.005:
     vnc.key("cmd+w")
     time.sleep(1)
 
-# Dragging and double-clicking, tabs on the side.
+# Dragging and double-clicking, tabs on the side. The top row is in the title bar; the empty
+# sidebar is below it. The outer 3 points of the left and right edges are AppKit's resize zone.
 gap = L["zoom"][0] + L["zoom"][2] / 2 + 4
-EDGES = (("the top frame edge", W / 2, 2), ("the left frame edge", 2, H / 2),
-         ("the right frame edge", W - 2, H / 2), ("the bottom frame edge", W / 2, H - 2))
+TOP_EDGE = ("the top frame edge", W / 2, 2)
+RESIZE_EDGES = (("the left edge", 1, H / 2), ("the right edge", W - 1, H / 2))
 SIDE_PLACES = (("the gap right of the buttons", gap, 14), ("the end of the top row", W - 6, TOP),
-               ("the empty sidebar", 100, H - 40)) + EDGES
-for place in SIDE_PLACES:
+               ("the empty sidebar", 100, H - 40))
+for place in SIDE_PLACES + (TOP_EDGE,):
     drags(*place, home)
+for place in RESIZE_EDGES:
+    drags(*place, home, "resizes the window")
+selects_text(home)
 for place in SIDE_PLACES:
     zooms(*place, home)
 
@@ -409,11 +435,12 @@ vnc.click(PX + 20, PY + TOP_H)
 time.sleep(PAGE_LOAD)
 check("a click reaches the back button, tabs on top", changed(page(PAGE_H), on_top) < 0.01 and still())
 
-TOP_PLACES = (("the empty strip", W - 100, 14),) + EDGES
-for place in TOP_PLACES:
+STRIP = ("the empty strip", W - 100, 14)
+for place in (STRIP, TOP_EDGE):
     drags(*place, home)
-for place in TOP_PLACES:
-    zooms(*place, home)
+for place in RESIZE_EDGES:
+    drags(*place, home, "resizes the window")
+zooms(*STRIP, home)
 full_screen("tabs on top, Ctrl+Cmd+F", lambda: vnc.key("ctrl+cmd+f"), home, BAR)
 
 vnc.click(PX + W - 20, PY + TOP_H)

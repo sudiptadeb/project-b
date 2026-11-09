@@ -335,6 +335,15 @@ void Window::SetShellRegions(std::vector<gfx::RectF> regions) {
   [impl_->container setRegions:std::move(regions)];
 }
 
+void Window::SetFrame(uint32_t rgb, double width) {
+  NSColor* color = [NSColor colorWithSRGBRed:((rgb >> 16) & 0xff) / 255.0
+                                       green:((rgb >> 8) & 0xff) / 255.0
+                                        blue:(rgb & 0xff) / 255.0
+                                       alpha:1];
+  impl_->window.backgroundColor = color;
+  impl_->container.layer.backgroundColor = color.CGColor;
+}
+
 void Window::SetDragRegions(std::vector<gfx::RectF> regions) {
   [impl_->container setDragRegions:std::move(regions)];
 }

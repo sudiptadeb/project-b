@@ -99,6 +99,11 @@ void CallSetShellRegions(const double* rects, size_t count) {
   g_engine->window()->SetShellRegions(ToRects(rects, count));
 }
 
+void CallSetWindowFrame(int32_t rgb, double width) {
+  CheckMainThread();
+  g_engine->window()->SetFrame(static_cast<uint32_t>(rgb), width);
+}
+
 void CallSetDragRegions(const double* rects, size_t count) {
   CheckMainThread();
   g_engine->window()->SetDragRegions(ToRects(rects, count));
@@ -173,6 +178,7 @@ const PBEngineCalls* Engine::Calls() {
       .set_page_bounds = CallSetPageBounds,
       .set_shell_regions = CallSetShellRegions,
       .set_drag_regions = CallSetDragRegions,
+      .set_window_frame = CallSetWindowFrame,
       .focus_page = CallFocusPage,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,

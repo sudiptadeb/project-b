@@ -9,9 +9,13 @@ import { state } from './state.js';
 // Both layouts show the same tabs from the same state; only where they sit differs.
 const horizontal = computed(() => state.tabLayout === 'horizontal');
 
-// The window's own corner radius, as the engine reports it, becomes one CSS variable on
-// the root. Whatever meets the window's curve derives its radius from it.
+// The frame's colour and width and the window's corner radius come from the managers
+// and become CSS variables on the root: the shell paints its bands in the colour and
+// width the window paints natively, so there is one source for both, and whatever
+// meets the window's curve derives its radius from the reported one.
 watchEffect(() => {
+  document.documentElement.style.setProperty('--frame', state.windowColor);
+  document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
   document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');
 });
 </script>
@@ -37,11 +41,10 @@ watchEffect(() => {
 </template>
 
 <style>
-/* Colours from the Ulaa Browser design, Personal mode. Spacing, radii, type sizes and the
-   flat look follow the Deb Design System: a 4px grid, borders instead of shadows. */
+/* Colours from the Ulaa Browser design, Personal mode. The frame's colour and width come
+   from Go with the snapshot (--frame, --frame-width), the same values the window paints
+   natively. */
 :root {
-  --frame: #0faaaa;
-  --frame-width: 4px;
   --bar: #e2f2f2;
   --accent: #0faaaa;
   /* Icons and the sidebar's New Tab take the design's deeper ink for this mode, so the
@@ -99,6 +102,7 @@ watchEffect(() => {
   border-radius: var(--window-radius, 0px);
   pointer-events: none;
 }
+
 
 /* Every control in the shell is a flat 28px square with a 6px radius. */
 .icon-button {

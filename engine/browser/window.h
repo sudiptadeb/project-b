@@ -43,6 +43,10 @@ class Window {
   void SetPageBounds(const gfx::RectF& bounds, const gfx::SizeF& viewport);
   void SetShellRegions(std::vector<gfx::RectF> regions);
   void SetDragRegions(std::vector<gfx::RectF> regions);
+  // The frame, 0xRRGGBB and a width in points: the colour the window paints wherever
+  // nothing else does, before the shell's first paint and wherever it lags a live
+  // resize, and the width of the band the shell paints with it.
+  void SetFrame(uint32_t rgb, double width);
 
   // Reports where the native window controls are, in shell coordinates, and the
   // window's own corner radius, now and whenever either changes. In full screen the

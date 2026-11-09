@@ -93,7 +93,7 @@ func main() {
 	})
 	mux.HandleFunc("GET /mock/regions", func(w http.ResponseWriter, r *http.Request) {
 		regions, drag, bounds := e.Regions()
-		out := map[string]any{"regions": regions, "drag": drag, "bounds": bounds, "closed": e.Closed(), "hidden": e.Hidden()}
+		out := map[string]any{"regions": regions, "drag": drag, "bounds": bounds, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": e.WindowColor(), "frameWidth": e.FrameWidth()}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)

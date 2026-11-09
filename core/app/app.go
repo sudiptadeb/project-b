@@ -45,6 +45,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Update = update.New(cfg.Update, e.Post, e.CloseWindow)
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update)
+	e.SetWindowFrame(a.Window.Color(), a.Window.FrameWidth())
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })

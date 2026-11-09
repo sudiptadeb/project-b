@@ -54,6 +54,8 @@ func (m *Manager) Handle(msg []byte) {
 			"engine":       m.eng.Name(),
 			"tabs":         m.tabs.All(),
 			"active":       m.tabs.ActiveID(),
+			"windowColor":  m.window.Color(),
+			"frameWidth":   m.window.FrameWidth(),
 			"controls":     m.window.Controls(),
 			"cornerRadius": m.window.CornerRadius(),
 			"tabLayout":    m.prefs.TabLayout(),

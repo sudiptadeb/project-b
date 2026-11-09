@@ -16,6 +16,10 @@ export const state = reactive({
   controls: { x: 0, y: 0, w: 0, h: 0 },
   // The radius the OS rounds the window's corners with, in CSS pixels. 0 in full screen.
   cornerRadius: 0,
+  // The frame the window paints natively; the shell paints its own bands with the same
+  // colour and width.
+  windowColor: '',
+  frameWidth: 0,
   // Whether the sidebar is open. The shell's own, so it stays here.
   sidebar: true,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
@@ -69,6 +73,8 @@ export function connect() {
           state.engine = m.engine;
           state.tabs = m.tabs;
           state.active = m.active;
+          state.windowColor = m.windowColor;
+          state.frameWidth = m.frameWidth;
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;

@@ -47,12 +47,14 @@ type tab struct {
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
 // as it does with real content.
 type Engine struct {
-	queue    chan func()
-	listener engine.Listener
-	nextTab  engine.TabID
-	tabs     map[engine.TabID]*tab
-	shown    engine.TabID
-	full     bool // Full screen, so there are no window controls.
+	windowColor string
+	frameWidth  float64
+	queue       chan func()
+	listener    engine.Listener
+	nextTab     engine.TabID
+	tabs        map[engine.TabID]*tab
+	shown       engine.TabID
+	full        bool // Full screen, so there are no window controls.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu      sync.Mutex
@@ -163,6 +165,27 @@ func (e *Engine) SetShellRegions(rects []engine.Rect) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.regions = rects
+}
+
+func (e *Engine) SetWindowFrame(hex string, width float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.windowColor = hex
+	e.frameWidth = width
+}
+
+// FrameWidth is the band the app last asked the window to draw around its edge.
+func (e *Engine) FrameWidth() float64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.frameWidth
+}
+
+// WindowColor is the colour the app last asked the window to paint.
+func (e *Engine) WindowColor() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.windowColor
 }
 
 func (e *Engine) SetDragRegions(rects []engine.Rect) {

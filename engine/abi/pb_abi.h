@@ -60,6 +60,9 @@ typedef struct PBEngineCalls {
   void (*set_shell_regions)(const double* rects, size_t count);
   // Same layout. A mouse down here drags the window.
   void (*set_drag_regions)(const double* rects, size_t count);
+  // The frame: the colour the window itself paints under the page and the shell,
+  // 0xRRGGBB, and the width of the band the window draws around its edge, in points.
+  void (*set_window_frame)(int32_t rgb, double width);
   void (*focus_page)(void);
   void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);

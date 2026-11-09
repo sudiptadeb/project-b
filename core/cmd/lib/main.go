@@ -20,6 +20,7 @@ static inline void call_reload(const PBEngineCalls* c, int64_t tab) { c->reload(
 static inline void call_set_page_bounds(const PBEngineCalls* c, double x, double y, double w, double h, double vw, double vh) { c->set_page_bounds(x, y, w, h, vw, vh); }
 static inline void call_set_shell_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_shell_regions(rects, count); }
 static inline void call_set_drag_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_drag_regions(rects, count); }
+static inline void call_set_window_frame(const PBEngineCalls* c, int32_t rgb, double width) { c->set_window_frame(rgb, width); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
@@ -35,6 +36,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"unsafe"
@@ -122,6 +124,15 @@ func (e *nativeEngine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
 func (e *nativeEngine) SetShellRegions(rects []engine.Rect) {
 	flat := flatten(rects)
 	C.call_set_shell_regions(e.calls, &flat[0], C.size_t(len(rects)))
+}
+
+func (e *nativeEngine) SetWindowFrame(hex string, width float64) {
+	rgb, err := strconv.ParseInt(strings.TrimPrefix(hex, "#"), 16, 32)
+	if err != nil {
+		log.Printf("window colour %q is not #rrggbb", hex)
+		return
+	}
+	C.call_set_window_frame(e.calls, C.int32_t(rgb), C.double(width))
 }
 
 func (e *nativeEngine) SetDragRegions(rects []engine.Rect) {

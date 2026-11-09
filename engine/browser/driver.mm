@@ -335,6 +335,12 @@ void Run(const std::string& line) {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {
     Stats(id);
+  } else if (cmd == "color") {
+    NSColor* c = [TheWindow().backgroundColor
+        colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
+    Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
+                                 int(c.greenComponent * 255 + 0.5),
+                                 int(c.blueComponent * 255 + 0.5)));
   } else if (cmd == "title") {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {

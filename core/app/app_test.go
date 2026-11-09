@@ -251,6 +251,9 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if m["cornerRadius"] != mockengine.CornerRadius {
 		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
 	}
+	if m["windowColor"] != "#0faaaa" || r.e.WindowColor() != "#0faaaa" || m["frameWidth"] != 4.0 || r.e.FrameWidth() != 4 {
+		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.WindowColor(), r.e.FrameWidth())
+	}
 
 	r.e.Fire("fullscreen", "")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" })

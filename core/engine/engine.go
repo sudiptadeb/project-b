@@ -70,6 +70,10 @@ type Engine interface {
 	// SetDragRegions replaces the rectangles where a mouse down moves the window
 	// instead: the empty parts of the shell. They win over shell regions.
 	SetDragRegions(rects []Rect)
+	// SetWindowFrame is the frame the window itself paints: its colour, "#rrggbb",
+	// under the page and the shell, so any gap the shell leaves shows it and not white,
+	// and the width of the band it draws around its edge over both.
+	SetWindowFrame(hex string, width float64)
 	// FocusPage gives keyboard focus to the shown tab's page; FocusShell gives it to
 	// the shell page, which then places it inside itself.
 	FocusPage()

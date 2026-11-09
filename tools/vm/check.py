@@ -195,22 +195,57 @@ def selects_text(home):
     set_window(home)
 
 
+def leave_full_screen(name):
+    """Shows the hidden title bar with the pointer, as a person would, and clicks its green button.
+
+    Returns whether a green button was there to click.
+    """
+    vnc.move(SCREEN[0] / 2, 40, 0.2)
+    vnc.move(SCREEN[0] / 2, 0, 2.0)
+    img = vnc.image()
+    shot("fullscreen-reveal-" + name)
+    box = crop(img, 0, 0, 160, 120).astype(np.int16)
+    ys, xs = np.nonzero((box[..., 1] > 150) & (box[..., 0] < 120) & (box[..., 2] < 120))
+    if len(xs) < 20:
+        return False
+    vnc.click((xs.min() + xs.max() + 1) / 2 / vnc.scale, (ys.min() + ys.max() + 1) / 2 / vnc.scale)
+    time.sleep(ANIMATION)
+    # Resting on the green button opens macOS's Move & Resize menu, which takes the next click.
+    vnc.move(SCREEN[0] / 2, SCREEN[1] / 2, 1.0)
+    return True
+
+
 def full_screen(name, enter, home, first_control):
     enter()
     time.sleep(ANIMATION)
     win = window()
     shot("fullscreen-" + name)
     img = vnc.image()
-    check(f"{name}: fills the screen", win is not None and win[2:] == SCREEN, f"window {win}")
-    check(f"{name}: window buttons hide", win is not None and lights(img, win) is None)
+    entered = win is not None and win[2:] == SCREEN
+    check(f"{name} enters full screen", entered, f"window {win}")
+    if not entered:
+        if win != home:
+            set_window(home)
+        return
+    check(f"{name}: window buttons hide", lights(img, win) is None)
     moved = near(crop(img, 8, 6, 24, 24), first_control).sum()
-    check(f"{name}: controls move into their space", moved > 10, f"{moved} pixels of the first control at the far left")
-    vnc.key("ctrl+cmd+f")
-    time.sleep(ANIMATION)
+    check(f"{name}: controls move into the buttons' space", moved > 10, f"{moved} pixels of the first control at the far left")
+    clicked = leave_full_screen(name)
     win = window()
     img = vnc.image()
     shot("fullscreen-exit-" + name)
-    check(f"{name}: comes back on exit", win == home and lights(img, win) is not None, f"window {win}")
+    # macOS puts the window back where it last placed it itself, which can be the zoomed
+    # frame rather than where these checks moved it, so any window frame counts.
+    check(f"{name}: the green button in the shown title bar brings the window back",
+          clicked and win is not None and win[2:] != SCREEN and lights(img, win) is not None, f"window {win}")
+    if win is not None and win[2:] == SCREEN:
+        # Leave without the green button, so the checks after this still mean something.
+        guest("/usr/bin/osascript", "-e",
+              f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
+              'to set value of attribute "AXFullScreen" of window 1 to false')
+        time.sleep(ANIMATION)
+    if window() != home:
+        set_window(home)
 
 
 # Start clean: nothing running, no profile, so the tabs start on the side.
@@ -441,7 +476,7 @@ for place in (STRIP, TOP_EDGE):
 for place in RESIZE_EDGES:
     drags(*place, home, "resizes the window")
 zooms(*STRIP, home)
-full_screen("tabs on top, Ctrl+Cmd+F", lambda: vnc.key("ctrl+cmd+f"), home, BAR)
+full_screen("tabs on top, green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, BAR)
 
 vnc.click(PX + W - 20, PY + TOP_H)
 time.sleep(1)

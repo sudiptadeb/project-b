@@ -38,6 +38,7 @@ class Engine {
   // The table handed to Go. Lives as long as the process.
   static const PBEngineCalls* Calls();
 
+  content::BrowserContext* browser_context() const { return browser_context_; }
   Window* window() const { return window_; }
   ShellPage* shell() const { return shell_; }
   // The tab whose page is shown.

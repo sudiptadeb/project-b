@@ -11,6 +11,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/browser_context.h"
+#include "project_b/engine/browser/devtools.h"
 #include "project_b/engine/browser/driver.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
@@ -82,6 +83,7 @@ int BrowserMainParts::PreMainMessageLoopRun() {
         args.Double(corner_radius);
         hooks::Fire(PB_EVENT_WINDOW_CONTROLS_CHANGED, args);
       }));
+  StartRemoteDebugging();
 
   if (command_line->HasSwitch("pb-driver")) {
     StartDriver(command_line->GetSwitchValuePath("pb-driver"));
@@ -95,6 +97,7 @@ void BrowserMainParts::WillRunMainMessageLoop(
 }
 
 void BrowserMainParts::PostMainMessageLoopRun() {
+  StopRemoteDebugging();
   Go().stop();
   engine_.reset();
   shell_.reset();

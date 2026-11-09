@@ -8,6 +8,7 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "project_b/engine/browser/browser_main_parts.h"
+#include "project_b/engine/browser/devtools.h"
 
 namespace project_b {
 
@@ -24,6 +25,11 @@ base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
   base::FilePath dir;
   CHECK(base::PathService::Get(base::DIR_EXE, &dir));
   return dir.Append(FILE_PATH_LITERAL("project_b_helper"));
+}
+
+std::unique_ptr<content::DevToolsManagerDelegate>
+ContentBrowserClient::CreateDevToolsManagerDelegate() {
+  return std::make_unique<DevToolsManagerDelegate>();
 }
 
 // Every navigation gets the generated throttle, whose hooks cross to Go only when Go

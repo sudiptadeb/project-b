@@ -60,6 +60,8 @@ source_set("browser") {
     "browser/browser_main_parts.mm",
     "browser/content_browser_client.cc",
     "browser/content_browser_client.h",
+    "browser/devtools.cc",
+    "browser/devtools.h",
     "browser/driver.h",
     "browser/driver.mm",
     "browser/engine.cc",

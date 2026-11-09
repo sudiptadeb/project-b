@@ -22,6 +22,8 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;
   base::FilePath GetChildProcessPath(int flags) override;
+  std::unique_ptr<content::DevToolsManagerDelegate>
+  CreateDevToolsManagerDelegate() override;
   void CreateThrottlesForNavigation(
       content::NavigationThrottleRegistry& registry) override;
   std::string GetProduct() override;

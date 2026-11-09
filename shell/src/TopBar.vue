@@ -16,7 +16,7 @@ function switchLayout() {
 </script>
 
 <template>
-  <header v-shell class="top">
+  <header v-shell class="top" :class="{ toolbar: !titleBar }">
     <template v-if="titleBar">
       <div v-drag class="space" :style="{ width: controls.left }"></div>
       <button
@@ -58,9 +58,17 @@ function switchLayout() {
   align-items: center;
   flex: none;
   height: 44px;
-  /* Its top corners meet the frame's inner edge, so they take the frame's curve. */
+  /* As the title bar its top corners meet the frame's inner edge, so they take the
+     frame's curve. */
   border-radius: var(--inner-radius) var(--inner-radius) 0 0;
   background: var(--bar);
+}
+
+/* Under the tab strip they meet the strip instead, with the tabs' own radius: the strip
+   paints 8px behind this row, so the corners are cut into the frame colour and nothing
+   beneath shows. */
+.top.toolbar {
+  border-radius: 8px 8px 0 0;
 }
 
 .space {

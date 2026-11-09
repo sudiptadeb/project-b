@@ -70,9 +70,13 @@ def set_window(box):
     """Puts the window back between checks. Done inside the VM: it isn't what's being tested."""
     x, y, w, h = box
     guest("/usr/bin/osascript", "-e",
-          f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
-          f"to set {{position, size}} of window 1 to {{{{{x}, {y}}}, {{{w}, {h}}}}}")
+          f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") to tell window 1\n'
+          f"set position to {{{x}, {y}}}\n"
+          f"set size to {{{w}, {h}}}\n"
+          "end tell")
     time.sleep(0.4)
+    if window() != box:
+        sys.exit(f"couldn't put the window back at {box}: it's at {window()}, so nothing after this would mean anything")
 
 
 def crop(img, x, y, w, h):

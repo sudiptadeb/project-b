@@ -10,6 +10,8 @@ export const state = reactive({
   engine: '',
   tabs: [],
   active: 0,
+  // Where the tabs go: 'vertical' (a sidebar) or 'horizontal' (a strip on top).
+  tabLayout: 'vertical',
   // Where the native window controls are. Zero size when there are none.
   controls: { x: 0, y: 0, w: 0, h: 0 },
   // Whether the sidebar is open. The shell's own, so it stays here.
@@ -18,6 +20,20 @@ export const state = reactive({
 
 // activeTab is the tab whose page is showing.
 export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
+
+// tabLabel is what a tab's row or strip entry says: the title, else the host while the
+// page is on its way, else New Tab.
+export function tabLabel(tab) {
+  if (tab.title) return tab.title;
+  if (tab.url) {
+    try {
+      return new URL(tab.url).host || tab.url;
+    } catch {
+      return tab.url;
+    }
+  }
+  return 'New Tab';
+}
 
 let onSuggestions = () => {};
 let onFocusAddressBar = () => {};
@@ -36,6 +52,7 @@ export function connect() {
           state.tabs = m.tabs;
           state.active = m.active;
           state.controls = m.controls;
+          state.tabLayout = m.tabLayout;
           break;
         case 'tabs':
           state.tabs = m.tabs;
@@ -46,6 +63,9 @@ export function connect() {
           if (i >= 0) state.tabs[i] = m.tab;
           break;
         }
+        case 'tabLayout':
+          state.tabLayout = m.tabLayout;
+          break;
         case 'controls':
           state.controls = m.controls;
           break;

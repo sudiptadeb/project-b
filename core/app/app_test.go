@@ -215,6 +215,22 @@ func TestTabsThroughTheShellAndShortcuts(t *testing.T) {
 	}
 }
 
+func TestTabLayoutIsAnnouncedAndSurvivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	r.shell(`{"t":"setTabLayout","text":"horizontal"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabLayout" && m["tabLayout"] == "horizontal" })
+	r.stop()
+
+	r2 := start(t, dir)
+	defer r2.stop()
+	r2.shell(`{"t":"ready"}`)
+	m := r2.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if m["tabLayout"] != "horizontal" {
+		t.Fatalf("snapshot after restart: %v", m["tabLayout"])
+	}
+}
+
 func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()

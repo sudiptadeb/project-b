@@ -6,6 +6,7 @@ import (
 	"projectb/engine"
 	"projectb/history"
 	"projectb/policy"
+	"projectb/prefs"
 	"projectb/shell"
 	"projectb/suggest"
 	"projectb/tabs"
@@ -25,6 +26,7 @@ type App struct {
 	Suggest *suggest.Manager
 	Policy  *policy.Manager
 	Window  *window.Manager
+	Prefs   *prefs.Manager
 	Shell   *shell.Manager
 }
 
@@ -37,7 +39,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Suggest = suggest.New(a.History)
 	a.Tabs = tabs.New(e)
 	a.Window = window.New()
-	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window)
+	a.Prefs = prefs.New(cfg.ProfileDir)
+	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
@@ -46,6 +49,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnListChanged(a.Shell.TabsChanged)
 	a.Tabs.OnEmpty(e.CloseWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
+	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 
 	a.History.Load(nil)
 	a.Tabs.Create()

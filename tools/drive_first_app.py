@@ -469,6 +469,37 @@ def main():
     app.wait("document.querySelector('nav').getBoundingClientRect().width===200", 5)
     time.sleep(0.3)
     check("expanding it takes the width back", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
+
+    # The same tabs on top. The strip is the title bar then; the toolbar row is below it.
+    click(app, "[aria-label='Tabs on top']")
+    app.wait("!!document.querySelector('.strip')", 5)
+    time.sleep(0.4)
+    horizontal = json.loads(app.cmd("bounds"))
+    check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 64 and horizontal["frame"][0] == 4, horizontal)
+    first_tab_x = app.js("document.querySelector('[role=tab]').getBoundingClientRect().x")
+    check("the strip leaves exactly the window buttons' space", first_tab_x == window["buttonsEnd"] + 8, (first_tab_x, window))
+    check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")
+    strip_empty = app.cmd("hit", 1000, BAR_Y)
+    check("the empty strip falls through to the frame, which drags", strip_empty == "frame", strip_empty)
+    n = app.js(ROWS)
+    app.cmd("key", "cmd+t")
+    app.wait(f"{ROWS}==={n + 1}", 10)
+    check("Cmd+T works with the tabs on top", app.js(ACTIVE_ROW_TITLE) == "New Tab")
+    # The shell re-reports its drag rectangles a frame after the strip changed. A click
+    # inside that frame would still hit the old empty space.
+    time.sleep(0.3)
+    click(app, "[role=tab][aria-selected=true] .close")
+    app.wait(f"{ROWS}==={n}", 10)
+    check("the close button on a strip tab closes it", True)
+    click(app, "[role=tab]")
+    app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
+    check("clicking a strip tab activates it", True)
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "7-horizontal.png")), flush=True)
+    click(app, "[aria-label='Tabs on the side']")
+    app.wait("!!document.querySelector('nav')", 5)
+    time.sleep(0.4)
+    check("switching back brings the sidebar and the page follows", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
     app.cmd("key", "cmd+1")
     app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
 
@@ -519,6 +550,10 @@ def main():
     final = json.loads(app.cmd("stats", timeout=60))
     print("stats", json.dumps(final), flush=True)
 
+    # Leave the tabs on top, so the restart below shows the choice was kept.
+    click(app, "[aria-label='Tabs on top']")
+    app.wait("!!document.querySelector('.strip')", 5)
+
     # Closing the last tab closes the window, which ends the app. After each close the
     # shell puts focus back in the next tab, so the next key waits for that.
     while app.js(ROWS) > 1:
@@ -550,6 +585,11 @@ def main():
         check("titles survive a restart", "Example" in app.js("document.querySelector('[role=option]').innerText"))
     except TimeoutError as e:
         check("history survives a restart", False, e)
+    app.cmd("key", "escape")
+    check("the tab layout survives a restart", app.js("!!document.querySelector('.strip')"))
+    click(app, "[aria-label='Tabs on the side']")
+    app.wait("!!document.querySelector('nav')", 5)
+    check("and can be switched back", app.js("!document.querySelector('.strip')"))
     app.close()
 
     print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)

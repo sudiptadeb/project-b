@@ -1,19 +1,6 @@
 <script setup>
 import { send } from './bridge.js';
-import { state } from './state.js';
-
-// What a row says: the title, else the host while the page is on its way, else New Tab.
-function label(tab) {
-  if (tab.title) return tab.title;
-  if (tab.url) {
-    try {
-      return new URL(tab.url).host || tab.url;
-    } catch {
-      return tab.url;
-    }
-  }
-  return 'New Tab';
-}
+import { state, tabLabel } from './state.js';
 </script>
 
 <template>
@@ -42,8 +29,8 @@ function label(tab) {
           <span class="icon">
             <img v-if="tab.favicon" :src="tab.favicon" alt="" width="16" height="16" />
           </span>
-          <span class="title" :class="{ muted: !tab.title }">{{ label(tab) }}</span>
-          <button class="close" type="button" :aria-label="`Close ${label(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
+          <span class="title" :class="{ muted: !tab.title }">{{ tabLabel(tab) }}</span>
+          <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="m1 1 6 6M7 1 1 7"/></svg>
           </button>
         </div>

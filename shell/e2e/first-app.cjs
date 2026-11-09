@@ -203,7 +203,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const rowTitles = () => rows.evaluateAll((els) => els.map((el) => el.querySelector('.title').textContent));
   check('one tab to start with, active', (await rows.count()) === 1 && (await activeRow.count()) === 1);
   await visit('https://example.org/', 'https://example.org/');
-  await page.getByRole('button', { name: 'New Tab' }).click();
+  await page.getByRole('button', { name: 'New Tab', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('New Tab adds a tab and makes it active', (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   check('a new tab has an empty, focused address bar', (await bar.inputValue()) === '' && (await bar.evaluate((el) => el === document.activeElement)));
@@ -268,6 +268,34 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('expanding it takes the width back', r.bounds.x === 200, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '5-tabs.png') });
 
+  // The same tabs on top. One switch, kept by the managers, drives both layouts.
+  const strip = page.locator('.strip');
+  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await strip.waitFor();
+  await settle(page);
+  check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await page.locator('.strip [aria-selected=true]').count()) === 1);
+  check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 9 + 60 + 8, String((await rows.first().boundingBox()).x));
+  r = await regions();
+  check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 64 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
+  check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
+  await page.getByRole('button', { name: 'New Tab', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  check('New Tab works from the strip', (await bar.inputValue()) === '');
+  await rows.first().click();
+  await page.waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
+  check('clicking a strip tab activates it', true);
+  await rows.nth(2).hover();
+  await rows.nth(2).getByRole('button', { name: /^Close/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  check('the close button on a strip tab closes it', true);
+  await page.screenshot({ path: path.join(out, '6-horizontal.png') });
+  await page.getByRole('button', { name: 'Tabs on the side' }).click();
+  await page.locator('nav').waitFor();
+  await settle(page);
+  check('switching back brings the sidebar and the page follows', (await rows.count()) === 2 && (await regions()).bounds.x === 200);
+  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await strip.waitFor();
+
   // Closing the last tab closes the window.
   await shortcut('closeTab');
   await shortcut('closeTab');
@@ -286,6 +314,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await options.first().waitFor();
   check('history survives a restart', (await options.count()) === 3, String(await options.count()));
   check('titles survive a restart', /Mock example/.test(await options.first().innerText()));
+  await page.keyboard.press('Escape');
+  check('the tab layout survives a restart', (await page.locator('.strip').count()) === 1);
+  await page.getByRole('button', { name: 'Tabs on the side' }).click();
+  await page.locator('nav').waitFor();
+  check('and can be switched back', (await page.locator('.strip').count()) === 0);
 
   // Phone width.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

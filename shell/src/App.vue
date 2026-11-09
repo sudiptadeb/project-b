@@ -1,16 +1,22 @@
 <script setup>
+import { computed } from 'vue';
 import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
+import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
 import { state } from './state.js';
+
+// Both layouts show the same tabs from the same state; only where they sit differs.
+const horizontal = computed(() => state.tabLayout === 'horizontal');
 </script>
 
 <template>
   <div class="app">
+    <TabStrip v-if="horizontal" />
     <TopBar />
     <div class="body">
-      <Sidebar />
-      <PageView :class="{ 'no-sidebar': !state.sidebar }" />
+      <Sidebar v-if="!horizontal" />
+      <PageView :class="{ 'no-sidebar': horizontal || !state.sidebar }" />
     </div>
   </div>
 </template>

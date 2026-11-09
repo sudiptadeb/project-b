@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"projectb/engine"
+	"projectb/prefs"
 	"projectb/suggest"
 	"projectb/tabs"
 	"projectb/window"
@@ -29,11 +30,12 @@ type Manager struct {
 	tabs    *tabs.Manager
 	suggest *suggest.Manager
 	window  *window.Manager
+	prefs   *prefs.Manager
 }
 
 // New returns a manager.
-func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w}
+func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager) *Manager {
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p}
 }
 
 // Handle takes one command from the shell.
@@ -46,11 +48,12 @@ func (m *Manager) Handle(msg []byte) {
 	switch c.T {
 	case "ready":
 		m.send(map[string]any{
-			"t":        "snapshot",
-			"engine":   m.eng.Name(),
-			"tabs":     m.tabs.All(),
-			"active":   m.tabs.ActiveID(),
-			"controls": m.window.Controls(),
+			"t":         "snapshot",
+			"engine":    m.eng.Name(),
+			"tabs":      m.tabs.All(),
+			"active":    m.tabs.ActiveID(),
+			"controls":  m.window.Controls(),
+			"tabLayout": m.prefs.TabLayout(),
 		})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
@@ -66,6 +69,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.tabs.Close(engine.TabID(c.ID))
 	case "activateTab":
 		m.tabs.Activate(engine.TabID(c.ID))
+	case "setTabLayout":
+		m.prefs.SetTabLayout(c.Text)
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "regions":
@@ -91,6 +96,11 @@ func (m *Manager) TabChanged(t tabs.Tab) {
 // TabsChanged tells the shell which tabs exist now and which is active.
 func (m *Manager) TabsChanged() {
 	m.send(map[string]any{"t": "tabs", "tabs": m.tabs.All(), "active": m.tabs.ActiveID()})
+}
+
+// TabLayoutChanged tells the shell where the tabs go now.
+func (m *Manager) TabLayoutChanged(layout string) {
+	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
 // WindowControlsChanged tells the shell where the native window controls now are.

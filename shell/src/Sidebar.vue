@@ -59,7 +59,7 @@ import { state, tabLabel } from './state.js';
   flex-direction: column;
   width: 196px;
   height: 100%;
-  padding: 0 8px 8px;
+  padding: 8px;
   box-sizing: border-box;
 }
 

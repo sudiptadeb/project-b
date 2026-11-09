@@ -29,6 +29,7 @@ function switchLayout() {
         <svg width="14" height="13" viewBox="0 0 14 13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.18.75H1.75a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h10.43a1 1 0 0 0 1-1V1.75a1 1 0 0 0-1-1Z"/><path d="M4.56.75V12"/><path v-if="state.sidebar" d="M4.28.75H.75v11h3.53z" fill="currentColor" stroke="none" opacity=".25"/></svg>
       </button>
     </template>
+    <div v-else class="space" style="width: 4px"></div>
     <NavButtons />
     <AddressBar />
     <button
@@ -43,7 +44,7 @@ function switchLayout() {
       <svg v-else width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x=".65" y=".65" width="12.7" height="10.7" rx="1.5"/><path d="M4.6.65v10.7"/></svg>
     </button>
     <div v-if="titleBar" v-drag class="space" :style="{ width: controls.right }"></div>
-    <div v-else class="space" style="width: 4px"></div>
+    <div v-else class="space" style="width: 8px"></div>
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
   </header>

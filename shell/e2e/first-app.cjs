@@ -193,7 +193,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
-  check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 8, String((await toggle.boundingBox()).x));
+  check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);

@@ -36,15 +36,16 @@ export function tabLabel(tab) {
 }
 
 // How much room each end of the top row leaves: the native window controls' space on
-// whichever side they are, counted from inside the 4px window frame. Empty when there are none.
+// whichever side they are, counted from inside the 4px window frame, and 8px, the same
+// gap the controls get, on an end without them.
 export const controlSpace = computed(() => {
   const frame = 4;
   const c = state.controls;
-  if (c.w <= 0) return { left: '4px', right: '4px' };
+  if (c.w <= 0) return { left: '8px', right: '8px' };
   const onLeft = c.x + c.w / 2 < window.innerWidth / 2;
   return onLeft
-    ? { left: c.x + c.w + 8 - frame + 'px', right: '4px' }
-    : { left: '4px', right: window.innerWidth - c.x + 8 - frame + 'px' };
+    ? { left: c.x + c.w + 8 - frame + 'px', right: '8px' }
+    : { left: '8px', right: window.innerWidth - c.x + 8 - frame + 'px' };
 });
 
 let onSuggestions = () => {};

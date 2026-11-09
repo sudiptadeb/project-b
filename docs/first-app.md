@@ -9,7 +9,7 @@ below them. The address bar's suggestion box, fed by real history, extends over 
 
 | Folder | What it is | Needs Chromium |
 |---|---|---|
-| `core/` | Go managers (tabs, history, suggest, policy, window, prefs, shell) and the engine contract | No |
+| `core/` | Go managers (tabs, history, suggest, policy, window, prefs, update, shell) and the engine contract | No |
 | `core/mockengine`, `core/cmd/dev` | Mock engine and dev server | No |
 | `shell/` | Vue 3 shell | No |
 | `core/cmd/lib` | The cgo layer: the Go core as a c-archive | Links into the main binary |
@@ -83,7 +83,8 @@ on the empty strip returns the frame, a point on a window button returns the but
   position) are honoured, because there is one window.
 - No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
   are not saved; the tab layout (sidebar or strip) is, in `prefs.json` in the profile.
-- No downloads, permissions, dialogs, autofill or extensions.
+- No downloads, permissions, dialogs, autofill or extensions. An installed copy does update
+  itself: [updates.md](updates.md).
 - Mac only. Windows needs checking, because Go's cgo there wants mingw.
 
 ## What the first run showed (2026-11-09)

@@ -7,6 +7,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-09.
 - [first-app.md](first-app.md): pieces, the window, measurements, packaging.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
+- [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.
 
 ## Daily commands
 
@@ -26,6 +27,12 @@ Where the project stands, for the next person or agent. Last updated 2026-11-09.
 A Mac installs `project-b-trust.mobileconfig` once, from `tools/signing-setup.sh`. The key
 stays on the build Mac. `tools/gen_hooks.py` reruns only on a Chromium upgrade.
 
+## Publishing a release
+
+    tools/release.sh                           # VERSION, committed, becomes a GitHub release
+
+Installed copies pick it up within a minute and offer a relaunch; see [updates.md](updates.md).
+
 ## Limits of the tests
 
 The build Mac's agent sessions have no display, so `drive_first_app.py` calls views directly
@@ -42,6 +49,5 @@ full screen and tearing need a person, or the macOS VM.
 ## Open decisions
 
 - URL policy on every request: a proxy in the browser process, or rules in a renderer throttle.
-- Auto-update: `core/update` here first, or a Mac updater inside amarit.
 - A Go nil dereference: recover or crash loudly.
 - From the review: move focus decisions into Go.

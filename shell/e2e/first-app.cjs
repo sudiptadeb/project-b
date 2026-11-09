@@ -67,8 +67,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('opens with nothing to go back to or reload', (await back.isDisabled()) && (await forward.isDisabled()) && (await reload.isDisabled()));
 
   let r = await regions();
-  check('opens empty with only the bar as shell', r.regions.length === 1 && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('page sits below the bar, inside the frame', r.bounds.y === r.regions[0].h && r.bounds.x === 4 && r.bounds.w === 1100 - 8 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
+  check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
+  check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 200 && r.bounds.y === 32 && r.bounds.w === 1100 - 200 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
+  check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
   // before the commit would correctly replace this one.
@@ -115,13 +116,13 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('titles arrive after the visit', /Mock example/.test(await options.first().innerText()));
 
   r = await regions();
-  check('the box becomes a second shell rectangle', r.regions.length === 2, JSON.stringify(r.regions));
+  check('the box becomes a third shell rectangle', r.regions.length === 3, JSON.stringify(r.regions));
   const box = await list.boundingBox();
   const over = await regions(`?x=${box.x + 20}&y=${box.y + 10}`);
   check('the box extends over the page', box.y + box.height > r.bounds.y + 40, JSON.stringify({ box, bounds: r.bounds }));
   check('a click on the box goes to the shell', over.hit === 'shell');
-  const beside = await regions(`?x=${box.x - 40}&y=${box.y + 10}`);
-  check('a click beside the box goes to the page', beside.hit === 'page');
+  const below = await regions(`?x=${box.x + 20}&y=${box.y + box.height + 40}`);
+  check('a click below the box goes to the page', below.hit === 'page');
 
   // Bar and list behave as one UI.
   await page.keyboard.press('ArrowDown');
@@ -134,7 +135,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.keyboard.press('Escape');
   await settle(page);
   r = await regions();
-  check('escape closes the box and its rectangle goes', (await list.count()) === 0 && r.regions.length === 1, JSON.stringify(r.regions));
+  check('escape closes the box and its rectangle goes', (await list.count()) === 0 && r.regions.length === 2, JSON.stringify(r.regions));
 
   // Clicking a suggestion.
   await bar.fill('');
@@ -151,8 +152,12 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await settle(page);
   check('clicking the page closes the box', (await list.count()) === 0 && (await bar.inputValue()) === 'https://go.dev/learn');
 
-  // Events from the page side.
-  await mock.getByRole('button', { name: 'Cmd+L' }).click();
+  // Events from the page side. Shortcuts arrive from the engine, whichever page had focus.
+  const shortcut = async (name) => {
+    await mock.getByLabel('Shortcut name').fill(name);
+    await mock.getByRole('button', { name: 'Shortcut' }).click();
+  };
+  await shortcut('focusAddressBar');
   await page.waitForFunction(() => document.activeElement === document.querySelector('input'));
   check('the shortcut focuses the address bar from the page', true);
   await page.keyboard.press('Escape');
@@ -176,6 +181,91 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
 
+  // The engine says where the window controls are; the shell leaves exactly that space.
+  // In full screen there are none, so the first control moves into their place.
+  const toggle = page.getByRole('button', { name: /sidebar/ });
+  const windowLeft = (await toggle.boundingBox()).x;
+  check('the first control starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
+  r = await regions('?x=74&y=16');
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 3 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
+  check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
+  check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 8, String((await toggle.boundingBox()).x));
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
+  check('leaving full screen gives the buttons their space back', true);
+
+  // Tabs.
+  const rows = page.getByRole('tab');
+  const activeRow = page.locator('.row.tab.active');
+  const rowTitles = () => rows.evaluateAll((els) => els.map((el) => el.querySelector('.title').textContent));
+  check('one tab to start with, active', (await rows.count()) === 1 && (await activeRow.count()) === 1);
+  await visit('https://example.org/', 'https://example.org/');
+  await page.getByRole('button', { name: 'New Tab' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  check('New Tab adds a tab and makes it active', (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
+  check('a new tab has an empty, focused address bar', (await bar.inputValue()) === '' && (await bar.evaluate((el) => el === document.activeElement)));
+  await mock.getByText('tab 2', { exact: true }).waitFor();
+  r = await regions();
+  check('the first tab was told it is hidden', JSON.stringify(r.hidden) === '[1]', JSON.stringify(r.hidden));
+  check('back and reload follow the new, empty tab', (await back.isDisabled()) && (await reload.isDisabled()));
+  await visit('https://example.net/', 'https://example.net/');
+  check('each tab keeps its own title', JSON.stringify(await rowTitles()) === JSON.stringify(['Mock example.org', 'Mock example.net']), JSON.stringify(await rowTitles()));
+  await rows.first().click();
+  await page.waitForFunction((v) => document.querySelector('input').value === v, 'https://example.org/');
+  check('clicking a row switches tabs and the address bar follows', (await rows.first().getAttribute('aria-selected')) === 'true');
+  check('back follows the tab that has history', await back.isEnabled());
+  await mock.getByText('tab 1', { exact: true }).waitFor();
+  check('the page view shows the active tab', true);
+
+  // The page opens a tab.
+  await mock.getByRole('button', { name: 'Open in new tab' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  await loaded('https://opened.test/');
+  check('a tab the page opens appears and is active', (await activeRow.innerText()).includes('opened.test'), await activeRow.innerText());
+
+  await shortcut('tab1');
+  await page.waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
+  check('Cmd+1 picks the first tab', true);
+  await shortcut('nextTab');
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]')[1].getAttribute('aria-selected') === 'true');
+  check('Ctrl+Tab picks the next tab', true);
+  await shortcut('closeTab');
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  check('Cmd+W closes the active tab and its right neighbour takes over', (await activeRow.innerText()).includes('opened.test'), await activeRow.innerText());
+  await shortcut('newTab');
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  check('Cmd+T opens a tab', (await bar.inputValue()) === '');
+
+  // Close with the button on the row.
+  await rows.nth(1).hover();
+  await rows.nth(1).getByRole('button', { name: /^Close/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  check('the close button on a row closes that tab', !(await rowTitles()).some((t) => t.includes('opened.test')), JSON.stringify(await rowTitles()));
+
+  // The sidebar collapses and the page follows.
+  await toggle.click();
+  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 0);
+  await settle(page);
+  r = await regions();
+  check('collapsing the sidebar gives its width to the page', r.bounds.x === 4 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
+  await page.screenshot({ path: path.join(out, '4-collapsed.png') });
+  await toggle.click();
+  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 200);
+  await settle(page);
+  r = await regions();
+  check('expanding it takes the width back', r.bounds.x === 200, JSON.stringify(r.bounds));
+  await page.screenshot({ path: path.join(out, '5-tabs.png') });
+
+  // Closing the last tab closes the window.
+  await shortcut('closeTab');
+  await shortcut('closeTab');
+  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 0);
+  await mock.getByText('Window closed', { exact: true }).waitFor();
+  check('closing the last tab closes the window', (await regions()).closed === true);
+
   // History survives a restart.
   await stopServer();
   await startServer();
@@ -185,23 +275,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await bar.click();
   await page.keyboard.type('exam');
   await options.first().waitFor();
-  check('history survives a restart', (await options.count()) === 2);
+  check('history survives a restart', (await options.count()) === 3, String(await options.count()));
   check('titles survive a restart', /Mock example/.test(await options.first().innerText()));
-
-  // The engine says where the window controls are; the shell leaves exactly that space.
-  // In full screen there are none, so the tab moves into their place.
-  const tab = page.locator('.tab');
-  const windowLeft = (await tab.boundingBox()).x;
-  check('the tab starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
-  r = await regions('?x=600&y=16');
-  check('the empty strip beside the tab drags the window', r.drag.length === 2 && r.hit === 'drag', JSON.stringify(r.drag));
-  check('the tab itself is shell, not drag', (await regions(`?x=${windowLeft + 20}&y=16`)).hit === 'shell');
-  await mock.getByRole('button', { name: 'Full screen' }).click();
-  await page.waitForFunction(() => document.querySelector('.tab').getBoundingClientRect().x < 20);
-  check('in full screen the tab moves into the controls\' place', (await tab.boundingBox()).x === 4, String((await tab.boundingBox()).x));
-  await mock.getByRole('button', { name: 'Full screen' }).click();
-  await page.waitForFunction((x) => document.querySelector('.tab').getBoundingClientRect().x === x, windowLeft);
-  check('leaving full screen gives the controls their space back', true);
 
   // Phone width.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

@@ -7,7 +7,8 @@
 <style>
   :root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
   body { margin: 0; padding: 16px; background: Canvas; color: CanvasText; }
-  #state { font-weight: 600; margin-bottom: 4px; }
+  #state { font-weight: 600; }
+  #tab { opacity: .7; margin-bottom: 4px; min-height: 1.4em; }
   #url { opacity: .7; margin-bottom: 16px; overflow-wrap: anywhere; min-height: 1.4em; }
   form { display: flex; gap: 8px; margin-bottom: 8px; max-width: 520px; }
   input { flex: 1; min-width: 0; padding: 6px 8px; font: inherit; }
@@ -16,15 +17,17 @@
 </head>
 <body>
   <div id="state">Empty</div>
+  <div id="tab"></div>
   <div id="url"></div>
   <form data-kind="navigate"><input value="https://example.com/next"><button>Navigate</button></form>
   <form data-kind="title"><input value="A new title"><button>Title</button></form>
   <form data-kind="fail"><input value="ERR_CONNECTION_REFUSED"><button>Fail</button></form>
   <form data-kind="crash"><button>Crash</button></form>
-  <form data-kind="shortcut"><button>Cmd+L</button></form>
+  <form data-kind="open"><input value="https://opened.test/"><button>Open in new tab</button></form>
+  <form data-kind="shortcut"><input value="focusAddressBar" aria-label="Shortcut name"><button>Shortcut</button></form>
   <form data-kind="fullscreen"><button>Full screen</button></form>
 <script>
-  const label = {loading: 'Loading', loaded: 'Loaded', blocked: 'Blocked', crashed: 'Crashed'};
+  const label = {empty: 'Empty', loading: 'Loading', loaded: 'Loaded', blocked: 'Blocked', crashed: 'Crashed', none: 'No tab', closed: 'Window closed'};
   for (const form of document.querySelectorAll('form')) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -38,6 +41,7 @@
   new EventSource('/mock/events').onmessage = (e) => {
     const m = JSON.parse(e.data);
     document.getElementById('state').textContent = label[m.state] || m.state;
+    document.getElementById('tab').textContent = m.tab ? 'tab ' + m.tab : '';
     document.getElementById('url').textContent = m.url;
   };
 </script>

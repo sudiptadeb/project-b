@@ -73,12 +73,11 @@ std::string Classify(NSView* hit) {
   }
   NSView* shell =
       Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView();
-  NSView* page =
-      Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
   if ([hit isDescendantOf:shell]) {
     return "shell";
   }
-  if ([hit isDescendantOf:page]) {
+  PageTab* tab = Engine::Get()->active_tab();
+  if (tab && [hit isDescendantOf:tab->contents()->GetNativeView().GetNativeNSView()]) {
     return "page";
   }
   if (hit == TheWindow().contentView) {
@@ -272,8 +271,27 @@ void Run(const std::string& line) {
       unichar c = NSDownArrowFunctionKey;
       SendKey([NSString stringWithCharacters:&c length:1], 125,
               NSEventModifierFlagFunction | NSEventModifierFlagNumericPad);
-    } else if (name == "cmd+l") {
-      SendKey(@"l", 37, NSEventModifierFlagCommand);
+    } else {
+      // cmd+<char>, ctrl+tab, ctrl+shift+tab.
+      NSEventModifierFlags flags = 0;
+      std::string key = name;
+      for (size_t plus = key.find('+'); plus != std::string::npos;
+           plus = key.find('+')) {
+        const std::string mod = key.substr(0, plus);
+        key = key.substr(plus + 1);
+        if (mod == "cmd") {
+          flags |= NSEventModifierFlagCommand;
+        } else if (mod == "ctrl") {
+          flags |= NSEventModifierFlagControl;
+        } else if (mod == "shift") {
+          flags |= NSEventModifierFlagShift;
+        }
+      }
+      if (key == "tab") {
+        SendKey(@"\t", 48, flags);
+      } else if (key.size() == 1) {
+        SendKey(base::SysUTF8ToNSString(key), CodeForChar(key[0]), flags);
+      }
     }
     Reply(id, "ok");
   } else if (cmd == "resize") {
@@ -291,12 +309,11 @@ void Run(const std::string& line) {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {
     gfx::RectF b = Engine::Get()->window()->page_bounds();
-    NSRect f = Engine::Get()
-                   ->active_tab()
-                   ->contents()
-                   ->GetNativeView()
-                   .GetNativeNSView()
-                   .frame;
+    // The shown page's frame in the window's content view, where SetPageBounds put it.
+    NSView* page_view =
+        Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
+    NSRect f = [page_view.superview convertRect:page_view.frame
+                                         toView:TheWindow().contentView];
     NSSize c = TheWindow().contentView.bounds.size;
     NSButton* close_button = [TheWindow() standardWindowButton:NSWindowCloseButton];
     NSRect zoom = [TheWindow() standardWindowButton:NSWindowZoomButton].frame;

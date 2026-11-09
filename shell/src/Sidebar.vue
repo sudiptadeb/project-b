@@ -1,0 +1,190 @@
+<script setup>
+import { send } from './bridge.js';
+import { state } from './state.js';
+
+// What a row says: the title, else the host while the page is on its way, else New Tab.
+function label(tab) {
+  if (tab.title) return tab.title;
+  if (tab.url) {
+    try {
+      return new URL(tab.url).host || tab.url;
+    } catch {
+      return tab.url;
+    }
+  }
+  return 'New Tab';
+}
+</script>
+
+<template>
+  <nav v-shell class="sidebar" :class="{ closed: !state.sidebar }" aria-label="Tabs">
+    <div class="inner">
+      <button class="row new-tab" type="button" @click="send({ t: 'newTab' })">
+        <span class="icon">
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
+        </span>
+        <span class="title">New Tab</span>
+        <span class="hint" aria-hidden="true">⌘T</span>
+      </button>
+      <div class="tabs" role="tablist" aria-label="Open tabs">
+        <div
+          v-for="tab in state.tabs"
+          :key="tab.id"
+          class="row tab"
+          :class="{ active: tab.id === state.active }"
+          role="tab"
+          tabindex="0"
+          :aria-selected="tab.id === state.active"
+          @click="send({ t: 'activateTab', id: tab.id })"
+          @keydown.enter="send({ t: 'activateTab', id: tab.id })"
+          @auxclick.middle="send({ t: 'closeTab', id: tab.id })"
+        >
+          <span class="icon">
+            <img v-if="tab.favicon" :src="tab.favicon" alt="" width="16" height="16" />
+          </span>
+          <span class="title" :class="{ muted: !tab.title }">{{ label(tab) }}</span>
+          <button class="close" type="button" :aria-label="`Close ${label(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="m1 1 6 6M7 1 1 7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div v-drag class="rest"></div>
+    </div>
+  </nav>
+</template>
+
+<style scoped>
+/* The sidebar collapses to nothing; the page follows. */
+.sidebar {
+  flex: none;
+  width: 200px;
+  overflow: hidden;
+  background: var(--bar);
+  transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sidebar.closed {
+  width: 0;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  height: 100%;
+  padding: 0 8px 8px;
+  box-sizing: border-box;
+}
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.rest {
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.row:hover {
+  background: var(--hover);
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+}
+
+/* Borders carry separation: the active tab is a white card with a line, no shadow. */
+.row.active {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.new-tab {
+  color: var(--accent);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.icon img {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.title.muted {
+  color: var(--muted);
+}
+
+.hint {
+  flex: none;
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  opacity: 0.6;
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.row:hover .close,
+.row.active .close,
+.row:focus-within .close {
+  visibility: visible;
+}
+
+.close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+</style>

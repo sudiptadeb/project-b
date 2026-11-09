@@ -1,8 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import NavButtons from './NavButtons.vue';
 import { send } from './bridge.js';
-import { setHandlers, state } from './state.js';
+import { activeTab, setHandlers, state } from './state.js';
 
 const input = ref(null);
 const focused = ref(false);
@@ -15,7 +14,7 @@ let latestQuery = 0;
 
 const open = computed(() => focused.value && items.value.length > 0);
 const status = computed(() => {
-  const t = state.tab;
+  const t = activeTab.value;
   if (t.blocked) return 'Blocked';
   if (t.crashed) return 'Crashed';
   if (t.error) return 'Failed';
@@ -72,7 +71,7 @@ function onKeydown(e) {
         text.value = typed.value;
         close();
       } else {
-        text.value = state.tab.url;
+        text.value = activeTab.value.url;
         input.value.blur();
         send({ t: 'focusPage' });
       }
@@ -113,7 +112,13 @@ function onMouseUp(e) {
 function onBlur() {
   focused.value = false;
   close();
-  text.value = state.tab.url;
+  text.value = activeTab.value.url;
+}
+
+// The shell page has to hold the keyboard before the input can.
+function focusBar() {
+  send({ t: 'focusShell' });
+  input.value.focus();
 }
 
 onMounted(() => {
@@ -124,85 +129,87 @@ onMounted(() => {
         highlight.value = -1;
       }
     },
-    focusAddressBar() {
-      input.value.focus();
-    },
+    focusAddressBar: () => input.value.focus(),
   });
 });
 
 watch(
-  () => state.tab.url,
+  () => activeTab.value.url,
   (url) => {
     if (!focused.value) text.value = url;
+  },
+);
+
+// A tab that becomes active with nothing in it wants the address bar; one with a page
+// wants the page.
+watch(
+  () => state.active,
+  () => {
+    if (state.active === 0) return;
+    close();
+    text.value = activeTab.value.url;
+    if (activeTab.value.url === '') {
+      focusBar();
+    } else {
+      input.value.blur();
+      send({ t: 'focusPage' });
+    }
   },
 );
 </script>
 
 <template>
-  <form class="bar" @submit.prevent="go()">
-    <NavButtons />
-    <div class="field" :class="{ open }">
-      <input
-        ref="input"
-        v-model="text"
-        aria-label="Address"
-        placeholder="Search DuckDuckGo or type a URL"
-        role="combobox"
-        :aria-expanded="open"
-        aria-controls="suggestions"
-        :aria-activedescendant="highlight >= 0 ? `suggestion-${highlight}` : undefined"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        @input="onInput"
-        @keydown="onKeydown"
-        @mouseup="onMouseUp"
-        @focus="onFocus"
-        @blur="onBlur"
-      />
-      <span v-if="status" class="status">{{ status }}</span>
-      <ul v-if="open" id="suggestions" v-shell class="list" role="listbox" @mousedown.prevent>
-        <li
-          v-for="(item, i) in items"
-          :id="`suggestion-${i}`"
-          :key="item.url"
-          role="option"
-          :aria-selected="i === highlight"
-          :class="{ active: i === highlight }"
-          @mouseenter="highlight = i"
-          @click="go(item.url)"
-        >
-          <span class="title">{{ item.title || item.url }}</span>
-          <span v-if="item.title" class="url">{{ item.url }}</span>
-        </li>
-      </ul>
-    </div>
-    <div class="progress" :class="{ on: state.tab.loading }"></div>
+  <form class="field" :class="{ open }" @submit.prevent="go()">
+    <input
+      ref="input"
+      v-model="text"
+      aria-label="Address"
+      placeholder="Search DuckDuckGo or type a URL"
+      role="combobox"
+      :aria-expanded="open"
+      aria-controls="suggestions"
+      :aria-activedescendant="highlight >= 0 ? `suggestion-${highlight}` : undefined"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      @input="onInput"
+      @keydown="onKeydown"
+      @mouseup="onMouseUp"
+      @focus="onFocus"
+      @blur="onBlur"
+    />
+    <span v-if="status" class="status">{{ status }}</span>
+    <ul v-if="open" id="suggestions" v-shell class="list" role="listbox" @mousedown.prevent>
+      <li
+        v-for="(item, i) in items"
+        :id="`suggestion-${i}`"
+        :key="item.url"
+        role="option"
+        :aria-selected="i === highlight"
+        :class="{ active: i === highlight }"
+        @mouseenter="highlight = i"
+        @click="go(item.url)"
+      >
+        <span class="title">{{ item.title || item.url }}</span>
+        <span v-if="item.title" class="url">{{ item.url }}</span>
+      </li>
+    </ul>
   </form>
 </template>
 
 <style scoped>
-.bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 40px;
-  margin: 0 4px;
-  padding: 0 8px 0 0;
-  background: var(--bar);
-  border-radius: 8px 8px 0 0;
-}
-
 .field {
   position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 28px;
+  height: 24px;
+  margin: 0;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
+  box-sizing: border-box;
 }
 
 .field:focus-within {
@@ -214,23 +221,24 @@ input {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 12px;
+  padding: 0 8px;
   border: 0;
   border-radius: 6px;
   outline: none;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 12.5px;
 }
 
 input::placeholder {
-  color: inherit;
+  color: var(--muted);
   opacity: 1;
 }
 
 .status {
   flex: none;
-  margin-right: 10px;
+  margin-right: 8px;
   color: var(--danger);
   font-size: 12.5px;
   font-weight: 500;
@@ -260,7 +268,7 @@ li {
 }
 
 li.active {
-  background: var(--hover);
+  background: rgba(15, 170, 170, 0.1);
 }
 
 .title,
@@ -273,25 +281,5 @@ li.active {
 .url {
   color: var(--muted);
   font-size: 12.5px;
-}
-
-.progress {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 2px;
-  width: 0;
-  background: var(--accent);
-}
-
-.progress.on {
-  width: 100%;
-  animation: load 1s ease-in-out infinite;
-  transform-origin: left;
-}
-
-@keyframes load {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
 }
 </style>

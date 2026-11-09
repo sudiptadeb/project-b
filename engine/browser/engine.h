@@ -35,29 +35,39 @@ class Engine {
   ~Engine();
 
   static Engine* Get();
-  static bool IsFocusAddressBarKey(const input::NativeWebKeyboardEvent& event);
+  // The reserved key combination this event is, or PB_SHORTCUT_NONE.
+  static PBShortcut ShortcutFor(const input::NativeWebKeyboardEvent& event);
 
   // The table handed to Go. Lives as long as the process.
   static const PBEngineCalls* Calls();
 
   Window* window() const { return window_; }
   ShellPage* shell() const { return shell_; }
+  // The tab whose page is shown.
   PageTab* active_tab() const;
   PageTab* TabFor(content::WebContents* contents) const;
 
-  void FocusAddressBar();
   void FocusShellForTraversal(bool reverse);
   void FocusPageForTraversal(bool reverse);
 
   int64_t CreateTab();
+  // Takes a WebContents content made for a page's target=_blank or window.open and
+  // makes it a hidden tab.
+  PageTab* AdoptTab(std::unique_ptr<content::WebContents> contents);
+  void CloseTab(int64_t tab);
+  void ShowTab(int64_t tab);
   void LoadURL(int64_t tab, const char* url);
   void GoBack(int64_t tab);
   void GoForward(int64_t tab);
   void Reload(int64_t tab);
+  void CloseWindow();
   void FocusPage();
+  void FocusShell();
   void SendToShell(const char* json, size_t length);
 
  private:
+  PageTab* Add(std::unique_ptr<content::WebContents> contents);
+
   const raw_ptr<content::BrowserContext> browser_context_;
   const raw_ptr<Window> window_;
   const raw_ptr<ShellPage> shell_;

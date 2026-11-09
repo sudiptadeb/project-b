@@ -18,7 +18,8 @@
 // That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
-@property(nonatomic, weak) NSView* pageView;
+// Holds every page view; the shown one is the only one not hidden.
+@property(nonatomic, strong) NSView* pages;
 - (void)setRegions:(std::vector<gfx::RectF>)regions;
 - (void)setDragRegions:(std::vector<gfx::RectF>)regions;
 @end
@@ -29,7 +30,7 @@
 }
 
 @synthesize shellView = _shellView;
-@synthesize pageView = _pageView;
+@synthesize pages = _pages;
 
 - (void)setRegions:(std::vector<gfx::RectF>)regions {
   _regions = std::move(regions);
@@ -57,8 +58,9 @@
       return [self.shellView hitTest:p];
     }
   }
-  NSView* page = [self.pageView hitTest:p];
-  return page ? page : self;
+  // hitTest: skips hidden views, so this finds the shown page or nothing.
+  NSView* page = [self.pages hitTest:p];
+  return page && page != self.pages ? page : self;
 }
 
 @end
@@ -210,6 +212,12 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
       initWithFrame:NSMakeRect(0, 0, 1100, 700)];
   impl_->container.wantsLayer = YES;
   impl_->window.contentView = impl_->container;
+
+  // Keeping its margins means the pages follow a window resize in the same frame,
+  // before the shell has had a chance to say anything.
+  impl_->container.pages = [[NSView alloc] initWithFrame:impl_->container.bounds];
+  impl_->container.pages.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  [impl_->container addSubview:impl_->container.pages];
 }
 
 Window::~Window() {
@@ -219,6 +227,10 @@ Window::~Window() {
 void Window::Show() {
   [impl_->window makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
+}
+
+void Window::Close() {
+  [impl_->window close];
 }
 
 void Window::SetTitle(const std::u16string& title) {
@@ -233,17 +245,28 @@ void Window::SetShellView(gfx::NativeView view) {
   [impl_->container addSubview:shell];
 }
 
-void Window::SetPageView(gfx::NativeView view) {
+void Window::AddPageView(gfx::NativeView view) {
   NSView* page = view.GetNativeNSView();
-  // Keeping its margins means it follows a window resize in the same frame, before
-  // the shell has had a chance to say anything.
+  NSView* pages = impl_->container.pages;
   page.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  page.frame = impl_->container.bounds;
-  [impl_->container.pageView removeFromSuperview];
-  impl_->container.pageView = page;
-  [impl_->container addSubview:page
-                    positioned:NSWindowBelow
-                    relativeTo:impl_->container.shellView];
+  page.frame = pages.bounds;
+  page.hidden = YES;
+  [pages addSubview:page];
+}
+
+void Window::ShowPageView(gfx::NativeView view) {
+  NSView* page = view.GetNativeNSView();
+  // The new one first, so the window is never empty between the two.
+  page.hidden = NO;
+  for (NSView* other in impl_->container.pages.subviews) {
+    if (other != page) {
+      other.hidden = YES;
+    }
+  }
+}
+
+void Window::RemovePageView(gfx::NativeView view) {
+  [view.GetNativeNSView() removeFromSuperview];
 }
 
 void Window::SetPageBounds(const gfx::RectF& bounds,
@@ -255,7 +278,7 @@ void Window::SetPageBounds(const gfx::RectF& bounds,
     return;
   }
   impl_->page_bounds = bounds;
-  impl_->container.pageView.frame =
+  impl_->container.pages.frame =
       NSMakeRect(std::round(bounds.x()),
                  std::round(size.height - bounds.y() - bounds.height()),
                  std::round(bounds.width()), std::round(bounds.height()));

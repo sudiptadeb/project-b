@@ -1,16 +1,17 @@
 <script setup>
-import AddressBar from './AddressBar.vue';
 import PageView from './PageView.vue';
-import TabStrip from './TabStrip.vue';
+import Sidebar from './Sidebar.vue';
+import TopBar from './TopBar.vue';
+import { state } from './state.js';
 </script>
 
 <template>
   <div class="app">
-    <header v-shell class="top">
-      <TabStrip />
-      <AddressBar />
-    </header>
-    <PageView />
+    <TopBar />
+    <div class="body">
+      <Sidebar />
+      <PageView :class="{ 'no-sidebar': !state.sidebar }" />
+    </div>
   </div>
 </template>
 
@@ -21,7 +22,7 @@ import TabStrip from './TabStrip.vue';
   --frame: #0faaaa;
   --bar: #e2f2f2;
   --accent: #0faaaa;
-  --hover: #e2f2f2;
+  --hover: rgba(255, 255, 255, 0.6);
   --surface: #ffffff;
   --text: #1f1f1f;
   --muted: #5c6270;
@@ -33,6 +34,7 @@ import TabStrip from './TabStrip.vue';
   -webkit-font-smoothing: antialiased;
 }
 
+/* The root stays transparent: the page shows through wherever nothing is painted. */
 .app {
   display: flex;
   flex-direction: column;
@@ -40,9 +42,39 @@ import TabStrip from './TabStrip.vue';
   overflow: hidden;
 }
 
-.top {
-  position: relative;
-  z-index: 1;
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Every control in the shell is a flat 24px square with a 6px radius. */
+.icon-button {
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
 </style>

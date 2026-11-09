@@ -25,7 +25,8 @@ void PBHistoryChanged(int64_t tab, int can_go_back, int can_go_forward);
 void PBTitleChanged(int64_t tab, const char* title);
 void PBLoadingChanged(int64_t tab, int loading);
 void PBPageCrashed(int64_t tab);
-void PBFocusAddressBarRequested(void);
+void PBTabOpened(int64_t opener, int64_t tab, const char* url, int foreground);
+void PBShortcutPressed(int shortcut);
 void PBWindowControlsChanged(double x, double y, double w, double h);
 
 void PBPing(void);

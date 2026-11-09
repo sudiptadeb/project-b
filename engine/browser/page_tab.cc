@@ -15,6 +15,7 @@
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
 namespace project_b {
@@ -27,7 +28,11 @@ PageTab::PageTab(int64_t id, std::unique_ptr<content::WebContents> contents)
 }
 
 PageTab::~PageTab() {
+  // Tearing down the WebContents finishes its pending navigations, which would
+  // otherwise arrive here mid-destruction.
   contents_->SetDelegate(nullptr);
+  Observe(nullptr);
+  contents_.reset();
 }
 
 void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
@@ -43,8 +48,7 @@ void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
     // A page coming back from history already has its title, and may not set it again.
     content::NavigationEntry* entry = controller.GetLastCommittedEntry();
     if (entry && !entry->GetTitle().empty()) {
-      Engine::Get()->window()->SetTitle(entry->GetTitle());
-      Go().title_changed(id_, base::UTF16ToUTF8(entry->GetTitle()).c_str());
+      TitleWasSet(entry);
     }
     return;
   }
@@ -52,7 +56,7 @@ void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
   if (handle->GetNetErrorCode() != net::OK &&
       handle->GetNetErrorCode() != net::ERR_ABORTED) {
     Go().navigation_failed(id_, url.c_str(),
-                       net::ErrorToString(handle->GetNetErrorCode()).c_str());
+                           net::ErrorToString(handle->GetNetErrorCode()).c_str());
   }
 }
 
@@ -66,7 +70,9 @@ void PageTab::DidStopLoading() {
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {
   const std::u16string& title = contents_->GetTitle();
-  Engine::Get()->window()->SetTitle(title);
+  if (Engine::Get()->active_tab() == this) {
+    Engine::Get()->window()->SetTitle(title);
+  }
   Go().title_changed(id_, base::UTF16ToUTF8(title).c_str());
 }
 
@@ -79,21 +85,46 @@ content::WebContents* PageTab::OpenURLFromTab(
     content::WebContents* source,
     const content::OpenURLParams& params,
     base::OnceCallback<void(content::NavigationHandle&)> callback) {
-  // One tab so far, so everything opens here.
+  content::WebContents* target = source;
+  if (params.disposition != WindowOpenDisposition::CURRENT_TAB) {
+    // A link asked for another tab. Go hears about the tab before its first
+    // navigation, so the gate finds it.
+    PageTab* tab = Engine::Get()->AdoptTab(content::WebContents::Create(
+        content::WebContents::CreateParams(source->GetBrowserContext())));
+    Go().tab_opened(id_, tab->id(), params.url.spec().c_str(),
+                    params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+    target = tab->contents();
+  }
   base::WeakPtr<content::NavigationHandle> handle =
-      source->GetController().LoadURLWithParams(
+      target->GetController().LoadURLWithParams(
           content::NavigationController::LoadURLParams(params));
   if (handle && callback) {
     std::move(callback).Run(*handle);
   }
-  return source;
+  return target;
+}
+
+// target=_blank and window.open arrive here with a WebContents content already made.
+// Content loads it after this returns.
+content::WebContents* PageTab::AddNewContents(
+    content::WebContents* source,
+    std::unique_ptr<content::WebContents> new_contents,
+    const GURL& target_url,
+    WindowOpenDisposition disposition,
+    const blink::mojom::WindowFeatures& window_features,
+    bool user_gesture,
+    bool* was_blocked) {
+  PageTab* tab = Engine::Get()->AdoptTab(std::move(new_contents));
+  Go().tab_opened(id_, tab->id(), target_url.spec().c_str(),
+                  disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+  return tab->contents();
 }
 
 content::KeyboardEventProcessingResult PageTab::PreHandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
-  if (Engine::IsFocusAddressBarKey(event)) {
-    Engine::Get()->FocusAddressBar();
+  if (PBShortcut shortcut = Engine::ShortcutFor(event)) {
+    Go().shortcut(shortcut);
     return content::KeyboardEventProcessingResult::HANDLED;
   }
   return content::KeyboardEventProcessingResult::NOT_HANDLED;

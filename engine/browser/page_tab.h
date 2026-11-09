@@ -35,6 +35,14 @@ class PageTab : public content::WebContentsObserver,
       content::WebContents* source,
       const content::OpenURLParams& params,
       base::OnceCallback<void(content::NavigationHandle&)> callback) override;
+  content::WebContents* AddNewContents(
+      content::WebContents* source,
+      std::unique_ptr<content::WebContents> new_contents,
+      const GURL& target_url,
+      WindowOpenDisposition disposition,
+      const blink::mojom::WindowFeatures& window_features,
+      bool user_gesture,
+      bool* was_blocked) override;
   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
       content::WebContents* source,
       const input::NativeWebKeyboardEvent& event) override;

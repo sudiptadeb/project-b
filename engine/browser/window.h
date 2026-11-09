@@ -16,9 +16,9 @@ struct NativeWebKeyboardEvent;
 
 namespace project_b {
 
-// The native window: the page's view at the bottom, the shell's view on top covering
-// everything. One question decides who gets a mouse event: is this point in a
-// rectangle the shell claimed?
+// The native window: the pages' views at the bottom, one shown at a time, the shell's
+// view on top covering everything. One question decides who gets a mouse event: is
+// this point in a rectangle the shell claimed?
 class Window {
  public:
   explicit Window(base::OnceClosure on_close);
@@ -27,9 +27,15 @@ class Window {
   ~Window();
 
   void Show();
+  void Close();
   void SetTitle(const std::u16string& title);
   void SetShellView(gfx::NativeView view);
-  void SetPageView(gfx::NativeView view);
+
+  // Page views all sit where SetPageBounds says. AddPageView adds one hidden;
+  // ShowPageView shows it and hides the others.
+  void AddPageView(gfx::NativeView view);
+  void ShowPageView(gfx::NativeView view);
+  void RemovePageView(gfx::NativeView view);
 
   // Where the page goes, in shell coordinates. viewport is the size the shell measured
   // against: a report made for an older window size is ignored, and a fresher one

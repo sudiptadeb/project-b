@@ -10,6 +10,9 @@ package main
 #include "pb_abi.h"
 
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
+static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
+static inline void call_show_tab(const PBEngineCalls* c, int64_t tab) { c->show_tab(tab); }
+static inline void call_close_window(const PBEngineCalls* c) { c->close_window(); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
 static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_forward(tab); }
@@ -18,6 +21,7 @@ static inline void call_set_page_bounds(const PBEngineCalls* c, double x, double
 static inline void call_set_shell_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_shell_regions(rects, count); }
 static inline void call_set_drag_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_drag_regions(rects, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
+static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
 */
@@ -48,6 +52,12 @@ func (e *nativeEngine) Name() string { return "content" }
 func (e *nativeEngine) CreateTab() engine.TabID {
 	return engine.TabID(C.call_create_tab(e.calls))
 }
+
+func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) ShowTab(tab engine.TabID) { C.call_show_tab(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) CloseWindow() { C.call_close_window(e.calls) }
 
 func (e *nativeEngine) LoadURL(tab engine.TabID, url string) {
 	c := C.CString(url)
@@ -86,6 +96,8 @@ func flatten(rects []engine.Rect) []C.double {
 }
 
 func (e *nativeEngine) FocusPage() { C.call_focus_page(e.calls) }
+
+func (e *nativeEngine) FocusShell() { C.call_focus_shell(e.calls) }
 
 func (e *nativeEngine) SendToShell(msg []byte) {
 	if len(msg) == 0 {
@@ -176,8 +188,13 @@ func PBLoadingChanged(tab C.int64_t, loading C.int) {
 //export PBPageCrashed
 func PBPageCrashed(tab C.int64_t) { theApp.PageCrashed(engine.TabID(tab)) }
 
-//export PBFocusAddressBarRequested
-func PBFocusAddressBarRequested() { theApp.FocusAddressBarRequested() }
+//export PBTabOpened
+func PBTabOpened(opener, tab C.int64_t, url *C.char, foreground C.int) {
+	theApp.TabOpened(engine.TabID(opener), engine.TabID(tab), C.GoString(url), foreground != 0)
+}
+
+//export PBShortcutPressed
+func PBShortcutPressed(s C.int) { theApp.Shortcut(engine.Shortcut(s)) }
 
 //export PBWindowControlsChanged
 func PBWindowControlsChanged(x, y, w, h C.double) {

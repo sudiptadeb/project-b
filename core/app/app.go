@@ -43,6 +43,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
 	a.Tabs.OnTitleChanged(func(t tabs.Tab) { a.History.UpdateTitle(t.URL, t.Title) })
 	a.Tabs.OnChanged(a.Shell.TabChanged)
+	a.Tabs.OnListChanged(a.Shell.TabsChanged)
+	a.Tabs.OnEmpty(e.CloseWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 
 	a.History.Load(nil)
@@ -79,6 +81,28 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 
 func (a *App) PageCrashed(tab engine.TabID) { a.Tabs.HandlePageCrashed(tab) }
 
-func (a *App) FocusAddressBarRequested() { a.Shell.FocusAddressBar() }
+func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
+	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
+}
+
+// Shortcut maps each reserved key combination to the one function that does it.
+func (a *App) Shortcut(s engine.Shortcut) {
+	switch {
+	case s == engine.ShortcutFocusAddressBar:
+		a.Shell.FocusAddressBar()
+	case s == engine.ShortcutNewTab:
+		a.Tabs.Create()
+	case s == engine.ShortcutCloseTab:
+		a.Tabs.CloseActive()
+	case s == engine.ShortcutNextTab:
+		a.Tabs.ActivateNext(false)
+	case s == engine.ShortcutPreviousTab:
+		a.Tabs.ActivateNext(true)
+	case s == engine.ShortcutTab1+8:
+		a.Tabs.ActivateLast()
+	case s >= engine.ShortcutTab1:
+		a.Tabs.ActivateAt(int(s - engine.ShortcutTab1))
+	}
+}
 
 func (a *App) WindowControlsChanged(r engine.Rect) { a.Window.HandleControlsChanged(r) }

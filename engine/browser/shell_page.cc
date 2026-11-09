@@ -231,8 +231,8 @@ void ShellPage::PrimaryMainFrameRenderProcessGone(
 content::KeyboardEventProcessingResult ShellPage::PreHandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
-  if (Engine::IsFocusAddressBarKey(event)) {
-    Engine::Get()->FocusAddressBar();
+  if (PBShortcut shortcut = Engine::ShortcutFor(event)) {
+    Go().shortcut(shortcut);
     return content::KeyboardEventProcessingResult::HANDLED;
   }
   return content::KeyboardEventProcessingResult::NOT_HANDLED;

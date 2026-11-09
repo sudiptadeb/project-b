@@ -168,6 +168,53 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	}
 }
 
+func TestTabsThroughTheShellAndShortcuts(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.visit("https://a.test/")
+
+	r.shell(`{"t":"newTab"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
+	second := m["active"].(float64)
+	if second == 1 {
+		t.Fatalf("new tab should be active: %v", m)
+	}
+	if hidden := r.e.Hidden(); len(hidden) != 1 || hidden[0] != 1 {
+		t.Fatalf("the first tab should have been told it is hidden: %v", hidden)
+	}
+	r.visit("https://b.test/")
+
+	// The page opens a tab: the engine made it, Go put it in the list and showed it.
+	r.e.Fire("open", "https://c.test/")
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 3 })
+	if m["active"].(float64) == second {
+		t.Fatalf("opened tab should be active: %v", m)
+	}
+	r.waitForTab(func(tab map[string]any) bool { return tab["url"] == "https://c.test/" && tab["loading"] == false })
+
+	r.e.Fire("shortcut", "tab1")
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == float64(1) })
+	r.e.Fire("shortcut", "nextTab")
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == second })
+	r.e.Fire("shortcut", "closeTab")
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
+	if m["active"] == second {
+		t.Fatalf("closed tab still active: %v", m)
+	}
+
+	// Closing the rest closes the window.
+	r.e.Fire("shortcut", "closeTab")
+	r.e.Fire("shortcut", "closeTab")
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 0 })
+	deadline := time.Now().Add(time.Second)
+	for !r.e.Closed() {
+		if time.Now().After(deadline) {
+			t.Fatal("window never closed")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()

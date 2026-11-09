@@ -25,8 +25,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
-BAR_Y = 52  # The middle of the address bar and the buttons, below the tab strip.
-BACK_X, FORWARD_X, RELOAD_X = 24, 52, 80
+BAR_Y = 16  # The middle of the top row: the title bar's height, shared with the window buttons.
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -90,15 +89,21 @@ class App:
         self.writer.flush()
         return self.wait_reply(key, timeout)
 
-    def js(self, expr, page=False):
-        r = self.cmd("evalpage" if page else "eval", expr.replace("\n", " "))
+    def js(self, expr, page=False, timeout=20):
+        r = self.cmd("evalpage" if page else "eval", expr.replace("\n", " "), timeout=timeout)
         return json.loads(r) if r != "" else None
 
     def wait(self, expr, timeout=15, page=False):
+        """Polls until expr is truthy. A navigation that swaps the page's frame drops the
+        answer to an eval sent just before, so a lost answer is tried again."""
         deadline = time.time() + timeout
         last = None
         while time.time() < deadline:
-            last = self.js(expr, page)
+            try:
+                last = self.js(expr, page, timeout=5)
+            except TimeoutError:
+                last = "no answer"
+                continue
             if last:
                 return last
             time.sleep(0.05)
@@ -114,6 +119,20 @@ VALUE = INPUT + ".value"
 OPTIONS = "document.querySelectorAll('[role=option]').length"
 ACTIVE = "document.querySelectorAll('li.active').length"
 TAB_READY = "!document.querySelector('.progress.on')"
+ROWS = "document.querySelectorAll('[role=tab]').length"
+ACTIVE_ROW_TITLE = "document.querySelector('[role=tab][aria-selected=true] .title').textContent"
+ROW_TITLES = "[...document.querySelectorAll('[role=tab] .title')].map(e=>e.textContent)"
+
+
+def center(app, selector):
+    """The middle of an element, in shell coordinates."""
+    x, y = app.js(f"(()=>{{const r=document.querySelector({json.dumps(selector)}).getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()")
+    return x, y
+
+
+def click(app, selector):
+    x, y = center(app, selector)
+    return app.cmd("click", x, y)
 
 
 def box(app):
@@ -122,7 +141,7 @@ def box(app):
 
 def focus_bar(app):
     """Clicks the bar and waits until it really has focus and everything is selected."""
-    app.cmd("click", 400, BAR_Y)
+    click(app, "input")
     app.wait(f"document.hasFocus()&&document.activeElement==={INPUT}&&{INPUT}.selectionStart===0&&{INPUT}.selectionEnd==={VALUE}.length")
 
 
@@ -188,23 +207,28 @@ def main():
     app.wait("document.querySelector('form').getBoundingClientRect().height>0")
     time.sleep(0.3)
     print("bounds", app.cmd("bounds"), flush=True)
+    check("one tab to start with", app.js(ROWS) == 1 and app.js(ACTIVE_ROW_TITLE) == "New Tab")
+    check("opens with the address bar focused, as a new tab does", app.js(f"document.hasFocus()&&document.activeElement==={INPUT}"))
+
     # Hit tests start from the window's frame view, as AppKit's do, so the title bar and
-    # its buttons take part.
-    check("bar belongs to the shell", app.cmd("hit", 400, BAR_Y) == "shell")
-    check("below the bar belongs to the page", app.cmd("hit", 400, 300) == "page")
-    time.sleep(0.3)
-    tab_x = app.js("document.querySelector('.tab').getBoundingClientRect().x")
-    check("the tab, at title bar height, belongs to the shell and not the title bar", app.cmd("hit", tab_x + 20, 16) == "shell", app.cmd("hit", tab_x + 20, 16))
-    empty_strip = app.cmd("hit", 600, 16)
-    check("the empty strip beside the tab falls through to the window frame, which drags", empty_strip == "frame", empty_strip)
-    over_buttons = app.cmd("hit", 40, 16)
-    check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
-    print("hit over window buttons:", over_buttons, flush=True)
+    # its buttons take part in the answer.
+    bar_x, bar_y = center(app, "input")
+    check("the address bar, at title bar height, belongs to the shell and not the title bar", app.cmd("hit", bar_x, bar_y) == "shell", app.cmd("hit", bar_x, bar_y))
+    check("the page belongs to the page", app.cmd("hit", 600, 300) == "page")
+    check("the sidebar belongs to the shell", app.cmd("hit", 100, 60) == "shell", app.cmd("hit", 100, 60))
     window = json.loads(app.cmd("bounds"))
     print("title bar", window["titlebar"], "buttons", window["buttonsStart"], window["buttonsEnd"], "middle", window["buttonsMiddleY"], "size", window["buttonSize"], "screen", app.js("[screen.width,screen.height]"), flush=True)
-    check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 32, window)
-    tab_left = app.js("document.querySelector('.tab').getBoundingClientRect().x")
-    check("the shell leaves exactly the window buttons' space, as the engine reported it", tab_left == window["buttonsEnd"] + 8, (tab_left, window))
+    toggle_left = app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x")
+    check("the shell leaves exactly the window buttons' space, as the engine reported it", toggle_left == window["buttonsEnd"] + 8, (toggle_left, window))
+    gap = app.cmd("hit", (window["buttonsEnd"] + toggle_left) / 2, BAR_Y)
+    check("the gap after the window buttons falls through to the window frame, which drags", gap == "frame", gap)
+    right_end = app.cmd("hit", 1096, BAR_Y)
+    check("the right end of the top row falls through to the frame too", right_end == "frame", right_end)
+    below_tabs = app.cmd("hit", 100, 600)
+    check("the empty sidebar falls through to the frame, so it drags the window", below_tabs == "frame", below_tabs)
+    over_buttons = app.cmd("hit", 40, BAR_Y)
+    check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
+    print("hit over window buttons:", over_buttons, flush=True)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -221,20 +245,20 @@ def main():
     # Back, forward and reload, through the real buttons.
     disabled = lambda name: app.js(f"document.querySelector('[aria-label={name}]').disabled")
     check("back is on and forward is off after new pages", not disabled("Back") and disabled("Forward"))
-    app.cmd("click", BACK_X, BAR_Y)
+    click(app, "[aria-label=Back]")
     app.wait(f"location.href==={json.dumps(URL_A)}", 30, page=True)
     app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
     check("back returns to the previous page", True)
     app.wait("!document.querySelector('[aria-label=Forward]').disabled", 10)
     check("forward is on after going back", True)
-    app.wait("document.querySelector('.tab .title').textContent.includes('Example Domain')", 10)
+    app.wait(f"{ACTIVE_ROW_TITLE}.includes('Example Domain')", 10)
     check("the tab's title comes back with the page", True)
-    app.cmd("click", FORWARD_X, BAR_Y)
+    click(app, "[aria-label=Forward]")
     app.wait("location.href.includes('iana.org')", 30, page=True)
     app.wait(f"{VALUE}.includes('iana.org')", 10)
     check("forward returns to the next page", True)
     app.js("(()=>{window.__before_reload=1;return 1})()", page=True)
-    app.cmd("click", RELOAD_X, BAR_Y)
+    click(app, "[aria-label=Reload]")
     app.wait("document.readyState==='complete'&&!window.__before_reload", 30, page=True)
     check("reload loads the page again", True)
 
@@ -248,7 +272,7 @@ def main():
     check("the suggestion has the real page's title", "Example" in app.js("document.querySelector('[role=option]').innerText"))
     x, y, w, h = box(app)
     check("the box belongs to the shell", app.cmd("hit", x + 30, y + h - 6) == "shell")
-    check("beside the box belongs to the page", app.cmd("hit", x + w + 8 if x + w + 8 < 1090 else x / 2, y + h - 6) == "page")
+    check("below the box belongs to the page", app.cmd("hit", x + 30, y + h + 40) == "page")
 
     # Bar and list behave as one UI.
     app.cmd("key", "down")
@@ -290,14 +314,14 @@ def main():
         check("Cmd+L focuses the address bar from the page", False, e)
     leave_bar(app)
 
-    # Tab off the end of the shell moves into the page.
+    # Tab off the end of the shell moves into the page. The sidebar comes after the bar.
     focus_bar(app)
-    app.cmd("key", "tab")
-    try:
-        app.wait("document.hasFocus()", 5, page=True)
-        check("tab past the end of the shell moves into the page", True)
-    except TimeoutError as e:
-        check("tab past the end of the shell moves into the page", False, e)
+    for _ in range(8):
+        app.cmd("key", "tab")
+        time.sleep(0.15)
+        if app.js("document.hasFocus()", page=True):
+            break
+    check("tab past the end of the shell moves into the page", app.js("document.hasFocus()", page=True))
 
     # Policy answered synchronously by Go.
     focus_bar(app)
@@ -321,7 +345,7 @@ def main():
 
     # A page restored from the back-forward cache never reports a start, so its commit
     # has to clear the Blocked chip.
-    app.cmd("click", BACK_X, BAR_Y)
+    click(app, "[aria-label=Back]")
     try:
         app.wait("document.querySelector('.status')===null", 30)
         check("going back clears the blocked chip", True)
@@ -358,12 +382,89 @@ def main():
     time.sleep(0.3)
     settled = json.loads(app.cmd("bounds"))
     r = settled["reported"]
-    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 4 and r[2] == settled["content"][0] - 8, settled)
+    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 200 and r[2] == settled["content"][0] - 204, settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
     # The window controls stay put through resizes, so the shell's space for them does too.
     # Real full screen needs a display; the mock test covers the switch to no controls.
-    check("the controls' space survives resizing", app.js("document.querySelector('.tab').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
+    check("the controls' space survives resizing", app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
+
+    # Tabs. Tab 1 is on example.com here.
+    app.cmd("key", "cmd+t")
+    app.wait(f"{ROWS}===2", 10)
+    check("Cmd+T opens a tab and makes it active", app.js(ACTIVE_ROW_TITLE) == "New Tab", app.js(ACTIVE_ROW_TITLE))
+    app.wait(f"document.hasFocus()&&document.activeElement==={INPUT}", 5)
+    check("the new tab focuses the address bar", True)
+    check("back and reload follow the new, empty tab", disabled("Back") and disabled("Reload"))
+    app.cmd("type", URL_B)
+    app.wait(f"{VALUE}==={json.dumps(URL_B)}")
+    app.cmd("key", "enter")
+    app.wait(f"{VALUE}.includes('iana.org')&&document.activeElement!=={INPUT}", 30)
+    app.wait(TAB_READY, 30)
+    app.wait(f"{ACTIVE_ROW_TITLE}.includes('Example Domains')", 10)
+    titles = app.js(ROW_TITLES)
+    check("each tab keeps its own title", titles[0] == "Example Domain" and titles[1] == "Example Domains", titles)
+    app.js("(()=>{window.__vis=[];document.addEventListener('visibilitychange',()=>window.__vis.push(document.visibilityState));return 1})()", page=True)
+    click(app, "[role=tab]")
+    app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
+    app.wait("document.title==='Example Domain'", 10, page=True)
+    check("clicking a row switches tabs: the address bar and the page follow", True)
+    check("back follows the tab that has history", not disabled("Back"))
+    click(app, "[role=tab]:nth-child(2)")
+    app.wait("document.title==='Example Domains'", 10, page=True)
+    vis = app.wait("window.__vis.length>=2&&window.__vis", 10, page=True)
+    check("a hidden tab is told it is hidden, and shown again later", vis == ["hidden", "visible"], vis)
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "5-tabs.png")), flush=True)
+
+    # Pages opening tabs.
+    app.js("window.open('https://example.com/?popup')", page=True)
+    app.wait(f"{ROWS}===3", 15)
+    app.wait(f"{VALUE}==='https://example.com/?popup'", 30)
+    app.wait(TAB_READY, 30)
+    check("window.open opens a new, active tab", app.js(ACTIVE_ROW_TITLE) == "Example Domain", app.js(ACTIVE_ROW_TITLE))
+    app.js("(()=>{const a=document.createElement('a');a.href='https://example.com/?blank';a.target='_blank';a.textContent='x';document.body.appendChild(a);a.click();return 1})()", page=True)
+    app.wait(f"{ROWS}===4", 15)
+    app.wait(f"{VALUE}==='https://example.com/?blank'", 30)
+    check("target=_blank opens a new, active tab", True)
+    app.js("window.open('https://www.blocked.test/popup')", page=True)
+    app.wait(f"{ROWS}===5", 15)
+    try:
+        app.wait("document.querySelector('.status')&&document.querySelector('.status').innerText==='Blocked'", 10)
+        check("a tab a page opens goes through the gate", True)
+    except TimeoutError as e:
+        check("a tab a page opens goes through the gate", False, e)
+
+    # Keys.
+    app.cmd("key", "cmd+w")
+    app.wait(f"{ROWS}===4", 10)
+    check("Cmd+W closes the active tab and its left neighbour takes over at the end", app.js(VALUE) == "https://example.com/?blank", app.js(VALUE))
+    app.cmd("key", "cmd+1")
+    app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
+    check("Cmd+1 picks the first tab", app.js("document.querySelector('[role=tab]').getAttribute('aria-selected')") == "true")
+    app.cmd("key", "ctrl+tab")
+    app.wait(f"{VALUE}.includes('iana.org')", 10)
+    check("Ctrl+Tab picks the next tab", True)
+    app.cmd("key", "cmd+9")
+    app.wait(f"{VALUE}==='https://example.com/?blank'", 10)
+    check("Cmd+9 picks the last tab", True)
+    click(app, "[role=tab][aria-selected=true] .close")
+    app.wait(f"{ROWS}===3", 10)
+    check("the close button on a row closes that tab", "blank" not in app.js(VALUE), app.js(VALUE))
+
+    # The sidebar collapses and the page follows.
+    click(app, "[aria-label$=sidebar]")
+    app.wait("document.querySelector('nav').getBoundingClientRect().width===0", 5)
+    time.sleep(0.3)
+    collapsed = json.loads(app.cmd("bounds"))
+    check("collapsing the sidebar gives its width to the page", collapsed["reported"][0] == 4 and collapsed["frame"][0] == 4, collapsed)
+    print(app.cmd("capture", os.path.join(OUT, "6-collapsed.png")), flush=True)
+    click(app, "[aria-label$=sidebar]")
+    app.wait("document.querySelector('nav').getBoundingClientRect().width===200", 5)
+    time.sleep(0.3)
+    check("expanding it takes the width back", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
+    app.cmd("key", "cmd+1")
+    app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
 
     # Crash handling, from a healthy page: a blocked tab correctly keeps saying Blocked.
     visit(app, URL_A)
@@ -412,7 +513,24 @@ def main():
     final = json.loads(app.cmd("stats", timeout=60))
     print("stats", json.dumps(final), flush=True)
 
-    app.close()
+    # Closing the last tab closes the window, which ends the app. After each close the
+    # shell puts focus back in the next tab, so the next key waits for that.
+    while app.js(ROWS) > 1:
+        n = app.js(ROWS)
+        app.cmd("key", "cmd+w")
+        app.wait(f"{ROWS}==={n - 1}", 10)
+        deadline = time.time() + 10
+        while not (app.js("document.hasFocus()") or app.js("document.hasFocus()", page=True)):
+            if time.time() > deadline:
+                raise TimeoutError("nothing has focus after closing a tab")
+            time.sleep(0.1)
+    app.cmd("key", "cmd+w")
+    try:
+        app.proc.wait(timeout=30)
+        check("closing the last tab closes the window and ends the app", True)
+    except subprocess.TimeoutExpired:
+        check("closing the last tab closes the window and ends the app", False)
+        app.close()
 
     # History survives a restart.
     app = App(profile)

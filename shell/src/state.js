@@ -1,15 +1,23 @@
 // The shell's copy of the state. The managers own the truth: this is only ever replaced
 // by what they send, and a new shell starts from a snapshot.
 
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { listen, send } from './bridge.js';
+
+const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 
 export const state = reactive({
   engine: '',
-  tab: { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' },
+  tabs: [],
+  active: 0,
   // Where the native window controls are. Zero size when there are none.
   controls: { x: 0, y: 0, w: 0, h: 0 },
+  // Whether the sidebar is open. The shell's own, so it stays here.
+  sidebar: true,
 });
+
+// activeTab is the tab whose page is showing.
+export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
 
 let onSuggestions = () => {};
 let onFocusAddressBar = () => {};
@@ -25,12 +33,19 @@ export function connect() {
       switch (m.t) {
         case 'snapshot':
           state.engine = m.engine;
-          state.tab = m.tab;
+          state.tabs = m.tabs;
+          state.active = m.active;
           state.controls = m.controls;
           break;
-        case 'tab':
-          state.tab = m.tab;
+        case 'tabs':
+          state.tabs = m.tabs;
+          state.active = m.active;
           break;
+        case 'tab': {
+          const i = state.tabs.findIndex((t) => t.id === m.tab.id);
+          if (i >= 0) state.tabs[i] = m.tab;
+          break;
+        }
         case 'controls':
           state.controls = m.controls;
           break;

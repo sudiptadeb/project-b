@@ -23,12 +23,32 @@ func (r Rect) Contains(x, y float64) bool {
 	return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H
 }
 
+// Shortcut is a key combination the engine keeps from pages and hands to the app.
+// The numbers match PBShortcut in engine/abi/pb_abi.h.
+type Shortcut int
+
+const (
+	ShortcutFocusAddressBar Shortcut = iota + 1
+	ShortcutNewTab
+	ShortcutCloseTab
+	ShortcutNextTab
+	ShortcutPreviousTab
+	// ShortcutTab1 and the eight after it pick a tab by position; the ninth picks the
+	// last tab, as every browser does.
+	ShortcutTab1
+)
+
 // Engine is what the app can ask a browser engine to do.
 type Engine interface {
 	// Name says which engine this is, so the shell can show the mock page.
 	Name() string
 
+	// CreateTab makes a hidden tab. ShowTab shows it.
 	CreateTab() TabID
+	CloseTab(tab TabID)
+	// ShowTab shows this tab's page and hides every other one. Hidden pages are told
+	// they are hidden.
+	ShowTab(tab TabID)
 	LoadURL(tab TabID, url string)
 
 	// GoBack, GoForward and Reload move within the tab's own session history. What
@@ -37,7 +57,10 @@ type Engine interface {
 	GoForward(tab TabID)
 	Reload(tab TabID)
 
-	// SetPageBounds places the active tab's view behind the shell. viewW and viewH are
+	// CloseWindow closes the window, which ends the app.
+	CloseWindow()
+
+	// SetPageBounds places the shown tab's view behind the shell. viewW and viewH are
 	// the window size the shell measured against, so an engine can ignore a report
 	// made for a size the window no longer has.
 	SetPageBounds(r Rect, viewW, viewH float64)
@@ -47,7 +70,10 @@ type Engine interface {
 	// SetDragRegions replaces the rectangles where a mouse down moves the window
 	// instead: the empty parts of the shell. They win over shell regions.
 	SetDragRegions(rects []Rect)
+	// FocusPage gives keyboard focus to the shown tab's page; FocusShell gives it to
+	// the shell page, which then places it inside itself.
 	FocusPage()
+	FocusShell()
 
 	// SendToShell delivers one message to the shell page.
 	SendToShell(msg []byte)
@@ -71,8 +97,12 @@ type Listener interface {
 	LoadingChanged(tab TabID, loading bool)
 	PageCrashed(tab TabID)
 
-	// FocusAddressBarRequested fires on the shortcut while the page has focus.
-	FocusAddressBarRequested()
+	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
+	// has already created it, hidden; the app decides whether to show it.
+	TabOpened(opener, tab TabID, url string, foreground bool)
+
+	// Shortcut fires for a key combination the engine reserves, wherever focus was.
+	Shortcut(s Shortcut)
 
 	// WindowControlsChanged says where the native window controls (close, minimise,
 	// zoom) sit, so the shell can leave that space. It fires after start, on resize and

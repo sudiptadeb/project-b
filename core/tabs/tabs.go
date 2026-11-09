@@ -1,8 +1,10 @@
-// Package tabs owns the tabs. Tab state changes only through this manager.
+// Package tabs owns the tabs: which exist, in what order, which one is active, and
+// each one's state. Tab state changes only through this manager.
 package tabs
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 
 	"projectb/engine"
@@ -31,12 +33,15 @@ const searchURL = "https://duckduckgo.com/?q="
 type Manager struct {
 	eng    engine.Engine
 	tabs   map[engine.TabID]*Tab
+	order  []engine.TabID
 	active engine.TabID
 
 	gates      []Gate
 	onChanged  []func(Tab)
 	onFinished []func(Tab)
 	onTitle    []func(Tab)
+	onList     []func()
+	onEmpty    []func()
 }
 
 // New returns an empty manager.
@@ -56,13 +61,101 @@ func (m *Manager) OnNavigationFinished(f func(Tab)) { m.onFinished = append(m.on
 // OnTitleChanged subscribes to title changes.
 func (m *Manager) OnTitleChanged(f func(Tab)) { m.onTitle = append(m.onTitle, f) }
 
-// Create opens a new tab and makes it active.
+// OnListChanged subscribes to a tab opening or closing, or the active tab changing.
+func (m *Manager) OnListChanged(f func()) { m.onList = append(m.onList, f) }
+
+// OnEmpty subscribes to the last tab closing.
+func (m *Manager) OnEmpty(f func()) { m.onEmpty = append(m.onEmpty, f) }
+
+// Create opens a new tab at the end and makes it active.
 func (m *Manager) Create() engine.TabID {
 	id := m.eng.CreateTab()
-	m.tabs[id] = &Tab{ID: id}
-	m.active = id
+	m.add(id)
+	m.Activate(id)
 	return id
 }
+
+func (m *Manager) add(id engine.TabID) *Tab {
+	t := &Tab{ID: id}
+	m.tabs[id] = t
+	m.order = append(m.order, id)
+	return t
+}
+
+// Activate shows a tab.
+func (m *Manager) Activate(id engine.TabID) {
+	if m.tabs[id] == nil || id == m.active {
+		return
+	}
+	m.active = id
+	m.eng.ShowTab(id)
+	m.listChanged()
+}
+
+// ActivateAt shows the tab at a position, counting from zero. Out of range does nothing.
+func (m *Manager) ActivateAt(i int) {
+	if i >= 0 && i < len(m.order) {
+		m.Activate(m.order[i])
+	}
+}
+
+// ActivateLast shows the last tab.
+func (m *Manager) ActivateLast() { m.ActivateAt(len(m.order) - 1) }
+
+// ActivateNext shows the tab after the active one, or before it, wrapping around.
+func (m *Manager) ActivateNext(reverse bool) {
+	n := len(m.order)
+	if n < 2 {
+		return
+	}
+	i := slices.Index(m.order, m.active)
+	if reverse {
+		m.ActivateAt((i + n - 1) % n)
+	} else {
+		m.ActivateAt((i + 1) % n)
+	}
+}
+
+// Close closes a tab. Closing the active one activates its right neighbour, or the
+// left one at the end. Closing the last tab leaves no tabs and fires OnEmpty.
+func (m *Manager) Close(id engine.TabID) {
+	if m.tabs[id] == nil {
+		return
+	}
+	i := slices.Index(m.order, id)
+	delete(m.tabs, id)
+	m.order = slices.Delete(m.order, i, i+1)
+	m.eng.CloseTab(id)
+	if len(m.order) == 0 {
+		m.active = 0
+		m.listChanged()
+		for _, f := range m.onEmpty {
+			f()
+		}
+		return
+	}
+	if id == m.active {
+		m.active = 0
+		m.ActivateAt(min(i, len(m.order)-1))
+		return
+	}
+	m.listChanged()
+}
+
+// CloseActive closes the active tab.
+func (m *Manager) CloseActive() { m.Close(m.active) }
+
+// All returns copies of the tabs, in order.
+func (m *Manager) All() []Tab {
+	out := make([]Tab, len(m.order))
+	for i, id := range m.order {
+		out[i] = *m.tabs[id]
+	}
+	return out
+}
+
+// ActiveID returns the active tab's id, or zero when there is none.
+func (m *Manager) ActiveID() engine.TabID { return m.active }
 
 // Active returns a copy of the active tab.
 func (m *Manager) Active() Tab {
@@ -99,6 +192,18 @@ func (m *Manager) Forward() {
 func (m *Manager) Reload() {
 	if t := m.tabs[m.active]; t != nil && t.URL != "" {
 		m.eng.Reload(m.active)
+	}
+}
+
+// HandleTabOpened records a tab a page opened, and shows it if the page asked for the
+// foreground.
+func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground bool) {
+	t := m.add(id)
+	t.URL = u
+	if foreground {
+		m.Activate(id)
+	} else {
+		m.listChanged()
 	}
 }
 
@@ -192,6 +297,12 @@ func (m *Manager) HandlePageCrashed(id engine.TabID) {
 func (m *Manager) changed(t *Tab) {
 	for _, f := range m.onChanged {
 		f(*t)
+	}
+}
+
+func (m *Manager) listChanged() {
+	for _, f := range m.onList {
+		f()
 	}
 }
 

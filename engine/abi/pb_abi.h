@@ -13,13 +13,30 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Key combinations the engine keeps from pages and hands to the app. Matches
+// engine.Shortcut in core/engine/engine.go.
+typedef enum PBShortcut {
+  PB_SHORTCUT_NONE = 0,
+  PB_SHORTCUT_FOCUS_ADDRESS_BAR = 1,
+  PB_SHORTCUT_NEW_TAB = 2,
+  PB_SHORTCUT_CLOSE_TAB = 3,
+  PB_SHORTCUT_NEXT_TAB = 4,
+  PB_SHORTCUT_PREVIOUS_TAB = 5,
+  // PB_SHORTCUT_TAB_1 + n picks the tab at position n; the ninth picks the last.
+  PB_SHORTCUT_TAB_1 = 6,
+} PBShortcut;
+
 // What Go can ask the adapter to do. Handed over once, at start.
 typedef struct PBEngineCalls {
+  // Makes a hidden tab. show_tab shows one tab and hides the rest.
   int64_t (*create_tab)(void);
+  void (*close_tab)(int64_t tab);
+  void (*show_tab)(int64_t tab);
   void (*load_url)(int64_t tab, const char* url);
   void (*go_back)(int64_t tab);
   void (*go_forward)(int64_t tab);
   void (*reload)(int64_t tab);
+  void (*close_window)(void);
   // view_w and view_h are the window size the shell measured against.
   void (*set_page_bounds)(double x,
                           double y,
@@ -32,6 +49,7 @@ typedef struct PBEngineCalls {
   // Same layout. A mouse down here drags the window.
   void (*set_drag_regions)(const double* rects, size_t count);
   void (*focus_page)(void);
+  void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);
   // Asks the main thread to call run_posted soon.
   void (*post_wakeup)(void);
@@ -55,7 +73,9 @@ typedef struct PBGoCalls {
   void (*title_changed)(int64_t tab, const char* title);
   void (*loading_changed)(int64_t tab, int loading);
   void (*page_crashed)(int64_t tab);
-  void (*focus_address_bar_requested)(void);
+  // A page opened a tab. The adapter already made it, hidden.
+  void (*tab_opened)(int64_t opener, int64_t tab, const char* url, int foreground);
+  void (*shortcut)(int shortcut);
   // Where the native window controls are, in window coordinates with y from the top.
   // All zero when there are none to leave space for.
   void (*window_controls_changed)(double x, double y, double w, double h);

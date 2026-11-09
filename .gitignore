@@ -6,3 +6,4 @@
 /shell/node_modules/
 /shell/dist/
 .DS_Store
+__pycache__/

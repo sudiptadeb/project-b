@@ -18,6 +18,8 @@ type command struct {
 	ID    int           `json:"id"`
 	Rect  engine.Rect   `json:"rect"`
 	Rects []engine.Rect `json:"rects"`
+	ViewW float64       `json:"viewW"`
+	ViewH float64       `json:"viewH"`
 }
 
 // Manager connects the shell page to the managers.
@@ -49,7 +51,7 @@ func (m *Manager) Handle(msg []byte) {
 	case "regions":
 		m.eng.SetShellRegions(c.Rects)
 	case "pageBounds":
-		m.eng.SetPageBounds(c.Rect)
+		m.eng.SetPageBounds(c.Rect, c.ViewW, c.ViewH)
 	case "focusPage":
 		m.eng.FocusPage()
 	default:

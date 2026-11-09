@@ -31,8 +31,10 @@ type Engine interface {
 	CreateTab() TabID
 	LoadURL(tab TabID, url string)
 
-	// SetPageBounds places the active tab's view behind the shell.
-	SetPageBounds(r Rect)
+	// SetPageBounds places the active tab's view behind the shell. viewW and viewH are
+	// the window size the shell measured against, so an engine can ignore a report
+	// made for a size the window no longer has.
+	SetPageBounds(r Rect, viewW, viewH float64)
 	// SetShellRegions replaces the rectangles the shell owns. Mouse events inside
 	// them go to the shell; everything else goes to the page.
 	SetShellRegions(rects []Rect)

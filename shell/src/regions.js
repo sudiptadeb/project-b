@@ -39,10 +39,10 @@ function measure() {
 
   if (pageEl) {
     const rect = rectOf(pageEl);
-    const bounds = JSON.stringify(rect);
+    const bounds = JSON.stringify([rect, window.innerWidth, window.innerHeight]);
     if (bounds !== lastBounds) {
       lastBounds = bounds;
-      send({ t: 'pageBounds', rect });
+      send({ t: 'pageBounds', rect, viewW: window.innerWidth, viewH: window.innerHeight });
     }
   }
 

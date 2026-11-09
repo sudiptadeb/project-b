@@ -51,6 +51,7 @@ function move(delta) {
 }
 
 function onKeydown(e) {
+  selectOnMouseUp = false;
   switch (e.key) {
     case 'ArrowDown':
       if (open.value) {
@@ -88,10 +89,24 @@ function go(target) {
   send({ t: 'focusPage' });
 }
 
+// Focusing the bar selects everything. When a click did the focusing, its mouse up
+// would put the caret back down and clear the selection, so that one mouse up selects
+// again. The first key clears this, so later clicks place the caret as usual.
+let selectOnMouseUp = false;
+
 function onFocus() {
   focused.value = true;
   typed.value = text.value;
+  selectOnMouseUp = true;
   nextTick(() => input.value.select());
+}
+
+function onMouseUp(e) {
+  if (selectOnMouseUp) {
+    e.preventDefault();
+    input.value.select();
+    selectOnMouseUp = false;
+  }
 }
 
 function onBlur() {
@@ -138,6 +153,7 @@ watch(
         spellcheck="false"
         @input="onInput"
         @keydown="onKeydown"
+        @mouseup="onMouseUp"
         @focus="onFocus"
         @blur="onBlur"
       />

@@ -56,7 +56,7 @@ func (e *Engine) CreateTab() engine.TabID {
 
 func (e *Engine) LoadURL(tab engine.TabID, u string) { e.navigate(tab, u) }
 
-func (e *Engine) SetPageBounds(r engine.Rect) {
+func (e *Engine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.bounds = r

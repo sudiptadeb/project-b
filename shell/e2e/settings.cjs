@@ -139,8 +139,10 @@ const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.jso
   check('a shell command from the settings page is dropped', (await rows()) === 2 && (await bar.inputValue()) === 'chrome://settings/' && (await shell.locator('[role=tab][aria-selected=true]').count()) === 1 && (await shell.locator('[role=tab]').nth(1).getAttribute('aria-selected')) === 'true',
     `${await rows()} ${await bar.inputValue()}`);
 
-  // Updates. A check asked for goes to the update manager, which says what it found.
+  // Updates. A check asked for goes to the update manager, which says what it found. The
+  // manager's own check two seconds after launch comes first, so it isn't counted here.
   const status = settings.locator('.status');
+  await until(() => manifests > 0);
   const before = manifests;
   await settings.getByRole('button', { name: 'Check for updates' }).click();
   check('Check asks the update manager, which says it is up to date', await until(async () => (await status.textContent()) === 'Up to date'), await status.textContent());

@@ -47,6 +47,10 @@ PAGES = {
     "/busy": "<title>Busy</title><button style='width:100%;height:200px' onclick='for(;;);'>busy</button>",
     "/form": "<title>Form</title><form method=post action=http://blocked.test/>"
              "<button style='width:100%;height:200px'>post</button></form>",
+    "/input": "<title>Input</title><form action=/typed><input name=q autofocus "
+              "style='width:100%;height:200px;font-size:40px'></form>",
+    "/typed": "<title>Typed</title>typed",
+    "/words": "<title>Words</title><p style='font-size:40px'>Some words to hold a finger on, " + "words " * 200,
     "/to-blocked": None,
 }
 
@@ -110,11 +114,24 @@ def go(text, wait=2.0):
 
 def launch(block=""):
     adb("shell", "am", "force-stop", PACKAGE)
+    # Android takes the app zygote down a few seconds after a force stop. A start inside that window
+    # reused the dying zygote once and hung for good, so wait it out. Killing it ourselves is worse:
+    # the system never makes another, and no renderer starts.
+    for _ in range(30):
+        if PACKAGE + "_zygote" not in adb("shell", "ps", "-A", "-o", "NAME"):
+            break
+        time.sleep(0.5)
     args = ["shell", "am", "start", "-W", "-n", PACKAGE + "/" + ACTIVITY]
     if block:
         args += ["--es", "block", block]
     adb(*args)
-    time.sleep(3)
+    # Content starts in the background, so the window shows before the shell does. The shell is
+    # up once its renderer is.
+    for _ in range(30):
+        if any("sandboxed" in name for _, name in children()):
+            break
+        time.sleep(0.5)
+    time.sleep(2)
 
 
 def history_file():
@@ -148,15 +165,18 @@ def children():
 
 
 def go_library_mappings(pid):
-    """How many executable mappings in a process fall inside libcore.so's stretch of the APK."""
+    """How many executable mappings of libcore.so a process has. Android either unpacks a library
+    to a file or maps it straight from the APK, where it shows as a stretch of the APK."""
     start, end = go_library_span()
     count = 0
     for line in adb("shell", "cat", "/proc/%s/maps" % pid).splitlines():
         parts = line.split()
-        if len(parts) >= 6 and "r-xp" in parts[1] and parts[5].endswith("base.apk") and PACKAGE + "-" in parts[5]:
-            offset = int(parts[2], 16)
-            if start <= offset < end:
-                count += 1
+        if len(parts) < 6 or "r-xp" not in parts[1] or PACKAGE + "-" not in parts[5]:
+            continue
+        if parts[5].endswith("/libcore.so"):
+            count += 1
+        elif parts[5].endswith("base.apk") and start <= int(parts[2], 16) < end:
+            count += 1
     return count
 
 
@@ -164,8 +184,8 @@ def go_library_span():
     """Where lib/arm64-v8a/libcore.so sits in the APK, from the zip's own directory."""
     with zipfile.ZipFile(APK) as z:
         info = z.getinfo("lib/arm64-v8a/libcore.so")
-    # The stored data begins after the local header, whose name and extra fields vary a little.
-    return info.header_offset, info.header_offset + 64 * 1024 + info.file_size
+    # The stored data begins just after the local header, a few hundred bytes at most.
+    return info.header_offset, info.header_offset + 4096 + info.file_size
 
 
 def check(name, ok, detail=""):
@@ -242,6 +262,36 @@ def main():
     shot("10-scrolled")
     check("a swipe scrolls the page under the shell", any(s.startswith("/scrolled") for s in served), str(served[:3]))
 
+    # Typing into a page goes through the keyboard to the page, not the shell.
+    go(BASE + "/input")
+    served.clear()
+    tap(PAGE_TOP, 1.0)
+    type_text("hello")
+    key(66, 2.0)
+    shot("10b-typed-into-page")
+    # Android 16's keyboard capitalises the first letter, as it would for a person.
+    check("the keyboard types into a page", any("q=hello" in s.lower() for s in served), str(served))
+
+    # Holding a finger on text starts a selection, and the app lives through it.
+    go(BASE + "/words")
+    adb("shell", "input", "swipe", "400", "600", "400", "600", "900")
+    time.sleep(1.5)
+    shot("10c-text-selected")
+    check("selecting text in a page doesn't kill the app", PACKAGE in adb("shell", "ps", "-A", "-o", "NAME"))
+    key(4)
+
+    # The phone turns: the page follows, and a tap in the new layout still lands.
+    go(BASE + "/tap")
+    adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
+    adb("shell", "settings", "put", "system", "user_rotation", "1")
+    time.sleep(3)
+    shot("10d-landscape")
+    served.clear()
+    tap((1200, 300), 1.5)
+    check("a tap lands in the page in landscape", "/tapped" in served, str(served))
+    adb("shell", "settings", "put", "system", "user_rotation", "0")
+    time.sleep(3)
+
     # A gate says no: for a typed URL and for a redirect.
     go("blocked.test")
     shot("11-blocked")
@@ -272,48 +322,67 @@ def main():
     check("history file still holds Page A after a restart", visited("http://%s/a" % BASE))
     launch()
 
-    # Where Go is: the app's process, and none of its children.
+    # Where Go is: the app's process, and none of its children. The page needs a renderer first.
+    go(BASE + "/a")
     main_pid = None
     for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines():
         parts = line.split()
         if len(parts) == 2 and parts[1] == PACKAGE:
             main_pid = parts[0]
-    renderers = children()
-    # Libraries are mapped straight from the APK, so a library shows as a stretch of the APK.
-    maps = adb("shell", "cat", "/proc/%s/maps" % main_pid)
-    check("the main process has our code mapped", any(PACKAGE + "-" in l and "r-xp" in l for l in maps.splitlines()),
-          "pid " + str(main_pid))
+    kids = children()
     go_size = go_library_mappings(main_pid)
     check("Go's library is mapped in the main process", go_size > 0, "%d executable mapping(s)" % go_size)
-    for pid, name in renderers:
+    for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] == PACKAGE + "_zygote":
+            kids.append((parts[0], "app:zygote"))
+    for pid, name in kids:
         rmaps = adb("shell", "cat", "/proc/%s/maps" % pid)
-        check("Go's library is not in " + name.split(":")[-1], len(rmaps) > 0 and go_library_mappings(pid) == 0, "pid " + pid)
+        check("Go's library is not in " + name.split(":")[1], len(rmaps) > 0 and go_library_mappings(pid) == 0, "pid " + pid)
+    renderers = sorted((int(pid) for pid, name in kids if "sandboxed" in name))
     if ENGINE == "webview":
-        check("exactly one renderer holds shell and page", len(renderers) == 1, str(renderers))
+        check("exactly one renderer holds shell and page", len(renderers) == 1, str(kids))
     else:
-        check("the shell and the page have separate renderers",
-              sum("sandboxed" in name for _, name in renderers) >= 2, str(renderers))
+        check("the shell and the page have separate renderers", len(renderers) >= 2, str(kids))
 
-    # Renderer crash: the app lives, the shell comes back from a snapshot, reload recovers.
-    go(BASE + "/a")
-    for pid, _ in children():
-        adb("shell", "kill", "-9", pid)
+    # The page's renderer dies, which is the last one to start.
+    adb("shell", "kill", "-9", str(renderers[-1]))
     time.sleep(3)
-    shot("16-after-renderer-kill")
-    alive = PACKAGE in adb("shell", "ps", "-A", "-o", "NAME")
-    check("the app survives a renderer crash", alive)
+    shot("16-after-page-renderer-kill")
+    check("the app survives a renderer crash", PACKAGE in adb("shell", "ps", "-A", "-o", "NAME"))
     served.clear()
     tap(RELOAD, 3.0)
     shot("17-reloaded-after-crash")
     check("reload recovers after a crash", "/a" in served, str(served))
 
-    # One renderer holds both views, so a page that spins freezes the shell too.
+    if ENGINE == "content":
+        # The shell's renderer dies alone: it comes back from a snapshot, and the page stays.
+        adb("shell", "kill", "-9", str(renderers[0]))
+        time.sleep(4)
+        shot("17b-after-shell-renderer-kill")
+        served.clear()
+        tap(RELOAD, 3.0)
+        check("the shell works again after its renderer died", "/a" in served, str(served))
+        # The GPU process dies.
+        for pid, name in children():
+            if "privileged" in name:
+                adb("shell", "kill", "-9", pid)
+        time.sleep(5)
+        shot("17c-after-gpu-kill")
+        served.clear()
+        tap(RELOAD, 3.0)
+        shot("17d-reload-after-gpu-kill")
+        check("the app works after the GPU process died", "/a" in served, str(served))
+
+    # On WebView one renderer holds both views, so a page that spins freezes the shell too. On
+    # content they're separate, so the shell keeps working.
+    launch()
     go(BASE + "/busy")
     tap(PAGE_TOP, 1.0)
     tap(FIELD, 1.0)
     type_text("xyz")
     time.sleep(2)
-    shot("18-page-spinning-shell-frozen")
+    shot("18-page-spinning")
     adb("shell", "am", "force-stop", PACKAGE)
 
     # The real web, over the office's 443-only egress.

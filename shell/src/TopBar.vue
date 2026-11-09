@@ -17,6 +17,7 @@ function switchLayout() {
 
 <template>
   <header v-shell class="top" :class="{ toolbar: !titleBar }">
+    <div class="bar">
     <template v-if="titleBar">
       <div v-drag class="space" :style="{ width: controls.left }"></div>
       <button
@@ -47,27 +48,38 @@ function switchLayout() {
     <div v-else class="space" style="width: 8px"></div>
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
+    </div>
   </header>
 </template>
 
 <style scoped>
+/* The row starts as frame colour, like every tracked component, and the bar is drawn
+   on it 4px in from the sides. As the title bar it also carries the frame's top band,
+   and the bar's top corners follow the window's curve, one frame width inside it. */
 .top {
   position: relative;
   z-index: 1;
+  flex: none;
+  padding: var(--frame-width) var(--frame-width) 0;
+  background: var(--frame);
+}
+
+.bar {
+  position: relative;
   display: flex;
   align-items: center;
-  flex: none;
   height: 44px;
-  /* As the title bar its top corners meet the frame's inner edge, so they take the
-     frame's curve. */
   border-radius: var(--inner-radius) var(--inner-radius) 0 0;
   background: var(--bar);
 }
 
-/* Under the tab strip they meet the strip instead, with the tabs' own radius: the strip
-   paints 8px behind this row, so the corners are cut into the frame colour and nothing
-   beneath shows. */
+/* Under the tab strip the row has no band of its own, and the bar's corners meet the
+   strip with the tabs' radius. */
 .top.toolbar {
+  padding-top: 0;
+}
+
+.top.toolbar .bar {
   border-radius: 8px 8px 0 0;
 }
 

@@ -40,15 +40,14 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
 </template>
 
 <style scoped>
-/* It runs 8px further down behind the bar below, so the bar's rounded corners sit on the
-   frame colour. */
+/* Frame colour through and through: the top band and the sides are its padding, and the
+   bar below cuts its own corners into it. */
 .strip {
   display: flex;
   align-items: flex-end;
   flex: none;
-  height: 52px;
-  margin-bottom: -8px;
-  padding-bottom: 8px;
+  height: 48px;
+  padding: var(--frame-width) var(--frame-width) 0;
   box-sizing: border-box;
   background: var(--frame);
   color: rgba(255, 255, 255, 0.9);
@@ -96,8 +95,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
   position: absolute;
   inset: 0 -4px;
   width: calc(100% + 8px);
-  /* The shape's lower edge goes under the bar, so no seam shows between them. */
-  height: calc(100% + 2px);
+  height: 100%;
   fill: var(--bar);
 }
 

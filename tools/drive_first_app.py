@@ -396,7 +396,7 @@ def main():
     # follows it, one frame width inside. Real full screen, which needs a display, has
     # square corners and no controls; the radius comes back with the window.
     radius = lambda: float(app.js("getComputedStyle(document.documentElement).getPropertyValue('--window-radius')").replace("px", ""))
-    inner = lambda: float(app.js("getComputedStyle(document.querySelector('header')).borderTopLeftRadius").replace("px", ""))
+    inner = lambda: float(app.js("getComputedStyle(document.querySelector('header .bar')).borderTopLeftRadius").replace("px", ""))
     windowed = radius()
     print("window corner radius", windowed, "inner", inner(), flush=True)
     check("the frame takes the window's corner radius from the engine", windowed > 0 and inner() == windowed - 4, (windowed, inner()))

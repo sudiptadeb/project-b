@@ -41,12 +41,14 @@ import { state, tabLabel } from './state.js';
 </template>
 
 <style scoped>
-/* The sidebar collapses to nothing; the page follows. */
+/* The sidebar collapses to nothing; the page follows. Frame colour underneath, as for
+   every tracked component; its surface is drawn on top and rounds its bottom corner to
+   the window's curve, so the frame shows evenly there. */
 .sidebar {
   flex: none;
   width: 220px;
   overflow: hidden;
-  background: var(--bar);
+  background: var(--frame);
   transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -61,6 +63,8 @@ import { state, tabLabel } from './state.js';
   height: 100%;
   padding: 8px;
   box-sizing: border-box;
+  border-radius: 0 0 0 var(--inner-radius);
+  background: var(--bar);
 }
 
 .tabs {

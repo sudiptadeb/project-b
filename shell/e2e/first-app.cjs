@@ -198,7 +198,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // The engine also says how round the window's corners are; the frame's inner edge
   // follows, one frame width inside.
   const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
-  const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('header')).borderTopLeftRadius);
+  const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('header .bar')).borderTopLeftRadius);
   check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '26px' && (await innerRadius()) === '22px', `${await windowRadius()} ${await innerRadius()}`);
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);

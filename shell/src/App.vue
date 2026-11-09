@@ -1,25 +1,35 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, watchEffect } from 'vue';
 import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
-import WindowFrame from './WindowFrame.vue';
 import { state } from './state.js';
 
 // Both layouts show the same tabs from the same state; only where they sit differs.
 const horizontal = computed(() => state.tabLayout === 'horizontal');
+
+// The window's own corner radius, as the engine reports it, becomes one CSS variable on
+// the root. Whatever meets the window's curve derives its radius from it.
+watchEffect(() => {
+  document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');
+});
 </script>
 
+<!-- Every component the shell tracks starts as frame colour and draws its own surface on
+     top; the frame is what shows where nothing was drawn. The page is a plain rectangle
+     between them, with the left, right and bottom edges as plain strips of their own. -->
 <template>
   <div class="app">
     <TabStrip v-if="horizontal" />
     <TopBar />
     <div class="body">
+      <div v-drag class="edge left"></div>
       <Sidebar v-if="!horizontal" />
-      <PageView :class="{ 'no-sidebar': horizontal || !state.sidebar }" />
+      <PageView />
+      <div v-drag class="edge right"></div>
     </div>
-    <WindowFrame />
+    <div v-drag class="edge bottom"></div>
   </div>
 </template>
 
@@ -29,6 +39,9 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
 :root {
   --frame: #0faaaa;
   --frame-width: 4px;
+  /* The frame's inner edge runs parallel to the window's, so its radius is the window's
+     less the frame's width; 0 when the window has square corners. */
+  --inner-radius: max(0px, calc(var(--window-radius, 0px) - var(--frame-width)));
   --bar: #e2f2f2;
   --accent: #0faaaa;
   /* Icons and the sidebar's New Tab take the design's deeper ink for this mode, so the
@@ -47,21 +60,32 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   -webkit-font-smoothing: antialiased;
 }
 
-/* The root stays transparent: the page shows through wherever nothing is painted. */
+/* The root has no background: the page shows through wherever nothing is painted. */
 .app {
-  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: var(--frame-width);
   overflow: hidden;
-  box-sizing: border-box;
 }
 
 .body {
   display: flex;
   flex: 1;
   min-height: 0;
+}
+
+.edge {
+  flex: none;
+  background: var(--frame);
+}
+
+.edge.left,
+.edge.right {
+  width: var(--frame-width);
+}
+
+.edge.bottom {
+  height: var(--frame-width);
 }
 
 /* Every control in the shell is a flat 28px square with a 6px radius. */

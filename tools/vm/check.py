@@ -23,6 +23,7 @@ TART = VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
 VM = "pb-test"
 SHOTS = time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
 BUNDLE_ID = "dev.projectb.browser"
+APP = "/Applications/Project B.app"
 SCREEN = (1440, 900)
 FRAME = (15, 170, 170)  # --frame and --accent
 BAR = (226, 242, 242)  # --bar
@@ -123,15 +124,9 @@ def field_middle(img, win, x):
 
 
 def launch():
-    """Opens the app from Finder's Applications folder. Returns seconds to the shell's first paint, or None."""
-    vnc.click(SCREEN[0] - 40, SCREEN[1] - 40)  # The desktop, so Finder is in front.
-    time.sleep(0.5)
-    vnc.key("cmd+shift+a")
-    time.sleep(1.5)
-    vnc.type("Project B")
-    time.sleep(0.8)
+    """Opens the app the way Finder does. Returns seconds to the shell's first paint, or None."""
     start = time.time()
-    vnc.key("cmd+o")
+    guest("/usr/bin/open", APP)
     need = 80000 * vnc.scale * vnc.scale  # About half the window's pale shell.
     while time.time() - start < 60:
         if near(vnc.image(), BAR, 8).sum() > need:

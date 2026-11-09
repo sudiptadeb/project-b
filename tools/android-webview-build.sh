@@ -15,9 +15,9 @@ CC=$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android$MIN_SDK
 PAGE_FLAG=-Wl,-z,max-page-size=16384
 
 SRC=$ROOT/engine/webview
-OUT=$ROOT/build/android
+OUT=$ROOT/build/android-webview
 LIBS=$OUT/apk/lib/arm64-v8a
-APK=$OUT/project-b-webview.apk
+APK=$ROOT/build/android/project-b-webview.apk
 
 SECRETS=$HOME/PW_TOOLS/lab-secrets.env
 KEYSTORE=$HOME/PW_TOOLS/project-b-signing/android.keystore
@@ -27,7 +27,7 @@ VERSION_CODE=$(git -C "$ROOT" rev-list --count HEAD)
 VERSION_NAME=0.1.$VERSION_CODE-webview
 
 rm -rf "$OUT"
-mkdir -p "$LIBS" "$OUT/classes" "$OUT/res" "$OUT/apk/assets/shell"
+mkdir -p "$LIBS" "$OUT/classes" "$OUT/res" "$OUT/apk/assets/shell" "$(dirname "$APK")"
 
 echo "=== shell"
 (cd "$ROOT/shell" && { [ -d node_modules ] || npm ci --silent; } && npm run build --silent)

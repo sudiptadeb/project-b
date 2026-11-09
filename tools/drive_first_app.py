@@ -466,7 +466,7 @@ def main():
     check("collapsing the sidebar gives its width to the page", collapsed["reported"][0] == 4 and collapsed["frame"][0] == 4, collapsed)
     print(app.cmd("capture", os.path.join(OUT, "6-collapsed.png")), flush=True)
     click(app, "[aria-label$=sidebar]")
-    app.wait("document.querySelector('nav').getBoundingClientRect().width===200", 5)
+    app.wait("document.querySelector('nav').getBoundingClientRect().width===196", 5)
     time.sleep(0.3)
     check("expanding it takes the width back", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
 

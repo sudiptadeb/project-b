@@ -1,16 +1,9 @@
 <script setup>
-import { computed } from 'vue';
 import { send } from './bridge.js';
-import { state, tabLabel } from './state.js';
+import { controlSpace as controls, state, tabLabel } from './state.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,
 // leaves the native window controls their space, and its empty parts drag the window.
-const controls = computed(() => {
-  const c = state.controls;
-  if (c.w <= 0) return { left: '8px', right: '8px' };
-  const onLeft = c.x + c.w / 2 < window.innerWidth / 2;
-  return onLeft ? { left: c.x + c.w + 8 + 'px', right: '8px' } : { left: '8px', right: window.innerWidth - c.x + 8 + 'px' };
-});
 </script>
 
 <template>
@@ -47,11 +40,16 @@ const controls = computed(() => {
 </template>
 
 <style scoped>
+/* It runs 8px further down behind the bar below, so the bar's rounded corners sit on the
+   frame colour. */
 .strip {
   display: flex;
   align-items: flex-end;
   flex: none;
-  height: 32px;
+  height: 36px;
+  margin-bottom: -8px;
+  padding-bottom: 8px;
+  box-sizing: border-box;
   background: var(--frame);
   color: rgba(255, 255, 255, 0.9);
 }
@@ -97,7 +95,8 @@ const controls = computed(() => {
   position: absolute;
   inset: 0 -4px;
   width: calc(100% + 8px);
-  height: 100%;
+  /* The shape's lower edge goes under the bar, so no seam shows between them. */
+  height: calc(100% + 2px);
   fill: var(--bar);
 }
 

@@ -44,7 +44,7 @@ import { state, tabLabel } from './state.js';
 /* The sidebar collapses to nothing; the page follows. */
 .sidebar {
   flex: none;
-  width: 200px;
+  width: 196px;
   overflow: hidden;
   background: var(--bar);
   transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -57,7 +57,7 @@ import { state, tabLabel } from './state.js';
 .inner {
   display: flex;
   flex-direction: column;
-  width: 200px;
+  width: 196px;
   height: 100%;
   padding: 0 8px 8px;
   box-sizing: border-box;

@@ -187,7 +187,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
-  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 3 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 7 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   await mock.getByRole('button', { name: 'Full screen' }).click();
@@ -262,7 +262,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('collapsing the sidebar gives its width to the page', r.bounds.x === 4 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '4-collapsed.png') });
   await toggle.click();
-  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 200);
+  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 196);
   await settle(page);
   r = await regions();
   check('expanding it takes the width back', r.bounds.x === 200, JSON.stringify(r.bounds));

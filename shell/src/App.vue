@@ -4,6 +4,7 @@ import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
+import WindowFrame from './WindowFrame.vue';
 import { state } from './state.js';
 
 // Both layouts show the same tabs from the same state; only where they sit differs.
@@ -18,6 +19,7 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
       <Sidebar v-if="!horizontal" />
       <PageView :class="{ 'no-sidebar': horizontal || !state.sidebar }" />
     </div>
+    <WindowFrame />
   </div>
 </template>
 
@@ -26,6 +28,7 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
    flat look follow the Deb Design System: a 4px grid, borders instead of shadows. */
 :root {
   --frame: #0faaaa;
+  --frame-width: 4px;
   --bar: #e2f2f2;
   --accent: #0faaaa;
   --hover: rgba(255, 255, 255, 0.6);
@@ -42,10 +45,13 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
 
 /* The root stays transparent: the page shows through wherever nothing is painted. */
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: var(--frame-width);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .body {

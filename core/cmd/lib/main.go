@@ -94,7 +94,11 @@ func updateConfig(profileDir string) update.Config {
 	}
 }
 
-// nativeEngine is the real engine: every method calls the C++ adapter.
+// engineName is what the engine reports. An adapter on something other than content sets it
+// at build time.
+var engineName = "content"
+
+// nativeEngine is the real engine: every method calls the adapter.
 type nativeEngine struct {
 	calls *C.PBEngineCalls
 
@@ -102,7 +106,7 @@ type nativeEngine struct {
 	posted []func()
 }
 
-func (e *nativeEngine) Name() string { return "content" }
+func (e *nativeEngine) Name() string { return engineName }
 
 func (e *nativeEngine) CreateTab() engine.TabID {
 	return engine.TabID(C.call_create_tab(e.calls))

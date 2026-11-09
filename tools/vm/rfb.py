@@ -24,6 +24,7 @@ from PIL import Image
 
 URL_FILE = os.path.expanduser("~/PW_TOOLS/macos-vm/vnc-url")
 POINTS_WIDE = 1440  # The VM's display, from DISPLAY_SIZE in vars.sh.
+INPUT_SETTLE = 1.0  # Screen Sharing drops input for about half a second after a connection opens.
 
 KEYS = {
     "cmd": 0xffe7, "opt": 0xffe9, "ctrl": 0xffe3, "shift": 0xffe1,
@@ -55,6 +56,7 @@ class Vnc:
         self._request(False)
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_frame()
+        time.sleep(INPUT_SETTLE)
 
     def _login(self, user, password):
         self.file.read(12)

@@ -1,13 +1,15 @@
 # The first app
 
-One box, an address bar on top, opening empty. The user types, and a suggestion box
-fed by real history extends below the bar, over the page.
+One window with tabs. A 32px top row holds the sidebar toggle, back, forward, reload and
+the address bar after the space for the native window controls; tabs sit in a sidebar
+on the left, or in a strip on top when the user switches, and the page sits beside or
+below them. The address bar's suggestion box, fed by real history, extends over the page.
 
 ## Pieces
 
 | Folder | What it is | Needs Chromium |
 |---|---|---|
-| `core/` | Go managers and the engine contract | No |
+| `core/` | Go managers (tabs, history, suggest, policy, window, prefs, shell) and the engine contract | No |
 | `core/mockengine`, `core/cmd/dev` | Mock engine and dev server | No |
 | `shell/` | Vue 3 shell | No |
 | `core/cmd/lib` | The cgo layer: the Go core as a c-archive | Links into the main binary |
@@ -41,15 +43,28 @@ inside the adapter.
 
 ## The window
 
-Two stacked views: the page at the bottom, a full-window transparent shell on top.
-Shell components mark themselves with `v-shell` and report their rectangles, and
-`<PageView>` reports where the page goes. `PBContainerView hitTest:` asks one question:
-is this point in a shell rectangle? Content's own views ask the same `hitTest:` before
-accepting a mouse event, so nothing routes events by hand.
+Stacked views: every tab's page view at the bottom, inside one holder, with only the
+active one not hidden; a full-window transparent shell on top. Shell components mark
+themselves with `v-shell` and report their rectangles, empty shell that should move the
+window marks itself with `v-drag`, and `<PageView>` reports where the page goes.
+`PBContainerView hitTest:` asks two questions: is this point in a drag rectangle (answer
+nil, so AppKit's frame drags the window and, inside the title bar, zooms on a
+double-click), else is it in a shell rectangle? Content's own views ask the same
+`hitTest:` before accepting a mouse event, so nothing routes events by hand. That is
+how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
 
-The page view keeps its margins through autoresizing, so it follows a window resize in
-the same frame. A page position measured for an older window size is ignored, because a
-fresher one follows.
+The page holder keeps its margins through autoresizing, so it follows a window resize
+in the same frame. A page position measured for an older window size is ignored,
+because a fresher one follows.
+
+The shell's top row is 32px, the height of the title bar, and the window uses
+`NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so the shell draws
+under the native window buttons. The engine reports where those buttons are
+(`WindowControlsChanged`: after start, on resize, on entering or leaving full screen,
+empty when there are none) and the shell leaves exactly that space on whichever side
+they are. Hit-testing from the window's frame view, as AppKit does, shows the title bar
+does not swallow clicks over the shell: a point on a control returns the shell, a point
+on the empty strip returns the frame, a point on a window button returns the button.
 
 ## Not in the first app
 
@@ -58,7 +73,10 @@ fresher one follows.
 - Gates answer immediately; holding a navigation for a prompt isn't built.
 - A back or forward restored from the back-forward cache skips the gates, because content
   runs no navigation start for it. A page allowed earlier stays reachable that way.
-- One tab. `target=_blank` and `window.open` don't open anything.
+- No popup blocking: every `window.open` becomes a tab. No window features (size,
+  position) are honoured, because there is one window.
+- No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
+  are not saved; the tab layout (sidebar or strip) is, in `prefs.json` in the profile.
 - No downloads, permissions, dialogs, autofill or extensions.
 - Mac only. Windows needs checking, because Go's cgo there wants mingw.
 
@@ -124,6 +142,32 @@ driver, not read back from the window.
   way for Calculator. The 39 checks start the binary inside the mounted DMG directly.
 - Windows and Linux.
 
+## What the tabs run showed (2026-11-09)
+
+Same machine and build. 84 real-app checks and 67 mock checks pass; the packaged app in
+the DMG passes the same 84.
+
+- **Closing a tab from its own keyboard event crashes** if the `WebContents` dies right
+  there: Cmd+W arrives through the tab's `PreHandleKeyboardEvent`, and content keeps using
+  the `RenderWidgetHost` after we return. The adapter takes the tab out of its map at once
+  and deletes it on a later task (`DeleteSoon`), and posts the window close the same way.
+- **A tab must stop observing its `WebContents` before destroying it.** Teardown finishes
+  pending navigations, which calls `DidFinishNavigation` on the half-destroyed observer.
+- **A popup's first navigation goes through the gate.** Content calls `AddNewContents`
+  before it loads the new `WebContents`, so Go knows the tab when the throttle asks.
+- **Focus has a gap after a tab closes**: nothing has the keyboard until the shell hears
+  the new tab list and sends `focusPage` or `focusShell` back, one round trip. A second
+  Cmd+W inside that gap does nothing.
+- **Shell rectangles are a frame or two stale after a layout change**, plus the hop to the
+  main process. A click 30 ms after Cmd+T hit the strip's old empty space and dragged
+  instead. A person can't click that fast; the driver can, and waits.
+- **The mock cannot show compositing bugs.** An opaque background on the shell's root
+  painted over the page hole and looked fine over the mock's iframe. Only the real
+  driver's composite caught it.
+- Favicons: content hands over the candidates and downloads one; the adapter picks the
+  plain icon declared smallest, encodes a PNG and sends a data URL. iana.org shows its
+  icon; example.com, whose `/favicon.ico` is a 404, shows none.
+
 ## Packaging
 
 `tools/package.sh` makes `build/project-b.dmg`: `Project B.app` with the two binaries in
@@ -158,7 +202,7 @@ for Chrome for Testing.
     tools/build.sh                         # the library and both binaries, out/pb
     RELEASE=1 OUT=out/rel tools/build.sh   # official-style build, takes hours
     tools/package.sh                       # build/project-b.dmg; OUT=out/rel for the release
-    python3 tools/drive_first_app.py       # real app, results in build/real; PB_BIN picks another binary
+    python3 tools/drive_first_app.py       # real app, results in build/real (7 screenshots); PB_BIN picks another binary
     python3 tools/measure_first_app.py     # the numbers above
     (cd core && go test ./...)             # managers, no C++
     node shell/e2e/first-app.cjs           # shell on the mock engine, in a browser

@@ -66,6 +66,10 @@ the guest's screen, not composites; each folder has an `ABOUT.txt` that says so.
 
 ### Calibration, for whoever changes the scripts
 
+- Where the shell draws what `check.py` clicks comes from the installed app: before the checks it
+  launches the app once more with `--pb-driver` and a throwaway profile under `/tmp/pb-layout`,
+  asks for the rectangles in both tab layouts with two tabs open, and AppKit's own place for the
+  window buttons and the page. A change to the shell's layout needs no new numbers in the script.
 - Command is `Super_L`; Screen Sharing ignores `Meta_L`. Input sent in the first half second of a
   connection is dropped, so `rfb.py` waits a second after connecting.
 - The guest draws at 1x, 1440x900 pixels for 1440x900 points.

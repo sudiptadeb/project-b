@@ -3,8 +3,9 @@
 
 Start the VM and install a DMG first (docs/vm-testing.md). Prints pass or FAIL for each check
 with what it measured, and saves a shot per step. Everything the app receives comes through
-VNC; window positions are read from macOS's window list inside the VM. Positions in the
-window come from the shell's source and are in points.
+VNC; window positions are read from macOS's window list inside the VM. Where the shell draws
+its controls is asked from the installed app itself, through its driver, in a launch of its
+own before the checks (layout()); positions are in points.
 """
 
 import json
@@ -28,8 +29,7 @@ SCREEN = (1440, 900)
 FRAME = (15, 170, 170)  # --frame and --accent
 BAR = (226, 242, 242)  # --bar
 WHITE = (255, 255, 255)  # --surface
-BUTTONS_X = (12, 72)  # Where the window buttons belong, left of close to right of zoom.
-BUTTONS_Y = 20  # Their middle, which is also the middle of the top row.
+ICON = (11, 143, 143)  # --icon, the toolbar's buttons
 PAGE_LOAD = 3.0
 ANIMATION = 2.0
 MOVE = (60, 40)
@@ -130,6 +130,87 @@ def field_middle(img, win, x):
     return (ys[0] + last + 1) / 2 / vnc.scale
 
 
+CAL = "/tmp/pb-layout"  # In the guest: the driver's pipe, its output and a throwaway profile.
+
+
+def layout():
+    """Where the shell draws everything the checks click, in both tab layouts, asked from the
+    installed app through its driver (--pb-driver, as tools/drive_first_app.py uses it).
+
+    A launch of its own, with its own profile, so the checks after it still start from a fresh
+    app. Returns the shell's rectangles as (x, y, w, h) in window points from the top left for
+    the window size it opened at, with two tabs open, and AppKit's own report of the window
+    buttons and the page ("bounds").
+    """
+    guest("/bin/sh", "-c", f"rm -rf {CAL}; mkdir -p {CAL} && mkfifo {CAL}/fifo")
+    guest("/usr/bin/open", "-n", "--stdout", f"{CAL}/out", "--stderr", f"{CAL}/err", APP, "--args",
+          f"--pb-driver={CAL}/fifo", f"--user-data-dir={CAL}/profile")
+    asked = [0]
+
+    def reply(key, timeout=30):
+        end = time.time() + timeout
+        while time.time() < end:
+            for line in guest("/bin/cat", f"{CAL}/out").splitlines():
+                if line.startswith(f"PBDRIVER {key} "):
+                    return line[len(f"PBDRIVER {key} "):]
+            time.sleep(0.3)
+        sys.exit(f"the app's driver didn't answer {key}; its output: {guest('/bin/cat', f'{CAL}/out', f'{CAL}/err')[-2000:]}")
+
+    def ask(*parts):
+        asked[0] += 1
+        guest("/bin/sh", "-c", 'printf "%s\\n" "$1" > "$2"', "sh", " ".join([str(asked[0]), *parts]), f"{CAL}/fifo")
+        return reply(asked[0])
+
+    def js(expr):
+        return json.loads(ask("eval", expr) or "null")
+
+    def until(expr):
+        end = time.time() + 15
+        while not js(expr):
+            if time.time() > end:
+                sys.exit(f"the shell never showed {expr}")
+            time.sleep(0.3)
+        time.sleep(0.5)  # The shell's regions follow a frame later.
+
+    def measure():
+        found = js("(()=>{const r=e=>{if(!e)return null;const b=e.getBoundingClientRect();return [b.x,b.y,b.width,b.height]};"
+                   "const q=s=>r(document.querySelector(s));"
+                   "return {w:innerWidth,h:innerHeight,field:q('form.field'),back:q('[aria-label=Back]'),"
+                   "forward:q('[aria-label=Forward]'),toggle:q('[aria-label$=sidebar]'),layout:q('button.layout'),"
+                   "settings:q('button.settings'),sidebar:q('nav.sidebar'),rest:q('.strip .rest'),"
+                   "tabs:[...document.querySelectorAll('[role=tab]')].map(r)}})()")
+        found["bounds"] = json.loads(ask("bounds"))
+        return found
+
+    reply("start")
+    until("!!document.querySelector('input')")
+    js("document.querySelector('.new-tab').click()")
+    until("document.querySelectorAll('[role=tab]').length===2")
+    side = measure()
+    js("document.querySelector('button.layout').click()")
+    until("!!document.querySelector('.strip')")
+    top = measure()
+    ask("close")
+    for _ in range(50):
+        if guest("/usr/bin/pgrep", "-x", "project_b") == "":
+            break
+        time.sleep(0.2)
+    guest("/usr/bin/killall", "project_b")
+    return side, top
+
+
+def middle(r):
+    return r[0] + r[2] / 2, r[1] + r[3] / 2
+
+
+def click_on(r, win=None, right=False):
+    """Clicks the middle of a shell rectangle in a window, home by default. right keeps its
+    distance from the window's right edge instead of its left, for controls that sit there."""
+    win = win or home
+    x, y = middle(r)
+    vnc.click(win[0] + (win[2] - (V["w"] - x) if right else x), win[1] + y)
+
+
 def launch():
     """Opens the app the way Finder does. Returns seconds to the shell's first paint, or None."""
     start = time.time()
@@ -155,6 +236,9 @@ def quit_app():
 def drags(name, x, y, home, expect="moves the window"):
     """expect is "moves the window", or "resizes the window" for the edges AppKit keeps for itself."""
     win = window()
+    if win is None:
+        check(f"dragging {name} {expect}", False, "no window: the app is gone")
+        return
     vnc.drag(win[0] + x, win[1] + y, win[0] + x + MOVE[0], win[1] + y + MOVE[1])
     time.sleep(0.6)
     now = window()
@@ -170,6 +254,9 @@ def drags(name, x, y, home, expect="moves the window"):
 def zooms(name, x, y, home):
     """Zoom grows both ways. Double-clicking a window edge grows just one, so it doesn't count."""
     win = window()
+    if win is None:
+        check(f"double-clicking {name} zooms", False, "no window: the app is gone")
+        return
     vnc.dbl(win[0] + x, win[1] + y)
     time.sleep(ANIMATION)
     now = window()
@@ -179,12 +266,13 @@ def zooms(name, x, y, home):
 
 def selects_text(home):
     """Dragging across text in the address field selects it and leaves the window alone."""
-    vnc.click(PX + 500, PY + TOP)
+    click_on(V["field"])
     time.sleep(0.4)
     vnc.type("select these words")
     time.sleep(0.3)
     win = window()
-    vnc.drag(win[0] + AFTER_BUTTONS + 130, win[1] + TOP, win[0] + AFTER_BUTTONS + 230, win[1] + TOP)
+    text = V["field"][0] + 12  # The input's padding.
+    vnc.drag(win[0] + text + 10, win[1] + TOP, win[0] + text + 90, win[1] + TOP)
     time.sleep(0.6)
     now = window()
     shot("address-field-drag")
@@ -223,28 +311,30 @@ def leave_full_screen(name):
     return True
 
 
-def layout_click_works(win):
-    """Clicks the layout button and, if the tabs moved, clicks it again to put them back.
+def layout_click_works(win, on_top):
+    """Clicks the layout button and, once the tabs move, clicks it again to put them back.
 
-    Returns whether the first click moved them.
+    Returns how many seconds the tabs took to move, or None if they didn't within 5 s.
     """
     def strip():
         return float(np.mean(near(crop(vnc.image(), win[0] + win[2] - 200, win[1] + 6, 150, 20), FRAME)))
 
-    row = field_middle(vnc.image(), win, 500)
-    if row is None:
-        return False
+    first, then = (T, V) if on_top else (V, T)
     before = strip()
-    vnc.click(win[0] + win[2] - 20, win[1] + row)
-    time.sleep(1)
-    moved = abs(strip() - before) > 0.5
-    if moved:
-        vnc.click(win[0] + win[2] - 20, win[1] + field_middle(vnc.image(), win, 500))
-        time.sleep(1)
-    return moved
+    click_on(first["layout"], win, right=True)
+    start = time.time()
+    while time.time() - start < 5:
+        if abs(strip() - before) > 0.5:
+            took = time.time() - start
+            time.sleep(0.5)
+            click_on(then["layout"], win, right=True)
+            time.sleep(1)
+            return took
+        time.sleep(0.1)
+    return None
 
 
-def full_screen(name, enter, home, first_control):
+def full_screen(name, enter, home, first_control, on_top=False):
     enter()
     time.sleep(ANIMATION)
     win = window()
@@ -268,14 +358,22 @@ def full_screen(name, enter, home, first_control):
     check(f"{name}: the green button in the shown title bar brings the window back",
           clicked and win is not None and win[2:] != SCREEN and lights(img, win) is not None, f"window {win}")
     if win is not None and win[2:] != SCREEN:
-        # Coming back to a frame other than the one it left from has left the shell deaf to clicks.
-        takes = layout_click_works(win)
-        check(f"{name}: after leaving, the shell takes clicks", takes, "" if takes else f"the layout button did nothing, window {win}")
-        if not takes:
-            # Start the app again, so the checks after this still mean something.
+        # Coming back to a frame other than the one it left from has left the shell deaf to
+        # clicks, or slow to take them.
+        took = layout_click_works(win, on_top)
+        check(f"{name}: after leaving, the shell takes a click within 1 s", took is not None and took <= 1,
+              f"the tabs moved {took:.1f} s after the click" if took is not None
+              else f"the layout button did nothing in 5 s, window {win}")
+        if took is None:
+            # Start the app again from a fresh profile, so the checks after this still mean
+            # something: a click that lands even later would move the tabs for the next launch.
             quit_app()
+            guest("/bin/rm", "-rf", "/Users/admin/.project-b")
             launch()
             time.sleep(1.5)
+            if on_top:
+                click_on(V["layout"], right=True)
+                time.sleep(1)
     if window() is not None and window()[2:] == SCREEN:
         # Leave without the green button, so the checks after this still mean something.
         guest("/usr/bin/osascript", "-e",
@@ -310,11 +408,18 @@ for i in range(4):
     paints.append(launch())
     time.sleep(1.5)
     shot(f"launch-{i}")
-    if i < 3 and not quit_app():
+    if not quit_app():
         print(f"Cmd+Q left the app running on launch {i}", flush=True)
     time.sleep(1)
 print("first paint, seconds: " + ", ".join("none" if p is None else f"{p:.2f}" for p in paints), flush=True)
 check("first paint under 5 s", all(p is not None and p < 5 for p in paints), str(paints))
+
+# Where everything is, from the app itself, then the app the checks drive.
+V, T = layout()
+print(f"from the driver, tabs on the side: {json.dumps(V)}", flush=True)
+print(f"from the driver, tabs on top: {json.dumps(T)}", flush=True)
+launch()
+time.sleep(1.5)
 
 # The window and its buttons.
 home = window()
@@ -323,6 +428,8 @@ if home is None:
     sys.exit("no window, nothing else can run")
 W, H = home[2], home[3]
 PX, PY = home[0], home[1]
+if (W, H) != (V["w"], V["h"]):
+    sys.exit(f"the window opened at {W}x{H}, but the driver measured {V['w']}x{V['h']}")
 img = vnc.image()
 sampled = img[int((PY + H / 2) * vnc.scale), int((PX + 100) * vnc.scale)]
 print(f"sidebar colour on screen {sampled.tolist()}, the shell asks for {list(BAR)}", flush=True)
@@ -331,15 +438,20 @@ check("window buttons are visible", L is not None, str(L))
 if L is None:
     sys.exit("no window buttons found: the window isn't active, or the colours need calibrating")
 buttons = (L["close"][0] - L["close"][2] / 2, L["zoom"][0] + L["zoom"][2] / 2)
-check(f"window buttons run from x {BUTTONS_X[0]} to {BUTTONS_X[1]}",
-      abs(buttons[0] - BUTTONS_X[0]) <= 1 and abs(buttons[1] - BUTTONS_X[1]) <= 1, f"x {buttons[0]} to {buttons[1]}")
-check(f"window buttons' middle is at y {BUTTONS_Y}", abs(L["close"][1] - BUTTONS_Y) <= 1, f"y {L['close'][1]}")
-TOP = field_middle(img, home, 500)
-if TOP is None:
-    sys.exit("no address field found, so nothing below knows where to click")
-check("window buttons centre on the address field", abs(TOP - L["close"][1]) <= 1, f"buttons y {L['close'][1]}, field y {TOP}")
-AFTER_BUTTONS = L["zoom"][0] + L["zoom"][2] / 2 + 8  # Where the shell's first control starts.
-PAGE_V = (260, 60, W - 280, H - 80)  # An inside part of the page, tabs on the side.
+B = V["bounds"]
+check(f"window buttons are drawn where AppKit says, x {B['buttonsStart']} to {B['buttonsEnd']}, middle y {B['buttonsMiddleY']}",
+      abs(buttons[0] - B["buttonsStart"]) <= 1 and abs(buttons[1] - B["buttonsEnd"]) <= 1
+      and abs(L["close"][1] - B["buttonsMiddleY"]) <= 1, f"x {buttons[0]} to {buttons[1]}, y {L['close'][1]}")
+TOP = middle(V["field"])[1]
+check("window buttons' middle is the top row's", abs(B["buttonsMiddleY"] - TOP) <= 1,
+      f"buttons y {B['buttonsMiddleY']}, the address field's middle {TOP}")
+FIELD_Y = field_middle(img, home, middle(V["field"])[0])
+check("window buttons centre on the address field", FIELD_Y is not None and abs(FIELD_Y - L["close"][1]) <= 1,
+      f"buttons y {L['close'][1]}, field y {FIELD_Y}")
+check("the shell's first control starts 8 points after the buttons", V["toggle"][0] == B["buttonsEnd"] + 8,
+      f"the sidebar button at x {V['toggle'][0]}, buttons end at {B['buttonsEnd']}")
+PX0, PY0, PW, PH = B["reported"]
+PAGE_V = (PX0 + 36, PY0 + 12, PW - 56, PH - 32)  # An inside part of the page, tabs on the side.
 NEUTRAL = (PX + W / 2, PY + H / 2)
 
 
@@ -365,12 +477,12 @@ def address():
     """The address field's text, as pixels. Which page is showing, without depending on how far
     the page has drawn: a first visit can wait seconds on fonts for some of its languages."""
     vnc.move(*NEUTRAL, 0.3)
-    return crop(vnc.image(), PX + AFTER_BUTTONS + 120, PY + TOP - 7, 400, 14)
+    return crop(vnc.image(), PX + V["field"][0] + 8, PY + TOP - 7, 400, 14)
 
 
 # Real clicks at title-bar height, tabs on the side.
 blank = page()
-vnc.click(PX + 500, PY + TOP)
+click_on(V["field"])
 time.sleep(0.4)
 vnc.type("example.com")
 vnc.key("return")
@@ -387,7 +499,7 @@ page_bar = float(np.mean(near(crop(img, PX + PAGE_V[0], PY + PAGE_V[1], PAGE_V[2
 check("tabs on the side: shell draws over the page", sidebar_bar > 0.9 and edge > 0.9 and page_bar < 0.2,
       f"sidebar {sidebar_bar:.2f}, frame {edge:.2f}, shell colour in page {page_bar:.2f}")
 
-vnc.click(PX + 500, PY + TOP)
+click_on(V["field"])
 time.sleep(0.4)
 vnc.type("iana.org/help/example-domains")
 vnc.key("return")
@@ -397,13 +509,13 @@ iana_at = address()
 check("a second page loads", changed(example, iana) > 0.001 and changed(example_at, iana_at) > 0.01,
       f"page changed {changed(example, iana):.3f}, address {changed(example_at, iana_at):.3f}")
 
-vnc.click(PX + AFTER_BUTTONS + 40, PY + TOP)
+click_on(V["back"])
 time.sleep(PAGE_LOAD)
 page()
 back = address()
 shot("after-back")
 check("a click reaches the back button", changed(back, example_at) < 0.01 and still(), f"address differs from the first page's by {changed(back, example_at):.3f}")
-vnc.click(PX + AFTER_BUTTONS + 68, PY + TOP)
+click_on(V["forward"])
 time.sleep(PAGE_LOAD)
 page()
 forward = address()
@@ -412,22 +524,24 @@ check("a click reaches the forward button", changed(forward, iana_at) < 0.01 and
 # Suggestions: Cmd+L from the page, type, pick one with a real click over the page.
 vnc.click(*NEUTRAL)
 time.sleep(0.3)
-before = crop(vnc.image(), PX + 300, PY + 34, 400, 60)
+SUGGESTED = (V["field"][0] + 70, V["field"][1] + V["field"][3] - 8, 400, 60)  # Where the list opens.
+before = crop(vnc.image(), PX + SUGGESTED[0], PY + SUGGESTED[1], SUGGESTED[2], SUGGESTED[3])
 vnc.key("cmd+l")
 time.sleep(0.3)
 vnc.type("exam")
 time.sleep(0.8)
-listed = crop(vnc.image(), PX + 300, PY + 34, 400, 60)
+listed = crop(vnc.image(), PX + SUGGESTED[0], PY + SUGGESTED[1], SUGGESTED[2], SUGGESTED[3])
 shot("suggestions")
 check("Cmd+L and typing shows suggestions over the page", changed(before, listed) > 0.05, f"changed {changed(before, listed):.3f}")
-vnc.click(PX + 500, PY + TOP + 38)
+# The first item: 6 below the field, inside the list's 1 border and 4 padding, 32 high.
+vnc.click(PX + middle(V["field"])[0], PY + V["field"][1] + V["field"][3] + 6 + 1 + 4 + 16)
 time.sleep(PAGE_LOAD)
 page()
 picked = address()
 check("a click picks a suggestion", changed(picked, example_at) < 0.01, f"address differs from example.com's by {changed(picked, example_at):.3f}")
 
 # Tabs by key, compared by what the sidebar shows.
-SIDE = (8, 36, 180, 300)
+SIDE = (V["sidebar"][0] + 4, V["sidebar"][1] + 4, 180, 300)
 
 
 def side():
@@ -451,11 +565,11 @@ if changed(one, two) <= 0.005:
 time.sleep(0.5)
 two = side()
 shot("two-tabs")
-vnc.click(PX + 100, PY + 78)
+click_on(V["tabs"][0])
 time.sleep(1)
 shown = address()
 check("a click reaches a tab in the sidebar", changed(shown, example_at) < 0.01, f"address differs from example.com's by {changed(shown, example_at):.3f}")
-vnc.click(PX + 100, PY + 110)
+click_on(V["tabs"][1])
 time.sleep(1)
 vnc.key("cmd+t")
 time.sleep(1)
@@ -491,12 +605,12 @@ for place in SIDE_PLACES:
     zooms(*place, home)
 
 # Full screen, both ways in.
-full_screen("green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, FRAME)
-full_screen("Ctrl+Cmd+F", lambda: vnc.key("ctrl+cmd+f"), home, FRAME)
+full_screen("green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, ICON)
+full_screen("Ctrl+Cmd+F", lambda: vnc.key("ctrl+cmd+f"), home, ICON)
 
 # Resizing, on a page of one colour so its edges can be measured in every frame.
 PINK = (255, 0, 255)
-vnc.click(PX + 500, PY + TOP)
+click_on(V["field"])
 time.sleep(0.4)
 vnc.type("data:text/html,<body bgcolor=fuchsia>")
 vnc.key("return")
@@ -629,17 +743,15 @@ set_window(home)
 
 
 # Tabs on top.
-vnc.click(PX + W - 20, PY + TOP)
+click_on(V["layout"], right=True)
 time.sleep(1)
 shot("horizontal")
 img = vnc.image()
 strip = float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME)))
 gone = float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR)))
 check("the layout button puts the tabs on top", strip > 0.9 and gone < 0.2, f"strip {strip:.2f}, shell colour where the sidebar was {gone:.2f}")
-TOP_H = field_middle(img, home, 500)
-if TOP_H is None:
-    sys.exit("no address field found with the tabs on top")
-PAGE_H = (60, 80, W - 120, H - 100)
+PX0, PY0, PW, PH = T["bounds"]["reported"]
+PAGE_H = (PX0 + 56, PY0 + 12, PW - 112, PH - 32)  # An inside part of the page, tabs on top.
 content = float(np.mean(near(crop(img, PX + PAGE_H[0], PY + PAGE_H[1], PAGE_H[2], PAGE_H[3]), BAR, 4)))
 edge = float(np.mean(near(crop(img, PX + 1, PY + 100, 2, H - 200), FRAME)))
 check("tabs on top: shell draws over the page", strip > 0.9 and edge > 0.9 and content < 0.2, f"frame {edge:.2f}, shell colour in page {content:.2f}")
@@ -650,32 +762,32 @@ vnc.key("cmd+t")
 time.sleep(1)
 blank_tab = page(PAGE_H)
 check("Cmd+T adds a tab, tabs on top", changed(on_top, blank_tab) > 0.001)
-vnc.click(PX + AFTER_BUTTONS + 76, PY + TOP)
+click_on(T["tabs"][0])
 time.sleep(1)
 check("a click reaches a tab at title-bar height", changed(page(PAGE_H), on_top) < 0.01 and still())
-vnc.click(PX + AFTER_BUTTONS + 76 + 152, PY + TOP)
+click_on(T["tabs"][1])
 time.sleep(1)
 vnc.key("cmd+w")
 time.sleep(1)
-vnc.click(PX + 500, PY + TOP_H)
+click_on(T["field"])
 time.sleep(0.4)
 vnc.type("iana.org/help/example-domains")
 vnc.key("return")
 time.sleep(PAGE_LOAD)
 check("a click reaches the address bar, tabs on top", changed(page(PAGE_H), on_top) > 0.001 and still())
-vnc.click(PX + 20, PY + TOP_H)
+click_on(T["back"])
 time.sleep(PAGE_LOAD)
 check("a click reaches the back button, tabs on top", changed(page(PAGE_H), on_top) < 0.01 and still())
 
-STRIP = ("the empty strip", W - 100, 14)
+STRIP = ("the empty strip", W - (T["w"] - T["rest"][0] - T["rest"][2]) - 60, middle(T["rest"])[1])
 for place in (STRIP, TOP_EDGE):
     drags(*place, home)
 for place in RESIZE_EDGES:
     drags(*place, home, "resizes the window")
 zooms(*STRIP, home)
-full_screen("tabs on top, green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, BAR)
+full_screen("tabs on top, green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, BAR, on_top=True)
 
-vnc.click(PX + W - 20, PY + TOP_H)
+click_on(T["layout"], right=True)
 time.sleep(1)
 shot("back-to-vertical")
 img = vnc.image()

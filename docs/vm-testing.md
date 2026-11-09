@@ -6,20 +6,82 @@ real desktop, driven from outside through its display, mouse and keyboard.
 
 ## Status (2026-11-09)
 
-**The macOS VM hasn't booted on the Mac Studio yet, so the app hasn't been tested in it.** It
-needs one desktop login first (next section).
+**It runs.** After the owner logged in to the Mac Studio's desktop at 21:19, the VM booted to its
+desktop in under a minute, and `stop.sh`, `start.sh`, `install-dmg.sh` and `check.py` then ran
+back to back from a stopped VM with no hands. Every piece has now run for real, against the
+macOS 26.6.2 guest. If the Mac reboots, or its keys lock again, `start.sh` stops with the host key
+error below until someone logs in again.
 
-| Piece | How far it has run |
-|---|---|
-| Tart under amarit | A Linux VM ran. The macOS VM stops with the error below |
-| `setup.sh`, `start.sh`'s failure path, `stop.sh` | Ran for real |
-| `rfb.py` frames and keys | Ran against Virtualization's own VNC server, on a Linux VM's console |
-| `rfb.py` Apple login | Ran only against a stand-in server written for the test |
-| `install-dmg.sh` | Never run: it needs the VM |
-| `check.py` | Ran only against a stand-in desktop, which found script errors and says nothing about the app |
+The DMG tested is `155.0.8059.41` built at 19:33, before main's `8a90a1a` moved the window buttons,
+so the three button-position checks fail on it by design: buttons at x 9 to 69, middle y 16, the
+address field's middle at 18.
 
-Expect the first real run of `check.py` to need calibrating: colours, the key for Command, and
-positions in the window.
+### What the real window showed
+
+Works: the buttons are drawn and active; shell colours are exact; clicks reach the address bar,
+back, forward, suggestions and tabs; Cmd+W twice fast closes two tabs; dragging the top row and the
+top frame edge moves the window; the left and right edges resize; double-clicking the top row or
+the empty sidebar zooms; the green button enters full screen, the buttons hide and the shell gives
+their space to its controls. The last full run: 40 passed, 17 failed. The failures are the three
+old button positions, first paint over 5 s once while the host was busy (1 to 2 s otherwise), and
+the bugs below.
+
+Project B bugs, worst first:
+
+1. **A crash, once.** `EXC_BREAKPOINT` (a `CHECK`) on the browser main thread, in a posted task,
+   during a run of drags and outside resizes. It didn't come back on the same steps. The report is
+   `~/PW_TOOLS/macos-vm/crashes/project_b-2026-11-09-164114.ips`; the library is stripped and the
+   release build on this Mac has been rebuilt since, so it can't be symbolized.
+2. **After leaving full screen onto another frame, the shell ignores clicks.** When macOS puts
+   the window back on a frame other than the one it left from, such as the zoomed frame it
+   remembers, the address field and the layout button stop answering clicks while keys still
+   work. Once it lasted over a minute and through a live resize. Steps: zoom, resize from outside,
+   full screen, leave by the green button.
+3. **Dragging across the address field moves the window** instead of selecting text. Any drag that
+   starts in the title bar strip moves the window, controls included.
+4. **Ctrl+Cmd+F does nothing**, in or out of full screen: the app's menus are only the app menu
+   and Edit, with no View or Window menu.
+5. **Shortcuts can wait behind the page.** Right after picking a suggestion by click and moving the
+   pointer over the new page, the first Cmd+T or Cmd+L landed 1.1 to 2.4 s late in most tries, and
+   in 0.1 to 0.2 s in the last two full runs. Terminal under the same input was instant. The browser main thread sat
+   idle in its event wait the whole time, so the key is queued behind the page's input, not stuck
+   on a busy thread.
+6. **The empty sidebar doesn't drag the window**, though double-clicking it zooms. Below the title
+   bar, a drag region falls through to nothing; AppKit's `performWindowDragWithEvent:` is the call
+   for that.
+7. **Stale pictures after resizes.** A resize from outside the app, as window managers and tiling
+   do it, shows the old window for 0.8 to 2 s: the whole old frame stays on screen, and after
+   shrinking, the old page still shows outside the new frame
+   (`shots/real-first/seq05-set-home.png`). Once, after the resize checks, switching the tabs to
+   the top left the lower part of the old sidebar painted over the page
+   (`shots/20261109-230458/horizontal.png`). A live corner drag kept the page against the frame
+   in 30 of 30 frames in one run and 26 of 30 in another, where the page ran up to 12 px past it.
+8. **In full screen, showing the title bar covers the shell's top row** with an empty white bar,
+   so the address field is hidden while it shows.
+
+`check.py` checks 2 to 7; the crash and 8 were found by hand. Pictures are under
+`~/PW_TOOLS/macos-vm/shots/`: one folder per run, and `real-first/` for the probes behind the list
+above. They are real pixels from
+the guest's screen, not composites; each folder has an `ABOUT.txt` that says so.
+
+### Calibration, for whoever changes the scripts
+
+- Command is `Super_L`; Screen Sharing ignores `Meta_L`. Input sent in the first half second of a
+  connection is dropped, so `rfb.py` waits a second after connecting.
+- The guest draws at 1x, 1440x900 pixels for 1440x900 points.
+- Clicking the wallpaper hides every window (Show Desktop), so the app is opened with `open`.
+  `EnableStandardClickToShowDesktop` is also off in this guest.
+- Resting the pointer on the green button opens macOS's Move & Resize menu, which takes the next
+  click. After leaving full screen, the pointer moves away.
+- After a boot, an "App Background Activity" notice sits over the window's top right; `check.py`
+  swipes it away.
+- Leaving full screen puts the window back where macOS last placed it itself, which can be the
+  zoomed frame.
+- `amarit run` on a unit removed seconds earlier stops the new process at once (exit 0, Tart prints
+  "Stopping VM"). `stop.sh` keeps the unit and `start.sh` restarts it.
+- Once per VM: the first window move asks "tart-guest-agent wants to control System Events".
+  It was allowed on `pb-test` by a click through `rfb.py` and stays on the VM's disk. A new VM
+  shows it again: take a shot with `rfb.py` and click Allow.
 
 ## Why the VM needs a desktop login
 
@@ -47,10 +109,9 @@ on, the console is at the login window, and the failure is the same from a tool 
 amarit. Only a real login with the account's password unlocks them, and only for that boot.
 
 **What's needed:** log in as `debmin` at the Mac's desktop once after each boot, and stay logged
-in. Screen Sharing answers on port 5900 and should reach the login window. Then run `start.sh`.
-This is the expected fix, not a tested one. It isn't known whether the key also needs the screen
-unlocked when the VM starts, so keep it unlocked for the first try. The Mac is managed and
-reboots on its own, so this will come up again.
+in. Screen Sharing answers on port 5900 and reaches the login window. Then run `start.sh`. Tested
+on 2026-11-09: after that login the VM started at once. Whether it still starts with the screen
+locked is untested. The Mac is managed and reboots on its own, so this will come up again.
 
 Not tried, on purpose: `sudo`, the keychain, or anything that goes around the enclave.
 
@@ -85,9 +146,9 @@ runs a command inside the VM with no password and no network.
   the image, on the VM's private address, so nothing new listens on this Mac's network. The same goes
   for the VM's SSH, which these scripts don't use. Frames and input then go through macOS inside
   the VM instead of the virtual display and keyboard. The image already grants Screen Sharing the
-  permissions, so there should be no prompts. If this doesn't work out, `rfb.py` also has the login
+  permissions; it asked for nothing. If this doesn't work out, `rfb.py` also has the login
   for the other server, but using that one needs the owner's OK.
-- **1440x900 points at 2x**, so half-point offsets show in shots.
+- **1440x900 points.** The guest draws them at 1x, so a shot has one pixel per point.
 - **The DMG goes in through a read-only shared folder**, so it has no quarantine flag. Gatekeeper
   and the signing profile aren't tested here.
 - **Window positions come from macOS's window list**, read inside the VM. Only the checks read

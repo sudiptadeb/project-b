@@ -72,6 +72,17 @@ they are. Hit-testing from the window's frame view, as AppKit does, shows the ti
 does not swallow clicks over the shell: a point on a control returns the shell, a point
 on the empty strip returns the frame, a point on a window button returns the button.
 
+The window goes on screen once Go has given it the frame colour and width, so even its
+first frame has them. Until the shell's first frame, content paints the shell's view
+white over all of it, as it does any view it has no frame for yet. A new tab loads
+`about:blank`, so every tab has a page view that paints in content's default colour from
+the start. The tab still reads as new: no address, titled New Tab, and `about:blank`
+stays out of history. A crashed page has no view, so the frame colour shows there.
+
+The shell's page, `chrome://shell/`, belongs to the shell's own WebContents. The policy
+gate refuses it in every tab, however it is reached. Anywhere else it loads, its WebUI
+controller gives it no bindings and drops whatever it sends, so nothing reaches Go.
+
 ## Not in the first app
 
 - Gates cover the top-level navigation only: not iframes, subresources, WebSockets or
@@ -85,6 +96,8 @@ on the empty strip returns the frame, a point on a window button returns the but
   are not saved; the tab layout (sidebar or strip) is, in `prefs.json` in the profile.
 - No downloads, permissions, dialogs, autofill or extensions. An installed copy does update
   itself: [updates.md](updates.md).
+- Content's own `chrome://` pages, such as `chrome://gpu`, pass the gate but fail to
+  load: `project_b.pak` doesn't carry their resources.
 - Mac only. Windows needs checking, because Go's cgo there wants mingw.
 
 ## What the first run showed (2026-11-09)

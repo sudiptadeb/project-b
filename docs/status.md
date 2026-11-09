@@ -12,6 +12,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [devtools.md](devtools.md): the DevTools endpoint, as Chrome opens it, for ChromeDriver and CDP.
 - [menus-shortcuts.md](menus-shortcuts.md): the design for actions, menus and key bindings, not built yet; Chrome's full list is in [chrome-shortcuts.md](chrome-shortcuts.md).
 - [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
+- [android.md](android.md): the same shell and managers on Android's content layer, built in a Linux VM on this Mac.
 
 ## Daily commands
 
@@ -47,11 +48,6 @@ The build Mac's agent sessions have no display, so `drive_first_app.py` calls vi
 and its pictures are composites without the native window buttons. Dragging, zoom, real
 full screen and tearing need a person, or the macOS VM in `tools/vm/`, which needs someone
 logged in to the Mac's desktop once after each boot.
-
-## Branches not on main
-
-- `android`: a WebView APK and `docs/android.md`, with real content being built. Predates tabs
-  and hooks, so it needs updating before merging.
 
 ## Open decisions and to do
 

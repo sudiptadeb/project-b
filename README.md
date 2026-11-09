@@ -2,11 +2,11 @@
 
 A proof of concept for a clean-sheet enterprise browser: Go managers, a Vue shell and
 Chromium's content layer (155.0.8059.41, unpatched) behind one engine interface. Apple
-silicon Macs only for now.
+silicon Macs, and arm64 Android phones built on the same Mac.
 
 Releases with a DMG and self-update: https://github.com/sudiptadeb/project-b/releases.
 Where the project stands: [docs/status.md](docs/status.md). How it is built:
-[docs/first-app.md](docs/first-app.md).
+[docs/first-app.md](docs/first-app.md). Android: [docs/android.md](docs/android.md).
 
 ## Get it working
 

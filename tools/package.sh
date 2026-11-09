@@ -14,6 +14,7 @@ RESOURCES=$APP/Contents/Resources
 LIBRARIES=$APP/Contents/Libraries
 FRAMEWORKS=$APP/Contents/Frameworks
 SIGNING=$HOME/PW_TOOLS/project-b-signing     # tools/signing-setup.sh makes it
+VERSION=$(tr -d '[:space:]' < "$ROOT/VERSION")   # what the installed app says it is, and compares releases against
 
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$MACOS" "$RESOURCES/shell" "$LIBRARIES" "$FRAMEWORKS"
@@ -35,7 +36,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>dev.projectb.browser</string>
   <key>CFBundleName</key><string>Project B</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>155.0.8059.41</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>

@@ -92,6 +92,9 @@ watchEffect(() => {
 .rounding {
   position: absolute;
   inset: 0;
+  /* Above every component, so a square surface in a corner sits under the curve. The
+     suggestion list never reaches the frame, so nothing of use is covered. */
+  z-index: 2;
   border: var(--frame-width) solid var(--frame);
   border-radius: var(--window-radius, 0px);
   pointer-events: none;

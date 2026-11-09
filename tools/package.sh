@@ -45,12 +45,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 # Symbol names are about a third of a non-official binary and do nothing at run time.
-# Stripping breaks the linker's signature. rcodesign signs everything in the bundle again.
-strip -x "$MACOS/project_b" "$MACOS/project_b_helper" "$FRAMEWORKS"/*.dylib "$LIBRARIES"/*.dylib 2>/dev/null
+# Stripping breaks the linker's signature, and rcodesign crashes reading what's left on a
+# release build, so the old signature goes first. The graphics libraries keep the linker's
+# signature, because rcodesign can't parse them after a release build.
+for binary in "$MACOS/project_b" "$MACOS/project_b_helper" "$FRAMEWORKS"/*.dylib; do
+    codesign --remove-signature "$binary"
+    strip -x "$binary" 2>/dev/null
+done
 "$SIGNING/rcodesign" sign \
     --p12-file "$SIGNING/identity.p12" \
     --p12-password-file <(grep '^PROJECT_B_SIGNING_P12_PASSWORD=' "$HOME/PW_TOOLS/lab-secrets.env" | cut -d= -f2- | tr -d '\n') \
     --timestamp-url none \
+    --exclude "Contents/Libraries/**" \
     --binary-identifier "Contents/MacOS/project_b_helper:dev.projectb.helper" \
     "$APP"
 codesign --verify --deep --strict "$APP"

@@ -57,6 +57,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnAutoUpdateChanged(a.Update.SetAuto)
+	a.Prefs.OnAutoUpdateChanged(a.Shell.AutoUpdateChanged)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 
 	a.History.Load(nil)

@@ -67,6 +67,8 @@ type Engine struct {
 
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
+
+	tabFeeds map[engine.TabID]*Feed // Messages to our page in each tab, under mu.
 }
 
 // New returns an engine. Call Run to start its main thread.
@@ -211,6 +213,22 @@ func (e *Engine) FocusPage() {}
 func (e *Engine) FocusShell() {}
 
 func (e *Engine) SendToShell(msg []byte) { e.Shell.Publish(msg) }
+
+func (e *Engine) SendToTab(tab engine.TabID, msg []byte) { e.TabFeed(tab).Publish(msg) }
+
+// TabFeed is what our page in a tab is told: the settings page, served by the dev server
+// under /tab/<id>/. Any goroutine.
+func (e *Engine) TabFeed(tab engine.TabID) *Feed {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.tabFeeds == nil {
+		e.tabFeeds = map[engine.TabID]*Feed{}
+	}
+	if e.tabFeeds[tab] == nil {
+		e.tabFeeds[tab] = &Feed{}
+	}
+	return e.tabFeeds[tab]
+}
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
 

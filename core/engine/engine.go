@@ -81,6 +81,9 @@ type Engine interface {
 
 	// SendToShell delivers one message to the shell page.
 	SendToShell(msg []byte)
+	// SendToTab delivers one message to our own page in a tab, if the tab holds one with
+	// its bridge. Anything else in the tab gets nothing.
+	SendToTab(tab TabID, msg []byte)
 
 	// Post runs fn on the main thread, later.
 	Post(fn func())

@@ -124,6 +124,11 @@ void CallSendToShell(const char* json, size_t length) {
   g_engine->SendToShell(json, length);
 }
 
+void CallSendToTab(int64_t tab, const char* json, size_t length) {
+  CheckMainThread();
+  g_engine->SendToTab(tab, json, length);
+}
+
 void CallSetHookSubscribed(int32_t hook, int on) {
   CheckMainThread();
   hooks::SetSubscribed(hook, on != 0);
@@ -182,6 +187,7 @@ const PBEngineCalls* Engine::Calls() {
       .focus_page = CallFocusPage,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,
+      .send_to_tab = CallSendToTab,
       .set_hook_subscribed = CallSetHookSubscribed,
       .post_wakeup = CallPostWakeup,
   };
@@ -310,6 +316,13 @@ void Engine::FocusShell() {
 
 void Engine::SendToShell(const char* json, size_t length) {
   shell_->Send(std::string(json, length));
+}
+
+void Engine::SendToTab(int64_t tab, const char* json, size_t length) {
+  auto it = tabs_.find(tab);
+  if (it != tabs_.end()) {
+    SendToOurPage(it->second->contents(), std::string(json, length));
+  }
 }
 
 }  // namespace project_b

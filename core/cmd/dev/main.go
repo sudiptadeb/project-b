@@ -18,6 +18,7 @@ import (
 	"syscall"
 
 	"projectb/app"
+	"projectb/engine"
 	"projectb/mockengine"
 	"projectb/update"
 )
@@ -82,6 +83,27 @@ func main() {
 		}
 		e.Post(func() { a.ShellMessage(0, msg) })
 	})
+	// The settings page in tab <id>, as the engine would bind it there: what it sends is
+	// tagged with the tab, and it hears what Go sends that tab.
+	mux.HandleFunc("GET /tab/{id}/{file...}", func(w http.ResponseWriter, r *http.Request) {
+		file := filepath.Base(r.PathValue("file"))
+		if file == "." || file == "/" || file == "" {
+			file = "settings.html"
+		}
+		http.ServeFile(w, r, filepath.Join(*shellDir, file))
+	})
+	mux.HandleFunc("GET /tab/{id}/shell/events", func(w http.ResponseWriter, r *http.Request) {
+		stream(w, r, e.TabFeed(tabID(r)))
+	})
+	mux.HandleFunc("POST /tab/{id}/shell/send", func(w http.ResponseWriter, r *http.Request) {
+		msg, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		tab := tabID(r)
+		e.Post(func() { a.ShellMessage(tab, msg) })
+	})
 	mux.HandleFunc("GET /mock/page", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := mockPage.ReadFile("mock_page.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -105,6 +127,11 @@ func main() {
 
 	log.Printf("mock engine on http://%s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))
+}
+
+func tabID(r *http.Request) engine.TabID {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return engine.TabID(id)
 }
 
 // stream sends a feed to the browser as server-sent events.

@@ -320,3 +320,59 @@ func TestATabsPageCannotGiveTheShellsCommands(t *testing.T) {
 		t.Fatalf("tabs = %v", tabs)
 	}
 }
+
+// readTab reads what our page in a tab is sent until one matches.
+func readTab(t *testing.T, got <-chan []byte, match func(map[string]any) bool) map[string]any {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case b := <-got:
+			var m map[string]any
+			if err := json.Unmarshal(b, &m); err != nil {
+				t.Fatalf("bad message %s: %v", b, err)
+			}
+			if match(m) {
+				return m
+			}
+		case <-deadline:
+			t.Fatal("timed out waiting for a message to the tab")
+		}
+	}
+}
+
+// The settings page reads and sets the prefs and reads the update state; what it sets
+// reaches the shell, and every change reaches every settings tab.
+func TestTheSettingsPageReadsAndSetsPrefs(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	r.visit("chrome://settings/")
+	got, stop := r.e.TabFeed(1).Subscribe()
+	defer stop()
+	prefs := func(m map[string]any) map[string]any { p, _ := m["prefs"].(map[string]any); return p }
+
+	r.fromTab(1, `{"t":"prefs"}`)
+	p := prefs(readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" }))
+	if p["tabLayout"] != "vertical" || p["autoUpdate"] != true {
+		t.Fatalf("prefs = %v", p)
+	}
+	r.fromTab(1, `{"t":"setTabLayout","text":"horizontal"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabLayout" && m["tabLayout"] == "horizontal" })
+	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["tabLayout"] == "horizontal" })
+	r.fromTab(1, `{"t":"setAutoUpdate","on":false}`)
+	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["autoUpdate"] == false })
+	r.fromTab(1, `{"t":"updateState"}`)
+	u := readTab(t, got, func(m map[string]any) bool { return m["t"] == "update" })
+	if _, ok := u["running"]; !ok {
+		t.Fatalf("update = %v", u)
+	}
+	// From the shell, too.
+	r.shell(`{"t":"setTabLayout","text":"vertical"}`)
+	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["tabLayout"] == "vertical" })
+
+	b, _ := os.ReadFile(filepath.Join(dir, "prefs.json"))
+	if !strings.Contains(string(b), `"autoUpdate":false`) {
+		t.Fatalf("prefs.json = %s", b)
+	}
+}

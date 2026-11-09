@@ -14,6 +14,10 @@ import (
 // loadDelay is how long a mock page takes to load.
 const loadDelay = 100 * time.Millisecond
 
+// Controls is where the mock's window controls sit: what macOS gives a window with a
+// 32px title bar. Full screen hides them.
+var Controls = engine.Rect{X: 9, Y: 9, W: 60, H: 14}
+
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
 // as it does with real content.
 type Engine struct {
@@ -24,6 +28,7 @@ type Engine struct {
 	navSeq   int
 	history  []string // The committed URLs of the one tab.
 	pos      int      // The current one in history, or -1 before the first.
+	full     bool     // Full screen, so there are no window controls.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu      sync.Mutex
@@ -45,8 +50,20 @@ func (e *Engine) Run() {
 	}
 }
 
-// SetListener sets who hears the engine's events.
-func (e *Engine) SetListener(l engine.Listener) { e.listener = l }
+// SetListener sets who hears the engine's events, and reports the window controls to
+// it, as the real engine does right after it starts.
+func (e *Engine) SetListener(l engine.Listener) {
+	e.listener = l
+	e.reportControls()
+}
+
+func (e *Engine) reportControls() {
+	if e.full {
+		e.listener.WindowControlsChanged(engine.Rect{})
+	} else {
+		e.listener.WindowControlsChanged(Controls)
+	}
+}
 
 func (e *Engine) Name() string { return "mock" }
 
@@ -131,6 +148,9 @@ func (e *Engine) Fire(kind, value string) {
 			e.publishPage("crashed", e.currentURL())
 		case "shortcut":
 			e.listener.FocusAddressBarRequested()
+		case "fullscreen":
+			e.full = !e.full
+			e.reportControls()
 		}
 	})
 }

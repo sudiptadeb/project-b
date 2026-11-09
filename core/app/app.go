@@ -9,6 +9,7 @@ import (
 	"projectb/shell"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/window"
 )
 
 // Config is what the app needs to start.
@@ -23,6 +24,7 @@ type App struct {
 	History *history.Manager
 	Suggest *suggest.Manager
 	Policy  *policy.Manager
+	Window  *window.Manager
 	Shell   *shell.Manager
 }
 
@@ -34,12 +36,14 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.History = history.New(cfg.ProfileDir, e.Post)
 	a.Suggest = suggest.New(a.History)
 	a.Tabs = tabs.New(e)
-	a.Shell = shell.New(e, a.Tabs, a.Suggest)
+	a.Window = window.New()
+	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
 	a.Tabs.OnTitleChanged(func(t tabs.Tab) { a.History.UpdateTitle(t.URL, t.Title) })
 	a.Tabs.OnChanged(a.Shell.TabChanged)
+	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 
 	a.History.Load(nil)
 	a.Tabs.Create()
@@ -76,3 +80,5 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 func (a *App) PageCrashed(tab engine.TabID) { a.Tabs.HandlePageCrashed(tab) }
 
 func (a *App) FocusAddressBarRequested() { a.Shell.FocusAddressBar() }
+
+func (a *App) WindowControlsChanged(r engine.Rect) { a.Window.HandleControlsChanged(r) }

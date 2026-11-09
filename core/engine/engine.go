@@ -70,4 +70,10 @@ type Listener interface {
 
 	// FocusAddressBarRequested fires on the shortcut while the page has focus.
 	FocusAddressBarRequested()
+
+	// WindowControlsChanged says where the native window controls (close, minimise,
+	// zoom) sit, so the shell can leave that space. It fires after start, on resize and
+	// on entering or leaving full screen. An empty Rect means there are none to leave
+	// space for.
+	WindowControlsChanged(r Rect)
 }

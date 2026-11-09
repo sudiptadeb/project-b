@@ -188,14 +188,17 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('history survives a restart', (await options.count()) === 2);
   check('titles survive a restart', /Mock example/.test(await options.first().innerText()));
 
-  // In full screen the window buttons are gone, so the tab moves into their place.
-  const full = await browser.newPage({ viewport: { width: 1500, height: 900 }, screen: { width: 1500, height: 900 } });
-  await full.goto(base + '/');
-  await full.locator('.tab').waitFor();
-  const fullLeft = (await full.locator('.tab').boundingBox()).x;
-  const windowLeft = (await page.locator('.tab').boundingBox()).x;
-  check('in full screen the tab moves left, into the buttons\' place', fullLeft < windowLeft, `${fullLeft} vs ${windowLeft}`);
-  await full.close();
+  // The engine says where the window controls are; the shell leaves exactly that space.
+  // In full screen there are none, so the tab moves into their place.
+  const tab = page.locator('.tab');
+  const windowLeft = (await tab.boundingBox()).x;
+  check('the tab starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  await page.waitForFunction(() => document.querySelector('.tab').getBoundingClientRect().x < 20);
+  check('in full screen the tab moves into the controls\' place', (await tab.boundingBox()).x === 4, String((await tab.boundingBox()).x));
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  await page.waitForFunction((x) => document.querySelector('.tab').getBoundingClientRect().x === x, windowLeft);
+  check('leaving full screen gives the controls their space back', true);
 
   // Phone width.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

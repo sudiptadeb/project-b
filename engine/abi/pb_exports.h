@@ -26,6 +26,7 @@ void PBTitleChanged(int64_t tab, const char* title);
 void PBLoadingChanged(int64_t tab, int loading);
 void PBPageCrashed(int64_t tab);
 void PBFocusAddressBarRequested(void);
+void PBWindowControlsChanged(double x, double y, double w, double h);
 
 void PBPing(void);
 void PBForceGC(void);

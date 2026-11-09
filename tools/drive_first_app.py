@@ -193,7 +193,8 @@ def main():
     window = json.loads(app.cmd("bounds"))
     print("title bar", window["titlebar"], "buttons", window["buttonsStart"], window["buttonsEnd"], "middle", window["buttonsMiddleY"], "size", window["buttonSize"], "screen", app.js("[screen.width,screen.height]"), flush=True)
     check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 32, window)
-    check("the window buttons end before the tab", window["buttonsEnd"] < 80, window)
+    tab_left = app.js("document.querySelector('.tab').getBoundingClientRect().x")
+    check("the shell leaves exactly the window buttons' space, as the engine reported it", tab_left == window["buttonsEnd"] + 8, (tab_left, window))
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -350,18 +351,9 @@ def main():
     check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 4 and r[2] == settled["content"][0] - 8, settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
-    # A picture of the layout at screen size, with the tab where full screen puts it. This
-    # session has no display, so it can't enter real full screen. The mock test covers the switch.
-    screen_w, screen_h = app.js("[screen.width,screen.height]")
-    app.cmd("resize", screen_w, screen_h)
-    time.sleep(0.5)
-    print("at screen size", app.js("[innerWidth,innerHeight]"), flush=True)
-    app.js("(()=>{document.querySelector('.tabstrip').classList.add('fullscreen');return 1})()")
-    time.sleep(0.2)
-    print(app.cmd("capture", os.path.join(OUT, "5-fullscreen.png")), flush=True)
-    app.js("(()=>{document.querySelector('.tabstrip').classList.remove('fullscreen');return 1})()")
-    app.cmd("resize", 1100, 700)
-    time.sleep(0.3)
+    # The window controls stay put through resizes, so the shell's space for them does too.
+    # Real full screen needs a display; the mock test covers the switch to no controls.
+    check("the controls' space survives resizing", app.js("document.querySelector('.tab').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
 
     # Crash handling, from a healthy page: a blocked tab correctly keeps saying Blocked.
     visit(app, URL_A)

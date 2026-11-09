@@ -9,6 +9,7 @@ import (
 	"projectb/engine"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/window"
 )
 
 // command is what the shell sends us.
@@ -27,11 +28,12 @@ type Manager struct {
 	eng     engine.Engine
 	tabs    *tabs.Manager
 	suggest *suggest.Manager
+	window  *window.Manager
 }
 
 // New returns a manager.
-func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s}
+func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager) *Manager {
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w}
 }
 
 // Handle takes one command from the shell.
@@ -43,7 +45,7 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
-		m.send(map[string]any{"t": "snapshot", "engine": m.eng.Name(), "tab": m.tabs.Active()})
+		m.send(map[string]any{"t": "snapshot", "engine": m.eng.Name(), "tab": m.tabs.Active(), "controls": m.window.Controls()})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
 	case "back":
@@ -68,6 +70,11 @@ func (m *Manager) Handle(msg []byte) {
 // TabChanged tells the shell a tab's state changed.
 func (m *Manager) TabChanged(t tabs.Tab) {
 	m.send(map[string]any{"t": "tab", "tab": t})
+}
+
+// WindowControlsChanged tells the shell where the native window controls now are.
+func (m *Manager) WindowControlsChanged(r engine.Rect) {
+	m.send(map[string]any{"t": "controls", "controls": r})
 }
 
 // FocusAddressBar asks the shell to focus the address bar.

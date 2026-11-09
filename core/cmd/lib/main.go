@@ -167,6 +167,11 @@ func PBPageCrashed(tab C.int64_t) { theApp.PageCrashed(engine.TabID(tab)) }
 //export PBFocusAddressBarRequested
 func PBFocusAddressBarRequested() { theApp.FocusAddressBarRequested() }
 
+//export PBWindowControlsChanged
+func PBWindowControlsChanged(x, y, w, h C.double) {
+	theApp.WindowControlsChanged(engine.Rect{X: float64(x), Y: float64(y), W: float64(w), H: float64(h)})
+}
+
 // PBPing does nothing. The driver times it to measure the boundary.
 //
 //export PBPing

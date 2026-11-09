@@ -54,6 +54,9 @@ typedef struct PBGoCalls {
   void (*loading_changed)(int64_t tab, int loading);
   void (*page_crashed)(int64_t tab);
   void (*focus_address_bar_requested)(void);
+  // Where the native window controls are, in window coordinates with y from the top.
+  // All zero when there are none to leave space for.
+  void (*window_controls_changed)(double x, double y, double w, double h);
 
   // Development only, used by the driver to measure the boundary.
   void (*ping)(void);

@@ -62,6 +62,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str());
+  window_->ListenForControls(base::BindRepeating([](const gfx::RectF& r) {
+    Go().window_controls_changed(r.x(), r.y(), r.width(), r.height());
+  }));
 
   if (command_line->HasSwitch("pb-driver")) {
     StartDriver(command_line->GetSwitchValuePath("pb-driver"));

@@ -167,4 +167,21 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	}
 }
 
+func TestSnapshotCarriesTheWindowControls(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	controls := m["controls"].(map[string]any)
+	if controls["x"] != float64(mockengine.Controls.X) || controls["w"] != float64(mockengine.Controls.W) {
+		t.Fatalf("controls = %v", controls)
+	}
+
+	r.e.Fire("fullscreen", "")
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" })
+	if m["controls"].(map[string]any)["w"] != float64(0) {
+		t.Fatalf("full screen should report no controls: %v", m)
+	}
+}
+
 var _ engine.Listener = (*app.App)(nil)

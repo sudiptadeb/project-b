@@ -69,12 +69,15 @@
 @end
 
 @interface PBWindowDelegate : NSObject <NSWindowDelegate>
+@property(nonatomic) base::RepeatingClosure onControlsMayHaveMoved;
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose;
 @end
 
 @implementation PBWindowDelegate {
   base::OnceClosure _onClose;
 }
+
+@synthesize onControlsMayHaveMoved = _onControlsMayHaveMoved;
 
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose {
   if ((self = [super init])) {
@@ -87,6 +90,24 @@
   std::move(_onClose).Run();
 }
 
+- (void)windowDidResize:(NSNotification*)notification {
+  if (_onControlsMayHaveMoved) {
+    _onControlsMayHaveMoved.Run();
+  }
+}
+
+- (void)windowDidEnterFullScreen:(NSNotification*)notification {
+  if (_onControlsMayHaveMoved) {
+    _onControlsMayHaveMoved.Run();
+  }
+}
+
+- (void)windowDidExitFullScreen:(NSNotification*)notification {
+  if (_onControlsMayHaveMoved) {
+    _onControlsMayHaveMoved.Run();
+  }
+}
+
 @end
 
 namespace project_b {
@@ -97,6 +118,38 @@ struct Window::Impl {
   PBWindowDelegate* __strong delegate;
   gfx::RectF page_bounds;
   size_t ignored_stale_bounds = 0;
+  base::RepeatingCallback<void(const gfx::RectF&)> on_controls;
+  gfx::RectF last_controls;
+
+  // The close and zoom buttons bound the controls. In full screen macOS hides them.
+  gfx::RectF Controls() const {
+    if (window.styleMask & NSWindowStyleMaskFullScreen) {
+      return gfx::RectF();
+    }
+    NSButton* close_button = [window standardWindowButton:NSWindowCloseButton];
+    NSButton* zoom_button = [window standardWindowButton:NSWindowZoomButton];
+    if (!close_button || !zoom_button || close_button.hidden) {
+      return gfx::RectF();
+    }
+    const NSRect close_frame = [close_button convertRect:close_button.bounds
+                                                  toView:container];
+    const NSRect zoom_frame = [zoom_button convertRect:zoom_button.bounds
+                                                toView:container];
+    // Shell coordinates measure y from the top.
+    return gfx::RectF(NSMinX(close_frame),
+                      container.bounds.size.height - NSMaxY(close_frame),
+                      NSMaxX(zoom_frame) - NSMinX(close_frame),
+                      NSHeight(close_frame));
+  }
+
+  void ReportControls() {
+    const gfx::RectF controls = Controls();
+    if (controls == last_controls) {
+      return;
+    }
+    last_controls = controls;
+    on_controls.Run(controls);
+  }
 };
 
 Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
@@ -175,6 +228,15 @@ void Window::SetPageBounds(const gfx::RectF& bounds,
 
 void Window::SetShellRegions(std::vector<gfx::RectF> regions) {
   [impl_->container setRegions:std::move(regions)];
+}
+
+void Window::ListenForControls(
+    base::RepeatingCallback<void(const gfx::RectF&)> on_change) {
+  impl_->on_controls = std::move(on_change);
+  impl_->last_controls = gfx::RectF(-1, -1, 0, 0);  // So the first report always goes.
+  impl_->delegate.onControlsMayHaveMoved = base::BindRepeating(
+      [](Impl* impl) { impl->ReportControls(); }, impl_.get());
+  impl_->ReportControls();
 }
 
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {

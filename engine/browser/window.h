@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "base/functional/callback_forward.h"
+#include "base/functional/callback.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/native_ui_types.h"
@@ -36,6 +36,10 @@ class Window {
   // follows because the resize made the shell measure again.
   void SetPageBounds(const gfx::RectF& bounds, const gfx::SizeF& viewport);
   void SetShellRegions(std::vector<gfx::RectF> regions);
+
+  // Reports where the native window controls are, in shell coordinates, now and
+  // whenever they move or hide. Empty in full screen.
+  void ListenForControls(base::RepeatingCallback<void(const gfx::RectF&)> on_change);
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 

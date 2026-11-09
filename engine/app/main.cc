@@ -18,6 +18,7 @@ int main(int argc, const char** argv) {
       .loading_changed = PBLoadingChanged,
       .page_crashed = PBPageCrashed,
       .focus_address_bar_requested = PBFocusAddressBarRequested,
+      .window_controls_changed = PBWindowControlsChanged,
       .ping = PBPing,
       .force_gc = PBForceGC,
       .recover_nil_deref = PBRecoverNilDeref,

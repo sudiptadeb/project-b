@@ -15,7 +15,8 @@ import TabStrip from './TabStrip.vue';
 </template>
 
 <style>
-/* Colours from the Ulaa Browser design, Personal mode. */
+/* Colours from the Ulaa Browser design, Personal mode. Spacing, radii, type sizes and the
+   flat look follow the Deb Design System: a 4px grid, borders instead of shadows. */
 :root {
   --frame: #0faaaa;
   --bar: #e2f2f2;
@@ -24,9 +25,10 @@ import TabStrip from './TabStrip.vue';
   --surface: #ffffff;
   --text: #1f1f1f;
   --muted: #5c6270;
-  --line: #e2e2e2;
+  --line: rgba(15, 20, 25, 0.1);
+  --accent-soft: rgba(15, 170, 170, 0.18);
   --danger: #ea3323;
-  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  font: 13.5px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }

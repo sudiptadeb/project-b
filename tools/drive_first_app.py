@@ -25,8 +25,8 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
-BAR_Y = 71  # The middle of the address bar and the buttons, below the tab strip.
-BACK_X, FORWARD_X, RELOAD_X = 35, 73, 109
+BAR_Y = 52  # The middle of the address bar and the buttons, below the tab strip.
+BACK_X, FORWARD_X, RELOAD_X = 24, 52, 80
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -191,9 +191,9 @@ def main():
     check("bar belongs to the shell", app.cmd("hit", 400, BAR_Y) == "shell")
     check("below the bar belongs to the page", app.cmd("hit", 400, 300) == "page")
     window = json.loads(app.cmd("bounds"))
-    print("title bar", window["titlebar"], "window buttons end at", window["buttonsEnd"], flush=True)
-    check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 42, window)
-    check("the window buttons end before the tab", window["buttonsEnd"] < 92, window)
+    print("title bar", window["titlebar"], "buttons", window["buttonsStart"], window["buttonsEnd"], "middle", window["buttonsMiddleY"], "size", window["buttonSize"], "screen", app.js("[screen.width,screen.height]"), flush=True)
+    check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 32, window)
+    check("the window buttons end before the tab", window["buttonsEnd"] < 80, window)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -347,8 +347,19 @@ def main():
     time.sleep(0.3)
     settled = json.loads(app.cmd("bounds"))
     r = settled["reported"]
-    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 10 and r[2] == settled["content"][0] - 20, settled)
+    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 4 and r[2] == settled["content"][0] - 8, settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
+
+    # A picture of the layout at screen size, with the tab where full screen puts it. This
+    # session has no display, so it can't enter real full screen. The mock test covers the switch.
+    screen_w, screen_h = app.js("[screen.width,screen.height]")
+    app.cmd("resize", screen_w, screen_h)
+    time.sleep(0.5)
+    print("at screen size", app.js("[innerWidth,innerHeight]"), flush=True)
+    app.js("(()=>{document.querySelector('.tabstrip').classList.add('fullscreen');return 1})()")
+    time.sleep(0.2)
+    print(app.cmd("capture", os.path.join(OUT, "5-fullscreen.png")), flush=True)
+    app.js("(()=>{document.querySelector('.tabstrip').classList.remove('fullscreen');return 1})()")
     app.cmd("resize", 1100, 700)
     time.sleep(0.3)
 

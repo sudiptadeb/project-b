@@ -19,7 +19,7 @@ onMounted(() => setPageElement(el.value));
 .page-view {
   flex: 1;
   min-height: 0;
-  margin: 0 10px 10px;
+  margin: 0 4px 4px;
   box-shadow: 0 0 0 100vmax var(--frame);
 }
 

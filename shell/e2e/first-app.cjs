@@ -47,7 +47,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 (async () => {
   await startServer();
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1100, height: 700 } });
+  const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, screen: { width: 1920, height: 1080 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -68,7 +68,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   let r = await regions();
   check('opens empty with only the bar as shell', r.regions.length === 1 && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('page sits below the bar, inside the frame', r.bounds.y === r.regions[0].h && r.bounds.x === 10 && r.bounds.w === 1100 - 20 && r.bounds.y + r.bounds.h === 700 - 10, JSON.stringify(r));
+  check('page sits below the bar, inside the frame', r.bounds.y === r.regions[0].h && r.bounds.x === 4 && r.bounds.w === 1100 - 8 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
   // before the commit would correctly replace this one.
@@ -187,6 +187,15 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await options.first().waitFor();
   check('history survives a restart', (await options.count()) === 2);
   check('titles survive a restart', /Mock example/.test(await options.first().innerText()));
+
+  // In full screen the window buttons are gone, so the tab moves into their place.
+  const full = await browser.newPage({ viewport: { width: 1500, height: 900 }, screen: { width: 1500, height: 900 } });
+  await full.goto(base + '/');
+  await full.locator('.tab').waitFor();
+  const fullLeft = (await full.locator('.tab').boundingBox()).x;
+  const windowLeft = (await page.locator('.tab').boundingBox()).x;
+  check('in full screen the tab moves left, into the buttons\' place', fullLeft < windowLeft, `${fullLeft} vs ${windowLeft}`);
+  await full.close();
 
   // Phone width.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });

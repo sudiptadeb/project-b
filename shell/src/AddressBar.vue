@@ -186,11 +186,11 @@ watch(
   position: relative;
   display: flex;
   align-items: center;
-  height: 59px;
-  margin: 0 10px;
-  padding: 0 20.4px 0 0;
+  height: 40px;
+  margin: 0 4px;
+  padding: 0 8px 0 0;
   background: var(--bar);
-  border-radius: 16.8px 16.8px 0 0;
+  border-radius: 8px 8px 0 0;
 }
 
 .field {
@@ -199,13 +199,15 @@ watch(
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 35px;
+  height: 28px;
+  border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
 }
 
 .field:focus-within {
-  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 input {
@@ -219,8 +221,6 @@ input {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
 }
 
 input::placeholder {
@@ -232,30 +232,30 @@ input::placeholder {
   flex: none;
   margin-right: 10px;
   color: var(--danger);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .list {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
   z-index: 10;
   margin: 0;
-  padding: 6px;
+  padding: 4px;
   list-style: none;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
 li {
   display: flex;
   flex-direction: column;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
   cursor: pointer;
 }
 
@@ -270,14 +270,9 @@ li.active {
   text-overflow: ellipsis;
 }
 
-.title {
-  font-size: 13px;
-  font-weight: 500;
-}
-
 .url {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .progress {

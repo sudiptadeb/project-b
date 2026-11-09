@@ -270,14 +270,20 @@ void Run(const std::string& line) {
                    .GetNativeNSView()
                    .frame;
     NSSize c = TheWindow().contentView.bounds.size;
+    NSButton* close_button = [TheWindow() standardWindowButton:NSWindowCloseButton];
     NSRect zoom = [TheWindow() standardWindowButton:NSWindowZoomButton].frame;
+    NSRect close_frame = close_button.frame;
+    const double from_top =
+        close_button.superview.bounds.size.height - NSMidY(close_frame);
     Reply(id, base::StringPrintf(
                   "{\"reported\":[%g,%g,%g,%g],\"frame\":[%g,%g,%g,%g],"
-                  "\"content\":[%g,%g],\"titlebar\":%g,\"buttonsEnd\":%g}",
+                  "\"content\":[%g,%g],\"titlebar\":%g,\"buttonsStart\":%g,"
+                  "\"buttonsEnd\":%g,\"buttonsMiddleY\":%g,\"buttonSize\":%g}",
                   b.x(), b.y(), b.width(), b.height(), f.origin.x, f.origin.y,
                   f.size.width, f.size.height, c.width, c.height,
                   c.height - TheWindow().contentLayoutRect.size.height,
-                  NSMaxX(zoom)));
+                  NSMinX(close_frame), NSMaxX(zoom), from_top,
+                  close_frame.size.width));
   } else if (cmd == "shellhidden") {
     Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView().hidden =
         parts[2] == "1";

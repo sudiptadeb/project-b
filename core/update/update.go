@@ -37,11 +37,24 @@ const (
 	Failed      = "failed"
 )
 
-// State is what the shell shows.
+// What a check asked for by the user found, beside the phase. Nothing is empty.
+const (
+	Checking    = "checking"
+	UpToDate    = "current"
+	CheckFailed = "failed"
+)
+
+// State is what the shell's bubble and the settings page show.
 type State struct {
 	Phase   string `json:"phase"`
 	Version string `json:"version,omitempty"` // the release being downloaded, ready, or refused
 	Error   string `json:"error,omitempty"`   // why it failed, in words a person can read
+	// Check is how a check the user asked for went: Checking while it runs, then UpToDate,
+	// or CheckFailed with CheckError when the manifest couldn't be read. A check that finds
+	// a release moves Phase instead. Only the settings page shows these; the bubble shows
+	// Phase alone, so automatic checks never set them.
+	Check      string `json:"check,omitempty"`
+	CheckError string `json:"checkError,omitempty"`
 }
 
 // Config says what this build is and where it lives.
@@ -68,14 +81,20 @@ type Manager struct {
 	state  State
 	staged string // the checked bundle waiting for Relaunch
 
+	checking sync.Mutex // one check at a time, automatic or asked for
+
+	// Main thread only.
+	auto    bool          // check every CheckInterval
+	started bool          // Start has run
+	timer   chan struct{} // closing it ends the running timer; nil when none runs
+
 	onChanged []func(State)
-	stop      chan struct{}
 }
 
 // New returns a manager. post runs a function on the main thread; quit ends the app, which
 // Relaunch calls once the new bundle is in place.
 func New(cfg Config, post func(func()), quit func()) *Manager {
-	m := &Manager{cfg: cfg, post: post, quit: quit, stop: make(chan struct{})}
+	m := &Manager{cfg: cfg, post: post, quit: quit, auto: true}
 	if cfg.Version == "" {
 		return m
 	}
@@ -99,32 +118,67 @@ func (m *Manager) State() State {
 // OnChanged subscribes to the state changing. Called on the main thread.
 func (m *Manager) OnChanged(f func(State)) { m.onChanged = append(m.onChanged, f) }
 
-// Start begins checking. A development build, or one amarit could not be configured for,
-// never checks. Whatever an earlier run left half done is cleared first.
+// Running is the version this build is: empty for a development build.
+func (m *Manager) Running() string { return m.cfg.Version }
+
+// Start begins checking every CheckInterval, unless automatic checks are off. A
+// development build, or one amarit could not be configured for, never checks. Whatever an
+// earlier run left half done is cleared first.
 func (m *Manager) Start() {
 	if m.client == nil {
 		return
 	}
 	os.RemoveAll(m.stageDir())
 	os.RemoveAll(m.downloadDir())
-	log.Printf("update: %s %s, checking %s every %s", m.cfg.Project, m.cfg.Version, m.cfg.Releases, CheckInterval)
-	go m.loop()
+	m.started = true
+	log.Printf("update: %s %s, %s", m.cfg.Project, m.cfg.Version, m.cfg.Releases)
+	if m.auto {
+		m.startTimer()
+	}
 }
 
 // Stop ends the checking.
 func (m *Manager) Stop() {
-	select {
-	case <-m.stop:
-	default:
-		close(m.stop)
+	m.started = false
+	m.stopTimer()
+}
+
+// SetAuto turns the check every CheckInterval on or off, at once. Turned on again, the
+// timer starts as it does at launch. A check the user asks for runs either way.
+func (m *Manager) SetAuto(on bool) {
+	if on == m.auto {
+		return
+	}
+	m.auto = on
+	if !m.started {
+		return
+	}
+	if on {
+		m.startTimer()
+	} else {
+		log.Printf("update: automatic checks are off")
+		m.stopTimer()
 	}
 }
 
-func (m *Manager) loop() {
+func (m *Manager) startTimer() {
+	log.Printf("update: checking every %s", CheckInterval)
+	m.timer = make(chan struct{})
+	go m.loop(m.timer)
+}
+
+func (m *Manager) stopTimer() {
+	if m.timer != nil {
+		close(m.timer)
+		m.timer = nil
+	}
+}
+
+func (m *Manager) loop(stop chan struct{}) {
 	wait := firstCheck
 	for {
 		select {
-		case <-m.stop:
+		case <-stop:
 			return
 		case <-time.After(wait):
 		}
@@ -133,18 +187,43 @@ func (m *Manager) loop() {
 	}
 }
 
+// CheckNow checks at once, whether or not automatic checks are on, and says how it went in
+// State.Check. A newer release goes the way an automatic check's does: download, checks,
+// stage, and the bubble offers relaunch.
+func (m *Manager) CheckNow() {
+	if m.client == nil {
+		m.setCheck(CheckFailed, "a development build doesn't update")
+		return
+	}
+	m.setCheck(Checking, "")
+	go func() {
+		current, err := m.check(context.Background())
+		switch {
+		case err != nil:
+			m.setCheck(CheckFailed, err.Error())
+		case current:
+			m.setCheck(UpToDate, "")
+		default:
+			m.setCheck("", "")
+		}
+	}()
+}
+
 // check is one look at the manifest, and the download, unpack and checks when it names a
-// newer release. A check that fails before anything was shown is only logged: the next
-// minute tries again. A download that fails is shown.
-func (m *Manager) check(ctx context.Context) {
+// newer release. current says nothing newer was found and nothing is on show; err says the
+// manifest couldn't be read. An automatic check only logs that error: the next minute
+// tries again. A download that fails is shown.
+func (m *Manager) check(ctx context.Context) (current bool, err error) {
+	m.checking.Lock()
+	defer m.checking.Unlock()
 	if err := writable(filepath.Dir(m.cfg.App)); err != nil {
 		m.set(State{Phase: Failed, Error: err.Error()})
-		return
+		return false, nil
 	}
 	d, err := m.client.Check(ctx)
 	if err != nil {
 		log.Printf("update: check: %v", err)
-		return
+		return false, err
 	}
 	log.Printf("update: %s", d.Reason)
 	m.mu.Lock()
@@ -156,23 +235,24 @@ func (m *Manager) check(ctx context.Context) {
 		if s.Phase == Failed && s.Version != d.Version {
 			m.set(State{})
 		}
-		return
+		return m.State().Phase == Idle, nil
 	}
 	if s.Phase == Ready && s.Version == d.Version {
-		return
+		return false, nil
 	}
 	m.set(State{Phase: Downloading, Version: d.Version})
 	app, err := m.fetch(ctx, d)
 	if err != nil {
 		log.Printf("update: %s: %v", d.Version, err)
 		m.set(State{Phase: Failed, Version: d.Version, Error: err.Error()})
-		return
+		return false, nil
 	}
 	m.mu.Lock()
 	m.staged = app
 	m.mu.Unlock()
 	log.Printf("update: %s is staged at %s; ready to relaunch", d.Version, app)
 	m.set(State{Phase: Ready, Version: d.Version})
+	return false, nil
 }
 
 // fetch downloads the release and unpacks it into the stage directory, and checks that the
@@ -273,9 +353,25 @@ func (m *Manager) set(s State) {
 	changed := m.state != s
 	m.state = s
 	m.mu.Unlock()
-	if !changed {
-		return
+	if changed {
+		m.notify(s)
 	}
+}
+
+// setCheck changes only how the asked-for check went.
+func (m *Manager) setCheck(check, err string) {
+	m.mu.Lock()
+	s := m.state
+	s.Check, s.CheckError = check, err
+	changed := m.state != s
+	m.state = s
+	m.mu.Unlock()
+	if changed {
+		m.notify(s)
+	}
+}
+
+func (m *Manager) notify(s State) {
 	m.post(func() {
 		for _, f := range m.onChanged {
 			f(s)

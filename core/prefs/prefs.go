@@ -1,5 +1,6 @@
-// Package prefs owns the user's settings: today, where the tabs go. They live in one
-// small JSON file in the profile, read when the app starts and written when one changes.
+// Package prefs owns the user's settings: where the tabs go, and whether the app checks for
+// updates on its own. They live in one small JSON file in the profile, read when the app
+// starts and written when one changes.
 package prefs
 
 import (
@@ -15,29 +16,41 @@ const (
 	TabsHorizontal = "horizontal"
 )
 
-type saved struct {
-	TabLayout string `json:"tabLayout"`
+// Prefs is every setting, as the file holds them and the settings page reads them.
+type Prefs struct {
+	TabLayout  string `json:"tabLayout"`
+	AutoUpdate bool   `json:"autoUpdate"`
 }
+
+func defaults() Prefs { return Prefs{TabLayout: TabsVertical, AutoUpdate: true} }
 
 // Manager owns the settings.
 type Manager struct {
-	path     string
-	prefs    saved
-	onLayout []func(string)
+	path         string
+	prefs        Prefs
+	onLayout     []func(string)
+	onAutoUpdate []func(bool)
 }
 
-// New returns a manager with the settings saved under dir, or the defaults. The file
-// is a few bytes, so it is read right here.
+// New returns a manager with the settings saved under dir, or the defaults. A setting the
+// file doesn't hold, or holds a value for that isn't one, keeps its default. The file is a
+// few bytes, so it is read right here.
 func New(dir string) *Manager {
-	m := &Manager{path: filepath.Join(dir, "prefs.json"), prefs: saved{TabLayout: TabsVertical}}
+	m := &Manager{path: filepath.Join(dir, "prefs.json"), prefs: defaults()}
 	if b, err := os.ReadFile(m.path); err == nil {
-		var s saved
-		if json.Unmarshal(b, &s) == nil && (s.TabLayout == TabsVertical || s.TabLayout == TabsHorizontal) {
+		s := defaults()
+		if json.Unmarshal(b, &s) == nil {
+			if s.TabLayout != TabsVertical && s.TabLayout != TabsHorizontal {
+				s.TabLayout = TabsVertical
+			}
 			m.prefs = s
 		}
 	}
 	return m
 }
+
+// All returns a copy of every setting.
+func (m *Manager) All() Prefs { return m.prefs }
 
 // TabLayout says where the tabs go: TabsVertical or TabsHorizontal.
 func (m *Manager) TabLayout() string { return m.prefs.TabLayout }
@@ -54,6 +67,27 @@ func (m *Manager) SetTabLayout(layout string) {
 	m.save()
 	for _, f := range m.onLayout {
 		f(layout)
+	}
+}
+
+// AutoUpdate says whether the app checks for updates on its own. A check the user asks
+// for runs either way.
+func (m *Manager) AutoUpdate() bool { return m.prefs.AutoUpdate }
+
+// OnAutoUpdateChanged subscribes to automatic updates being turned on or off.
+func (m *Manager) OnAutoUpdateChanged(f func(bool)) {
+	m.onAutoUpdate = append(m.onAutoUpdate, f)
+}
+
+// SetAutoUpdate turns automatic update checks on or off.
+func (m *Manager) SetAutoUpdate(on bool) {
+	if on == m.prefs.AutoUpdate {
+		return
+	}
+	m.prefs.AutoUpdate = on
+	m.save()
+	for _, f := range m.onAutoUpdate {
+		f(on)
 	}
 }
 

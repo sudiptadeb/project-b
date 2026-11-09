@@ -44,6 +44,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Window = window.New()
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Update = update.New(cfg.Update, e.Post, e.CloseWindow)
+	a.Update.SetAuto(a.Prefs.AutoUpdate())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update)
 	e.SetWindowFrame(a.Window.Color(), a.Window.FrameWidth())
 
@@ -55,6 +56,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnEmpty(e.CloseWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
+	a.Prefs.OnAutoUpdateChanged(a.Update.SetAuto)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 
 	a.History.Load(nil)

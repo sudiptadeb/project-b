@@ -16,6 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // fakeApp writes a bundle the way tools/package.sh lays one out: the plist and an
@@ -68,6 +69,7 @@ type releaseServer struct {
 	Good      []byte
 	Served    []byte
 	downloads atomic.Int32
+	manifests atomic.Int32
 	url       string
 }
 
@@ -77,6 +79,7 @@ func release(t *testing.T, version string, good, served []byte) *releaseServer {
 	mux := http.NewServeMux()
 	var srv *httptest.Server
 	mux.HandleFunc("/releases.json", func(w http.ResponseWriter, r *http.Request) {
+		rs.manifests.Add(1)
 		rs.mu.Lock()
 		defer rs.mu.Unlock()
 		sum := sha256.Sum256(rs.Good)
@@ -282,5 +285,89 @@ func TestBundleOfFindsTheApp(t *testing.T) {
 	}
 	if got := BundleOf("/Users/me/project-b/chromium/src/out/pb/project_b"); got != "" {
 		t.Fatal(got)
+	}
+}
+
+// eventually waits for the manager's state to match, as a check asked for runs on its own
+// goroutine.
+func eventually(t *testing.T, m *Manager, match func(State) bool) State {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if s := m.State(); match(s) {
+			return s
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("state stayed %+v", m.State())
+	return State{}
+}
+
+func TestCheckNowSaysUpToDate(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	r := start(t, "0.2.0", rs.url, nil)
+	r.m.CheckNow()
+	eventually(t, r.m, func(s State) bool { return s.Check == UpToDate && s.Phase == Idle })
+	if rs.manifests.Load() != 1 || rs.downloads.Load() != 0 {
+		t.Fatalf("manifests %d downloads %d", rs.manifests.Load(), rs.downloads.Load())
+	}
+}
+
+func TestCheckNowSaysWhyTheManifestCouldNotBeRead(t *testing.T) {
+	r := start(t, "0.2.0", "http://127.0.0.1:1/releases.json", nil)
+	r.m.CheckNow()
+	s := eventually(t, r.m, func(s State) bool { return s.Check == CheckFailed })
+	if s.CheckError == "" || s.Phase != Idle {
+		t.Fatalf("state %+v", s)
+	}
+}
+
+func TestCheckNowTakesANewerReleaseTheWayAnAutomaticCheckDoes(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	r := start(t, "0.1.0", rs.url, nil)
+	r.m.CheckNow()
+	s := eventually(t, r.m, func(s State) bool { return s.Phase == Ready })
+	if s.Version != "0.2.0" || s.Check != "" {
+		t.Fatalf("state %+v", s)
+	}
+}
+
+func TestDevelopmentBuildSaysItDoesNotUpdate(t *testing.T) {
+	m := New(Config{}, func(f func()) { f() }, func() {})
+	m.CheckNow()
+	if s := m.State(); s.Check != CheckFailed || !strings.Contains(s.CheckError, "development build") {
+		t.Fatalf("state %+v", s)
+	}
+}
+
+// Off, the timer doesn't check; a check asked for still does. On again, the timer starts
+// as it does at launch.
+func TestAutomaticChecksTurnOffAndOnAtOnce(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	installed := t.TempDir()
+	cfg := Config{Project: "project-b", Version: "0.2.0", Releases: rs.url, StateDir: filepath.Join(t.TempDir(), "updates"), App: fakeApp(t, installed, "0.2.0")}
+	m := New(cfg, func(f func()) { f() }, func() {})
+	m.SetAuto(false)
+	m.Start()
+	defer m.Stop()
+	time.Sleep(firstCheck + time.Second)
+	if n := rs.manifests.Load(); n != 0 {
+		t.Fatalf("off, the timer still checked %d times", n)
+	}
+	m.CheckNow()
+	eventually(t, m, func(s State) bool { return s.Check == UpToDate })
+	if n := rs.manifests.Load(); n != 1 {
+		t.Fatalf("a check asked for made %d requests", n)
+	}
+	m.SetAuto(true)
+	deadline := time.Now().Add(firstCheck + 3*time.Second)
+	for rs.manifests.Load() < 2 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := rs.manifests.Load(); n != 2 {
+		t.Fatalf("on again, the timer made %d requests in all", n)
 	}
 }

@@ -18,6 +18,9 @@ export const state = reactive({
   cornerRadius: 0,
   // Whether the sidebar is open. The shell's own, so it stays here.
   sidebar: true,
+  // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
+  // with the release's version and, when it failed, why.
+  update: { phase: '' },
 });
 
 // activeTab is the tab whose page is showing.
@@ -69,6 +72,10 @@ export function connect() {
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;
+          state.update = m.update;
+          break;
+        case 'update':
+          state.update = m.update;
           break;
         case 'tabs':
           state.tabs = m.tabs;

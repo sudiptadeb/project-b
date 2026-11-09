@@ -2,7 +2,9 @@
 // Run: node shell/e2e/first-app.cjs   (from the repo root; Playwright is preinstalled)
 
 const { spawn, execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 const { chromium } = require(path.join(os.homedir(), '.local/playwright/node_modules/playwright'));
@@ -18,8 +20,8 @@ const bin = path.join(out, 'dev');
 execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
 let server;
-async function startServer() {
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, '-block=blocked.test'], { stdio: 'ignore' });
+async function startServer(extra = []) {
+  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, '-block=blocked.test', ...extra], { stdio: 'ignore' });
   for (let i = 0; i < 100; i++) {
     try {
       await fetch(base + '/mock/regions');
@@ -70,6 +72,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
   check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
+  check('no update bubble when nothing is happening', (await page.locator('.update').count()) === 0);
+  const pageBounds = JSON.stringify(r.bounds);
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
   // before the commit would correctly replace this one.
@@ -341,10 +345,105 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const scroll = await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   check('no horizontal scroll on a phone', scroll);
 
+  // Updates. The real manager runs against a release server here: a manifest and a zip of a
+  // bundle, as tools/release.sh publishes, served slowly enough to watch the download.
+  const releases = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-releases-'));
+  const fakeApp = (dir, version) => {
+    const app = path.join(dir, 'Project B.app');
+    fs.mkdirSync(path.join(app, 'Contents/MacOS'), { recursive: true });
+    fs.writeFileSync(path.join(app, 'Contents/Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>project_b</string>
+  <key>CFBundleShortVersionString</key><string>${version}</string>
+</dict></plist>
+`);
+    fs.writeFileSync(path.join(app, 'Contents/MacOS/project_b'), `#!/bin/sh\necho ${version} > "$(dirname "$0")/ran"\n`, { mode: 0o755 });
+    return app;
+  };
+  const installed = path.join(releases, 'installed');
+  const version = (app) => /CFBundleShortVersionString<\/key><string>([^<]+)/.exec(fs.readFileSync(path.join(app, 'Contents/Info.plist'), 'utf8'))[1];
+  const zip = path.join(releases, 'Project-B-0.2.0-darwin-arm64.zip');
+  execFileSync('ditto', ['-c', '-k', '--keepParent', fakeApp(path.join(releases, 'new'), '0.2.0'), zip]);
+  const good = fs.readFileSync(zip);
+  let served = good;
+  const releasePort = 8798;
+  const releaseServer = http.createServer((req, res) => {
+    if (req.url === '/releases.json') {
+      res.end(JSON.stringify({ spec: 1, project: 'project-b', published: '2026-11-09T00:00:00Z', channels: { stable: '0.2.0' },
+        releases: { '0.2.0': { assets: { 'darwin/arm64': { url: `http://127.0.0.1:${releasePort}/asset.zip`, sha256: crypto.createHash('sha256').update(good).digest('hex'), size: good.length } } } } }));
+    } else {
+      res.writeHead(200, { 'Content-Length': served.length });
+      setTimeout(() => res.end(served), 1500);
+    }
+  });
+  await new Promise((r) => releaseServer.listen(releasePort, '127.0.0.1', r));
+  const updateArgs = () => ['-version=0.1.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`];
+  const bubble = page.locator('.update');
+
+  fs.rmSync(installed, { recursive: true, force: true });
+  fakeApp(installed, '0.1.0');
+  await stopServer();
+  await startServer(updateArgs());
+  await page.goto(base + '/');
+  errors.length = 0;
+  await mock.getByRole('button', { name: 'Navigate' }).waitFor();
+  await page.getByText(/Downloading Project B 0\.2\.0/).waitFor({ timeout: 10000 });
+  await settle(page);
+  await page.screenshot({ path: path.join(out, '7-update-downloading.png') });
+  r = await regions();
+  let bb = await bubble.boundingBox();
+  check('the download shows as a bubble in the page\'s bottom-left corner', bb.x === r.bounds.x && bb.y + bb.height === r.bounds.y + r.bounds.h, JSON.stringify({ bb, bounds: r.bounds }));
+  check('the bubble takes no layout space', JSON.stringify(r.bounds) === pageBounds, JSON.stringify(r.bounds));
+  check('the bubble is shell, so its click does not reach the page', r.regions.length === 3 && (await regions(`?x=${bb.x + 10}&y=${bb.y + 10}`)).hit === 'shell', JSON.stringify(r.regions));
+  check('just above the bubble is still the page', (await regions(`?x=${bb.x + 10}&y=${bb.y - 10}`)).hit === 'page');
+  const relaunch = page.getByRole('button', { name: /Relaunch to update/ });
+  await relaunch.waitFor({ timeout: 10000 });
+  await settle(page);
+  await page.screenshot({ path: path.join(out, '8-update-ready.png') });
+  check('the bubble offers relaunch once the release is checked and staged', /0\.2\.0 is ready/.test(await bubble.innerText()), await bubble.innerText());
+  check('the installed app is untouched until relaunch', version(path.join(installed, 'Project B.app')) === '0.1.0');
+  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await strip.waitFor();
+  await settle(page);
+  r = await regions();
+  bb = await bubble.boundingBox();
+  check('with the tabs on top the bubble follows the page\'s corner', bb.x === r.bounds.x && bb.x === 4 && bb.y + bb.height === r.bounds.y + r.bounds.h, JSON.stringify({ bb, bounds: r.bounds }));
+  await page.screenshot({ path: path.join(out, '9-update-ready-horizontal.png') });
+  await page.getByRole('button', { name: 'Tabs on the side' }).click();
+  await page.locator('nav').waitFor();
+  await relaunch.click();
+  await page.waitForFunction(async () => (await (await fetch('/mock/regions')).json()).closed === true);
+  check('relaunch puts the new release in place and closes the window', version(path.join(installed, 'Project B.app')) === '0.2.0');
+  check('the running release is kept as the previous one', version(path.join(profile, 'updates/previous/Project B.app')) === '0.1.0');
+  await stopServer();
+  const ran = path.join(installed, 'Project B.app/Contents/MacOS/ran');
+  for (let i = 0; i < 60 && !fs.existsSync(ran); i++) await new Promise((r) => setTimeout(r, 50));
+  check('the new release starts once the old process has exited', fs.existsSync(ran) && fs.readFileSync(ran, 'utf8').trim() === '0.2.0');
+
+  // A corrupted download is refused and the installed release keeps working.
+  served = Buffer.from(good);
+  served[Math.floor(served.length / 2)] ^= 0xff;
+  fs.rmSync(installed, { recursive: true, force: true });
+  fakeApp(installed, '0.1.0');
+  await startServer(updateArgs());
+  await page.goto(base + '/');
+  errors.length = 0;
+  await page.getByText(/Update to 0\.2\.0 failed/).waitFor({ timeout: 10000 });
+  await settle(page);
+  await page.screenshot({ path: path.join(out, '10-update-failed.png') });
+  check('a corrupted download is refused and the bubble says so', /sha256/.test(await bubble.innerText()), await bubble.innerText());
+  check('the installed app is left alone', version(path.join(installed, 'Project B.app')) === '0.1.0' && !fs.existsSync(path.join(profile, 'updates/stage')));
+  await bar.fill('https://example.org/');
+  await bar.press('Enter');
+  await loaded('https://example.org/');
+  check('the running release keeps working', (await bar.inputValue()) === 'https://example.org/');
+  releaseServer.close();
+
   check('no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();
   await stopServer();
   fs.rmSync(profile, { recursive: true, force: true });
+  fs.rmSync(releases, { recursive: true, force: true });
   console.log(failed ? `\n${failed} FAILED` : '\nall passed');
   process.exit(failed ? 1 : 0);
 })().catch(async (e) => {

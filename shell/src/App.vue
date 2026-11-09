@@ -37,6 +37,7 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   --muted: #5c6270;
   --line: rgba(15, 20, 25, 0.1);
   --accent-soft: rgba(15, 170, 170, 0.18);
+  --accent-tint: rgba(15, 170, 170, 0.1);
   --danger: #ea3323;
   font: 13.5px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);

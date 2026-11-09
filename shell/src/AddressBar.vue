@@ -191,6 +191,7 @@ watch(
         @click="go(item.url)"
       >
         <span class="title">{{ item.title || item.url }}</span>
+        <span v-if="item.title" class="dash" aria-hidden="true"></span>
         <span v-if="item.title" class="url">{{ item.url }}</span>
       </li>
     </ul>
@@ -245,6 +246,7 @@ input::placeholder {
   font-weight: 500;
 }
 
+/* A floating surface, with the shadow the Ulaa design gives its menus. */
 .list {
   position: absolute;
   top: calc(100% + 4px);
@@ -257,19 +259,23 @@ input::placeholder {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
 }
 
+/* One line per item, the title then the address, the way a tab row in the design reads
+   "title – detail". The title keeps its words; the address gives way first. */
 li {
   display: flex;
-  flex-direction: column;
-  padding: 4px 8px;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
   border-radius: 4px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
 li.active {
-  background: rgba(15, 170, 170, 0.1);
+  background: var(--accent-tint);
 }
 
 .title,
@@ -279,8 +285,22 @@ li.active {
   text-overflow: ellipsis;
 }
 
+.title {
+  flex: none;
+  max-width: 60%;
+}
+
 .url {
+  flex: 1;
+  min-width: 0;
   color: var(--muted);
-  font-size: 12.5px;
+}
+
+.dash {
+  flex: none;
+  width: 5px;
+  height: 1px;
+  margin: 0 8px;
+  background: var(--muted);
 }
 </style>

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "project_b/engine/abi/pb_abi.h"
@@ -11,6 +12,7 @@
 
 namespace content {
 class BrowserContext;
+class RenderWidgetHost;
 class WebContents;
 }  // namespace content
 
@@ -43,6 +45,8 @@ class Engine {
   ShellPage* shell() const { return shell_; }
   // The tab whose page is shown.
   PageTab* active_tab() const;
+  // What the window shows: the shell's widget and the shown page's.
+  std::vector<content::RenderWidgetHost*> DrawnWidgets() const;
 
   void FocusShellForTraversal(bool reverse);
   void FocusPageForTraversal(bool reverse);

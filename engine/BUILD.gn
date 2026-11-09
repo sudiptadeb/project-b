@@ -134,6 +134,7 @@ source_set("browser") {
     "//third_party/blink/public/common",
     "//third_party/blink/public/mojom:mojom_platform",
     "//third_party/inspector_protocol:crdtp",
+    "//ui/accelerated_widget_mac",
     "//ui/base",
     "//ui/display",
     "//ui/events",

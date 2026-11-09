@@ -69,6 +69,19 @@ The page holder keeps its margins through autoresizing, so it follows a window r
 in the same frame. A page position measured for an older window size is ignored,
 because a fresher one follows.
 
+After a resize, AppKit's commit of the new frame waits until the shell and the shown
+page have each answered the new size with a frame, for at most half a second. That is
+Chrome's wait for its compositor (`NativeWidgetNSWindowBridge::ShouldWaitInPreCommit`,
+through `ui::CATransactionCoordinator`), with content's
+`RenderWidgetHostDidUpdateVisualProperties` as the answer: on a Mac it arrives on the task
+runner the wait runs. A widget that misses the half second isn't waited for again until it
+answers, so a busy page can't hold up a live resize. The answer means the renderer has sent
+its frame, not that the GPU has drawn it, so a picture can still be a frame behind. On the
+Mac Studio's own screen, 3 of 18 captures during a zoom or zoom back still showed it,
+against 12 of 18 before. Resizes from outside showed 1 of 28 (0 before) and live drags
+none either way, since a stale picture here lasts a frame or two. The VM's 0.8 to 2 s
+hasn't been measured with the wait.
+
 The shell's top row is 44px, centred on the window buttons of a unified toolbar, and
 the window uses `NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so
 the shell draws under the native window buttons. The engine reports where those buttons are

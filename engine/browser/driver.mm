@@ -279,13 +279,16 @@ void Stats(const std::string& id) {
                 "{\"cgoCallNs\":%.1f,\"hookOffNs\":%.1f,\"hookOnNs\":%.1f,"
                 "\"firstPaintMs\":%lld,\"go\":%s,"
                 "\"key\":%d,\"main\":%d,\"visible\":%d,\"occlusionVisible\":%d,"
-                "\"ignoredStaleBounds\":%zu}",
+                "\"ignoredStaleBounds\":%zu,\"frameWaits\":%zu,"
+                "\"frameWaitsTimedOut\":%zu}",
                 ns, hook_off_ns, hook_on_ns,
                 Engine::Get()->shell()->first_paint().InMilliseconds(),
                 go_stats.c_str(), window.isKeyWindow, window.isMainWindow,
                 window.isVisible,
                 (window.occlusionState & NSWindowOcclusionStateVisible) != 0,
-                Engine::Get()->window()->ignored_stale_bounds()));
+                Engine::Get()->window()->ignored_stale_bounds(),
+                Engine::Get()->window()->frame_waits(),
+                Engine::Get()->window()->frame_waits_timed_out()));
 }
 
 void Run(const std::string& line) {

@@ -11,6 +11,10 @@
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/native_ui_types.h"
 
+namespace content {
+class RenderWidgetHost;
+}
+
 namespace input {
 struct NativeWebKeyboardEvent;
 }
@@ -57,6 +61,12 @@ class Window {
   void ListenForControls(
       base::RepeatingCallback<void(const gfx::RectF&, double corner_radius)> on_change);
 
+  // The widgets drawn in the window, asked for on every resize: the shell's and the
+  // shown page's. AppKit's commit of the new size then waits until each has answered it
+  // with a frame, for at most half a second, as Chrome's windows wait for theirs.
+  void SetDrawnWidgets(
+      base::RepeatingCallback<std::vector<content::RenderWidgetHost*>()> widgets);
+
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 
   // The window's frame on screen, y measured down from the top of the main screen, and
@@ -80,6 +90,9 @@ class Window {
   size_t ignored_stale_bounds() const;
   // Whether a press at this point, in shell coordinates, moves the window.
   bool PressMovesWindow(double x, double y) const;
+  // Resizes whose commit waited for frames, and how many of those waits ran out.
+  size_t frame_waits() const;
+  size_t frame_waits_timed_out() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;
 

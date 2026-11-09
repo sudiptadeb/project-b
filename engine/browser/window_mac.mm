@@ -3,12 +3,18 @@
 #import <Cocoa/Cocoa.h>
 
 #include <cmath>
+#include <map>
 #include <string_view>
 #include <utility>
 
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
+#include "base/time/time.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "content/public/browser/render_process_host.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_observer.h"
+#include "ui/accelerated_widget_mac/ca_transaction_observer.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
 
 // Answers the OS hit test. Content's own views ask this same question, so a view that
@@ -145,8 +151,121 @@
 
 @end
 
+namespace project_b {
+namespace {
+
+// How long the commit of a resized window waits for frames, as long as Chrome's windows
+// wait for theirs (kUIPaintTimeout in
+// components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm).
+constexpr base::TimeDelta kFrameWait = base::Milliseconds(500);
+
+// Holds AppKit's commit of a resized window until every widget drawn in it has answered
+// the new size with a frame, so the new frame doesn't go on screen around the old
+// pictures. This is Chrome's wait (NativeWidgetNSWindowBridge::ShouldWaitInPreCommit)
+// with each renderer's answer in place of Chrome's own compositor frame. Content reports
+// that answer from the task runner the wait runs (the render frame metadata provider is
+// bound to WindowResizeHelperMac's), so it arrives inside the wait, and the GPU process's
+// commit joins the window's as it does in Chrome (content's CATransactionGPUCoordinator).
+// The answer means the renderer has sent its frame, not that the GPU has drawn it, so a
+// picture can still be a frame behind; Chrome's own frame size isn't visible to us.
+// A widget that hasn't answered within kFrameWait isn't waited for again until it does,
+// so a busy page can't hold up every step of a live resize.
+class FrameWait : public ui::CATransactionCoordinator::PreCommitObserver,
+                  public content::RenderWidgetHostObserver {
+ public:
+  explicit FrameWait(NSWindow* window) : window_(window) {
+    ui::CATransactionCoordinator::Get().AddPreCommitObserver(this);
+  }
+
+  FrameWait(const FrameWait&) = delete;
+  FrameWait& operator=(const FrameWait&) = delete;
+
+  ~FrameWait() override {
+    ui::CATransactionCoordinator::Get().RemovePreCommitObserver(this);
+    for (const auto& [host, since] : waiting_) {
+      host->RemoveObserver(this);
+    }
+  }
+
+  // The window changed size, and every widget drawn in it with it.
+  void Resized(const std::vector<content::RenderWidgetHost*>& widgets) {
+    if (in_fullscreen_transition_) {
+      return;
+    }
+    for (content::RenderWidgetHost* host : widgets) {
+      if (host->GetProcess()->IsInitializedAndNotDead() &&
+          !waiting_.contains(host)) {
+        host->AddObserver(this);
+        waiting_[host] = base::TimeTicks::Now();
+      }
+    }
+    if (!waiting_.empty()) {
+      waits_++;
+      ui::CATransactionCoordinator::Get().Synchronize();
+    }
+  }
+
+  // AppKit animates full screen by itself and the content lays out after it, so nothing
+  // waits during the transition, as in Chrome.
+  void SetInFullscreenTransition(bool in_transition) {
+    in_fullscreen_transition_ = in_transition;
+  }
+
+  size_t waits() const { return waits_; }
+  size_t timed_out() const { return timed_out_; }
+
+  // ui::CATransactionCoordinator::PreCommitObserver:
+  bool ShouldWaitInPreCommit() override {
+    if (!window_.visible ||
+        !(window_.occlusionState & NSWindowOcclusionStateVisible) ||
+        in_fullscreen_transition_) {
+      return false;
+    }
+    const base::TimeTicks now = base::TimeTicks::Now();
+    for (auto it = waiting_.begin(); it != waiting_.end();) {
+      if (now - it->second >= kFrameWait) {
+        timed_out_++;
+        it->first->RemoveObserver(this);
+        it = waiting_.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    return !waiting_.empty();
+  }
+  base::TimeDelta PreCommitTimeout() override { return kFrameWait; }
+  bool IsWindowInLiveResize() override { return window_.inLiveResize; }
+
+  // content::RenderWidgetHostObserver:
+  void RenderWidgetHostDidUpdateVisualProperties(
+      content::RenderWidgetHost* host) override {
+    Forget(host);
+  }
+  void RenderWidgetHostDestroyed(content::RenderWidgetHost* host) override {
+    Forget(host);
+  }
+
+ private:
+  void Forget(content::RenderWidgetHost* host) {
+    host->RemoveObserver(this);
+    waiting_.erase(host);
+  }
+
+  NSWindow* __weak window_;
+  bool in_fullscreen_transition_ = false;
+  // Each widget yet to answer, and since when.
+  std::map<content::RenderWidgetHost*, base::TimeTicks> waiting_;
+  size_t waits_ = 0;
+  size_t timed_out_ = 0;
+};
+
+}  // namespace
+}  // namespace project_b
+
 @interface PBWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic) base::RepeatingClosure onControlsMayHaveMoved;
+@property(nonatomic) base::RepeatingClosure onResized;
+@property(nonatomic) base::RepeatingCallback<void(bool)> onFullscreenTransition;
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose;
 @end
 
@@ -155,6 +274,8 @@
 }
 
 @synthesize onControlsMayHaveMoved = _onControlsMayHaveMoved;
+@synthesize onResized = _onResized;
+@synthesize onFullscreenTransition = _onFullscreenTransition;
 
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose {
   if ((self = [super init])) {
@@ -168,6 +289,9 @@
 }
 
 - (void)windowDidResize:(NSNotification*)notification {
+  if (_onResized) {
+    _onResized.Run();
+  }
   if (_onControlsMayHaveMoved) {
     _onControlsMayHaveMoved.Run();
   }
@@ -178,12 +302,26 @@
 // NSToolbar at all and draws its own, which is why it never shows this strip.
 - (void)windowWillEnterFullScreen:(NSNotification*)notification {
   [notification.object toolbar].visible = NO;
+  _onFullscreenTransition.Run(true);
 }
 
 - (void)windowDidEnterFullScreen:(NSNotification*)notification {
+  _onFullscreenTransition.Run(false);
   if (_onControlsMayHaveMoved) {
     _onControlsMayHaveMoved.Run();
   }
+}
+
+- (void)windowDidFailToEnterFullScreen:(NSWindow*)window {
+  _onFullscreenTransition.Run(false);
+}
+
+- (void)windowWillExitFullScreen:(NSNotification*)notification {
+  _onFullscreenTransition.Run(true);
+}
+
+- (void)windowDidFailToExitFullScreen:(NSWindow*)window {
+  _onFullscreenTransition.Run(false);
 }
 
 // The toolbar comes back once the window is windowed again; set during the transition
@@ -191,6 +329,7 @@
 // goes out now and once more then.
 - (void)windowDidExitFullScreen:(NSNotification*)notification {
   [notification.object toolbar].visible = YES;
+  _onFullscreenTransition.Run(false);
   if (_onControlsMayHaveMoved) {
     _onControlsMayHaveMoved.Run();
     base::RepeatingClosure again = _onControlsMayHaveMoved;
@@ -214,6 +353,8 @@ struct Window::Impl {
   base::RepeatingCallback<void(const gfx::RectF&, double)> on_controls;
   gfx::RectF last_controls;
   double last_radius = -1;
+  std::unique_ptr<FrameWait> frame_wait;
+  base::RepeatingCallback<std::vector<content::RenderWidgetHost*>()> drawn_widgets;
 
   // The close and zoom buttons bound the controls. In full screen macOS hides them.
   gfx::RectF Controls() const {
@@ -296,6 +437,19 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->window.acceptsMouseMovedEvents = YES;
   impl_->delegate = [[PBWindowDelegate alloc] initWithOnClose:std::move(on_close)];
   impl_->window.delegate = impl_->delegate;
+  impl_->frame_wait = std::make_unique<FrameWait>(impl_->window);
+  impl_->delegate.onResized = base::BindRepeating(
+      [](Impl* impl) {
+        if (impl->drawn_widgets) {
+          impl->frame_wait->Resized(impl->drawn_widgets.Run());
+        }
+      },
+      impl_.get());
+  impl_->delegate.onFullscreenTransition = base::BindRepeating(
+      [](Impl* impl, bool in_transition) {
+        impl->frame_wait->SetInFullscreenTransition(in_transition);
+      },
+      impl_.get());
 
   impl_->container = [[PBContainerView alloc]
       initWithFrame:NSMakeRect(0, 0, 1100, 700)];
@@ -311,6 +465,7 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
 
 Window::~Window() {
   impl_->window.delegate = nil;
+  impl_->frame_wait.reset();
 }
 
 void Window::Show() {
@@ -409,6 +564,11 @@ void Window::ListenForControls(
   impl_->ReportControls();
 }
 
+void Window::SetDrawnWidgets(
+    base::RepeatingCallback<std::vector<content::RenderWidgetHost*>()> widgets) {
+  impl_->drawn_widgets = std::move(widgets);
+}
+
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
   NSEvent* ns_event = event.os_event.Get();
   if (ns_event.type != NSEventTypeKeyDown) {
@@ -489,6 +649,14 @@ bool Window::PressMovesWindow(double x, double y) const {
   NSView* content = impl_->window.contentView;
   const NSPoint p = NSMakePoint(x, content.bounds.size.height - y);
   return [impl_->window mouseDownMovesWindowAt:[content convertPoint:p toView:nil]];
+}
+
+size_t Window::frame_waits() const {
+  return impl_->frame_wait->waits();
+}
+
+size_t Window::frame_waits_timed_out() const {
+  return impl_->frame_wait->timed_out();
 }
 
 uint32_t Window::shown_rgb() const {

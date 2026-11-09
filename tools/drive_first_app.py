@@ -611,7 +611,8 @@ def main():
     leave_bar(app)
 
     # Resize: does the page follow in step with the shell?
-    before = json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"]
+    stats = json.loads(app.cmd("stats", timeout=60))
+    before = stats["ignoredStaleBounds"]
     results = []
     for w, h in ((1300, 800), (900, 560), (1100, 700)):
         app.cmd("resize", w, h)
@@ -621,6 +622,12 @@ def main():
         results.append((w, h, immediately["frame"], settled["frame"], settled["reported"]))
         check(f"page frame is right straight after resize to {w}x{h}", immediately["frame"] == settled["frame"], (immediately, settled))
     print("resize", results, flush=True)
+    # Each resize holds the window's commit until the shell and the page have answered the
+    # new size with a frame, and both answer within the half second it waits at most.
+    waited = json.loads(app.cmd("stats", timeout=60))
+    check("each resize waits for the shell's and the page's frames, and both answer in time",
+          waited["frameWaits"] - stats["frameWaits"] == 3 and waited["frameWaitsTimedOut"] == stats["frameWaitsTimedOut"],
+          (stats["frameWaits"], waited["frameWaits"], waited["frameWaitsTimedOut"]))
     for i in range(30):
         app.cmd("resize", 1000 + i * 7, 650 + i * 5)
     final_frame = json.loads(app.cmd("bounds"))

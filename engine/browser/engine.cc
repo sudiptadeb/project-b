@@ -12,6 +12,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/reload_type.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
@@ -197,6 +198,20 @@ const PBEngineCalls* Engine::Calls() {
 PageTab* Engine::active_tab() const {
   auto it = tabs_.find(active_tab_);
   return it == tabs_.end() ? nullptr : it->second.get();
+}
+
+std::vector<content::RenderWidgetHost*> Engine::DrawnWidgets() const {
+  std::vector<content::RenderWidgetHost*> widgets;
+  PageTab* tab = active_tab();
+  for (content::WebContents* contents :
+       {shell_->contents(), tab ? tab->contents() : nullptr}) {
+    content::RenderWidgetHostView* view =
+        contents ? contents->GetRenderWidgetHostView() : nullptr;
+    if (view) {
+      widgets.push_back(view->GetRenderWidgetHost());
+    }
+  }
+  return widgets;
 }
 
 void Engine::FocusShellForTraversal(bool reverse) {

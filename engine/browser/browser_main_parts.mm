@@ -65,6 +65,10 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   window_->SetShellView(shell_->contents()->GetNativeView());
   engine_ = std::make_unique<Engine>(browser_context_.get(), window_.get(),
                                      shell_.get());
+  window_->SetDrawnWidgets(base::BindRepeating([] {
+    return Engine::Get() ? Engine::Get()->DrawnWidgets()
+                         : std::vector<content::RenderWidgetHost*>();
+  }));
   shell_->Load();
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),

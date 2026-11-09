@@ -42,7 +42,7 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   --accent-soft: rgba(15, 170, 170, 0.18);
   --accent-tint: rgba(15, 170, 170, 0.1);
   --danger: #ea3323;
-  font: 13.5px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
@@ -64,14 +64,14 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   min-height: 0;
 }
 
-/* Every control in the shell is a flat 24px square with a 6px radius. */
+/* Every control in the shell is a flat 28px square with a 6px radius. */
 .icon-button {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 6px;

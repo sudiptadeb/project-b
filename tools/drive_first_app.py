@@ -25,7 +25,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
-BAR_Y = 20  # The middle of the top row: the title bar's height, shared with the window buttons.
+BAR_Y = 26  # The middle of the top row, where the window buttons centre.
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -226,7 +226,7 @@ def main():
     check("the right end of the top row falls through to the frame too", right_end == "frame", right_end)
     below_tabs = app.cmd("hit", 100, 600)
     check("the empty sidebar falls through to the frame, so it drags the window", below_tabs == "frame", below_tabs)
-    over_buttons = app.cmd("hit", 40, BAR_Y)
+    over_buttons = app.cmd("hit", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y)
     check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
     print("hit over window buttons:", over_buttons, flush=True)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
@@ -386,7 +386,7 @@ def main():
     time.sleep(0.3)
     settled = json.loads(app.cmd("bounds"))
     r = settled["reported"]
-    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 200 and r[2] == settled["content"][0] - 204, settled)
+    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 224 and r[2] == settled["content"][0] - 228, settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
     # The window controls stay put through resizes, so the shell's space for them does too.
@@ -404,12 +404,13 @@ def main():
     try:
         app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
         check("real full screen reports square corners and no controls", inner() == 0 and app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == 12, (inner(), radius()))
+        time.sleep(1)  # A toggle sent while macOS is still in its transition is dropped.
         app.cmd("fullscreen")
-        app.wait(f"getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='{windowed:g}px'", 10)
+        app.wait(f"getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='{windowed:g}px'", 20)
         app.wait(f"document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x==={window['buttonsEnd'] + 8}", 10)
         check("leaving full screen brings the curve and the controls back", True)
     except TimeoutError as e:
-        check("real full screen reports square corners and no controls", False, f"no display? {e}")
+        check("leaving full screen brings the curve and the controls back", False, f"no display? {e}")
 
     # Tabs. Tab 1 is on example.com here.
     app.cmd("key", "cmd+t")
@@ -488,16 +489,16 @@ def main():
     check("collapsing the sidebar gives its width to the page", collapsed["reported"][0] == 4 and collapsed["frame"][0] == 4, collapsed)
     print(app.cmd("capture", os.path.join(OUT, "6-collapsed.png")), flush=True)
     click(app, "[aria-label$=sidebar]")
-    app.wait("document.querySelector('nav').getBoundingClientRect().width===196", 5)
+    app.wait("document.querySelector('nav').getBoundingClientRect().width===220", 5)
     time.sleep(0.3)
-    check("expanding it takes the width back", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
+    check("expanding it takes the width back", json.loads(app.cmd("bounds"))["frame"][0] == 224, app.cmd("bounds"))
 
     # The same tabs on top. The strip is the title bar then; the toolbar row is below it.
     click(app, "[aria-label='Tabs on top']")
     app.wait("!!document.querySelector('.strip')", 5)
     time.sleep(0.4)
     horizontal = json.loads(app.cmd("bounds"))
-    check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 68 and horizontal["frame"][0] == 4, horizontal)
+    check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 92 and horizontal["frame"][0] == 4, horizontal)
     first_tab_x = app.js("document.querySelector('[role=tab]').getBoundingClientRect().x")
     check("the strip leaves exactly the window buttons' space", first_tab_x == window["buttonsEnd"] + 8, (first_tab_x, window))
     check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")
@@ -521,7 +522,7 @@ def main():
     click(app, "[aria-label='Tabs on the side']")
     app.wait("!!document.querySelector('nav')", 5)
     time.sleep(0.4)
-    check("switching back brings the sidebar and the page follows", json.loads(app.cmd("bounds"))["frame"][0] == 200, app.cmd("bounds"))
+    check("switching back brings the sidebar and the page follows", json.loads(app.cmd("bounds"))["frame"][0] == 224, app.cmd("bounds"))
     app.cmd("key", "cmd+1")
     app.wait(f"{VALUE}==={json.dumps(URL_A)}", 10)
 

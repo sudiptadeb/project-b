@@ -28,6 +28,6 @@ function act(t) {
   display: flex;
   flex: none;
   gap: 4px;
-  margin: 0 8px 0 4px;
+  margin: 0 12px 0 8px;
 }
 </style>

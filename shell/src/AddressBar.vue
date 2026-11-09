@@ -199,8 +199,7 @@ watch(
 </template>
 
 <style scoped>
-/* The same height as the icon buttons beside it, so one line of controls runs through
-   the row with 4px of bar above and below. The Ulaa design's omnibox has no border: the
+/* Taller than the icon buttons beside it, as Ulaa's is, with 6px of bar above and below. The Ulaa design's omnibox has no border: the
    white fill on the tinted bar is the edge. The focus ring stays inside the bar. */
 .field {
   position: relative;
@@ -208,7 +207,7 @@ watch(
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 24px;
+  height: 32px;
   margin: 0;
   border-radius: 6px;
   background: var(--surface);
@@ -223,14 +222,14 @@ input {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
   border-radius: 6px;
   outline: none;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 input::placeholder {
@@ -242,14 +241,14 @@ input::placeholder {
   flex: none;
   margin-right: 8px;
   color: var(--danger);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 /* A floating surface, with the shadow the Ulaa design gives its menus. */
 .list {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   z-index: 10;
@@ -267,10 +266,10 @@ input::placeholder {
 li {
   display: flex;
   align-items: center;
-  height: 28px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 10px;
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 

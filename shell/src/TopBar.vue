@@ -57,7 +57,7 @@ function switchLayout() {
   display: flex;
   align-items: center;
   flex: none;
-  height: 32px;
+  height: 44px;
   /* Its top corners meet the frame's inner edge, so they take the frame's curve. */
   border-radius: var(--inner-radius) var(--inner-radius) 0 0;
   background: var(--bar);
@@ -69,7 +69,7 @@ function switchLayout() {
 }
 
 .layout {
-  margin-left: 8px;
+  margin-left: 12px;
 }
 
 .progress {

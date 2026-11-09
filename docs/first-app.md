@@ -1,6 +1,6 @@
 # The first app
 
-One window with tabs. A 32px top row holds the sidebar toggle, back, forward, reload and
+One window with tabs. A 44px top row holds the sidebar toggle, back, forward, reload and
 the address bar after the space for the native window controls; tabs sit in a sidebar
 on the left, or in a strip on top when the user switches, and the page sits beside or
 below them. The address bar's suggestion box, fed by real history, extends over the page.
@@ -63,9 +63,9 @@ The page holder keeps its margins through autoresizing, so it follows a window r
 in the same frame. A page position measured for an older window size is ignored,
 because a fresher one follows.
 
-The shell's top row is 32px, the height of the title bar, and the window uses
-`NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so the shell draws
-under the native window buttons. The engine reports where those buttons are
+The shell's top row is 44px, centred on the window buttons of a unified toolbar, and
+the window uses `NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so
+the shell draws under the native window buttons. The engine reports where those buttons are
 (`WindowControlsChanged`: after start, on resize, on entering or leaving full screen,
 empty when there are none) and the shell leaves exactly that space on whichever side
 they are. Hit-testing from the window's frame view, as AppKit does, shows the title bar

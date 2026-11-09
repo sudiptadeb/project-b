@@ -15,12 +15,12 @@ import (
 // loadDelay is how long a mock page takes to load.
 const loadDelay = 100 * time.Millisecond
 
-// Controls is where the mock's window controls sit: what macOS gives a window with a
-// 32px title bar. Full screen hides them.
-var Controls = engine.Rect{X: 9, Y: 9, W: 60, H: 14}
+// Controls is where the mock's window controls sit: what macOS 26 gives a window with
+// a unified toolbar, whose buttons centre 26px down. Full screen hides them.
+var Controls = engine.Rect{X: 19, Y: 19, W: 60, H: 14}
 
 // CornerRadius is what macOS 26 rounds that window's corners with. Full screen has none.
-const CornerRadius = 20.0
+const CornerRadius = 26.0
 
 // Shortcuts are the names the mock page uses for engine.Shortcut.
 var Shortcuts = map[string]engine.Shortcut{

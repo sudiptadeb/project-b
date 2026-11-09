@@ -68,7 +68,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   let r = await regions();
   check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 200 && r.bounds.y === 36 && r.bounds.w === 1100 - 200 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
+  check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
@@ -186,7 +186,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // In full screen there are none, so the first control moves into their place.
   const toggle = page.getByRole('button', { name: /sidebar/ });
   const windowLeft = (await toggle.boundingBox()).x;
-  check('the first control starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
+  check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
   check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 7 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
@@ -195,7 +195,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // follows, one frame width inside.
   const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
   const innerRadius = () => page.evaluate(() => getComputedStyle(document.querySelector('header')).borderTopLeftRadius);
-  check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '20px' && (await innerRadius()) === '16px', `${await windowRadius()} ${await innerRadius()}`);
+  check('the frame takes the window\'s corner radius from the engine', (await windowRadius()) === '26px' && (await innerRadius()) === '22px', `${await windowRadius()} ${await innerRadius()}`);
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
@@ -203,7 +203,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);
-  check('and the corners their curve', (await windowRadius()) === '20px', await windowRadius());
+  check('and the corners their curve', (await windowRadius()) === '26px', await windowRadius());
 
   // Tabs.
   const rows = page.getByRole('tab');
@@ -270,10 +270,10 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('collapsing the sidebar gives its width to the page', r.bounds.x === 4 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '4-collapsed.png') });
   await toggle.click();
-  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 196);
+  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 220);
   await settle(page);
   r = await regions();
-  check('expanding it takes the width back', r.bounds.x === 200, JSON.stringify(r.bounds));
+  check('expanding it takes the width back', r.bounds.x === 224, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '5-tabs.png') });
 
   // The same tabs on top. One switch, kept by the managers, drives both layouts.
@@ -282,9 +282,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await strip.waitFor();
   await settle(page);
   check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await page.locator('.strip [aria-selected=true]').count()) === 1);
-  check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 9 + 60 + 8, String((await rows.first().boundingBox()).x));
+  check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 19 + 60 + 8, String((await rows.first().boundingBox()).x));
   r = await regions();
-  check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 68 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
+  check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
   await page.getByRole('button', { name: 'New Tab', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
@@ -300,7 +300,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.getByRole('button', { name: 'Tabs on the side' }).click();
   await page.locator('nav').waitFor();
   await settle(page);
-  check('switching back brings the sidebar and the page follows', (await rows.count()) === 2 && (await regions()).bounds.x === 200);
+  check('switching back brings the sidebar and the page follows', (await rows.count()) === 2 && (await regions()).bounds.x === 224);
   await page.getByRole('button', { name: 'Tabs on top' }).click();
   await strip.waitFor();
 

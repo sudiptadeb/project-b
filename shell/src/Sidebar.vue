@@ -44,7 +44,7 @@ import { state, tabLabel } from './state.js';
 /* The sidebar collapses to nothing; the page follows. */
 .sidebar {
   flex: none;
-  width: 196px;
+  width: 220px;
   overflow: hidden;
   background: var(--bar);
   transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -57,7 +57,7 @@ import { state, tabLabel } from './state.js';
 .inner {
   display: flex;
   flex-direction: column;
-  width: 196px;
+  width: 220px;
   height: 100%;
   padding: 8px;
   box-sizing: border-box;
@@ -80,14 +80,14 @@ import { state, tabLabel } from './state.js';
   display: flex;
   align-items: center;
   flex: none;
-  height: 28px;
-  padding: 0 4px 0 8px;
+  height: 32px;
+  padding: 0 6px 0 10px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -131,7 +131,7 @@ import { state, tabLabel } from './state.js';
 .title {
   flex: 1;
   min-width: 0;
-  margin-left: 8px;
+  margin-left: 10px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -145,7 +145,7 @@ import { state, tabLabel } from './state.js';
   flex: none;
   margin-right: 4px;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13px;
   opacity: 0.6;
 }
 

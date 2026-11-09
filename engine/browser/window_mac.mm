@@ -230,12 +230,12 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->window.releasedWhenClosed = NO;
   impl_->window.title = @"Project B";
   // The shell draws all the way to the top of the window, with the window buttons on it.
-  // An empty toolbar makes the title bar tall enough that the buttons centre on the shell's
-  // top row, inside its frame.
+  // An empty unified toolbar puts the buttons 26px down, the centre of the shell's 44px
+  // top row inside its 4px frame.
   impl_->window.titlebarAppearsTransparent = YES;
   impl_->window.titleVisibility = NSWindowTitleHidden;
   impl_->window.toolbar = [[NSToolbar alloc] initWithIdentifier:@"project-b"];
-  impl_->window.toolbarStyle = NSWindowToolbarStyleUnifiedCompact;
+  impl_->window.toolbarStyle = NSWindowToolbarStyleUnified;
   impl_->window.acceptsMouseMovedEvents = YES;
   impl_->delegate = [[PBWindowDelegate alloc] initWithOnClose:std::move(on_close)];
   impl_->window.delegate = impl_->delegate;

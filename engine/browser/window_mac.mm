@@ -134,15 +134,30 @@
   }
 }
 
+// The toolbar exists only to size the title bar. In full screen AppKit would show it as
+// an opaque strip over the content, so it goes away for the duration. Chrome has no
+// NSToolbar at all and draws its own, which is why it never shows this strip.
+- (void)windowWillEnterFullScreen:(NSNotification*)notification {
+  [notification.object toolbar].visible = NO;
+}
+
 - (void)windowDidEnterFullScreen:(NSNotification*)notification {
   if (_onControlsMayHaveMoved) {
     _onControlsMayHaveMoved.Run();
   }
 }
 
+// The toolbar comes back once the window is windowed again; set during the transition
+// it stays hidden. The buttons take their place beside it a turn later, so the report
+// goes out now and once more then.
 - (void)windowDidExitFullScreen:(NSNotification*)notification {
+  [notification.object toolbar].visible = YES;
   if (_onControlsMayHaveMoved) {
     _onControlsMayHaveMoved.Run();
+    base::RepeatingClosure again = _onControlsMayHaveMoved;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      again.Run();
+    });
   }
 }
 

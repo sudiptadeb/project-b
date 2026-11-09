@@ -12,6 +12,7 @@ APP="$STAGE/Project B.app"
 MACOS=$APP/Contents/MacOS
 RESOURCES=$APP/Contents/Resources
 LIBRARIES=$APP/Contents/Libraries
+SIGNING=$HOME/PW_TOOLS/project-b-signing     # tools/signing-setup.sh makes it
 
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$MACOS" "$RESOURCES/shell" "$LIBRARIES"
@@ -42,14 +43,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 # Symbol names are about a third of a non-official binary and do nothing at run time.
-# Stripping breaks the linker's signature, so everything is signed again, inside out.
+# Stripping breaks the linker's signature. rcodesign signs everything in the bundle again.
 strip -x "$MACOS/project_b" "$MACOS/project_b_helper" "$LIBRARIES"/*.dylib 2>/dev/null
-for lib in "$LIBRARIES"/*.dylib; do
-    codesign -f -s - "$lib"
-done
-codesign -f -s - -i dev.projectb.helper "$MACOS/project_b_helper"
-codesign -f -s - "$APP"
+"$SIGNING/rcodesign" sign \
+    --p12-file "$SIGNING/identity.p12" \
+    --p12-password-file <(grep '^PROJECT_B_SIGNING_P12_PASSWORD=' "$HOME/PW_TOOLS/lab-secrets.env" | cut -d= -f2- | tr -d '\n') \
+    --timestamp-url none \
+    --binary-identifier "Contents/MacOS/project_b_helper:dev.projectb.helper" \
+    "$APP"
 codesign --verify --deep --strict "$APP"
+codesign --verify -R="certificate leaf = H\"$(cat "$SIGNING/identity.sha1")\"" "$APP"
 
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -quiet -volname "Project B" -srcfolder "$STAGE" -format ULMO -ov "$DMG"

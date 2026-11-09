@@ -110,8 +110,9 @@ type Listener interface {
 	Shortcut(s Shortcut)
 
 	// WindowControlsChanged says where the native window controls (close, minimise,
-	// zoom) sit, so the shell can leave that space. It fires after start, on resize and
-	// on entering or leaving full screen. An empty Rect means there are none to leave
-	// space for.
-	WindowControlsChanged(r Rect)
+	// zoom) sit, so the shell can leave that space, and the radius the OS rounds the
+	// window's corners with, so the shell can follow the curve. It fires after start,
+	// on resize and on entering or leaving full screen. An empty Rect means there are
+	// none to leave space for; a radius of 0 means square corners.
+	WindowControlsChanged(r Rect, cornerRadius float64)
 }

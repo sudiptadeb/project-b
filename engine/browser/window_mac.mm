@@ -3,6 +3,7 @@
 #import <Cocoa/Cocoa.h>
 
 #include <cmath>
+#include <string_view>
 #include <utility>
 
 #include "base/functional/callback.h"
@@ -155,8 +156,9 @@ struct Window::Impl {
   PBWindowDelegate* __strong delegate;
   gfx::RectF page_bounds;
   size_t ignored_stale_bounds = 0;
-  base::RepeatingCallback<void(const gfx::RectF&)> on_controls;
+  base::RepeatingCallback<void(const gfx::RectF&, double)> on_controls;
   gfx::RectF last_controls;
+  double last_radius = -1;
 
   // The close and zoom buttons bound the controls. In full screen macOS hides them.
   gfx::RectF Controls() const {
@@ -179,13 +181,40 @@ struct Window::Impl {
                       NSHeight(close_frame));
   }
 
+  // The radius macOS rounds this window's corners with. AppKit has no public getter
+  // (macOS 26 SDK), so this asks the window itself through its private
+  // -_cornerRadius, and reports 0 if a future AppKit drops it. The value depends on
+  // the toolbar style, so it is read rather than assumed. Full screen has no corners.
+  double CornerRadius() const {
+    if (window.styleMask & NSWindowStyleMaskFullScreen) {
+      return 0;
+    }
+    SEL selector = NSSelectorFromString(@"_cornerRadius");
+    if (![window respondsToSelector:selector]) {
+      return 0;
+    }
+    NSMethodSignature* signature = [window methodSignatureForSelector:selector];
+    if (std::string_view(signature.methodReturnType) != @encode(double)) {
+      return 0;
+    }
+    NSInvocation* invocation =
+        [NSInvocation invocationWithMethodSignature:signature];
+    invocation.selector = selector;
+    [invocation invokeWithTarget:window];
+    double radius = 0;
+    [invocation getReturnValue:&radius];
+    return radius;
+  }
+
   void ReportControls() {
     const gfx::RectF controls = Controls();
-    if (controls == last_controls) {
+    const double radius = CornerRadius();
+    if (controls == last_controls && radius == last_radius) {
       return;
     }
     last_controls = controls;
-    on_controls.Run(controls);
+    last_radius = radius;
+    on_controls.Run(controls, radius);
   }
 };
 
@@ -296,9 +325,10 @@ void Window::SetDragRegions(std::vector<gfx::RectF> regions) {
 }
 
 void Window::ListenForControls(
-    base::RepeatingCallback<void(const gfx::RectF&)> on_change) {
+    base::RepeatingCallback<void(const gfx::RectF&, double)> on_change) {
   impl_->on_controls = std::move(on_change);
   impl_->last_controls = gfx::RectF(-1, -1, 0, 0);  // So the first report always goes.
+  impl_->last_radius = -1;
   impl_->delegate.onControlsMayHaveMoved = base::BindRepeating(
       [](Impl* impl) { impl->ReportControls(); }, impl_.get());
   impl_->ReportControls();

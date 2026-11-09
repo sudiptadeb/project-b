@@ -34,7 +34,7 @@ typedef enum PBEvent {
   PB_EVENT_SHELL_MESSAGE = 1,           // s: json
   PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
-  PB_EVENT_WINDOW_CONTROLS_CHANGED = 4, // d: x, d: y, d: w, d: h
+  PB_EVENT_WINDOW_CONTROLS_CHANGED = 4, // d: x, d: y, d: w, d: h, d: window corner radius
   PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
 } PBEvent;
 

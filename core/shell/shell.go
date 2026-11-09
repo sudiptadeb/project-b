@@ -48,12 +48,13 @@ func (m *Manager) Handle(msg []byte) {
 	switch c.T {
 	case "ready":
 		m.send(map[string]any{
-			"t":         "snapshot",
-			"engine":    m.eng.Name(),
-			"tabs":      m.tabs.All(),
-			"active":    m.tabs.ActiveID(),
-			"controls":  m.window.Controls(),
-			"tabLayout": m.prefs.TabLayout(),
+			"t":            "snapshot",
+			"engine":       m.eng.Name(),
+			"tabs":         m.tabs.All(),
+			"active":       m.tabs.ActiveID(),
+			"controls":     m.window.Controls(),
+			"cornerRadius": m.window.CornerRadius(),
+			"tabLayout":    m.prefs.TabLayout(),
 		})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
@@ -103,9 +104,10 @@ func (m *Manager) TabLayoutChanged(layout string) {
 	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
-// WindowControlsChanged tells the shell where the native window controls now are.
-func (m *Manager) WindowControlsChanged(r engine.Rect) {
-	m.send(map[string]any{"t": "controls", "controls": r})
+// WindowControlsChanged tells the shell where the native window controls now are and
+// how round the window's corners are.
+func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
+	m.send(map[string]any{"t": "controls", "controls": r, "cornerRadius": cornerRadius})
 }
 
 // FocusAddressBar gives the shell focus and asks it to put that focus in the address bar.

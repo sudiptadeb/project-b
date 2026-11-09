@@ -81,8 +81,10 @@ func (r *recorder) FaviconChanged(tab engine.TabID, dataURL string) { r.note("fa
 func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	r.note("opened " + url)
 }
-func (r *recorder) Shortcut(s engine.Shortcut)             { r.note("shortcut") }
-func (r *recorder) WindowControlsChanged(rect engine.Rect) { r.note("controls") }
+func (r *recorder) Shortcut(s engine.Shortcut) { r.note("shortcut") }
+func (r *recorder) WindowControlsChanged(rect engine.Rect, cornerRadius float64) {
+	r.note(fmt.Sprintf("controls r=%g", cornerRadius))
+}
 
 func wired(t *testing.T) (*Hooks, *recorder, map[Hook]bool) {
 	t.Helper()
@@ -192,8 +194,8 @@ func TestLoadProgressReachesTheListener(t *testing.T) {
 func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h, r, _ := wired(t)
 	h.Dispatch(eventTabOpened, []Value{{I: 1}, {I: 2}, {S: "https://p.test/"}, {I: 1}})
-	h.Dispatch(eventWindowControlsChanged, []Value{{D: 1}, {D: 2}, {D: 3}, {D: 4}})
-	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "controls"}) {
+	h.Dispatch(eventWindowControlsChanged, []Value{{D: 1}, {D: 2}, {D: 3}, {D: 4}, {D: 20}})
+	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "controls r=20"}) {
 		t.Fatalf("got %v", r.got)
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {

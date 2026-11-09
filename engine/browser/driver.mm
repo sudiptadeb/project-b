@@ -324,6 +324,9 @@ void Run(const std::string& line) {
   } else if (cmd == "resize") {
     [TheWindow() setContentSize:NSMakeSize(number(2), number(3))];
     Reply(id, "ok");
+  } else if (cmd == "fullscreen") {
+    [TheWindow() toggleFullScreen:nil];
+    Reply(id, "ok");
   } else if (cmd == "eval") {
     Eval(id, Engine::Get()->shell()->contents(), rest(2));
   } else if (cmd == "evalpage") {

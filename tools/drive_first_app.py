@@ -390,8 +390,26 @@ def main():
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
     # The window controls stay put through resizes, so the shell's space for them does too.
-    # Real full screen needs a display; the mock test covers the switch to no controls.
     check("the controls' space survives resizing", app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
+
+    # The engine reads the window's corner radius from macOS and the shell's frame
+    # follows it, one frame width inside. Real full screen, which needs a display, has
+    # square corners and no controls; the radius comes back with the window.
+    radius = lambda: float(app.js("getComputedStyle(document.documentElement).getPropertyValue('--window-radius')").replace("px", ""))
+    inner = lambda: float(app.js("getComputedStyle(document.querySelector('header')).borderTopLeftRadius").replace("px", ""))
+    windowed = radius()
+    print("window corner radius", windowed, "inner", inner(), flush=True)
+    check("the frame takes the window's corner radius from the engine", windowed > 0 and inner() == windowed - 4, (windowed, inner()))
+    app.cmd("fullscreen")
+    try:
+        app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
+        check("real full screen reports square corners and no controls", inner() == 0 and app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == 12, (inner(), radius()))
+        app.cmd("fullscreen")
+        app.wait(f"getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='{windowed:g}px'", 10)
+        app.wait(f"document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x==={window['buttonsEnd'] + 8}", 10)
+        check("leaving full screen brings the curve and the controls back", True)
+    except TimeoutError as e:
+        check("real full screen reports square corners and no controls", False, f"no display? {e}")
 
     # Tabs. Tab 1 is on example.com here.
     app.cmd("key", "cmd+t")

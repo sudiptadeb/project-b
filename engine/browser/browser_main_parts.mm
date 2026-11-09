@@ -65,14 +65,16 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
-  window_->ListenForControls(base::BindRepeating([](const gfx::RectF& r) {
-    hooks::Args args;
-    args.Double(r.x());
-    args.Double(r.y());
-    args.Double(r.width());
-    args.Double(r.height());
-    hooks::Fire(PB_EVENT_WINDOW_CONTROLS_CHANGED, args);
-  }));
+  window_->ListenForControls(
+      base::BindRepeating([](const gfx::RectF& r, double corner_radius) {
+        hooks::Args args;
+        args.Double(r.x());
+        args.Double(r.y());
+        args.Double(r.width());
+        args.Double(r.height());
+        args.Double(corner_radius);
+        hooks::Fire(PB_EVENT_WINDOW_CONTROLS_CHANGED, args);
+      }));
 
   if (command_line->HasSwitch("pb-driver")) {
     StartDriver(command_line->GetSwitchValuePath("pb-driver"));

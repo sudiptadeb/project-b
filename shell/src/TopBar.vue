@@ -58,7 +58,8 @@ function switchLayout() {
   align-items: center;
   flex: none;
   height: 32px;
-  border-radius: 8px 8px 0 0;
+  /* Its top corners meet the frame's inner edge, so they take the frame's curve. */
+  border-radius: var(--inner-radius) var(--inner-radius) 0 0;
   background: var(--bar);
 }
 

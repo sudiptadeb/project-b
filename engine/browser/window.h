@@ -44,9 +44,11 @@ class Window {
   void SetShellRegions(std::vector<gfx::RectF> regions);
   void SetDragRegions(std::vector<gfx::RectF> regions);
 
-  // Reports where the native window controls are, in shell coordinates, now and
-  // whenever they move or hide. Empty in full screen.
-  void ListenForControls(base::RepeatingCallback<void(const gfx::RectF&)> on_change);
+  // Reports where the native window controls are, in shell coordinates, and the
+  // window's own corner radius, now and whenever either changes. In full screen the
+  // controls are empty and the radius is 0.
+  void ListenForControls(
+      base::RepeatingCallback<void(const gfx::RectF&, double corner_radius)> on_change);
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 

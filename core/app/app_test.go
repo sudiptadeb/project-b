@@ -248,11 +248,14 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if controls["x"] != float64(mockengine.Controls.X) || controls["w"] != float64(mockengine.Controls.W) {
 		t.Fatalf("controls = %v", controls)
 	}
+	if m["cornerRadius"] != mockengine.CornerRadius {
+		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
+	}
 
 	r.e.Fire("fullscreen", "")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" })
-	if m["controls"].(map[string]any)["w"] != float64(0) {
-		t.Fatalf("full screen should report no controls: %v", m)
+	if m["controls"].(map[string]any)["w"] != float64(0) || m["cornerRadius"] != float64(0) {
+		t.Fatalf("full screen should report no controls and square corners: %v", m)
 	}
 }
 

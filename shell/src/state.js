@@ -14,6 +14,8 @@ export const state = reactive({
   tabLayout: 'vertical',
   // Where the native window controls are. Zero size when there are none.
   controls: { x: 0, y: 0, w: 0, h: 0 },
+  // The radius the OS rounds the window's corners with, in CSS pixels. 0 in full screen.
+  cornerRadius: 0,
   // Whether the sidebar is open. The shell's own, so it stays here.
   sidebar: true,
 });
@@ -65,6 +67,7 @@ export function connect() {
           state.tabs = m.tabs;
           state.active = m.active;
           state.controls = m.controls;
+          state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;
           break;
         case 'tabs':
@@ -81,6 +84,7 @@ export function connect() {
           break;
         case 'controls':
           state.controls = m.controls;
+          state.cornerRadius = m.cornerRadius;
           break;
         case 'suggestions':
           onSuggestions(m.id, m.items || []);

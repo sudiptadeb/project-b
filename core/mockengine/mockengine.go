@@ -19,6 +19,9 @@ const loadDelay = 100 * time.Millisecond
 // 32px title bar. Full screen hides them.
 var Controls = engine.Rect{X: 9, Y: 9, W: 60, H: 14}
 
+// CornerRadius is what macOS 26 rounds that window's corners with. Full screen has none.
+const CornerRadius = 20.0
+
 // Shortcuts are the names the mock page uses for engine.Shortcut.
 var Shortcuts = map[string]engine.Shortcut{
 	"focusAddressBar": engine.ShortcutFocusAddressBar,
@@ -84,9 +87,9 @@ func (e *Engine) SetListener(l engine.Listener) {
 
 func (e *Engine) reportControls() {
 	if e.full {
-		e.listener.WindowControlsChanged(engine.Rect{})
+		e.listener.WindowControlsChanged(engine.Rect{}, 0)
 	} else {
-		e.listener.WindowControlsChanged(Controls)
+		e.listener.WindowControlsChanged(Controls, CornerRadius)
 	}
 }
 

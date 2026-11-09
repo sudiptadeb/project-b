@@ -117,4 +117,6 @@ func (a *App) Shortcut(s engine.Shortcut) {
 	}
 }
 
-func (a *App) WindowControlsChanged(r engine.Rect) { a.Window.HandleControlsChanged(r) }
+func (a *App) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
+	a.Window.HandleControlsChanged(r, cornerRadius)
+}

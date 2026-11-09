@@ -25,7 +25,7 @@ type Events struct {
 	OnShellMessage          func(msg []byte)
 	OnTabOpened             func(opener, tab engine.TabID, url string, foreground bool)
 	OnFaviconChanged        func(tab engine.TabID, dataURL string)
-	OnWindowControlsChanged func(r engine.Rect)
+	OnWindowControlsChanged func(r engine.Rect, cornerRadius float64)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -44,7 +44,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 	case eventWindowControlsChanged:
 		if e.OnWindowControlsChanged != nil {
-			e.OnWindowControlsChanged(engine.Rect{X: r.float(), Y: r.float(), W: r.float(), H: r.float()})
+			e.OnWindowControlsChanged(engine.Rect{X: r.float(), Y: r.float(), W: r.float(), H: r.float()}, r.float())
 		}
 	}
 	return Value{}, false

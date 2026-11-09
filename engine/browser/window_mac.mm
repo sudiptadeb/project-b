@@ -16,8 +16,8 @@
 // content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm).
 //
 // In a drag region the answer is nil, so the event falls through to the window's own
-// frame, which moves the window and, inside the title bar, zooms on a double-click.
-// That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
+// frame and the window moves (PBNSWindow), or, on a double-click, zooms. That is how
+// Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
 // Holds every page view; the shown one is the only one not hidden.
@@ -67,15 +67,37 @@
 
 @end
 
+// AppKit's own test for its resize zones, private, which Chrome asks too
+// (native_widget_mac_nswindow.mm). -1 means no resize here.
+@interface NSWindow (PBPrivate)
+- (long long)_resizeDirectionForMouseLocation:(CGPoint)location;
+@end
+
 // In a session with no real GUI the OS never makes us the key window. The driver can
 // say we are, so focus behaves as it does on a real desktop. Never set otherwise.
 @interface PBNSWindow : NSWindow
 @property(nonatomic) BOOL forceKeyForDriver;
+// Whether a left mouse down at this point, in window coordinates, moves the window.
+- (BOOL)mouseDownMovesWindowAt:(NSPoint)location;
 @end
 
 @implementation PBNSWindow
 
 @synthesize forceKeyForDriver = _forceKeyForDriver;
+
+// A press that nothing in the window takes, so it falls through to the frame view, as in
+// a drag region, moves the window. AppKit's frame does that by itself only inside the
+// title bar; below it, as on the empty sidebar, it does nothing, so the window starts the
+// drag itself, as Chrome's frame view does (cr_mouseDownOnFrameView). A window button
+// takes its own press, and the frame keeps its resize zones.
+- (BOOL)mouseDownMovesWindowAt:(NSPoint)location {
+  NSView* frame = self.contentView.superview;
+  if ([frame hitTest:location] != frame) {
+    return NO;
+  }
+  return ![self respondsToSelector:@selector(_resizeDirectionForMouseLocation:)] ||
+         [self _resizeDirectionForMouseLocation:location] == -1;
+}
 
 - (BOOL)isKeyWindow {
   return _forceKeyForDriver || [super isKeyWindow];
@@ -101,6 +123,12 @@
       [self performMiniaturize:nil];
     }
     return;
+  }
+  // AppKit carries on with the press as usual, which keeps the title bar's own handling.
+  if (event.type == NSEventTypeLeftMouseDown &&
+      !(event.modifierFlags & NSEventModifierFlagControl) &&
+      [self mouseDownMovesWindowAt:event.locationInWindow]) {
+    [self performWindowDragWithEvent:event];
   }
   [super sendEvent:event];
 }
@@ -445,6 +473,12 @@ gfx::RectF Window::page_bounds() const {
 
 size_t Window::ignored_stale_bounds() const {
   return impl_->ignored_stale_bounds;
+}
+
+bool Window::PressMovesWindow(double x, double y) const {
+  NSView* content = impl_->window.contentView;
+  const NSPoint p = NSMakePoint(x, content.bounds.size.height - y);
+  return [impl_->window mouseDownMovesWindowAt:[content convertPoint:p toView:nil]];
 }
 
 uint32_t Window::shown_rgb() const {

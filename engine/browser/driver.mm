@@ -311,6 +311,11 @@ void Run(const std::string& line) {
     // Who would get a mouse event here: shell, page, container, frame (AppKit drags the
     // window), or a native view such as a window button.
     Reply(id, Classify(HitFromFrame(number(2), number(3))));
+  } else if (cmd == "moves") {
+    // Whether a real press here would move the window, by the window's own rule.
+    const bool moves =
+        Engine::Get()->window()->PressMovesWindow(number(2), number(3));
+    Reply(id, moves ? "yes" : "no");
   } else if (cmd == "type") {
     NSString* text = base::SysUTF8ToNSString(rest(2));
     for (NSUInteger i = 0; i < text.length; i++) {

@@ -389,6 +389,17 @@ def main():
     over_buttons = app.cmd("hit", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y)
     check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
     print("hit over window buttons:", over_buttons, flush=True)
+    # Falling through to the frame isn't enough below the title bar: AppKit's frame does
+    # nothing with a press there, so the window has to start the drag itself.
+    moves = {name: app.cmd("moves", x, y) for name, x, y in (
+        ("empty sidebar", 100, 600), ("gap", (window["buttonsEnd"] + toggle_left) / 2, BAR_Y),
+        ("address bar", bar_x, bar_y), ("sidebar", 100, 60), ("page", 600, 300),
+        ("window button", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y), ("left edge", 1, 400))}
+    check("a press on the empty sidebar moves the window", moves["empty sidebar"] == "yes", moves)
+    check("a press in the title bar's empty gap moves the window", moves["gap"] == "yes", moves)
+    check("a press on the shell, the page or a window button doesn't move the window",
+          all(moves[k] == "no" for k in ("address bar", "sidebar", "page", "window button")), moves)
+    check("a press in the left edge's resize zone is left to AppKit, which resizes", moves["left edge"] == "no", moves)
     # An empty tab holds the blank page, so its page area is a page in content's own
     # colours, never the frame colour showing through. The frame colour used to take
     # over a few seconds in, so this looks after ten.

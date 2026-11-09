@@ -78,6 +78,8 @@ class Window {
   void ForceKeyForDriver();
   gfx::RectF page_bounds() const;
   size_t ignored_stale_bounds() const;
+  // Whether a press at this point, in shell coordinates, moves the window.
+  bool PressMovesWindow(double x, double y) const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;
 

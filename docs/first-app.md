@@ -54,10 +54,16 @@ active one not hidden; a full-window transparent shell on top. Shell components 
 themselves with `v-shell` and report their rectangles, empty shell that should move the
 window marks itself with `v-drag`, and `<PageView>` reports where the page goes.
 `PBContainerView hitTest:` asks two questions: is this point in a drag rectangle (answer
-nil, so AppKit's frame drags the window and, inside the title bar, zooms on a
-double-click), else is it in a shell rectangle? Content's own views ask the same
-`hitTest:` before accepting a mouse event, so nothing routes events by hand. That is
-how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
+nil, so the press falls through to the window's frame), else is it in a shell rectangle?
+Content's own views ask the same `hitTest:` before accepting a mouse event, so nothing
+routes events by hand. That is how Chrome does it too
+(`components/remote_cocoa/app_shim/bridged_content_view.mm`).
+
+AppKit's frame moves the window, and zooms on a double-click, only inside the title bar.
+Below it, as on the empty sidebar, it does nothing with a press, so `PBNSWindow` starts
+the drag itself for any press that falls through to the frame outside AppKit's resize
+zones, and zooms on a double-click there, as Chrome does
+(`components/remote_cocoa/app_shim/native_widget_mac_nswindow.mm`).
 
 The page holder keeps its margins through autoresizing, so it follows a window resize
 in the same frame. A page position measured for an older window size is ignored,

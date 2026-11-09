@@ -195,10 +195,10 @@ def selects_text(home):
     set_window(home)
 
 
-def leave_full_screen(name):
-    """Shows the hidden title bar with the pointer, as a person would, and clicks its green button.
+def shown_green_button(name):
+    """In full screen, shows the hidden title bar with the pointer, as a person would.
 
-    Returns whether a green button was there to click.
+    Returns where its green button is, or None.
     """
     vnc.move(SCREEN[0] / 2, 40, 0.2)
     vnc.move(SCREEN[0] / 2, 0, 2.0)
@@ -207,8 +207,16 @@ def leave_full_screen(name):
     box = crop(img, 0, 0, 160, 120).astype(np.int16)
     ys, xs = np.nonzero((box[..., 1] > 150) & (box[..., 0] < 120) & (box[..., 2] < 120))
     if len(xs) < 20:
+        return None
+    return (xs.min() + xs.max() + 1) / 2 / vnc.scale, (ys.min() + ys.max() + 1) / 2 / vnc.scale
+
+
+def leave_full_screen(name):
+    """Clicks the green button in the shown title bar. Returns whether there was one."""
+    green = shown_green_button(name)
+    if green is None:
         return False
-    vnc.click((xs.min() + xs.max() + 1) / 2 / vnc.scale, (ys.min() + ys.max() + 1) / 2 / vnc.scale)
+    vnc.click(*green)
     time.sleep(ANIMATION)
     # Resting on the green button opens macOS's Move & Resize menu, which takes the next click.
     vnc.move(SCREEN[0] / 2, SCREEN[1] / 2, 1.0)
@@ -430,6 +438,140 @@ for place in SIDE_PLACES:
 # Full screen, both ways in.
 full_screen("green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, FRAME)
 full_screen("Ctrl+Cmd+F", lambda: vnc.key("ctrl+cmd+f"), home, FRAME)
+
+# Resizing, on a page of one colour so its edges can be measured in every frame.
+PINK = (255, 0, 255)
+vnc.click(PX + 500, PY + TOP)
+time.sleep(0.4)
+vnc.type("data:text/html,<body bgcolor=fuchsia>")
+vnc.key("return")
+time.sleep(PAGE_LOAD)
+vnc.move(*NEUTRAL, 0.3)
+
+
+def page_box():
+    """The page's bounds on screen in points, from its colour, or None."""
+    ys, xs = np.nonzero(near(vnc.image(), PINK, 10))
+    if len(xs) == 0:
+        return None
+    s = vnc.scale
+    return (xs.min() / s, ys.min() / s, (xs.max() + 1) / s, (ys.max() + 1) / s)
+
+
+
+
+def slot(win):
+    """Where the page belongs in a window."""
+    return (win[0] + INSET[0], win[1] + INSET[1], win[0] + win[2] - INSET[2], win[1] + win[3] - INSET[3])
+
+
+def page_timeline(action, seconds):
+    """Runs action and records the page's bounds for that long. Returns them and the window after."""
+    start = time.time()
+    action()
+    boxes = []
+    while time.time() - start < seconds:
+        vnc.wait_frame(0.2)
+        boxes.append((time.time() - start, page_box()))
+    return boxes, window()
+
+
+def in_place_at(boxes, win):
+    """When the page took its place in win for good, or None."""
+    want, at = slot(win), None
+    for t, box in boxes:
+        if box is not None and all(abs(a - b) <= 1 for a, b in zip(box, want)):
+            at = t if at is None else at
+        else:
+            at = None
+    return at
+
+
+def resize_from_outside(w, h):
+    guest("/usr/bin/osascript", "-e",
+          f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
+          f"to set size of window 1 to {{{w}, {h}}}")
+
+
+# Typed keys can wait seconds behind the page (see the Cmd+T check), so give it time.
+HOME_PAGE, end = None, time.time() + 10
+while HOME_PAGE is None and time.time() < end:
+    time.sleep(0.2)
+    HOME_PAGE = page_box()
+check("the one-colour test page loads", HOME_PAGE is not None)
+
+
+def resizing():
+    # A live resize by the corner: in every frame the page should end where the frame starts.
+    x1, y1 = PX + W - 2, PY + H - 2
+    vnc.move(x1, y1, 0.4)
+    vnc.press()
+    time.sleep(0.2)
+    torn = []
+    for i in range(1, 31):
+        vnc.move(x1 + 8 * i, y1 + 3 * i, 0.0)
+        vnc.wait_frame(1.0)
+        box = page_box()
+        # The frame's right end on one row, looking no further right than the pointer: the
+        # desktop picture can have the frame's colour in it.
+        row = np.nonzero(near(crop(vnc.image(), PX, PY + 300, x1 + 8 * i + 10 - PX, 1), FRAME, 12)[0])[0]
+        frame_right = PX + (row.max() + 1) / vnc.scale if len(row) else None
+        if i == 15:
+            shot("live-resize")
+        if box is None or frame_right is None or not 0 <= frame_right - box[2] <= INSET[2]:
+            torn.append((i, box, frame_right))
+        time.sleep(0.03)
+    vnc.release()
+    time.sleep(0.6)
+    check("a live resize keeps the page against the frame in every frame", not torn, f"{len(torn)} of 30 frames off: {torn[:3]}")
+    set_window(home)
+
+    # A resize from outside the app, as window managers and tiling do: there's no animation.
+    set_window((PX, PY, W - 200, H - 150))
+    time.sleep(1.5)
+    boxes, win = page_timeline(lambda: resize_from_outside(W, H), 4)
+    at = in_place_at(boxes, win)
+    shot("resized-from-outside")
+    check("after a resize from outside the app, the page fills its new place within 0.5 s",
+          at is not None and at <= 0.5, f"in place after {at} s, window {win}, page at 0.2 s {next((b for t, b in boxes if t >= 0.2), None)}")
+    set_window(home)
+
+    # Zoom, and back.
+    boxes, win = page_timeline(lambda: vnc.dbl(PX + gap, PY + 14), 4)
+    at = in_place_at(boxes, win)
+    check("after zoom, the page fills its new place within 2 s", at is not None and at <= 2, f"in place after {at} s, window {win}")
+    boxes, win = page_timeline(lambda: vnc.dbl(win[0] + gap, win[1] + 14), 4)
+    at = in_place_at(boxes, win)
+    check("after zooming back, the page fills its place within 2 s", at is not None and at <= 2, f"in place after {at} s, window {win}")
+    set_window(home)
+
+    # Leaving full screen.
+    vnc.click(PX + L["zoom"][0], PY + L["zoom"][1])
+    time.sleep(ANIMATION)
+    target = shown_green_button("resize")
+    if target is not None:
+        boxes, win = page_timeline(lambda: vnc.click(*target), 5)
+        vnc.move(SCREEN[0] / 2, SCREEN[1] / 2, 1.0)  # Off the green button, as in leave_full_screen.
+        at = in_place_at(boxes, win)
+        shot("after-full-screen")
+        check("after leaving full screen, the page fills its place within 2 s", at is not None and at <= 2,
+              f"in place after {at} s, window {win}, page at 1 s {next((b for t, b in boxes if t >= 1), None)}")
+    else:
+        check("after leaving full screen, the page fills its place within 2 s", False, "no green button to leave by")
+    if window() != home:
+        guest("/usr/bin/osascript", "-e",
+              f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
+              'to set value of attribute "AXFullScreen" of window 1 to false')
+        time.sleep(ANIMATION)
+    set_window(home)
+
+
+if HOME_PAGE is not None:
+    INSET = (HOME_PAGE[0] - PX, HOME_PAGE[1] - PY, PX + W - HOME_PAGE[2], PY + H - HOME_PAGE[3])
+    print(f"the page sits at {HOME_PAGE}, inset {INSET} from the window", flush=True)
+    resizing()
+set_window(home)
+
 
 # Tabs on top.
 vnc.click(PX + W - 20, PY + TOP)

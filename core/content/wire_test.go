@@ -83,7 +83,9 @@ func (r *recorder) FaviconChanged(tab engine.TabID, dataURL string) { r.note("fa
 func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	r.note("opened " + url)
 }
-func (r *recorder) Shortcut(s engine.Shortcut) { r.note("shortcut") }
+func (r *recorder) CloseRequested(tab engine.TabID)    { r.note(fmt.Sprintf("close %d", tab)) }
+func (r *recorder) ActivateRequested(tab engine.TabID) { r.note(fmt.Sprintf("activate %d", tab)) }
+func (r *recorder) Shortcut(s engine.Shortcut)         { r.note("shortcut") }
 func (r *recorder) WindowControlsChanged(rect engine.Rect, cornerRadius float64) {
 	r.note(fmt.Sprintf("controls r=%g", cornerRadius))
 }
@@ -181,6 +183,19 @@ func TestReservedKeysBecomeShortcuts(t *testing.T) {
 	}
 	if s := shortcutFor(NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: WebInputEventModifiersControlKey | WebInputEventModifiersShiftKey, WindowsKeyCode: KeyboardCodeTab}); s != engine.ShortcutPreviousTab {
 		t.Fatalf("Ctrl+Shift+Tab = %v", s)
+	}
+}
+
+func TestCloseAndActivateReachTheListener(t *testing.T) {
+	h, r, subscribed := wired(t)
+	if !subscribed[DelegateCloseContents] || !subscribed[DelegateActivateContents] {
+		t.Fatal("close or activate not subscribed")
+	}
+	h.Dispatch(DelegateCloseContents, pack(WebContents{ID: 4}, WebContents{ID: 4}))
+	h.Dispatch(DelegateActivateContents, pack(WebContents{ID: 4}, WebContents{ID: 5}))
+	h.Dispatch(DelegateCloseContents, pack(WebContents{ID: 0}, WebContents{ID: 0}))
+	if !reflect.DeepEqual(r.got, []string{"close 4", "activate 5"}) {
+		t.Fatalf("got %v", r.got)
 	}
 }
 

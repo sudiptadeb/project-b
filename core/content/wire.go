@@ -73,6 +73,18 @@ func Wire(h *Hooks, l engine.Listener) {
 		}
 	})
 
+	// Content asks the tab's delegate to close or show it. The shell (id 0) is no tab.
+	h.Delegate.OnCloseContents(func(_, source WebContents) {
+		if source.ID != 0 {
+			l.CloseRequested(engine.TabID(source.ID))
+		}
+	})
+	h.Delegate.OnActivateContents(func(_, contents WebContents) {
+		if contents.ID != 0 {
+			l.ActivateRequested(engine.TabID(contents.ID))
+		}
+	})
+
 	// Reserved keys are kept from the page and the shell alike, and handed to the app.
 	h.Delegate.AnswerPreHandleKeyboardEvent(func(c, source WebContents, event NativeWebKeyboardEvent) (KeyboardEventProcessingResult, bool) {
 		if s := shortcutFor(event); s != 0 {

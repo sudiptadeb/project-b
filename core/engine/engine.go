@@ -115,6 +115,13 @@ type Listener interface {
 	// has already created it, hidden; the app decides whether to show it.
 	TabOpened(opener, tab TabID, url string, foreground bool)
 
+	// CloseRequested says something asked to close a tab: its page called
+	// window.close(), or a DevTools client closed its target. ActivateRequested asks
+	// for a tab to be shown, as a DevTools client's Target.activateTarget does. The app
+	// decides; the engine has done nothing yet.
+	CloseRequested(tab TabID)
+	ActivateRequested(tab TabID)
+
 	// Shortcut fires for a key combination the engine reserves, wherever focus was.
 	Shortcut(s Shortcut)
 

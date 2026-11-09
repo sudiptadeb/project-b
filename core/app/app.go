@@ -110,6 +110,10 @@ func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
 }
 
+func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
+
+func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
+
 // Shortcut maps each reserved key combination to the one function that does it.
 func (a *App) Shortcut(s engine.Shortcut) {
 	switch {

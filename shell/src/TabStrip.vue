@@ -46,7 +46,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
   display: flex;
   align-items: flex-end;
   flex: none;
-  height: 36px;
+  height: 40px;
   margin-bottom: -8px;
   padding-bottom: 8px;
   box-sizing: border-box;

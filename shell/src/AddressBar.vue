@@ -204,7 +204,7 @@ watch(
   min-width: 0;
   display: flex;
   align-items: center;
-  height: 24px;
+  height: 28px;
   margin: 0;
   border: 1px solid var(--line);
   border-radius: 6px;

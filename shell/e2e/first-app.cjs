@@ -68,7 +68,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   let r = await regions();
   check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 200 && r.bounds.y === 32 && r.bounds.w === 1100 - 200 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
+  check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 200 && r.bounds.y === 36 && r.bounds.w === 1100 - 200 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
@@ -277,7 +277,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await page.locator('.strip [aria-selected=true]').count()) === 1);
   check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 9 + 60 + 8, String((await rows.first().boundingBox()).x));
   r = await regions();
-  check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 64 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
+  check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 68 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
   await page.getByRole('button', { name: 'New Tab', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);

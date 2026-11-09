@@ -16,7 +16,7 @@ function switchLayout() {
 </script>
 
 <template>
-  <header v-shell class="top" :class="{ 'title-bar': titleBar }">
+  <header v-shell class="top">
     <template v-if="titleBar">
       <div v-drag class="space" :style="{ width: controls.left }"></div>
       <button
@@ -59,10 +59,6 @@ function switchLayout() {
   height: 32px;
   border-radius: 8px 8px 0 0;
   background: var(--bar);
-}
-
-.title-bar {
-  height: 28px;
 }
 
 .space {

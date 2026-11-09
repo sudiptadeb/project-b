@@ -25,7 +25,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
-BAR_Y = 16  # The middle of the top row: the title bar's height, shared with the window buttons.
+BAR_Y = 20  # The middle of the top row: the title bar's height, shared with the window buttons.
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
@@ -479,7 +479,7 @@ def main():
     app.wait("!!document.querySelector('.strip')", 5)
     time.sleep(0.4)
     horizontal = json.loads(app.cmd("bounds"))
-    check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 64 and horizontal["frame"][0] == 4, horizontal)
+    check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 68 and horizontal["frame"][0] == 4, horizontal)
     first_tab_x = app.js("document.querySelector('[role=tab]').getBoundingClientRect().x")
     check("the strip leaves exactly the window buttons' space", first_tab_x == window["buttonsEnd"] + 8, (first_tab_x, window))
     check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")

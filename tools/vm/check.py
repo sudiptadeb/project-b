@@ -262,6 +262,10 @@ guest("/bin/rm", "-rf", "/Users/admin/.project-b")
 time.sleep(1)
 vnc = rfb.Vnc()
 print(f"display {vnc.width}x{vnc.height}, shots in {SHOTS}", flush=True)
+with open(SHOTS + "/ABOUT.txt", "w") as about:
+    about.write(f"Real pixels: the macOS {guest('/usr/bin/sw_vers', '-productVersion')} VM's screen as Screen Sharing\n"
+                f"sent it, {time.strftime('%Y-%m-%d %H:%M')}, not composites. Project B "
+                f"{guest('/usr/bin/defaults', 'read', APP + '/Contents/Info', 'CFBundleVersion')} from /Applications.\n")
 shot("desktop")
 # After a boot the image's login item leaves an "App Background Activity" notice at the top
 # right, over the window's right end. Swipe it away as a person would; on a clear desktop

@@ -23,7 +23,8 @@ that commit.
 
 ## What happens
 
-1. Two seconds after start, then every `CheckInterval`, the manager fetches
+1. Two seconds after start, then every `CheckInterval`, unless automatic updates are off in
+   Settings, the manager fetches
    `https://github.com/sudiptadeb/project-b/releases/latest/download/releases.json`. That is
    a plain web redirect to the latest release's asset, not GitHub's REST API, so a check a
    minute is not rate limited (the response carries no rate-limit headers).
@@ -46,10 +47,23 @@ that commit.
    and then starts the new one, and closes the window. Unix lets the running processes keep
    using the moved bundle, so the helpers never notice.
 
-A failed check of the manifest itself (offline) is logged, not shown: nothing was happening
-for the user to see. A build running from a build directory, or with no version in its
+A failed automatic check of the manifest itself (offline) is logged, not shown: nothing was
+happening for the user to see. A build running from a build directory, or with no version in its
 bundle, never checks. The staged and downloaded leftovers of an earlier run are cleared at
 start; a release that was ready but not relaunched into is downloaded again.
+
+## Settings
+
+`chrome://settings/` shows the running version, a Check for updates button and the
+automatic updates switch.
+
+- **Check for updates** runs one check at once, whatever the switch says (`CheckNow`). The
+  page shows what the manager says: checking, up to date, downloading a version, ready to
+  relaunch, or the error it hit, including a manifest it couldn't read. A release it finds
+  goes the way an automatic one does, and the bubble stays the one place to relaunch.
+  Automatic checks never set the page's check result, so the bubble is unchanged.
+- **Automatic updates** is a pref, `autoUpdate` in `prefs.json`, on by default. Off, the
+  manager's timer stops at once; on again, it starts as it does at launch.
 
 ## Publishing
 
@@ -68,6 +82,10 @@ version has to be installed by hand from its DMG, once; from then on the app upd
   previous one; a corrupted download is refused and tried again; a bundle of another
   version, or one that fails the signature check, is refused once; an unwritable location
   is reported without downloading; the same version shows nothing.
+- `core/update` tests also cover a check asked for (up to date, a manifest that can't be
+  read, a newer release) and the timer stopping and starting with the switch.
+- `shell/e2e/settings.cjs` checks the settings page's version, Check and switch against a
+  local release server, including that the switch survives a restart.
 - `shell/e2e/first-app.cjs` runs the real manager against a local release server with a
   slow asset, in both layouts, through to the relaunch helper starting the new bundle.
 - The signature check runs only in the real app (`core/cmd/lib`); the mock has no signing

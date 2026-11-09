@@ -79,9 +79,26 @@ white over all of it, as it does any view it has no frame for yet. A new tab loa
 the start. The tab still reads as new: no address, titled New Tab, and `about:blank`
 stays out of history. A crashed page has no view, so the frame colour shows there.
 
-The shell's page, `chrome://shell/`, belongs to the shell's own WebContents. The policy
-gate refuses it in every tab, however it is reached. Anywhere else it loads, its WebUI
-controller gives it no bindings and drops whatever it sends, so nothing reaches Go.
+## Our own pages
+
+The engine knows exactly two pages of ours. Both are built from `shell/`, one Vite build
+each, and served by one data source from the app's `Resources/shell`.
+
+- `chrome://shell/` belongs to the shell's own WebContents. The policy gate refuses it in
+  every tab, however it is reached.
+- `chrome://settings/` belongs to a tab. Typing it opens it there, and the toolbar's gear
+  button asks Go to open it in a new, active tab. It shows the prefs (the tab layout,
+  automatic updates) and the updater (the running version, Check for updates), in the
+  system's colours.
+
+Each gets its bridge only in its own kind of WebContents. Anywhere else its WebUI
+controller gives it no bindings and drops whatever it sends, so nothing reaches Go. The
+engine tags every message with its sender, 0 for the shell or the tab's id, and the page
+can't change that. `allowed` in `core/shell` is the one list of what each sender may ask:
+the shell anything; the settings page only to read and set prefs, read the update state
+and ask for a check. Anything else is dropped and logged. Go pushes changes to every
+settings tab as it does to the shell. No other page has `chrome.send`, and Chromium itself
+refuses a web page's link to a `chrome://` page or a frame of one.
 
 ## Not in the first app
 
@@ -93,7 +110,8 @@ controller gives it no bindings and drops whatever it sends, so nothing reaches 
 - No popup blocking: every `window.open` becomes a tab. No window features (size,
   position) are honoured, because there is one window.
 - No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
-  are not saved; the tab layout (sidebar or strip) is, in `prefs.json` in the profile.
+  are not saved; the prefs, the tab layout and automatic updates, are, in `prefs.json` in
+  the profile.
 - No downloads, permissions, dialogs, autofill or extensions. An installed copy does update
   itself: [updates.md](updates.md).
 - Content's own `chrome://` pages, such as `chrome://gpu`, pass the gate but fail to

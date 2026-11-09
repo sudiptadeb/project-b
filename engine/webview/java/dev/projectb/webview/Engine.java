@@ -3,11 +3,13 @@ package dev.projectb.webview;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.net.http.SslError;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.RenderProcessGoneDetail;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebBackForwardList;
 import android.webkit.WebChromeClient;
 import android.webkit.WebHistoryItem;
@@ -35,6 +37,7 @@ final class Engine implements ShellView.Host {
 
     private ShellView shell;
     private WebView page;
+    private String startingUrl;
     private String lastUrl;
     // WebView commits an error page for a failed load and reports that commit like any other.
     private String failedUrl;
@@ -135,6 +138,7 @@ final class Engine implements ShellView.Host {
     // WebView only tells its client about navigations the page started, so the ones the app
     // starts ask the managers here. Content's navigation throttle sees both in one place.
     private boolean allowed(String url) {
+        startingUrl = url;
         failedUrl = null;
         return Core.navigationStarting(TAB, url);
     }
@@ -218,6 +222,15 @@ final class Engine implements ShellView.Host {
             if (request.isForMainFrame()) {
                 failedUrl = request.getUrl().toString();
                 Core.navigationFailed(TAB, failedUrl, error.getDescription().toString());
+            }
+        }
+
+        // Refusing is WebView's default too, but left alone it says nothing and the old page stays.
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            handler.cancel();
+            if (error.getUrl().equals(startingUrl)) {
+                Core.navigationFailed(TAB, startingUrl, "certificate error");
             }
         }
 

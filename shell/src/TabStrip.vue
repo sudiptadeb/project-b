@@ -28,11 +28,11 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
       <img v-if="tab.favicon" class="icon" :src="tab.favicon" alt="" width="16" height="16" />
       <span class="title">{{ tabLabel(tab) }}</span>
       <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
-        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="m1 1 6 6M7 1 1 7"/></svg>
+        <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
       </button>
     </div>
     <button class="new-tab" type="button" aria-label="New Tab" title="New Tab (⌘T)" @click="send({ t: 'newTab' })">
-      <svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
     </button>
     <div v-drag class="rest"></div>
     <div v-drag class="space" :style="{ width: controls.right }"></div>

@@ -8,7 +8,7 @@ import { state, tabLabel } from './state.js';
     <div class="inner">
       <button class="row new-tab" type="button" @click="send({ t: 'newTab' })">
         <span class="icon">
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
         </span>
         <span class="title">New Tab</span>
         <span class="hint" aria-hidden="true">⌘T</span>
@@ -31,7 +31,7 @@ import { state, tabLabel } from './state.js';
           </span>
           <span class="title" :class="{ muted: !tab.title }">{{ tabLabel(tab) }}</span>
           <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="m1 1 6 6M7 1 1 7"/></svg>
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
           </button>
         </div>
       </div>
@@ -109,7 +109,7 @@ import { state, tabLabel } from './state.js';
 }
 
 .new-tab {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .icon {

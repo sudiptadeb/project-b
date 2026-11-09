@@ -39,8 +39,8 @@ function switchLayout() {
       @click="switchLayout"
     >
       <!-- Where the tabs will go after the switch: a band on top, or down the side. -->
-      <svg v-if="titleBar" width="14" height="13" viewBox="0 0 14 13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.18.75H1.75a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h10.43a1 1 0 0 0 1-1V1.75a1 1 0 0 0-1-1Z"/><path d="M.75 4.5h12.43"/><path d="M4.5.75v3.75M8.5.75v3.75" /></svg>
-      <svg v-else width="14" height="13" viewBox="0 0 14 13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.18.75H1.75a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h10.43a1 1 0 0 0 1-1V1.75a1 1 0 0 0-1-1Z"/><path d="M4.56.75V12"/><path d="M1.5 4h2.5M1.5 6.5h2.5M1.5 9h2.5"/></svg>
+      <svg v-if="titleBar" width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x=".65" y=".65" width="12.7" height="10.7" rx="1.5"/><path d="M.65 3.8h12.7"/></svg>
+      <svg v-else width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x=".65" y=".65" width="12.7" height="10.7" rx="1.5"/><path d="M4.6.65v10.7"/></svg>
     </button>
     <div v-if="titleBar" v-drag class="space" :style="{ width: controls.right }"></div>
     <div v-else class="space" style="width: 4px"></div>

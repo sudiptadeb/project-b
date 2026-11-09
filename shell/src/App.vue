@@ -31,6 +31,9 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   --frame-width: 4px;
   --bar: #e2f2f2;
   --accent: #0faaaa;
+  /* Icons and the sidebar's New Tab take the design's deeper ink for this mode, so the
+     frame is the one thing in the full accent. */
+  --icon: #0b8f8f;
   --hover: rgba(255, 255, 255, 0.6);
   --surface: #ffffff;
   --text: #1f1f1f;
@@ -73,16 +76,16 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
   border: 0;
   border-radius: 6px;
   background: none;
-  color: var(--accent);
+  color: var(--icon);
   cursor: pointer;
 }
 
 .icon-button:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--accent-tint);
 }
 
 .icon-button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 

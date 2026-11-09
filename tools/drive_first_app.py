@@ -7,6 +7,7 @@ view checks the same hitTest: before accepting the event. AppKit's own dispatch 
 exercised. Run it from the repo root:
 
     python3 tools/drive_first_app.py
+    python3 tools/drive_first_app.py settings   # only the settings page's checks
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -42,7 +43,10 @@ class Pages(http.server.BaseHTTPRequestHandler):
             self.send_header("Location", "chrome://shell/")
             self.end_headers()
             return
-        body = b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>'
+        body = {
+            "/settings-link": b'<!doctype html><title>Links</title><a href="chrome://settings/">Settings</a>',
+            "/settings-frame": b'<!doctype html><title>Frame</title><iframe src="chrome://settings/"></iframe>',
+        }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>')
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(body)))
@@ -212,6 +216,137 @@ def process_table(pid):
             sub = re.search(r"--utility-sub-type=(\S+)", row[3])
             keep.append({"pid": row[0], "exe": exe, "type": kind.group(1) if kind else "main", "sub": sub.group(1) if sub else "", "threads": threads, "rssMB": round(row[2] / 1024, 1)})
     return keep
+
+
+def page_click(app, selector):
+    """A real click on an element of the shown page: its middle, moved into the window by
+    where the page view sits."""
+    x, y = app.js(f"(()=>{{const r=document.querySelector({json.dumps(selector)}).getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
+    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
+    return app.cmd("click", px + x, py + y)
+
+
+def bundle_version():
+    """The version in the bundle PB_BIN runs from, or None for a build directory."""
+    plist = os.path.join(os.path.dirname(BIN), "../Info.plist")
+    if not os.path.exists(plist):
+        return None
+    m = re.search(r"CFBundleShortVersionString</key>\s*<string>([^<]+)", open(plist).read())
+    return m.group(1) if m else None
+
+
+def settings_checks():
+    """The settings page, chrome://settings/: how it opens, what it shows, that changing the
+    layout there moves the real shell, what its sender may ask Go, and that no other page
+    gets a bridge or reaches it."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    time.sleep(0.5)
+    on_settings = "location.href==='chrome://settings/'&&typeof (window.chrome&&chrome.send)==='function'&&!!document.querySelector('.version')"
+    checked = lambda value: f"document.querySelector('input[value={value}]').checked"
+    has_bridge = "[location.href, typeof (window.chrome && chrome.send)]"
+
+    def typed(url):
+        focus_bar(app)
+        app.cmd("type", url)
+        app.wait(f"{VALUE}==={json.dumps(url)}")
+        app.cmd("key", "enter")
+
+    typed("chrome://settings/")
+    try:
+        app.wait(on_settings, 15, page=True)
+        check("typing chrome://settings/ opens it in the tab, with its bridge", True)
+    except TimeoutError as e:
+        check("typing chrome://settings/ opens it in the tab, with its bridge", False, e)
+        app.close()
+        return
+    app.wait(ACTIVE_ROW_TITLE + "==='Settings'", 10)
+    check("the tab is titled Settings", True)
+    app.wait(checked("vertical"), 10, page=True)
+    check("it shows the current layout", not app.js(checked("horizontal"), page=True))
+    expected = bundle_version() or "Development build"
+    shown = app.wait("document.querySelector('.version').textContent", 10, page=True)
+    check("it shows the running version", shown == expected, (shown, expected))
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "settings-vertical.png")), flush=True)
+
+    # A real click on the page's radio moves the real shell; the shell's own switch moves
+    # the page back.
+    page_click(app, "input[value=horizontal]")
+    try:
+        app.wait("!!document.querySelector('.strip')", 10)
+        check("choosing Horizontal on the page switches the real shell", True)
+    except TimeoutError as e:
+        check("choosing Horizontal on the page switches the real shell", False, e)
+    app.wait(checked("horizontal"), 10, page=True)
+    time.sleep(0.4)
+    print(app.cmd("capture", os.path.join(OUT, "settings-horizontal.png")), flush=True)
+    click(app, "[aria-label='Tabs on the side']")
+    app.wait("!!document.querySelector('nav')", 5)
+    try:
+        app.wait(checked("vertical"), 10, page=True)
+        check("a change from the shell reaches the page", True)
+    except TimeoutError as e:
+        check("a change from the shell reaches the page", False, e)
+
+    # The settings sender may read and set prefs, read the update state and ask for a check.
+    # Anything else is dropped by Go and logged.
+    rows = app.js(ROWS)
+    logged = os.path.getsize(os.path.join(OUT, "app.log"))
+    app.js("chrome.send('shell',[JSON.stringify({t:'newTab'})]),1", page=True)
+    app.js("chrome.send('shell',[JSON.stringify({t:'navigate',text:'https://example.com/'})]),1", page=True)
+    time.sleep(1)
+    with open(os.path.join(OUT, "app.log")) as f:
+        f.seek(logged)
+        log = f.read()
+    check("a shell command sent from the settings page is dropped and logged", app.js(ROWS) == rows and app.js("location.href", page=True) == "chrome://settings/" and 'dropped "newTab" from tab' in log, (app.js(ROWS), app.js("location.href", page=True)))
+
+    # Check for updates asks the update manager, which says what it found. A development
+    # build has no version and says it doesn't update; a release that is the newest says
+    # it is up to date.
+    page_click(app, "button")
+    status = "document.querySelector('.status').textContent"
+    want = "a development build doesn't update" if bundle_version() is None else "Up to date"
+    try:
+        app.wait(f"{status}==={json.dumps(want)}", 30, page=True)
+        check(f"Check for updates says: {want}", True)
+    except TimeoutError as e:
+        check(f"Check for updates says: {want}", False, e)
+    time.sleep(0.3)
+    print(app.cmd("capture", os.path.join(OUT, "settings-checked.png")), flush=True)
+
+    # The toolbar's settings button opens it in a new, active tab, in both layouts.
+    for layout in ("vertical", "horizontal"):
+        n = app.js(ROWS)
+        click(app, "[aria-label=Settings]")
+        try:
+            app.wait(f"{ROWS}==={n + 1}", 10)
+            app.wait(on_settings, 15, page=True)
+            check(f"the toolbar's settings button opens it in a new, active tab ({layout})", app.js(VALUE) == "chrome://settings/", app.js(VALUE))
+        except TimeoutError as e:
+            check(f"the toolbar's settings button opens it in a new, active tab ({layout})", False, e)
+        if layout == "vertical":
+            click(app, "[aria-label='Tabs on top']")
+            app.wait("!!document.querySelector('.strip')", 5)
+            time.sleep(0.4)
+    click(app, "[aria-label='Tabs on the side']")
+    app.wait("!!document.querySelector('nav')", 5)
+
+    # No other page has a bridge, and a page can't reach chrome://settings/: Chromium
+    # won't let a web page display a chrome:// page, by link or in a frame. A refused frame
+    # stays on its first about:blank, which the page can still read.
+    visit(app, PAGES + "settings-link")
+    check("an ordinary page has no chrome.send", app.js(has_bridge, page=True) == [PAGES + "settings-link", "undefined"], app.js(has_bridge, page=True))
+    app.js("document.querySelector('a').click(), 1", page=True)
+    time.sleep(1.5)
+    landed = app.js(has_bridge, page=True)
+    check("a page's link to chrome://settings/ is refused by Chromium", landed == [PAGES + "settings-link", "undefined"], (landed, app.js(VALUE)))
+    visit(app, PAGES + "settings-frame")
+    time.sleep(1.5)
+    frame = app.js("(()=>{try{return document.querySelector('iframe').contentWindow.location.href}catch(e){return 'cross-origin: '+e.name}})()", page=True)
+    check("and so is a frame of it", frame == "about:blank", frame)
+    app.close()
 
 
 def main():
@@ -721,9 +856,15 @@ def main():
     check("and can be switched back", app.js("!document.querySelector('.strip')"))
     app.close()
 
+    settings_checks()
     print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
     sys.exit(1 if failures else 0)
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["settings"]:
+        os.makedirs(OUT, exist_ok=True)
+        settings_checks()
+        print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
+        sys.exit(1 if failures else 0)
     main()

@@ -103,13 +103,41 @@ driver, not read back from the window.
   by eye, drag and drop, real GPU and battery cost, a real video, screen readers.
 - AppKit's own event dispatch: real mouse, real keyboard, input methods.
 - Crashpad and official builds. Crashpad isn't in this build.
+- Double-clicking the app. `open` fails from a session with no display, and fails the same
+  way for Calculator. The 35 checks start the binary inside the mounted DMG directly.
 - Windows and Linux.
+
+## Packaging
+
+`tools/package.sh` makes `build/project-b.dmg`: `Project B.app` with its data files inside,
+and a link to Applications. Inside an app, Chromium looks under the "framework bundle". We
+have no framework, so `MainDelegate` points it at `Contents`, which gives
+`Contents/Resources` and `Contents/Libraries`.
+
+The app is signed ad hoc, not notarized. Gatekeeper blocks a copy downloaded by a browser
+until its quarantine flag is removed; `curl` doesn't set the flag.
+
+Sizes in decimal MB, for one arm64 binary:
+
+| Binary | File | Code (`__TEXT`) | Symbols (`__LINKEDIT`) |
+|---|---|---:|---:|
+| `project_b`, `out/pb` | 418 | 260 | 149 |
+| `project_b`, stripped, in the DMG | 270 | 260 | |
+| Ulaa Framework 155, official, a whole browser | 249 | 234 | 2 |
+| Chrome for Testing 153 framework | 246 | | |
+
+`out/pb` isn't a debug build, but a non-official build keeps its symbols, has DCHECKs on and
+skips link-time optimisation. The DMG is 153 MB. The installed app is 572 MB against 376 MB
+for Chrome for Testing, because we carry content twice and Chrome shares one framework with
+thin helpers.
 
 ## Commands
 
     tools/fetch-chromium.sh                # fresh Chromium 155, once
     tools/build.sh                         # both binaries, out/pb
-    python3 tools/drive_first_app.py       # real app, results in build/real
+    RELEASE=1 OUT=out/rel tools/build.sh   # official-style build, takes hours
+    tools/package.sh                       # build/project-b.dmg; OUT=out/rel for the release
+    python3 tools/drive_first_app.py       # real app, results in build/real; PB_BIN picks another binary
     python3 tools/measure_first_app.py     # the numbers above
     (cd core && go test ./...)             # managers, no C++
     node shell/e2e/first-app.cjs           # shell on the mock engine, in a browser

@@ -100,7 +100,7 @@ class ShellDataSource : public content::URLDataSource {
                         const content::WebContents::Getter& wc_getter,
                         GotDataCallback callback) override {
     base::FilePath dir;
-    CHECK(base::PathService::Get(base::DIR_EXE, &dir));
+    CHECK(base::PathService::Get(base::DIR_ASSETS, &dir));
     std::string name = Name(url);
     base::FilePath file = dir.Append("shell").AppendASCII(name);
     base::ThreadPool::PostTaskAndReplyWithResult(

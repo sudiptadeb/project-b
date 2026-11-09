@@ -1,5 +1,7 @@
 #include "project_b/engine/common/main_delegate.h"
 
+#include "base/apple/bundle_locations.h"
+#include "base/apple/foundation_util.h"
 #include "base/check.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
@@ -14,6 +16,13 @@ MainDelegate::MainDelegate() = default;
 MainDelegate::~MainDelegate() = default;
 
 std::optional<int> MainDelegate::BasicStartupComplete() {
+  // Inside an app, content looks for its files under the "framework bundle". We have
+  // no framework, so that's the app's Contents folder.
+  if (base::apple::AmIBundled()) {
+    base::apple::SetOverrideFrameworkBundlePath(
+        base::apple::MainBundlePath().Append(FILE_PATH_LITERAL("Contents")));
+  }
+
   logging::LoggingSettings settings;
   settings.logging_dest =
       logging::LOG_TO_SYSTEM_DEBUG_LOG | logging::LOG_TO_STDERR;

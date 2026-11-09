@@ -23,7 +23,7 @@ import threading
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-BIN = os.path.join(ROOT, "chromium/src/out/pb/project_b")
+BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 OUT = os.path.join(ROOT, "build/real")
 BLOCKED = "blocked.test"
 URL_A = "https://example.com/"
@@ -161,7 +161,7 @@ def process_table(pid):
     for row in rows:
         if row[0] in seen:
             threads = len(subprocess.run(["ps", "-M", "-p", str(row[0])], capture_output=True, text=True).stdout.splitlines()) - 1
-            exe = row[3].split()[0].split("/")[-1]
+            exe = row[3].split(" --")[0].split("/")[-1]  # The path can hold spaces.
             kind = re.search(r"--type=(\S+)", row[3])
             sub = re.search(r"--utility-sub-type=(\S+)", row[3])
             keep.append({"pid": row[0], "exe": exe, "type": kind.group(1) if kind else "main", "sub": sub.group(1) if sub else "", "threads": threads, "rssMB": round(row[2] / 1024, 1)})

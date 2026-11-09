@@ -19,7 +19,7 @@ ADB = [SDK + "/platform-tools/adb", "-s", os.environ.get("ADB_SERIAL", "emulator
 APK = os.environ.get("APK", ROOT + "/build/android/project-b-webview.apk")
 PACKAGE = os.environ.get("PACKAGE", "dev.projectb.webview")
 ACTIVITY = os.environ.get("ACTIVITY", ".BrowserActivity")
-OUT = ROOT + "/build/android-drive"
+OUT = os.environ.get("OUT", ROOT + "/build/android-drive")
 PORT = 8765
 BASE = "localhost:%d" % PORT
 
@@ -129,6 +129,20 @@ def history_title(url):
     return title
 
 
+def children():
+    """The app's child processes as (pid, process name), from what the system knows it bound."""
+    out = []
+    pending = False
+    for line in adb("shell", "dumpsys", "activity", "services", PACKAGE).splitlines():
+        if "ServiceRecord{" in line:
+            pending = (PACKAGE + "/" in line) and "ProcessService" in line
+        elif pending and "app=ProcessRecord{" in line:
+            pid, name = line.split("ProcessRecord{")[1].split()[1].split(":", 1)
+            out.append((pid, name.split("/")[0]))
+            pending = False
+    return out
+
+
 def check(name, ok, detail=""):
     results.append((name, bool(ok), detail))
     print("%s  %s  %s" % ("ok  " if ok else "FAIL", name, detail), flush=True)
@@ -220,6 +234,8 @@ def main():
     go("https://nothing.invalid/", 3.0)
     shot("14-failed")
     check("a failed load never joins history", not visited("https://nothing.invalid/"))
+    go("https://expired.badssl.com/", 4.0)
+    shot("14b-bad-certificate")
 
     # History survives the process.
     adb("shell", "am", "force-stop", PACKAGE)
@@ -231,16 +247,13 @@ def main():
     check("history file still holds Page A after a restart", visited("http://%s/a" % BASE))
     launch()
 
-    # Where Go is: the app's process, and no WebView renderer.
-    ps = adb("shell", "ps", "-A", "-o", "PID,NAME")
+    # Where Go is: the app's process, and none of its children.
     main_pid = None
-    renderers = []
-    for line in ps.splitlines():
+    for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines():
         parts = line.split()
         if len(parts) == 2 and parts[1] == PACKAGE:
             main_pid = parts[0]
-        if len(parts) == 2 and "sandboxed_process" in parts[1]:
-            renderers.append(parts)
+    renderers = children()
     # Libraries are mapped straight from the APK, so the mapping's name is the APK's.
     ours = PACKAGE + "-"
     maps = adb("shell", "cat", "/proc/%s/maps" % main_pid)
@@ -248,16 +261,13 @@ def main():
           "pid " + str(main_pid))
     for pid, name in renderers:
         rmaps = adb("shell", "cat", "/proc/%s/maps" % pid)
-        check("none of our code in renderer " + name.split(":")[1], ours not in rmaps and len(rmaps) > 0, "pid " + pid)
-    check("exactly one renderer holds shell and page", len(renderers) == 1, str(len(renderers)))
+        check("none of our code in " + name.split(":")[-1], ours not in rmaps and len(rmaps) > 0, "pid " + pid)
+    check("exactly one renderer holds shell and page", len(renderers) == 1, str(renderers))
 
     # Renderer crash: the app lives, the shell comes back from a snapshot, reload recovers.
     go(BASE + "/a")
-    ps = adb("shell", "ps", "-A", "-o", "PID,NAME")
-    for line in ps.splitlines():
-        parts = line.split()
-        if len(parts) == 2 and "sandboxed_process" in parts[1]:
-            adb("shell", "kill", "-9", parts[0])
+    for pid, _ in children():
+        adb("shell", "kill", "-9", pid)
     time.sleep(3)
     shot("16-after-renderer-kill")
     alive = PACKAGE in adb("shell", "ps", "-A", "-o", "NAME")

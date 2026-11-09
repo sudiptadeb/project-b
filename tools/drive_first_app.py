@@ -400,6 +400,13 @@ def main():
     check("a press on the shell, the page or a window button doesn't move the window",
           all(moves[k] == "no" for k in ("address bar", "sidebar", "page", "window button")), moves)
     check("a press in the left edge's resize zone is left to AppKit, which resizes", moves["left edge"] == "no", moves)
+    # The window server moves the window by itself from whatever part of the title bar
+    # AppKit gives it, without asking the app. Given the address bar, it moved the window
+    # on a drag there instead of selecting text.
+    region = app.cmd("dragregion")
+    served = [tuple(map(float, r)) for r in re.findall(r"\{\{([\d.]+), ([\d.]+)\}, \{([\d.]+), ([\d.]+)\}\}", region)]
+    over_bar = [r for r in served if r[0] <= bar_x < r[0] + r[2] and r[1] <= window["content"][1] - bar_y < r[1] + r[3]]
+    check("the window server isn't given the address bar to drag by itself", region != "unknown" and not over_bar, region)
     # An empty tab holds the blank page, so its page area is a page in content's own
     # colours, never the frame colour showing through. The frame colour used to take
     # over a few seconds in, so this looks after ten.

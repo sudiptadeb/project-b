@@ -38,6 +38,16 @@
   _regions = std::move(regions);
 }
 
+// AppKit asks this, privately, which part of the title bar the window server must leave
+// to the app. A transparent view leaves none, so the server moved the window from any
+// drag that started in the title bar strip, the address field included. The container
+// leaves all of itself: every press there goes through hitTest:, and only a drag region
+// falls through to the frame, which moves the window. Chrome's content view answers the
+// same (bridged_content_view.mm).
+- (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
+  return self.bounds;
+}
+
 - (void)setDragRegions:(std::vector<gfx::RectF>)regions {
   _dragRegions = std::move(regions);
 }

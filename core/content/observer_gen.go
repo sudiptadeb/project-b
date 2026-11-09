@@ -26,6 +26,7 @@ type ObserverHooks struct {
 	onDidGetIgnoredUIEvent                       []func(tab WebContents)
 	onDidGetUserInteraction                      []func(tab WebContents, event WebInputEvent)
 	onDidLoadResourceFromMemoryCache             []func(tab WebContents, renderFrameHost RenderFrameHost, url string, mimeType string, requestDestination RequestDestination)
+	onDidOpenRequestedURL                        []func(tab WebContents, newContents WebContents, sourceRenderFrameHost RenderFrameHost, url string, referrer Referrer, disposition WindowOpenDisposition, transition PageTransition, startedFromContextMenu bool, rendererInitiated bool)
 	onDidRedirectNavigation                      []func(tab WebContents, navigationHandle NavigationHandle)
 	onDidStartLoading                            []func(tab WebContents)
 	onDidStartNavigation                         []func(tab WebContents, navigationHandle NavigationHandle)
@@ -287,6 +288,14 @@ func (c *ObserverHooks) OnDidGetUserInteraction(f func(tab WebContents, event We
 func (c *ObserverHooks) OnDidLoadResourceFromMemoryCache(f func(tab WebContents, renderFrameHost RenderFrameHost, url string, mimeType string, requestDestination RequestDestination)) {
 	c.hooks.subscribe(ObserverDidLoadResourceFromMemoryCache)
 	c.onDidLoadResourceFromMemoryCache = append(c.onDidLoadResourceFromMemoryCache, f)
+}
+
+// DidOpenRequestedURL: This method is invoked when a new WebContents was created in response to an action in
+// the observed WebContents, e.g. a link with target=_blank was clicked. The
+// |source_render_frame_host| is the frame in which the action took place.
+func (c *ObserverHooks) OnDidOpenRequestedURL(f func(tab WebContents, newContents WebContents, sourceRenderFrameHost RenderFrameHost, url string, referrer Referrer, disposition WindowOpenDisposition, transition PageTransition, startedFromContextMenu bool, rendererInitiated bool)) {
+	c.hooks.subscribe(ObserverDidOpenRequestedURL)
+	c.onDidOpenRequestedURL = append(c.onDidOpenRequestedURL, f)
 }
 
 // DidRedirectNavigation: Called when a navigation encountered a server redirect.
@@ -578,13 +587,13 @@ func (c *ObserverHooks) OnNavigationStopped(f func(tab WebContents)) {
 // or more frames or child contents are emitting audio; if false, then no frames or
 // child contents are emitting audio. See OnFrameAudioStateChanged for per-frame
 // information.
-func (c *ObserverHooks) OnOnAudioStateChanged(f func(tab WebContents, audible bool)) {
+func (c *ObserverHooks) OnAudioStateChanged(f func(tab WebContents, audible bool)) {
 	c.hooks.subscribe(ObserverOnAudioStateChanged)
 	c.onOnAudioStateChanged = append(c.onOnAudioStateChanged, f)
 }
 
 // OnBackgroundColorChanged: Invoked when background color is changed.
-func (c *ObserverHooks) OnOnBackgroundColorChanged(f func(tab WebContents)) {
+func (c *ObserverHooks) OnBackgroundColorChanged(f func(tab WebContents)) {
 	c.hooks.subscribe(ObserverOnBackgroundColorChanged)
 	c.onOnBackgroundColorChanged = append(c.onOnBackgroundColorChanged, f)
 }
@@ -592,7 +601,7 @@ func (c *ObserverHooks) OnOnBackgroundColorChanged(f func(tab WebContents)) {
 // OnCapabilityTypesChanged: Called when WebContents starts/stops using a capability type. The arguments indicate
 // the capability type that starts/stops being used and whether it is in use (true if it
 // starts being used, false if it stops).
-func (c *ObserverHooks) OnOnCapabilityTypesChanged(f func(tab WebContents, capabilityType WebContentsCapabilityType, used bool)) {
+func (c *ObserverHooks) OnCapabilityTypesChanged(f func(tab WebContents, capabilityType WebContentsCapabilityType, used bool)) {
 	c.hooks.subscribe(ObserverOnCapabilityTypesChanged)
 	c.onOnCapabilityTypesChanged = append(c.onOnCapabilityTypesChanged, f)
 }
@@ -603,13 +612,13 @@ func (c *ObserverHooks) OnOnCapabilityTypesChanged(f func(tab WebContents, capab
 // CaptureController.decreaseZoomLevel() * CaptureController.resetZoomLevel() Observing
 // this occurrence allows us to update the UX accordingly; for example, show the user an
 // indicator that the capturing tab is being controlled by the capturing tab.
-func (c *ObserverHooks) OnOnCapturedSurfaceControl(f func(tab WebContents)) {
+func (c *ObserverHooks) OnCapturedSurfaceControl(f func(tab WebContents)) {
 	c.hooks.subscribe(ObserverOnCapturedSurfaceControl)
 	c.onOnCapturedSurfaceControl = append(c.onOnCapturedSurfaceControl, f)
 }
 
 // OnColorProviderChanged: Invoked when the ColorProvider instance associated with this WebContents has changed.
-func (c *ObserverHooks) OnOnColorProviderChanged(f func(tab WebContents)) {
+func (c *ObserverHooks) OnColorProviderChanged(f func(tab WebContents)) {
 	c.hooks.subscribe(ObserverOnColorProviderChanged)
 	c.onOnColorProviderChanged = append(c.onOnColorProviderChanged, f)
 }
@@ -619,7 +628,7 @@ func (c *ObserverHooks) OnOnColorProviderChanged(f func(tab WebContents)) {
 // the RenderFrameHost created by the navigation. This method not only includes accesses
 // from the navigation's request/response, but also accesses from other
 // requests/responses triggered by the navigation e.g. early hints requests.
-func (c *ObserverHooks) OnOnCookiesAccessed1(f func(tab WebContents, navigationHandle NavigationHandle, details CookieAccessDetails)) {
+func (c *ObserverHooks) OnCookiesAccessed1(f func(tab WebContents, navigationHandle NavigationHandle, details CookieAccessDetails)) {
 	c.hooks.subscribe(ObserverOnCookiesAccessed1)
 	c.onOnCookiesAccessed1 = append(c.onOnCookiesAccessed1, f)
 }
@@ -627,7 +636,7 @@ func (c *ObserverHooks) OnOnCookiesAccessed1(f func(tab WebContents, navigationH
 // OnCookiesAccessed2: Called when document reads or sets a cookie (either via document.cookie or issuing a
 // network request). Cookie reads/writes for a dedicated worker are attributed to the
 // RenderFrameHost which created it.
-func (c *ObserverHooks) OnOnCookiesAccessed2(f func(tab WebContents, renderFrameHost RenderFrameHost, details CookieAccessDetails)) {
+func (c *ObserverHooks) OnCookiesAccessed2(f func(tab WebContents, renderFrameHost RenderFrameHost, details CookieAccessDetails)) {
 	c.hooks.subscribe(ObserverOnCookiesAccessed2)
 	c.onOnCookiesAccessed2 = append(c.onOnCookiesAccessed2, f)
 }
@@ -636,20 +645,20 @@ func (c *ObserverHooks) OnOnCookiesAccessed2(f func(tab WebContents, renderFrame
 // before forwarding the message to the WebContents' delegate. |source_id| is a URL.
 // |untrusted_stack_trace| is not present for most messages; only when requested in
 // advance and only for exceptions.
-func (c *ObserverHooks) OnOnDidAddMessageToConsole(f func(tab WebContents, sourceFrame RenderFrameHost, logLevel ConsoleMessageLevel, message string, lineNo int64, sourceId string, untrustedStackTrace Optional[string])) {
+func (c *ObserverHooks) OnDidAddMessageToConsole(f func(tab WebContents, sourceFrame RenderFrameHost, logLevel ConsoleMessageLevel, message string, lineNo int64, sourceId string, untrustedStackTrace Optional[string])) {
 	c.hooks.subscribe(ObserverOnDidAddMessageToConsole)
 	c.onOnDidAddMessageToConsole = append(c.onOnDidAddMessageToConsole, f)
 }
 
 // OnFedCmFederatedLogin: Invoked when a federated login request completes.
-func (c *ObserverHooks) OnOnFedCmFederatedLogin(f func(tab WebContents, success bool)) {
+func (c *ObserverHooks) OnFedCmFederatedLogin(f func(tab WebContents, success bool)) {
 	c.hooks.subscribe(ObserverOnFedCmFederatedLogin)
 	c.onOnFedCmFederatedLogin = append(c.onOnFedCmFederatedLogin, f)
 }
 
 // OnFirstContentfulPaintInPrimaryMainFrame: Called when a first contentful paint happened in the primary main frame.
 // `presentation_time` is the renderer-side presentation timestamp of the paint.
-func (c *ObserverHooks) OnOnFirstContentfulPaintInPrimaryMainFrame(f func(tab WebContents, presentationTime int64)) {
+func (c *ObserverHooks) OnFirstContentfulPaintInPrimaryMainFrame(f func(tab WebContents, presentationTime int64)) {
 	c.hooks.subscribe(ObserverOnFirstContentfulPaintInPrimaryMainFrame)
 	c.onOnFirstContentfulPaintInPrimaryMainFrame = append(c.onOnFirstContentfulPaintInPrimaryMainFrame, f)
 }
@@ -659,13 +668,13 @@ func (c *ObserverHooks) OnOnFirstContentfulPaintInPrimaryMainFrame(f func(tab We
 // allows for observing focus changes within WebContents, as opposed to
 // OnWebContentsFocused/LostFocus which allows observation that the RenderWidgetHost for
 // the WebContents has gained/lost focus.
-func (c *ObserverHooks) OnOnFocusChangedInPage(f func(tab WebContents, details FocusedNodeDetails)) {
+func (c *ObserverHooks) OnFocusChangedInPage(f func(tab WebContents, details FocusedNodeDetails)) {
 	c.hooks.subscribe(ObserverOnFocusChangedInPage)
 	c.onOnFocusChangedInPage = append(c.onOnFocusChangedInPage, f)
 }
 
 // OnFrameAudioStateChanged: Called when the audio state of an individual frame changes.
-func (c *ObserverHooks) OnOnFrameAudioStateChanged(f func(tab WebContents, rfh RenderFrameHost, audible bool)) {
+func (c *ObserverHooks) OnFrameAudioStateChanged(f func(tab WebContents, rfh RenderFrameHost, audible bool)) {
 	c.hooks.subscribe(ObserverOnFrameAudioStateChanged)
 	c.onOnFrameAudioStateChanged = append(c.onOnFrameAudioStateChanged, f)
 }
@@ -674,14 +683,14 @@ func (c *ObserverHooks) OnOnFrameAudioStateChanged(f func(tab WebContents, rfh R
 // (audio or video). For example, the frame could be capturing audio from the microphone
 // using getUserMedia(), or it could be capturing another window using
 // getDisplayMedia().
-func (c *ObserverHooks) OnOnFrameIsCapturingMediaStreamChanged(f func(tab WebContents, rfh RenderFrameHost, isCapturingMediaStream bool)) {
+func (c *ObserverHooks) OnFrameIsCapturingMediaStreamChanged(f func(tab WebContents, rfh RenderFrameHost, isCapturingMediaStream bool)) {
 	c.hooks.subscribe(ObserverOnFrameIsCapturingMediaStreamChanged)
 	c.onOnFrameIsCapturingMediaStreamChanged = append(c.onOnFrameIsCapturingMediaStreamChanged, f)
 }
 
 // OnFrameVisibilityChanged: Called when an individual frame's visibility inside the viewport of the page changes.
 // Note that this value is independent from the visibility of the page.
-func (c *ObserverHooks) OnOnFrameVisibilityChanged(f func(tab WebContents, rfh RenderFrameHost, visibility FrameVisibility)) {
+func (c *ObserverHooks) OnFrameVisibilityChanged(f func(tab WebContents, rfh RenderFrameHost, visibility FrameVisibility)) {
 	c.hooks.subscribe(ObserverOnFrameVisibilityChanged)
 	c.onOnFrameVisibilityChanged = append(c.onOnFrameVisibilityChanged, f)
 }
@@ -691,7 +700,7 @@ func (c *ObserverHooks) OnOnFrameVisibilityChanged(f func(tab WebContents, rfh R
 // captures the time when the request is proxied in the browser process.
 // `resource_request` is the fetch keepalive request that is created. `initiator_rfh` is
 // the RenderFrameHost that initiates the request.
-func (c *ObserverHooks) OnOnKeepAliveRequestCreated(f func(tab WebContents, resourceRequest ResourceRequest, initiatorRfh RenderFrameHost)) {
+func (c *ObserverHooks) OnKeepAliveRequestCreated(f func(tab WebContents, resourceRequest ResourceRequest, initiatorRfh RenderFrameHost)) {
 	c.hooks.subscribe(ObserverOnKeepAliveRequestCreated)
 	c.onOnKeepAliveRequestCreated = append(c.onOnKeepAliveRequestCreated, f)
 }
@@ -701,31 +710,31 @@ func (c *ObserverHooks) OnOnKeepAliveRequestCreated(f func(tab WebContents, reso
 // input freezes the metric) reflects the page's largest contentful paint.
 // `presentation_time` is the renderer-side presentation timestamp of the current
 // candidate.
-func (c *ObserverHooks) OnOnLargestContentfulPaintInPrimaryMainFrame(f func(tab WebContents, presentationTime int64)) {
+func (c *ObserverHooks) OnLargestContentfulPaintInPrimaryMainFrame(f func(tab WebContents, presentationTime int64)) {
 	c.hooks.subscribe(ObserverOnLargestContentfulPaintInPrimaryMainFrame)
 	c.onOnLargestContentfulPaintInPrimaryMainFrame = append(c.onOnLargestContentfulPaintInPrimaryMainFrame, f)
 }
 
 // OnPageScaleFactorChanged: Invoked when the renderer process changes the page scale factor.
-func (c *ObserverHooks) OnOnPageScaleFactorChanged(f func(tab WebContents, pageScaleFactor float64)) {
+func (c *ObserverHooks) OnPageScaleFactorChanged(f func(tab WebContents, pageScaleFactor float64)) {
 	c.hooks.subscribe(ObserverOnPageScaleFactorChanged)
 	c.onOnPageScaleFactorChanged = append(c.onOnPageScaleFactorChanged, f)
 }
 
 // OnPaste: Invoked when a paste event occurs.
-func (c *ObserverHooks) OnOnPaste(f func(tab WebContents)) {
+func (c *ObserverHooks) OnPaste(f func(tab WebContents)) {
 	c.hooks.subscribe(ObserverOnPaste)
 	c.onOnPaste = append(c.onOnPaste, f)
 }
 
 // OnRendererResponsive: See WebContentsDelegate::RendererResponsive().
-func (c *ObserverHooks) OnOnRendererResponsive(f func(tab WebContents, renderProcessHost RenderProcessHost)) {
+func (c *ObserverHooks) OnRendererResponsive(f func(tab WebContents, renderProcessHost RenderProcessHost)) {
 	c.hooks.subscribe(ObserverOnRendererResponsive)
 	c.onOnRendererResponsive = append(c.onOnRendererResponsive, f)
 }
 
 // OnRendererUnresponsive: This method is invoked when a process in the WebContents becomes unresponsive.
-func (c *ObserverHooks) OnOnRendererUnresponsive(f func(tab WebContents, renderProcessHost RenderProcessHost)) {
+func (c *ObserverHooks) OnRendererUnresponsive(f func(tab WebContents, renderProcessHost RenderProcessHost)) {
 	c.hooks.subscribe(ObserverOnRendererUnresponsive)
 	c.onOnRendererUnresponsive = append(c.onOnRendererUnresponsive, f)
 }
@@ -736,37 +745,37 @@ func (c *ObserverHooks) OnOnRendererUnresponsive(f func(tab WebContents, renderP
 // operation took place. Note: If clipboard copy events for other types of data are
 // later needed by other WebContentsObservers, it'd be okay to generalize this method to
 // support content::ClipboardPasteData directly.
-func (c *ObserverHooks) OnOnTextCopiedToClipboard(f func(tab WebContents, renderFrameHost RenderFrameHost, copiedText string)) {
+func (c *ObserverHooks) OnTextCopiedToClipboard(f func(tab WebContents, renderFrameHost RenderFrameHost, copiedText string)) {
 	c.hooks.subscribe(ObserverOnTextCopiedToClipboard)
 	c.onOnTextCopiedToClipboard = append(c.onOnTextCopiedToClipboard, f)
 }
 
 // OnTextSelectionChanged: Called when text selection is changed.
-func (c *ObserverHooks) OnOnTextSelectionChanged(f func(tab WebContents, renderFrameHost RenderFrameHost, selectedText string)) {
+func (c *ObserverHooks) OnTextSelectionChanged(f func(tab WebContents, renderFrameHost RenderFrameHost, selectedText string)) {
 	c.hooks.subscribe(ObserverOnTextSelectionChanged)
 	c.onOnTextSelectionChanged = append(c.onOnTextSelectionChanged, f)
 }
 
 // OnVisibilityChanged: Invoked every time the WebContents changes visibility.
-func (c *ObserverHooks) OnOnVisibilityChanged(f func(tab WebContents, visibility Visibility)) {
+func (c *ObserverHooks) OnVisibilityChanged(f func(tab WebContents, visibility Visibility)) {
 	c.hooks.subscribe(ObserverOnVisibilityChanged)
 	c.onOnVisibilityChanged = append(c.onOnVisibilityChanged, f)
 }
 
 // OnVisibilityWillChange: Invoked before the WebContents changes visibility.
-func (c *ObserverHooks) OnOnVisibilityWillChange(f func(tab WebContents, visibility Visibility)) {
+func (c *ObserverHooks) OnVisibilityWillChange(f func(tab WebContents, visibility Visibility)) {
 	c.hooks.subscribe(ObserverOnVisibilityWillChange)
 	c.onOnVisibilityWillChange = append(c.onOnVisibilityWillChange, f)
 }
 
 // OnWebContentsFocused: Notification that the |render_widget_host| for this WebContents has gained focus.
-func (c *ObserverHooks) OnOnWebContentsFocused(f func(tab WebContents, renderWidgetHost RenderWidgetHost)) {
+func (c *ObserverHooks) OnWebContentsFocused(f func(tab WebContents, renderWidgetHost RenderWidgetHost)) {
 	c.hooks.subscribe(ObserverOnWebContentsFocused)
 	c.onOnWebContentsFocused = append(c.onOnWebContentsFocused, f)
 }
 
 // OnWebContentsLostFocus: Notification that the |render_widget_host| for this WebContents has lost focus.
-func (c *ObserverHooks) OnOnWebContentsLostFocus(f func(tab WebContents, renderWidgetHost RenderWidgetHost)) {
+func (c *ObserverHooks) OnWebContentsLostFocus(f func(tab WebContents, renderWidgetHost RenderWidgetHost)) {
 	c.hooks.subscribe(ObserverOnWebContentsLostFocus)
 	c.onOnWebContentsLostFocus = append(c.onOnWebContentsLostFocus, f)
 }
@@ -1127,6 +1136,19 @@ func (c *ObserverHooks) dispatch(id Hook, r *reader) (Value, bool) {
 		requestDestination := RequestDestination(r.int())
 		for _, f := range c.onDidLoadResourceFromMemoryCache {
 			f(tab, renderFrameHost, url, mimeType, requestDestination)
+		}
+	case ObserverDidOpenRequestedURL:
+		tab := r.webContents()
+		newContents := r.webContents()
+		sourceRenderFrameHost := r.renderFrameHost()
+		url := r.str()
+		referrer := r.referrer()
+		disposition := WindowOpenDisposition(r.int())
+		transition := PageTransition(r.int())
+		startedFromContextMenu := r.bool()
+		rendererInitiated := r.bool()
+		for _, f := range c.onDidOpenRequestedURL {
+			f(tab, newContents, sourceRenderFrameHost, url, referrer, disposition, transition, startedFromContextMenu, rendererInitiated)
 		}
 	case ObserverDidRedirectNavigation:
 		tab := r.webContents()

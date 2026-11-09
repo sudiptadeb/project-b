@@ -10,6 +10,7 @@ type BrowserHooks struct {
 	answerAllowGpuLaunchRetryOnIOThread                             func() (bool, bool)
 	answerAllowNonActivatedCrossOriginPaintHolding                  func() (bool, bool)
 	answerAllowServiceWorkerToControlSrcdocIframe                   func(context BrowserContext) (bool, bool)
+	answerAllowSharedWorker                                         func(workerUrl string, siteForCookies string, topFrameOrigin Optional[string], name string, storageKey StorageKey, sameSiteCookies SharedWorkerSameSiteCookies, context BrowserContext, renderProcessId int64, renderFrameId int64) (bool, bool)
 	answerAllowSharedWorkerBlobURLFix                               func(context BrowserContext) (bool, bool)
 	answerAllowSharedWorkerExtendedLifetime                         func(context BrowserContext) (bool, bool)
 	answerAllowSignedExchange                                       func(context BrowserContext) (bool, bool)
@@ -65,6 +66,7 @@ type BrowserHooks struct {
 	answerIsFileSystemURLNavigationAllowed                          func(browserContext BrowserContext, url string) (bool, bool)
 	answerIsFindInPageDisabledForOrigin                             func(origin string) (bool, bool)
 	answerIsFirstPartySetsEnabled                                   func() (bool, bool)
+	answerIsFullCookieAccessAllowed                                 func(browserContext BrowserContext, webContents WebContents, url string, storageKey StorageKey, overrides int64) (bool, bool)
 	answerIsFullscreenAllowedForUnfocusedWebContents                func(unfocusedWebContents WebContents) (bool, bool)
 	answerIsHandledURL                                              func(url string) (bool, bool)
 	answerIsInitialWebUIURL                                         func(url string) (bool, bool)
@@ -122,6 +124,7 @@ type BrowserHooks struct {
 	answerShouldDenyRequestOnCertificateError                       func(mainFrameUrl string) (bool, bool)
 	answerShouldDisableOriginAgentClusterDefault                    func(browserContext BrowserContext) (bool, bool)
 	answerShouldDisableOriginIsolation                              func() (bool, bool)
+	answerShouldDisableSiteIsolation                                func(siteIsolationMode SiteIsolationMode) (bool, bool)
 	answerShouldDisallowCredentialRequest                           func(webContents WebContents) (bool, bool)
 	answerShouldEmbeddedFramesTryToReuseExistingProcess             func(outermostMainFrame RenderFrameHost) (bool, bool)
 	answerShouldEnableBtm                                           func(browserContext BrowserContext) (bool, bool)
@@ -191,6 +194,13 @@ func (c *BrowserHooks) AnswerAllowNonActivatedCrossOriginPaintHolding(f func() (
 func (c *BrowserHooks) AnswerAllowServiceWorkerToControlSrcdocIframe(f func(context BrowserContext) (bool, bool)) {
 	c.hooks.subscribe(BrowserAllowServiceWorkerToControlSrcdocIframe)
 	c.answerAllowServiceWorkerToControlSrcdocIframe = f
+}
+
+// AllowSharedWorker: Allow the embedder to control if a Shared Worker can be connected from a given tab.
+// This is called on the UI thread.
+func (c *BrowserHooks) AnswerAllowSharedWorker(f func(workerUrl string, siteForCookies string, topFrameOrigin Optional[string], name string, storageKey StorageKey, sameSiteCookies SharedWorkerSameSiteCookies, context BrowserContext, renderProcessId int64, renderFrameId int64) (bool, bool)) {
+	c.hooks.subscribe(BrowserAllowSharedWorker)
+	c.answerAllowSharedWorker = f
 }
 
 // AllowSharedWorkerBlobURLFix: Allow to apply the fix to make SharedWorker with a blob URL inherit a ServiceWorker
@@ -618,6 +628,16 @@ func (c *BrowserHooks) AnswerIsFirstPartySetsEnabled(f func() (bool, bool)) {
 	c.answerIsFirstPartySetsEnabled = f
 }
 
+// IsFullCookieAccessAllowed: Returns whether cookies should be allowed for requests to `url`, fetched from
+// contexts whose storage is keyed on `storage_key`. The `web_contents` parameter should
+// be `nullptr` for requests coming from ServiceWorkers, otherwise set to the
+// WebContents instance that is making the request. The `browser_context` parameter must
+// not be `nullptr`.
+func (c *BrowserHooks) AnswerIsFullCookieAccessAllowed(f func(browserContext BrowserContext, webContents WebContents, url string, storageKey StorageKey, overrides int64) (bool, bool)) {
+	c.hooks.subscribe(BrowserIsFullCookieAccessAllowed)
+	c.answerIsFullCookieAccessAllowed = f
+}
+
 // IsFullscreenAllowedForUnfocusedWebContents: Returns whether the given |web_contents|, which does not currently have focus, should
 // be allowed to enter fullscreen mode. This provides a hook for handling special
 // scenarios where an unfocused WebContents needs fullscreen capability. The primary
@@ -828,7 +848,7 @@ func (c *BrowserHooks) OnMaybePrewarmHttpDiskCache(f func(browserContext Browser
 
 // OnDisplayInsecureContent: Called when optionally blockable insecure content is displayed on a secure page
 // (resulting in mixed content).
-func (c *BrowserHooks) OnOnDisplayInsecureContent(f func(webContents WebContents)) {
+func (c *BrowserHooks) OnDisplayInsecureContent(f func(webContents WebContents)) {
 	c.hooks.subscribe(BrowserOnDisplayInsecureContent)
 	c.onOnDisplayInsecureContent = append(c.onOnDisplayInsecureContent, f)
 }
@@ -837,32 +857,32 @@ func (c *BrowserHooks) OnOnDisplayInsecureContent(f func(webContents WebContents
 // receive the same `browser_context` for a given loader. The context passed to
 // OnFetchKeepAliveRequestDestroyed() may be in destruction (loaders are torn down with
 // its StoragePartition), so it must only be used as a lookup key.
-func (c *BrowserHooks) OnOnFetchKeepAliveRequestCreated(f func(browserContext BrowserContext)) {
+func (c *BrowserHooks) OnFetchKeepAliveRequestCreated(f func(browserContext BrowserContext)) {
 	c.hooks.subscribe(BrowserOnFetchKeepAliveRequestCreated)
 	c.onOnFetchKeepAliveRequestCreated = append(c.onOnFetchKeepAliveRequestCreated, f)
 }
 
 // OnFetchKeepAliveRequestDestroyed is content::ContentBrowserClient::OnFetchKeepAliveRequestDestroyed.
-func (c *BrowserHooks) OnOnFetchKeepAliveRequestDestroyed(f func(browserContext BrowserContext)) {
+func (c *BrowserHooks) OnFetchKeepAliveRequestDestroyed(f func(browserContext BrowserContext)) {
 	c.hooks.subscribe(BrowserOnFetchKeepAliveRequestDestroyed)
 	c.onOnFetchKeepAliveRequestDestroyed = append(c.onOnFetchKeepAliveRequestDestroyed, f)
 }
 
 // OnKeepaliveRequestFinished: Called when a keepalive request finishes either successfully or unsuccessfully.
-func (c *BrowserHooks) OnOnKeepaliveRequestFinished(f func()) {
+func (c *BrowserHooks) OnKeepaliveRequestFinished(f func()) {
 	c.hooks.subscribe(BrowserOnKeepaliveRequestFinished)
 	c.onOnKeepaliveRequestFinished = append(c.onOnKeepaliveRequestFinished, f)
 }
 
 // OnKeepaliveRequestStarted: Called when a keepalive request
 // (https://fetch.spec.whatwg.org/#request-keepalive-flag) is requested.
-func (c *BrowserHooks) OnOnKeepaliveRequestStarted(f func(browserContext BrowserContext)) {
+func (c *BrowserHooks) OnKeepaliveRequestStarted(f func(browserContext BrowserContext)) {
 	c.hooks.subscribe(BrowserOnKeepaliveRequestStarted)
 	c.onOnKeepaliveRequestStarted = append(c.onOnKeepaliveRequestStarted, f)
 }
 
 // OnNewSCTAuditingReportSent: Notification that a new SCT auditing report has been sent.
-func (c *BrowserHooks) OnOnNewSCTAuditingReportSent(f func(browserContext BrowserContext)) {
+func (c *BrowserHooks) OnNewSCTAuditingReportSent(f func(browserContext BrowserContext)) {
 	c.hooks.subscribe(BrowserOnNewSCTAuditingReportSent)
 	c.onOnNewSCTAuditingReportSent = append(c.onOnNewSCTAuditingReportSent, f)
 }
@@ -871,38 +891,38 @@ func (c *BrowserHooks) OnOnNewSCTAuditingReportSent(f func(browserContext Browse
 // allows_any_site and allows_any_site -> locked_to_site) and when renderers are
 // respawned after crashing. Note that this method is gated to be called only once per
 // renderer to avoid reapplying static renderer settings.
-func (c *BrowserHooks) OnOnRendererProcessLockedStateUpdated(f func(host RenderProcessHost, siteUrl string)) {
+func (c *BrowserHooks) OnRendererProcessLockedStateUpdated(f func(host RenderProcessHost, siteUrl string)) {
 	c.hooks.subscribe(BrowserOnRendererProcessLockedStateUpdated)
 	c.onOnRendererProcessLockedStateUpdated = append(c.onOnRendererProcessLockedStateUpdated, f)
 }
 
 // OnSharedStorageSelectURLCalled: Called when `sharedStorage.selectURL()` is called for some frame on a page whose main
 // frame is `main_rfh`.
-func (c *BrowserHooks) OnOnSharedStorageSelectURLCalled(f func(mainRfh RenderFrameHost)) {
+func (c *BrowserHooks) OnSharedStorageSelectURLCalled(f func(mainRfh RenderFrameHost)) {
 	c.hooks.subscribe(BrowserOnSharedStorageSelectURLCalled)
 	c.onOnSharedStorageSelectURLCalled = append(c.onOnSharedStorageSelectURLCalled, f)
 }
 
 // OnSharedStorageWorkletHostCreated: Called when a `SharedStorageWorkletHost` is created for `rfh`.
-func (c *BrowserHooks) OnOnSharedStorageWorkletHostCreated(f func(rfh RenderFrameHost)) {
+func (c *BrowserHooks) OnSharedStorageWorkletHostCreated(f func(rfh RenderFrameHost)) {
 	c.hooks.subscribe(BrowserOnSharedStorageWorkletHostCreated)
 	c.onOnSharedStorageWorkletHostCreated = append(c.onOnSharedStorageWorkletHostCreated, f)
 }
 
 // OnTracingServiceStarted: Called when the tracing service is started.
-func (c *BrowserHooks) OnOnTracingServiceStarted(f func()) {
+func (c *BrowserHooks) OnTracingServiceStarted(f func()) {
 	c.hooks.subscribe(BrowserOnTracingServiceStarted)
 	c.onOnTracingServiceStarted = append(c.onOnTracingServiceStarted, f)
 }
 
 // OnTracingServiceStopped: Called when the tracing service has stopped.
-func (c *BrowserHooks) OnOnTracingServiceStopped(f func()) {
+func (c *BrowserHooks) OnTracingServiceStopped(f func()) {
 	c.hooks.subscribe(BrowserOnTracingServiceStopped)
 	c.onOnTracingServiceStopped = append(c.onOnTracingServiceStopped, f)
 }
 
 // OnWebContentsCreated: Called on every WebContents creation.
-func (c *BrowserHooks) OnOnWebContentsCreated(f func(webContents WebContents)) {
+func (c *BrowserHooks) OnWebContentsCreated(f func(webContents WebContents)) {
 	c.hooks.subscribe(BrowserOnWebContentsCreated)
 	c.onOnWebContentsCreated = append(c.onOnWebContentsCreated, f)
 }
@@ -1069,6 +1089,17 @@ func (c *BrowserHooks) AnswerShouldDisableOriginAgentClusterDefault(f func(brows
 func (c *BrowserHooks) AnswerShouldDisableOriginIsolation(f func() (bool, bool)) {
 	c.hooks.subscribe(BrowserShouldDisableOriginIsolation)
 	c.answerShouldDisableOriginIsolation = f
+}
+
+// ShouldDisableSiteIsolation: Allows the embedder to programmatically control whether Site Isolation should be
+// disabled. Note that this takes precedence over ShouldEnableStrictSiteIsolation() if
+// both return true. `site_isolation_mode` specifies the site isolation mode to check;
+// this allows strict site isolation and partial site isolation to be disabled according
+// to different policies (e.g., different memory thresholds) on Android. Note that for
+// correctness, the same value should be consistently returned.
+func (c *BrowserHooks) AnswerShouldDisableSiteIsolation(f func(siteIsolationMode SiteIsolationMode) (bool, bool)) {
+	c.hooks.subscribe(BrowserShouldDisableSiteIsolation)
+	c.answerShouldDisableSiteIsolation = f
 }
 
 // ShouldDisallowCredentialRequest: Gives the content embedder a chance to disallow a credential request, for example if
@@ -1468,6 +1499,21 @@ func (c *BrowserHooks) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 		v, ok := c.answerAllowServiceWorkerToControlSrcdocIframe(context)
 		return boolValue(v), ok
+	case BrowserAllowSharedWorker:
+		workerUrl := r.str()
+		siteForCookies := r.str()
+		topFrameOrigin := readOptional(r, func() string { return r.str() })
+		name := r.str()
+		storageKey := r.storageKey()
+		sameSiteCookies := SharedWorkerSameSiteCookies(r.int())
+		context := r.browserContext()
+		renderProcessId := r.int()
+		renderFrameId := r.int()
+		if c.answerAllowSharedWorker == nil {
+			return Value{}, false
+		}
+		v, ok := c.answerAllowSharedWorker(workerUrl, siteForCookies, topFrameOrigin, name, storageKey, sameSiteCookies, context, renderProcessId, renderFrameId)
+		return boolValue(v), ok
 	case BrowserAllowSharedWorkerBlobURLFix:
 		context := r.browserContext()
 		if c.answerAllowSharedWorkerBlobURLFix == nil {
@@ -1840,6 +1886,17 @@ func (c *BrowserHooks) dispatch(id Hook, r *reader) (Value, bool) {
 			return Value{}, false
 		}
 		v, ok := c.answerIsFirstPartySetsEnabled()
+		return boolValue(v), ok
+	case BrowserIsFullCookieAccessAllowed:
+		browserContext := r.browserContext()
+		webContents := r.webContents()
+		url := r.str()
+		storageKey := r.storageKey()
+		overrides := r.int()
+		if c.answerIsFullCookieAccessAllowed == nil {
+			return Value{}, false
+		}
+		v, ok := c.answerIsFullCookieAccessAllowed(browserContext, webContents, url, storageKey, overrides)
 		return boolValue(v), ok
 	case BrowserIsFullscreenAllowedForUnfocusedWebContents:
 		unfocusedWebContents := r.webContents()
@@ -2216,6 +2273,13 @@ func (c *BrowserHooks) dispatch(id Hook, r *reader) (Value, bool) {
 			return Value{}, false
 		}
 		v, ok := c.answerShouldDisableOriginIsolation()
+		return boolValue(v), ok
+	case BrowserShouldDisableSiteIsolation:
+		siteIsolationMode := SiteIsolationMode(r.int())
+		if c.answerShouldDisableSiteIsolation == nil {
+			return Value{}, false
+		}
+		v, ok := c.answerShouldDisableSiteIsolation(siteIsolationMode)
 		return boolValue(v), ok
 	case BrowserShouldDisallowCredentialRequest:
 		webContents := r.webContents()

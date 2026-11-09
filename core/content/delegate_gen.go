@@ -434,7 +434,7 @@ func (c *DelegateHooks) OnNavigationStateChanged(f func(tab WebContents, source 
 // delegate to provide some UI to let the user know about the blocked navigation and
 // give them the option to recover from it. |blocked_url| is the blocked navigation
 // target, and |reason| specifies why the navigation was blocked.
-func (c *DelegateHooks) OnOnDidBlockNavigation(f func(tab WebContents, webContents WebContents, blockedUrl string, initiatorUrl string, initiatorOrigin string, reason NavigationBlockedReason)) {
+func (c *DelegateHooks) OnDidBlockNavigation(f func(tab WebContents, webContents WebContents, blockedUrl string, initiatorUrl string, initiatorOrigin string, reason NavigationBlockedReason)) {
 	c.hooks.subscribe(DelegateOnDidBlockNavigation)
 	c.onOnDidBlockNavigation = append(c.onOnDidBlockNavigation, f)
 }

@@ -31,6 +31,7 @@
 #include "content/public/common/referrer.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/mojom/frame/fullscreen.mojom.h"
 #include "third_party/blink/public/mojom/loader/resource_load_info.mojom.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -39,6 +40,11 @@
 
 namespace project_b {
 namespace hooks {
+
+void Pack(Args& args, const blink::StorageKey& v) {
+  args.Str(v.origin().Serialize());
+  args.Str(v.top_level_site().Serialize());
+}
 
 void Pack(Args& args, const blink::WebInputEvent& v) {
   args.Int(static_cast<int64_t>(v.GetType()));
@@ -506,6 +512,24 @@ void WebContentsObserverHooks::DidLoadResourceFromMemoryCache(content::RenderFra
   args.Int(static_cast<int64_t>(request_destination));
   hooks::Fire(hooks::kWebContentsObserver_DidLoadResourceFromMemoryCache, args);
   content::WebContentsObserver::DidLoadResourceFromMemoryCache(render_frame_host, url, mime_type, request_destination);
+}
+
+void WebContentsObserverHooks::DidOpenRequestedURL(content::WebContents* new_contents, content::RenderFrameHost* source_render_frame_host, const GURL& url, const content::Referrer& referrer, WindowOpenDisposition disposition, ui::PageTransition transition, bool started_from_context_menu, bool renderer_initiated) {
+  if (!hooks::Subscribed(hooks::kWebContentsObserver_DidOpenRequestedURL)) {
+    return content::WebContentsObserver::DidOpenRequestedURL(new_contents, source_render_frame_host, url, referrer, disposition, transition, started_from_context_menu, renderer_initiated);
+  }
+  hooks::Args args;
+  hooks::Pack(args, web_contents());
+  hooks::Pack(args, new_contents);
+  hooks::Pack(args, source_render_frame_host);
+  args.Str(url.spec());
+  hooks::Pack(args, referrer);
+  args.Int(static_cast<int64_t>(disposition));
+  args.Int(static_cast<int64_t>(transition));
+  args.Bool(started_from_context_menu);
+  args.Bool(renderer_initiated);
+  hooks::Fire(hooks::kWebContentsObserver_DidOpenRequestedURL, args);
+  content::WebContentsObserver::DidOpenRequestedURL(new_contents, source_render_frame_host, url, referrer, disposition, transition, started_from_context_menu, renderer_initiated);
 }
 
 void WebContentsObserverHooks::DidRedirectNavigation(content::NavigationHandle* navigation_handle) {
@@ -2566,6 +2590,27 @@ bool ContentBrowserClientHooks::AllowServiceWorkerToControlSrcdocIframe(content:
   return content::ContentBrowserClient::AllowServiceWorkerToControlSrcdocIframe(context);
 }
 
+bool ContentBrowserClientHooks::AllowSharedWorker(const GURL& worker_url, const net::SiteForCookies& site_for_cookies, const std::optional<url::Origin>& top_frame_origin, const std::string& name, const blink::StorageKey& storage_key, const blink::mojom::SharedWorkerSameSiteCookies same_site_cookies, content::BrowserContext* context, int render_process_id, int render_frame_id) {
+  if (hooks::Subscribed(hooks::kContentBrowserClient_AllowSharedWorker)) {
+    hooks::Args args;
+    args.Str(worker_url.spec());
+    args.Str(site_for_cookies.RepresentativeUrl().spec());
+    args.Bool(top_frame_origin.has_value());
+    args.Str(top_frame_origin ? (*top_frame_origin).Serialize() : std::string());
+    args.Str(name);
+    hooks::Pack(args, storage_key);
+    args.Int(static_cast<int64_t>(same_site_cookies));
+    hooks::Pack(args, context);
+    args.Int(render_process_id);
+    args.Int(render_frame_id);
+    PBValue result;
+    if (hooks::Ask(hooks::kContentBrowserClient_AllowSharedWorker, args, &result)) {
+      return result.i != 0;
+    }
+  }
+  return content::ContentBrowserClient::AllowSharedWorker(worker_url, site_for_cookies, top_frame_origin, name, storage_key, same_site_cookies, context, render_process_id, render_frame_id);
+}
+
 bool ContentBrowserClientHooks::AllowSharedWorkerBlobURLFix(content::BrowserContext* context) {
   if (hooks::Subscribed(hooks::kContentBrowserClient_AllowSharedWorkerBlobURLFix)) {
     hooks::Args args;
@@ -3212,6 +3257,22 @@ bool ContentBrowserClientHooks::IsFirstPartySetsEnabled() {
     }
   }
   return content::ContentBrowserClient::IsFirstPartySetsEnabled();
+}
+
+bool ContentBrowserClientHooks::IsFullCookieAccessAllowed(content::BrowserContext* browser_context, content::WebContents* web_contents, const GURL& url, const blink::StorageKey& storage_key, net::CookieSettingOverrides overrides) {
+  if (hooks::Subscribed(hooks::kContentBrowserClient_IsFullCookieAccessAllowed)) {
+    hooks::Args args;
+    hooks::Pack(args, browser_context);
+    hooks::Pack(args, web_contents);
+    args.Str(url.spec());
+    hooks::Pack(args, storage_key);
+    args.Int(overrides.ToEnumBitmask());
+    PBValue result;
+    if (hooks::Ask(hooks::kContentBrowserClient_IsFullCookieAccessAllowed, args, &result)) {
+      return result.i != 0;
+    }
+  }
+  return content::ContentBrowserClient::IsFullCookieAccessAllowed(browser_context, web_contents, url, storage_key, overrides);
 }
 
 bool ContentBrowserClientHooks::IsFullscreenAllowedForUnfocusedWebContents(content::WebContents* unfocused_web_contents) {
@@ -3874,6 +3935,18 @@ bool ContentBrowserClientHooks::ShouldDisableOriginIsolation() {
     }
   }
   return content::ContentBrowserClient::ShouldDisableOriginIsolation();
+}
+
+bool ContentBrowserClientHooks::ShouldDisableSiteIsolation(content::SiteIsolationMode site_isolation_mode) {
+  if (hooks::Subscribed(hooks::kContentBrowserClient_ShouldDisableSiteIsolation)) {
+    hooks::Args args;
+    args.Int(static_cast<int64_t>(site_isolation_mode));
+    PBValue result;
+    if (hooks::Ask(hooks::kContentBrowserClient_ShouldDisableSiteIsolation, args, &result)) {
+      return result.i != 0;
+    }
+  }
+  return content::ContentBrowserClient::ShouldDisableSiteIsolation(site_isolation_mode);
 }
 
 bool ContentBrowserClientHooks::ShouldDisallowCredentialRequest(content::WebContents* web_contents) {

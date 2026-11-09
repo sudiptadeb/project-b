@@ -60,6 +60,7 @@ PLAIN = {
     "base::Time": ("int", "({v} - base::Time::UnixEpoch()).InMicroseconds()"),
     "base::TimeDelta": ("int", "{v}.InMicroseconds()"),
     "net::SiteForCookies": ("str", "{v}.RepresentativeUrl().spec()"),
+    "net::CookieSettingOverrides": ("int", "{v}.ToEnumBitmask()"),
 }
 GO_PLAIN = {"bool": "bool", "int": "int64", "double": "float64", "str": "string"}
 
@@ -245,6 +246,10 @@ COPIERS = {
         ("HasUserGesture", "bool", "v.has_user_gesture"),
         ("IsOutermostMainFrame", "bool", "v.is_outermost_main_frame"),
     ]),
+    "blink::StorageKey": dict(include="third_party/blink/public/common/storage_key/storage_key.h", fields=[
+        ("Origin", "str", "v.origin().Serialize()"),
+        ("TopLevelSite", "str", "v.top_level_site().Serialize()"),
+    ]),
     "gfx::Size": dict(include="ui/gfx/geometry/size.h", fields=[("Width", "int", "v.width()"), ("Height", "int", "v.height()")]),
     "gfx::Point": dict(include="ui/gfx/geometry/point.h", fields=[("X", "int", "v.x()"), ("Y", "int", "v.y()")]),
     "gfx::Rect": dict(include="ui/gfx/geometry/rect.h", fields=[("X", "int", "v.x()"), ("Y", "int", "v.y()"), ("Width", "int", "v.width()"), ("Height", "int", "v.height()")]),
@@ -253,7 +258,7 @@ COPIERS = {
     "gfx::RectF": dict(include="ui/gfx/geometry/rect_f.h", fields=[("X", "double", "v.x()"), ("Y", "double", "v.y()"), ("Width", "double", "v.width()"), ("Height", "double", "v.height()")]),
 }
 # Headers the copiers' field types come from, when the class headers don't bring them.
-PROBE_INCLUDES = ["ui/events/keycodes/keyboard_codes.h", "content/public/browser/keyboard_event_processing_result.h"]
+PROBE_INCLUDES = ["ui/events/keycodes/keyboard_codes.h", "content/public/browser/keyboard_event_processing_result.h", "content/public/browser/site_isolation_mode.h"]
 # Return types that are classes but carry as one enum value.
 RETURN_AS_ENUM = {
     "content::NavigationThrottle::ThrottleCheckResult": "content::NavigationThrottle::ThrottleAction",
@@ -689,8 +694,9 @@ def main():
                 enums[t] = enums[c]
                 enum_target[t] = enum_target.get(c, c)
                 break
-    # A bare candidate matched an enum by substring, but its real name is qualified.
-    for t in [t for t in enums if "::" not in t]:
+    # A bare alias candidate matched an enum by substring, but its real name is
+    # qualified. Enums a hook names bare (WindowOpenDisposition) are global and stay.
+    for t in [t for t in enums if "::" not in t and t not in unknown]:
         del enums[t]
 
     # Pass 3: enumerator values, from the compiler.
@@ -1035,7 +1041,7 @@ def write_go(classes, hooks, used_copiers, used_enums, enum_values, enums, recor
             else:
                 f.append(f"// {m.hook_name} is {qualified}::{m.name}.")
             if m.ret is None:
-                f.append(f"func (c *{go}Hooks) On{m.hook_name}(f {func_type(m, scope)}) {{")
+                f.append(f"func (c *{go}Hooks) {on_name(m)}(f {func_type(m, scope)}) {{")
                 f.append(f"\tc.hooks.subscribe({m.go_name})")
                 f.append(f"\tc.{field_name(m)} = append(c.{field_name(m)}, f)")
             else:
@@ -1069,6 +1075,11 @@ def write_go(classes, hooks, used_copiers, used_enums, enum_values, enums, recor
                 f.append(f"\t\treturn {value_from(m.ret)}, ok")
         f += ["\t}", "\treturn Value{}, false", "}", ""]
         write(os.path.join(ROOT, f"core/content/{go.lower()}_gen.go"), "\n".join(f))
+
+
+def on_name(m):
+    """On plus the hook's name, without doubling an On content already put there."""
+    return m.hook_name if m.hook_name.startswith("On") and m.hook_name[2:3].isupper() else "On" + m.hook_name
 
 
 def field_name(m):
@@ -1117,7 +1128,7 @@ def wrap(text, width, prefix):
     return ("\n" + prefix).join(lines)
 
 
-def grep_uses(name):
+def grep_uses(method):
     """Where in core/ a hook is subscribed, so the doc says who listens."""
     out = []
     for root, _, files in os.walk(os.path.join(ROOT, "core")):
@@ -1125,7 +1136,7 @@ def grep_uses(name):
             if fn.endswith(".go") and not fn.endswith("_gen.go"):
                 path = os.path.join(root, fn)
                 text = open(path).read()
-                if re.search(r"\.(On|Answer)" + re.escape(name) + r"\(", text):
+                if re.search(r"\." + re.escape(method) + r"\(", text):
                     out.append(os.path.relpath(path, ROOT))
     return out
 
@@ -1155,8 +1166,9 @@ def write_doc(classes, hooks, methods, demangled, version, enums, records):
         for m in ms:
             if m.reason is None:
                 status = "carried, struct copy" if m.struct_copy else "carried"
-                where = f"`{cpp_class_name(qualified)}::{m.name}` · `Hooks.{go}.{'On' if m.ret is None else 'Answer'}{m.hook_name}`"
-                uses = grep_uses(m.hook_name)
+                method = on_name(m) if m.ret is None else "Answer" + m.hook_name
+                where = f"`{cpp_class_name(qualified)}::{m.name}` · `Hooks.{go}.{method}`"
+                uses = grep_uses(method)
                 if uses:
                     where += " · used by " + ", ".join(f"`{u}`" for u in uses)
             else:

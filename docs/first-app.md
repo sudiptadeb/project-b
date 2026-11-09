@@ -34,12 +34,18 @@ launch, and we answer with the helper.
 
 ## The boundary
 
-`engine/abi/pb_abi.h` is plain C, ids and strings. Each side holds a table of the other's
+`engine/abi/pb_abi.h` is plain C, ids and values. Each side holds a table of the other's
 functions: `PBEngineCalls` for Go calling C++, handed over at start, and `PBGoCalls` for
 C++ calling Go, which `app/main.cc` fills from Go's exports (`engine/abi/pb_exports.h`).
 So the library has no link-time reference to Go, and the helper has nothing to resolve.
 Every call is on the main thread, except `post_wakeup`. Mojo and content's types stay
 inside the adapter.
+
+Everything the adapter tells Go goes through one function, `hook`: a number and a flat
+list of values. Content's own hooks are carried by generated classes that check one bit
+each and cross only when Go subscribed; the adapter's four own events (a shell message,
+a tab a page opened, a favicon, the window controls) use the same call. Adding a use of a
+content hook is a Go change only; see [content-hooks.md](content-hooks.md).
 
 ## The window
 
@@ -99,7 +105,7 @@ driver, not read back from the window.
 | Library / `project_b` / `project_b_helper`, unstripped, decimal MB | 415 / 2.6 / 0.03, `symbol_level = 0` |
 | Go symbols in main / helper / library | 1,911 / 0 / 0 |
 | Content symbols in main / helper | 0 / 0 |
-| cgo call, C++ to Go | 34 to 54 ns |
+| cgo call, C++ to Go | 34 to 54 ns (bare); a `hook` crossing with no values is 120 ns |
 | Forced full GC blocking the main thread | median 181 us, max 743 us, 20 runs |
 | First paint, process start to shell paint | 1.05 to 1.5 s at best; up to 10.6 s from the OS issue below |
 | Key press to next frames, inside the shell | median 8.6 to 12.1 ms, max about 33 ms, 26 keys |

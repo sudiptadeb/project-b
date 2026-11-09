@@ -4,7 +4,7 @@ package content
 
 // TableHash names the hook table this file was generated with. The library carries
 // the same hash, and start refuses a library built from a different table.
-const TableHash = "89ff5a0b3ae0"
+const TableHash = "443b8c4a1614"
 
 // Each carried hook's number, matching engine/browser/hooks_gen.h.
 const (
@@ -28,349 +28,353 @@ const (
 	ObserverDidGetIgnoredUIEvent                                     Hook = 117
 	ObserverDidGetUserInteraction                                    Hook = 118
 	ObserverDidLoadResourceFromMemoryCache                           Hook = 119
-	ObserverDidRedirectNavigation                                    Hook = 120
-	ObserverDidStartLoading                                          Hook = 121
-	ObserverDidStartNavigation                                       Hook = 122
-	ObserverDidStopLoading                                           Hook = 123
-	ObserverDidToggleFullscreenModeForTab                            Hook = 124
-	ObserverDidUpdateAudioMutingState                                Hook = 125
-	ObserverDidUpdateNavigationHandleTiming                          Hook = 126
-	ObserverDidUpdateWebManifestURL                                  Hook = 127
-	ObserverDocumentOnLoadCompletedInPrimaryMainFrame                Hook = 128
-	ObserverDomOperationResponse                                     Hook = 129
-	ObserverFrameDeleted                                             Hook = 130
-	ObserverFrameDisplayStateChanged                                 Hook = 131
-	ObserverFrameNameChanged                                         Hook = 132
-	ObserverFrameReceivedUserActivation                              Hook = 133
-	ObserverFrameSizeChanged                                         Hook = 134
-	ObserverInferredColorSchemeUpdated                               Hook = 135
-	ObserverInnerWebContentsAttached                                 Hook = 136
-	ObserverInnerWebContentsCreated                                  Hook = 137
-	ObserverKeyboardLockRequested                                    Hook = 138
-	ObserverLoadProgressChanged                                      Hook = 139
-	ObserverMediaDestroyed                                           Hook = 140
-	ObserverMediaEffectivelyFullscreenChanged                        Hook = 141
-	ObserverMediaMetadataChanged                                     Hook = 142
-	ObserverMediaMutedStatusChanged                                  Hook = 143
-	ObserverMediaPictureInPictureChanged                             Hook = 144
-	ObserverMediaResized                                             Hook = 145
-	ObserverMediaStartedPlaying                                      Hook = 146
-	ObserverMediaStoppedPlaying                                      Hook = 147
-	ObserverNavigationEntriesDeleted                                 Hook = 148
-	ObserverNavigationEntryChanged                                   Hook = 149
-	ObserverNavigationEntryCommitted                                 Hook = 150
-	ObserverNavigationListPruned                                     Hook = 151
-	ObserverNavigationStopped                                        Hook = 152
-	ObserverOnAudioStateChanged                                      Hook = 153
-	ObserverOnBackgroundColorChanged                                 Hook = 154
-	ObserverOnCapabilityTypesChanged                                 Hook = 155
-	ObserverOnCapturedSurfaceControl                                 Hook = 156
-	ObserverOnColorProviderChanged                                   Hook = 157
-	ObserverOnCookiesAccessed1                                       Hook = 158
-	ObserverOnCookiesAccessed2                                       Hook = 159
-	ObserverOnDidAddMessageToConsole                                 Hook = 160
-	ObserverOnFedCmFederatedLogin                                    Hook = 161
-	ObserverOnFirstContentfulPaintInPrimaryMainFrame                 Hook = 162
-	ObserverOnFocusChangedInPage                                     Hook = 163
-	ObserverOnFrameAudioStateChanged                                 Hook = 164
-	ObserverOnFrameIsCapturingMediaStreamChanged                     Hook = 165
-	ObserverOnFrameVisibilityChanged                                 Hook = 166
-	ObserverOnKeepAliveRequestCreated                                Hook = 167
-	ObserverOnLargestContentfulPaintInPrimaryMainFrame               Hook = 168
-	ObserverOnPageScaleFactorChanged                                 Hook = 169
-	ObserverOnPaste                                                  Hook = 170
-	ObserverOnRendererResponsive                                     Hook = 171
-	ObserverOnRendererUnresponsive                                   Hook = 172
-	ObserverOnTextCopiedToClipboard                                  Hook = 173
-	ObserverOnTextSelectionChanged                                   Hook = 174
-	ObserverOnVisibilityChanged                                      Hook = 175
-	ObserverOnVisibilityWillChange                                   Hook = 176
-	ObserverOnWebContentsFocused                                     Hook = 177
-	ObserverOnWebContentsLostFocus                                   Hook = 178
-	ObserverPointerLockRequested                                     Hook = 179
-	ObserverPrimaryMainDocumentElementAvailable                      Hook = 180
-	ObserverPrimaryMainFrameRenderProcessGone                        Hook = 181
-	ObserverPrimaryMainFrameWasResized                               Hook = 182
-	ObserverPrimaryPageChanged                                       Hook = 183
-	ObserverPrimaryPageWillBeDeactivated                             Hook = 184
-	ObserverReadyToCommitNavigation                                  Hook = 185
-	ObserverRenderFrameCreated                                       Hook = 186
-	ObserverRenderFrameDeleted                                       Hook = 187
-	ObserverRenderFrameHostChanged                                   Hook = 188
-	ObserverRenderFrameHostStateChanged                              Hook = 189
-	ObserverRenderViewDeleted                                        Hook = 190
-	ObserverRenderViewHostChanged                                    Hook = 191
-	ObserverRenderViewReady                                          Hook = 192
-	ObserverResourceLoadComplete                                     Hook = 193
-	ObserverSafeAreaConstraintChanged                                Hook = 194
-	ObserverSurfaceEmbedChildWebContentsAttached                     Hook = 195
-	ObserverSurfaceEmbedChildWebContentsDetached                     Hook = 196
-	ObserverTitleWasSet                                              Hook = 197
-	ObserverTitleWasSetForMainFrame                                  Hook = 198
-	ObserverVibrationRequested                                       Hook = 199
-	ObserverWasDiscarded                                             Hook = 200
-	ObserverWebAuthnAssertionRequestSucceeded                        Hook = 201
-	ObserverWebContentsDestroyed                                     Hook = 202
-	DelegateActivateContents                                         Hook = 203
-	DelegateAllowKeyboardLockForInnerContents                        Hook = 204
-	DelegateAllowedPrerenderingCount                                 Hook = 205
-	DelegateCanEnterFullscreenModeForTab                             Hook = 206
-	DelegateCanOverscrollContent                                     Hook = 207
-	DelegateCanUseWindowingControls                                  Hook = 208
-	DelegateCancelKeyboardLockRequest                                Hook = 209
-	DelegateCheckMediaAccessPermission                               Hook = 210
-	DelegateCloseContents                                            Hook = 211
-	DelegateContentsZoomChange                                       Hook = 212
-	DelegateDidAddMessageToConsole                                   Hook = 213
-	DelegateDidChangeCloseSignalInterceptStatus                      Hook = 214
-	DelegateDoBrowserControlsShrinkRendererSize                      Hook = 215
-	DelegateEnterFullscreenModeForTab                                Hook = 216
-	DelegateEnterPictureInPicture                                    Hook = 217
-	DelegateExitFullscreenModeForTab                                 Hook = 218
-	DelegateExitPictureInPicture                                     Hook = 219
-	DelegateFindReply                                                Hook = 220
-	DelegateFullscreenStateChangedForTab                             Hook = 221
-	DelegateGetApplicationContext                                    Hook = 222
-	DelegateGetBottomControlsHeight                                  Hook = 223
-	DelegateGetBottomControlsMinHeight                               Hook = 224
-	DelegateGetCanResize                                             Hook = 225
-	DelegateGetDisplayMode                                           Hook = 226
-	DelegateGetIsAlwaysOnTop                                         Hook = 227
-	DelegateGetTitleForMediaControls                                 Hook = 228
-	DelegateGetTopControlsHeight                                     Hook = 229
-	DelegateGetTopControlsMinHeight                                  Hook = 230
-	DelegateGetVirtualKeyboardHeight                                 Hook = 231
-	DelegateGuestSaveFrame                                           Hook = 232
-	DelegateHandleDragEnded                                          Hook = 233
-	DelegateHandleKeyboardEvent                                      Hook = 234
-	DelegateIsBackForwardCacheSupported                              Hook = 235
-	DelegateIsContentsActive                                         Hook = 236
-	DelegateIsDocumentPictureInPictureBlockedBySystem                Hook = 237
-	DelegateIsFullscreenForTabOrPending                              Hook = 238
-	DelegateIsImmersivePlaybackEnabled                               Hook = 239
-	DelegateIsPictureInPictureEnabled                                Hook = 240
-	DelegateIsPrerender2Supported                                    Hook = 241
-	DelegateIsPrivileged                                             Hook = 242
-	DelegateIsWaitingForPointerLockPrompt                            Hook = 243
-	DelegateLoadingStateChanged                                      Hook = 244
-	DelegateLostPointerLock                                          Hook = 245
-	DelegateMaximizeFromWebAPI                                       Hook = 246
-	DelegateMinimizeFromWebAPI                                       Hook = 247
-	DelegateNavigationStateChanged                                   Hook = 248
-	DelegateOnDidBlockNavigation                                     Hook = 249
-	DelegateOnGoToEntryOffset                                        Hook = 250
-	DelegateOnlyExpandTopControlsAtPageTop                           Hook = 251
-	DelegatePassiveInsecureContentFound                              Hook = 252
-	DelegatePreHandleDragExit                                        Hook = 253
-	DelegatePreHandleKeyboardEvent                                   Hook = 254
-	DelegatePrerenderWebContentsCreated                              Hook = 255
-	DelegatePrerenderWebContentsReleased                             Hook = 256
-	DelegatePrintCrossProcessSubframe                                Hook = 257
-	DelegateRegisterProtocolHandler                                  Hook = 258
-	DelegateRendererResponsive                                       Hook = 259
-	DelegateRequestKeyboardLock                                      Hook = 260
-	DelegateRequestPointerLock                                       Hook = 261
-	DelegateResizeDueToAutoResize                                    Hook = 262
-	DelegateRestoreFromWebAPI                                        Hook = 263
-	DelegateSaveFrame                                                Hook = 264
-	DelegateSetContentsBounds                                        Hook = 265
-	DelegateSetFocusToLocationBar                                    Hook = 266
-	DelegateSetResizableFromWebAPI                                   Hook = 267
-	DelegateSetTopControlsGestureScrollInProgress                    Hook = 268
-	DelegateSetTopControlsShownRatio                                 Hook = 269
-	DelegateShouldAllowLazyLoad                                      Hook = 270
-	DelegateShouldAllowPartialParamMismatchOfPrerender2              Hook = 271
-	DelegateShouldAllowRendererInitiatedCrossProcessNavigation       Hook = 272
-	DelegateShouldAllowRunningInsecureContent                        Hook = 273
-	DelegateShouldAnimateBrowserControlsHeightChanges                Hook = 274
-	DelegateShouldFocusLocationBarByDefault                          Hook = 275
-	DelegateShouldFocusPageAfterCrash                                Hook = 276
-	DelegateShouldOverrideUserAgentForPreloading                     Hook = 277
-	DelegateShouldPreserveAbortedURLs                                Hook = 278
-	DelegateShouldResumeRequestsForCreatedWindow                     Hook = 279
-	DelegateShouldShowStaleContentOnEviction                         Hook = 280
-	DelegateShouldSuppressDialogs                                    Hook = 281
-	DelegateShouldUseInstancedSystemMediaControls                    Hook = 282
-	DelegateShowRepostFormWarningDialog                              Hook = 283
-	DelegateTakeFocus                                                Hook = 284
-	DelegateUnregisterProtocolHandler                                Hook = 285
-	DelegateUpdatePreferredSize                                      Hook = 286
-	DelegateUpdateTargetURL                                          Hook = 287
-	DelegateVisibleSecurityStateChanged                              Hook = 288
-	DelegateWebContentsCreated                                       Hook = 289
-	BrowserAllowCompressionDictionaryTransport                       Hook = 290
-	BrowserAllowGpuLaunchRetryOnIOThread                             Hook = 291
-	BrowserAllowNonActivatedCrossOriginPaintHolding                  Hook = 292
-	BrowserAllowServiceWorkerToControlSrcdocIframe                   Hook = 293
-	BrowserAllowSharedWorkerBlobURLFix                               Hook = 294
-	BrowserAllowSharedWorkerExtendedLifetime                         Hook = 295
-	BrowserAllowSignedExchange                                       Hook = 296
-	BrowserAreDeprecatedAutomaticBeaconCredentialsAllowed            Hook = 297
-	BrowserAreIsolatedWebAppsEnabled                                 Hook = 298
-	BrowserAreThirdPartyCookiesGenerallyAllowed                      Hook = 299
-	BrowserCanAcceptUntrustedExchangesIfNeeded                       Hook = 300
-	BrowserCanCommitURL                                              Hook = 301
-	BrowserCanSendSCTAuditingReport                                  Hook = 302
-	BrowserCanShutdownGpuProcessNowOnIOThread                        Hook = 303
-	BrowserCrossProcessSubframeRenderProcessGone                     Hook = 304
-	BrowserDetermineAddressSpaceFromURL                              Hook = 305
-	BrowserDisallowV8FeatureFlagOverridesForSite                     Hook = 306
-	BrowserDoesSchemeAllowCrossOriginSharedWorker                    Hook = 307
-	BrowserDoesSiteRequireDedicatedProcess                           Hook = 308
-	BrowserDoesWebUIUrlRequireProcessLock                            Hook = 309
-	BrowserEnforceSystemAudioEchoCancellation                        Hook = 310
-	BrowserGetAcceptLangs                                            Hook = 311
-	BrowserGetApplicationClientGUIDForQuarantineCheck                Hook = 312
-	BrowserGetApplicationLocale                                      Hook = 313
-	BrowserGetBtmRemoveMask                                          Hook = 314
-	BrowserGetChildProcessPath                                       Hook = 315
-	BrowserGetDefaultDownloadName                                    Hook = 316
-	BrowserGetDnsTxtResolverUrlPrefix                                Hook = 317
-	BrowserGetFirstPartySetsDirectory                                Hook = 318
-	BrowserGetGPUPersistentCacheDirectory                            Hook = 319
-	BrowserGetGrShaderDiskCacheDirectory                             Hook = 320
-	BrowserGetGraphiteDawnDiskCacheDirectory                         Hook = 321
-	BrowserGetMaxRendererProcessCountOverride                        Hook = 322
-	BrowserGetNetLogDefaultDirectory                                 Hook = 323
-	BrowserGetProcessCountToIgnoreForLimit                           Hook = 324
-	BrowserGetProduct                                                Hook = 325
-	BrowserGetSandboxedStorageServiceDataDirectory                   Hook = 326
-	BrowserGetShaderDiskCacheDirectory                               Hook = 327
-	BrowserGetSiteDisplayNameForCdmProcess                           Hook = 328
-	BrowserGetUserAgent                                              Hook = 329
-	BrowserGetWebUIHostnameForCodeCacheMetrics                       Hook = 330
-	BrowserGrantAdditionalRequestPrivilegesToWorkerProcess           Hook = 331
-	BrowserHasCustomSchemeHandler                                    Hook = 332
-	BrowserHasErrorPage                                              Hook = 333
-	BrowserHasWebRequestAPIProxy                                     Hook = 334
-	BrowserIsAndroidAdvancedProtectionEnabled                        Hook = 335
-	BrowserIsBlobUrlPartitioningEnabled                              Hook = 336
-	BrowserIsBuiltinComponent                                        Hook = 337
-	BrowserIsClearWindowNameForNewBrowsingContextGroupAllowed        Hook = 338
-	BrowserIsClipboardPasteAllowed                                   Hook = 339
-	BrowserIsCrossOriginSubframeAllowedToShowFilePicker              Hook = 340
-	BrowserIsDataSaverEnabled                                        Hook = 341
-	BrowserIsDataUrlInWebWorkerOpaqueOriginEnabled                   Hook = 342
-	BrowserIsExplicitNavigation                                      Hook = 343
-	BrowserIsFileAccessAllowed                                       Hook = 344
-	BrowserIsFileSystemAccessApiFilePickerAllowed                    Hook = 345
-	BrowserIsFileSystemURLNavigationAllowed                          Hook = 346
-	BrowserIsFindInPageDisabledForOrigin                             Hook = 347
-	BrowserIsFirstPartySetsEnabled                                   Hook = 348
-	BrowserIsFullscreenAllowedForUnfocusedWebContents                Hook = 349
-	BrowserIsHandledURL                                              Hook = 350
-	BrowserIsInitialWebUIURL                                         Hook = 351
-	BrowserIsInternalScheme                                          Hook = 352
-	BrowserIsJitDisabledForSite                                      Hook = 353
-	BrowserIsMultiCaptureAllowed                                     Hook = 354
-	BrowserIsPinchToZoomAllowed                                      Hook = 355
-	BrowserIsPopupBypassAllowed                                      Hook = 356
-	BrowserIsPrefetchWithServiceWorkerAllowed                        Hook = 357
-	BrowserIsPrivacySandboxReportingDestinationAttested              Hook = 358
-	BrowserIsRendererProcessPriorityEnabled                          Hook = 359
-	BrowserIsSecureContextRoot                                       Hook = 360
-	BrowserIsSecurityLevelAcceptableForWebAuthn                      Hook = 361
-	BrowserIsServiceWorkerAutoPreloadAllowed                         Hook = 362
-	BrowserIsServiceWorkerSyntheticResponseAllowed                   Hook = 363
-	BrowserIsShuttingDown                                            Hook = 364
-	BrowserIsSystemWideTracingEnabled                                Hook = 365
-	BrowserIsTopChromeWebUIURL                                       Hook = 366
-	BrowserIsTransientActivationRequiredForShowFileOrDirectoryPicker Hook = 367
-	BrowserIsVideoCaptureAllowedWhileScreenLocked                    Hook = 368
-	BrowserIsWebUIAllowedToMakeNetworkRequests                       Hook = 369
-	BrowserIsWebUIBundledCodeCachingEnabled                          Hook = 370
-	BrowserMayDeleteServiceWorkerRegistration                        Hook = 371
-	BrowserMayReuseHost                                              Hook = 372
-	BrowserMaybePrewarmHttpDiskCache                                 Hook = 373
-	BrowserOnDisplayInsecureContent                                  Hook = 374
-	BrowserOnFetchKeepAliveRequestCreated                            Hook = 375
-	BrowserOnFetchKeepAliveRequestDestroyed                          Hook = 376
-	BrowserOnKeepaliveRequestFinished                                Hook = 377
-	BrowserOnKeepaliveRequestStarted                                 Hook = 378
-	BrowserOnNewSCTAuditingReportSent                                Hook = 379
-	BrowserOnRendererProcessLockedStateUpdated                       Hook = 380
-	BrowserOnSharedStorageSelectURLCalled                            Hook = 381
-	BrowserOnSharedStorageWorkletHostCreated                         Hook = 382
-	BrowserOnTracingServiceStarted                                   Hook = 383
-	BrowserOnTracingServiceStopped                                   Hook = 384
-	BrowserOnWebContentsCreated                                      Hook = 385
-	BrowserOriginSupportsConcreteCrossOriginIsolation                Hook = 386
-	BrowserOverridesAudioManager                                     Hook = 387
-	BrowserPersistIsolatedOrigin                                     Hook = 388
-	BrowserRecordAssistedLogin                                       Hook = 389
-	BrowserRenderProcessWillLaunch                                   Hook = 390
-	BrowserSetBrowserStartupIsCompleteForTesting                     Hook = 391
-	BrowserSetIsMinimalMode                                          Hook = 392
-	BrowserShouldAllowBackForwardCacheForCacheControlNoStorePage     Hook = 393
-	BrowserShouldAllowCrossProcessSandboxedFrameForPrecursor         Hook = 394
-	BrowserShouldAllowMojoJsBindingsForFrame                         Hook = 395
-	BrowserShouldAllowNoLongerUsedProcessToExit                      Hook = 396
-	BrowserShouldAllowPrefetchRedirection                            Hook = 397
-	BrowserShouldAllowProcessPerSiteForMultipleMainFrames            Hook = 398
-	BrowserShouldAnimateBackForwardTransitions                       Hook = 399
-	BrowserShouldBlockRendererDebugURL                               Hook = 400
-	BrowserShouldBtmDeleteInteractionRecords                         Hook = 401
-	BrowserShouldCompareEffectiveURLsForSiteInstanceSelection        Hook = 402
-	BrowserShouldDenyRequestOnCertificateError                       Hook = 403
-	BrowserShouldDisableOriginAgentClusterDefault                    Hook = 404
-	BrowserShouldDisableOriginIsolation                              Hook = 405
-	BrowserShouldDisallowCredentialRequest                           Hook = 406
-	BrowserShouldEmbeddedFramesTryToReuseExistingProcess             Hook = 407
-	BrowserShouldEnableBtm                                           Hook = 408
-	BrowserShouldEnableStrictSiteIsolation                           Hook = 409
-	BrowserShouldEnableSubframeZoom                                  Hook = 410
-	BrowserShouldIgnoreSameSiteCookieRestrictionsWhenTopLevel        Hook = 411
-	BrowserShouldInheritCrossOriginEmbedderPolicyImplicitly          Hook = 412
-	BrowserShouldIsolateErrorPage                                    Hook = 413
-	BrowserShouldLockProcessToSite                                   Hook = 414
-	BrowserShouldPreconnectNavigation                                Hook = 415
-	BrowserShouldPrioritizeForBackForwardCache                       Hook = 416
-	BrowserShouldReduceAcceptLanguage                                Hook = 417
-	BrowserShouldReuseAnyExistingProcessForNewMainFrameSiteInstance  Hook = 418
-	BrowserShouldRunOutOfProcessSystemDnsResolution                  Hook = 419
-	BrowserShouldSandboxAudioService                                 Hook = 420
-	BrowserShouldSandboxNetworkService                               Hook = 421
-	BrowserShouldSandboxWebNNCompilerService                         Hook = 422
-	BrowserShouldSendOutermostOriginToRenderer                       Hook = 423
-	BrowserShouldServiceWorkerInheritPolicyContainerFromCreator      Hook = 424
-	BrowserShouldServiceWorkerRequireForegroundPriorityDuringStartup Hook = 425
-	BrowserShouldSkipBeforeUnloadDialog                              Hook = 426
-	BrowserShouldStayInParentProcessForNTP                           Hook = 427
-	BrowserShouldSuppressAXLoadComplete                              Hook = 428
-	BrowserShouldSwapBrowsingInstancesForNavigation                  Hook = 429
-	BrowserShouldTreatAsFirstPartyWhenTopLevel                       Hook = 430
-	BrowserShouldTryToUpdateServiceWorkerRegistration                Hook = 431
-	BrowserShouldTryToUseExistingProcessHost                         Hook = 432
-	BrowserShouldUrlUseApplicationIsolationLevel                     Hook = 433
-	BrowserShouldUseFirstPartyStorageKey                             Hook = 434
-	BrowserShouldUseSpareRenderProcessHost                           Hook = 435
-	BrowserShowCaptionSettings                                       Hook = 436
-	BrowserSiteInstanceGotProcessAndSite                             Hook = 437
-	BrowserSupportsAvoidUnnecessaryBeforeUnloadCheckSync             Hook = 438
-	BrowserSupportsBaselinePermissionsPolicyForIsolatedApp           Hook = 439
-	BrowserSuppressDifferentOriginSubframeJSDialogs                  Hook = 440
-	BrowserUpdateDevToolsBackgroundServiceExpiration                 Hook = 441
-	BrowserUseOutermostMainFrameOrEmbedderForSubCaptureTargets       Hook = 442
-	BrowserUsePrefetchPrerenderIntegration                           Hook = 443
-	BrowserWebPreferencesNeedUpdateForColorRelatedStateChanges       Hook = 444
-	BrowserWillComputeSiteForNavigation                              Hook = 445
-	BrowserWillInterceptWebSocket                                    Hook = 446
-	BrowserWillProvidePublicFirstPartySets                           Hook = 447
-	ThrottleResume                                                   Hook = 448
-	ThrottleWillCommitWithoutUrlLoader                               Hook = 449
-	ThrottleWillFailRequest                                          Hook = 450
-	ThrottleWillProcessResponse                                      Hook = 451
-	ThrottleWillRedirectRequest                                      Hook = 452
-	ThrottleWillStartRequest                                         Hook = 453
+	ObserverDidOpenRequestedURL                                      Hook = 120
+	ObserverDidRedirectNavigation                                    Hook = 121
+	ObserverDidStartLoading                                          Hook = 122
+	ObserverDidStartNavigation                                       Hook = 123
+	ObserverDidStopLoading                                           Hook = 124
+	ObserverDidToggleFullscreenModeForTab                            Hook = 125
+	ObserverDidUpdateAudioMutingState                                Hook = 126
+	ObserverDidUpdateNavigationHandleTiming                          Hook = 127
+	ObserverDidUpdateWebManifestURL                                  Hook = 128
+	ObserverDocumentOnLoadCompletedInPrimaryMainFrame                Hook = 129
+	ObserverDomOperationResponse                                     Hook = 130
+	ObserverFrameDeleted                                             Hook = 131
+	ObserverFrameDisplayStateChanged                                 Hook = 132
+	ObserverFrameNameChanged                                         Hook = 133
+	ObserverFrameReceivedUserActivation                              Hook = 134
+	ObserverFrameSizeChanged                                         Hook = 135
+	ObserverInferredColorSchemeUpdated                               Hook = 136
+	ObserverInnerWebContentsAttached                                 Hook = 137
+	ObserverInnerWebContentsCreated                                  Hook = 138
+	ObserverKeyboardLockRequested                                    Hook = 139
+	ObserverLoadProgressChanged                                      Hook = 140
+	ObserverMediaDestroyed                                           Hook = 141
+	ObserverMediaEffectivelyFullscreenChanged                        Hook = 142
+	ObserverMediaMetadataChanged                                     Hook = 143
+	ObserverMediaMutedStatusChanged                                  Hook = 144
+	ObserverMediaPictureInPictureChanged                             Hook = 145
+	ObserverMediaResized                                             Hook = 146
+	ObserverMediaStartedPlaying                                      Hook = 147
+	ObserverMediaStoppedPlaying                                      Hook = 148
+	ObserverNavigationEntriesDeleted                                 Hook = 149
+	ObserverNavigationEntryChanged                                   Hook = 150
+	ObserverNavigationEntryCommitted                                 Hook = 151
+	ObserverNavigationListPruned                                     Hook = 152
+	ObserverNavigationStopped                                        Hook = 153
+	ObserverOnAudioStateChanged                                      Hook = 154
+	ObserverOnBackgroundColorChanged                                 Hook = 155
+	ObserverOnCapabilityTypesChanged                                 Hook = 156
+	ObserverOnCapturedSurfaceControl                                 Hook = 157
+	ObserverOnColorProviderChanged                                   Hook = 158
+	ObserverOnCookiesAccessed1                                       Hook = 159
+	ObserverOnCookiesAccessed2                                       Hook = 160
+	ObserverOnDidAddMessageToConsole                                 Hook = 161
+	ObserverOnFedCmFederatedLogin                                    Hook = 162
+	ObserverOnFirstContentfulPaintInPrimaryMainFrame                 Hook = 163
+	ObserverOnFocusChangedInPage                                     Hook = 164
+	ObserverOnFrameAudioStateChanged                                 Hook = 165
+	ObserverOnFrameIsCapturingMediaStreamChanged                     Hook = 166
+	ObserverOnFrameVisibilityChanged                                 Hook = 167
+	ObserverOnKeepAliveRequestCreated                                Hook = 168
+	ObserverOnLargestContentfulPaintInPrimaryMainFrame               Hook = 169
+	ObserverOnPageScaleFactorChanged                                 Hook = 170
+	ObserverOnPaste                                                  Hook = 171
+	ObserverOnRendererResponsive                                     Hook = 172
+	ObserverOnRendererUnresponsive                                   Hook = 173
+	ObserverOnTextCopiedToClipboard                                  Hook = 174
+	ObserverOnTextSelectionChanged                                   Hook = 175
+	ObserverOnVisibilityChanged                                      Hook = 176
+	ObserverOnVisibilityWillChange                                   Hook = 177
+	ObserverOnWebContentsFocused                                     Hook = 178
+	ObserverOnWebContentsLostFocus                                   Hook = 179
+	ObserverPointerLockRequested                                     Hook = 180
+	ObserverPrimaryMainDocumentElementAvailable                      Hook = 181
+	ObserverPrimaryMainFrameRenderProcessGone                        Hook = 182
+	ObserverPrimaryMainFrameWasResized                               Hook = 183
+	ObserverPrimaryPageChanged                                       Hook = 184
+	ObserverPrimaryPageWillBeDeactivated                             Hook = 185
+	ObserverReadyToCommitNavigation                                  Hook = 186
+	ObserverRenderFrameCreated                                       Hook = 187
+	ObserverRenderFrameDeleted                                       Hook = 188
+	ObserverRenderFrameHostChanged                                   Hook = 189
+	ObserverRenderFrameHostStateChanged                              Hook = 190
+	ObserverRenderViewDeleted                                        Hook = 191
+	ObserverRenderViewHostChanged                                    Hook = 192
+	ObserverRenderViewReady                                          Hook = 193
+	ObserverResourceLoadComplete                                     Hook = 194
+	ObserverSafeAreaConstraintChanged                                Hook = 195
+	ObserverSurfaceEmbedChildWebContentsAttached                     Hook = 196
+	ObserverSurfaceEmbedChildWebContentsDetached                     Hook = 197
+	ObserverTitleWasSet                                              Hook = 198
+	ObserverTitleWasSetForMainFrame                                  Hook = 199
+	ObserverVibrationRequested                                       Hook = 200
+	ObserverWasDiscarded                                             Hook = 201
+	ObserverWebAuthnAssertionRequestSucceeded                        Hook = 202
+	ObserverWebContentsDestroyed                                     Hook = 203
+	DelegateActivateContents                                         Hook = 204
+	DelegateAllowKeyboardLockForInnerContents                        Hook = 205
+	DelegateAllowedPrerenderingCount                                 Hook = 206
+	DelegateCanEnterFullscreenModeForTab                             Hook = 207
+	DelegateCanOverscrollContent                                     Hook = 208
+	DelegateCanUseWindowingControls                                  Hook = 209
+	DelegateCancelKeyboardLockRequest                                Hook = 210
+	DelegateCheckMediaAccessPermission                               Hook = 211
+	DelegateCloseContents                                            Hook = 212
+	DelegateContentsZoomChange                                       Hook = 213
+	DelegateDidAddMessageToConsole                                   Hook = 214
+	DelegateDidChangeCloseSignalInterceptStatus                      Hook = 215
+	DelegateDoBrowserControlsShrinkRendererSize                      Hook = 216
+	DelegateEnterFullscreenModeForTab                                Hook = 217
+	DelegateEnterPictureInPicture                                    Hook = 218
+	DelegateExitFullscreenModeForTab                                 Hook = 219
+	DelegateExitPictureInPicture                                     Hook = 220
+	DelegateFindReply                                                Hook = 221
+	DelegateFullscreenStateChangedForTab                             Hook = 222
+	DelegateGetApplicationContext                                    Hook = 223
+	DelegateGetBottomControlsHeight                                  Hook = 224
+	DelegateGetBottomControlsMinHeight                               Hook = 225
+	DelegateGetCanResize                                             Hook = 226
+	DelegateGetDisplayMode                                           Hook = 227
+	DelegateGetIsAlwaysOnTop                                         Hook = 228
+	DelegateGetTitleForMediaControls                                 Hook = 229
+	DelegateGetTopControlsHeight                                     Hook = 230
+	DelegateGetTopControlsMinHeight                                  Hook = 231
+	DelegateGetVirtualKeyboardHeight                                 Hook = 232
+	DelegateGuestSaveFrame                                           Hook = 233
+	DelegateHandleDragEnded                                          Hook = 234
+	DelegateHandleKeyboardEvent                                      Hook = 235
+	DelegateIsBackForwardCacheSupported                              Hook = 236
+	DelegateIsContentsActive                                         Hook = 237
+	DelegateIsDocumentPictureInPictureBlockedBySystem                Hook = 238
+	DelegateIsFullscreenForTabOrPending                              Hook = 239
+	DelegateIsImmersivePlaybackEnabled                               Hook = 240
+	DelegateIsPictureInPictureEnabled                                Hook = 241
+	DelegateIsPrerender2Supported                                    Hook = 242
+	DelegateIsPrivileged                                             Hook = 243
+	DelegateIsWaitingForPointerLockPrompt                            Hook = 244
+	DelegateLoadingStateChanged                                      Hook = 245
+	DelegateLostPointerLock                                          Hook = 246
+	DelegateMaximizeFromWebAPI                                       Hook = 247
+	DelegateMinimizeFromWebAPI                                       Hook = 248
+	DelegateNavigationStateChanged                                   Hook = 249
+	DelegateOnDidBlockNavigation                                     Hook = 250
+	DelegateOnGoToEntryOffset                                        Hook = 251
+	DelegateOnlyExpandTopControlsAtPageTop                           Hook = 252
+	DelegatePassiveInsecureContentFound                              Hook = 253
+	DelegatePreHandleDragExit                                        Hook = 254
+	DelegatePreHandleKeyboardEvent                                   Hook = 255
+	DelegatePrerenderWebContentsCreated                              Hook = 256
+	DelegatePrerenderWebContentsReleased                             Hook = 257
+	DelegatePrintCrossProcessSubframe                                Hook = 258
+	DelegateRegisterProtocolHandler                                  Hook = 259
+	DelegateRendererResponsive                                       Hook = 260
+	DelegateRequestKeyboardLock                                      Hook = 261
+	DelegateRequestPointerLock                                       Hook = 262
+	DelegateResizeDueToAutoResize                                    Hook = 263
+	DelegateRestoreFromWebAPI                                        Hook = 264
+	DelegateSaveFrame                                                Hook = 265
+	DelegateSetContentsBounds                                        Hook = 266
+	DelegateSetFocusToLocationBar                                    Hook = 267
+	DelegateSetResizableFromWebAPI                                   Hook = 268
+	DelegateSetTopControlsGestureScrollInProgress                    Hook = 269
+	DelegateSetTopControlsShownRatio                                 Hook = 270
+	DelegateShouldAllowLazyLoad                                      Hook = 271
+	DelegateShouldAllowPartialParamMismatchOfPrerender2              Hook = 272
+	DelegateShouldAllowRendererInitiatedCrossProcessNavigation       Hook = 273
+	DelegateShouldAllowRunningInsecureContent                        Hook = 274
+	DelegateShouldAnimateBrowserControlsHeightChanges                Hook = 275
+	DelegateShouldFocusLocationBarByDefault                          Hook = 276
+	DelegateShouldFocusPageAfterCrash                                Hook = 277
+	DelegateShouldOverrideUserAgentForPreloading                     Hook = 278
+	DelegateShouldPreserveAbortedURLs                                Hook = 279
+	DelegateShouldResumeRequestsForCreatedWindow                     Hook = 280
+	DelegateShouldShowStaleContentOnEviction                         Hook = 281
+	DelegateShouldSuppressDialogs                                    Hook = 282
+	DelegateShouldUseInstancedSystemMediaControls                    Hook = 283
+	DelegateShowRepostFormWarningDialog                              Hook = 284
+	DelegateTakeFocus                                                Hook = 285
+	DelegateUnregisterProtocolHandler                                Hook = 286
+	DelegateUpdatePreferredSize                                      Hook = 287
+	DelegateUpdateTargetURL                                          Hook = 288
+	DelegateVisibleSecurityStateChanged                              Hook = 289
+	DelegateWebContentsCreated                                       Hook = 290
+	BrowserAllowCompressionDictionaryTransport                       Hook = 291
+	BrowserAllowGpuLaunchRetryOnIOThread                             Hook = 292
+	BrowserAllowNonActivatedCrossOriginPaintHolding                  Hook = 293
+	BrowserAllowServiceWorkerToControlSrcdocIframe                   Hook = 294
+	BrowserAllowSharedWorker                                         Hook = 295
+	BrowserAllowSharedWorkerBlobURLFix                               Hook = 296
+	BrowserAllowSharedWorkerExtendedLifetime                         Hook = 297
+	BrowserAllowSignedExchange                                       Hook = 298
+	BrowserAreDeprecatedAutomaticBeaconCredentialsAllowed            Hook = 299
+	BrowserAreIsolatedWebAppsEnabled                                 Hook = 300
+	BrowserAreThirdPartyCookiesGenerallyAllowed                      Hook = 301
+	BrowserCanAcceptUntrustedExchangesIfNeeded                       Hook = 302
+	BrowserCanCommitURL                                              Hook = 303
+	BrowserCanSendSCTAuditingReport                                  Hook = 304
+	BrowserCanShutdownGpuProcessNowOnIOThread                        Hook = 305
+	BrowserCrossProcessSubframeRenderProcessGone                     Hook = 306
+	BrowserDetermineAddressSpaceFromURL                              Hook = 307
+	BrowserDisallowV8FeatureFlagOverridesForSite                     Hook = 308
+	BrowserDoesSchemeAllowCrossOriginSharedWorker                    Hook = 309
+	BrowserDoesSiteRequireDedicatedProcess                           Hook = 310
+	BrowserDoesWebUIUrlRequireProcessLock                            Hook = 311
+	BrowserEnforceSystemAudioEchoCancellation                        Hook = 312
+	BrowserGetAcceptLangs                                            Hook = 313
+	BrowserGetApplicationClientGUIDForQuarantineCheck                Hook = 314
+	BrowserGetApplicationLocale                                      Hook = 315
+	BrowserGetBtmRemoveMask                                          Hook = 316
+	BrowserGetChildProcessPath                                       Hook = 317
+	BrowserGetDefaultDownloadName                                    Hook = 318
+	BrowserGetDnsTxtResolverUrlPrefix                                Hook = 319
+	BrowserGetFirstPartySetsDirectory                                Hook = 320
+	BrowserGetGPUPersistentCacheDirectory                            Hook = 321
+	BrowserGetGrShaderDiskCacheDirectory                             Hook = 322
+	BrowserGetGraphiteDawnDiskCacheDirectory                         Hook = 323
+	BrowserGetMaxRendererProcessCountOverride                        Hook = 324
+	BrowserGetNetLogDefaultDirectory                                 Hook = 325
+	BrowserGetProcessCountToIgnoreForLimit                           Hook = 326
+	BrowserGetProduct                                                Hook = 327
+	BrowserGetSandboxedStorageServiceDataDirectory                   Hook = 328
+	BrowserGetShaderDiskCacheDirectory                               Hook = 329
+	BrowserGetSiteDisplayNameForCdmProcess                           Hook = 330
+	BrowserGetUserAgent                                              Hook = 331
+	BrowserGetWebUIHostnameForCodeCacheMetrics                       Hook = 332
+	BrowserGrantAdditionalRequestPrivilegesToWorkerProcess           Hook = 333
+	BrowserHasCustomSchemeHandler                                    Hook = 334
+	BrowserHasErrorPage                                              Hook = 335
+	BrowserHasWebRequestAPIProxy                                     Hook = 336
+	BrowserIsAndroidAdvancedProtectionEnabled                        Hook = 337
+	BrowserIsBlobUrlPartitioningEnabled                              Hook = 338
+	BrowserIsBuiltinComponent                                        Hook = 339
+	BrowserIsClearWindowNameForNewBrowsingContextGroupAllowed        Hook = 340
+	BrowserIsClipboardPasteAllowed                                   Hook = 341
+	BrowserIsCrossOriginSubframeAllowedToShowFilePicker              Hook = 342
+	BrowserIsDataSaverEnabled                                        Hook = 343
+	BrowserIsDataUrlInWebWorkerOpaqueOriginEnabled                   Hook = 344
+	BrowserIsExplicitNavigation                                      Hook = 345
+	BrowserIsFileAccessAllowed                                       Hook = 346
+	BrowserIsFileSystemAccessApiFilePickerAllowed                    Hook = 347
+	BrowserIsFileSystemURLNavigationAllowed                          Hook = 348
+	BrowserIsFindInPageDisabledForOrigin                             Hook = 349
+	BrowserIsFirstPartySetsEnabled                                   Hook = 350
+	BrowserIsFullCookieAccessAllowed                                 Hook = 351
+	BrowserIsFullscreenAllowedForUnfocusedWebContents                Hook = 352
+	BrowserIsHandledURL                                              Hook = 353
+	BrowserIsInitialWebUIURL                                         Hook = 354
+	BrowserIsInternalScheme                                          Hook = 355
+	BrowserIsJitDisabledForSite                                      Hook = 356
+	BrowserIsMultiCaptureAllowed                                     Hook = 357
+	BrowserIsPinchToZoomAllowed                                      Hook = 358
+	BrowserIsPopupBypassAllowed                                      Hook = 359
+	BrowserIsPrefetchWithServiceWorkerAllowed                        Hook = 360
+	BrowserIsPrivacySandboxReportingDestinationAttested              Hook = 361
+	BrowserIsRendererProcessPriorityEnabled                          Hook = 362
+	BrowserIsSecureContextRoot                                       Hook = 363
+	BrowserIsSecurityLevelAcceptableForWebAuthn                      Hook = 364
+	BrowserIsServiceWorkerAutoPreloadAllowed                         Hook = 365
+	BrowserIsServiceWorkerSyntheticResponseAllowed                   Hook = 366
+	BrowserIsShuttingDown                                            Hook = 367
+	BrowserIsSystemWideTracingEnabled                                Hook = 368
+	BrowserIsTopChromeWebUIURL                                       Hook = 369
+	BrowserIsTransientActivationRequiredForShowFileOrDirectoryPicker Hook = 370
+	BrowserIsVideoCaptureAllowedWhileScreenLocked                    Hook = 371
+	BrowserIsWebUIAllowedToMakeNetworkRequests                       Hook = 372
+	BrowserIsWebUIBundledCodeCachingEnabled                          Hook = 373
+	BrowserMayDeleteServiceWorkerRegistration                        Hook = 374
+	BrowserMayReuseHost                                              Hook = 375
+	BrowserMaybePrewarmHttpDiskCache                                 Hook = 376
+	BrowserOnDisplayInsecureContent                                  Hook = 377
+	BrowserOnFetchKeepAliveRequestCreated                            Hook = 378
+	BrowserOnFetchKeepAliveRequestDestroyed                          Hook = 379
+	BrowserOnKeepaliveRequestFinished                                Hook = 380
+	BrowserOnKeepaliveRequestStarted                                 Hook = 381
+	BrowserOnNewSCTAuditingReportSent                                Hook = 382
+	BrowserOnRendererProcessLockedStateUpdated                       Hook = 383
+	BrowserOnSharedStorageSelectURLCalled                            Hook = 384
+	BrowserOnSharedStorageWorkletHostCreated                         Hook = 385
+	BrowserOnTracingServiceStarted                                   Hook = 386
+	BrowserOnTracingServiceStopped                                   Hook = 387
+	BrowserOnWebContentsCreated                                      Hook = 388
+	BrowserOriginSupportsConcreteCrossOriginIsolation                Hook = 389
+	BrowserOverridesAudioManager                                     Hook = 390
+	BrowserPersistIsolatedOrigin                                     Hook = 391
+	BrowserRecordAssistedLogin                                       Hook = 392
+	BrowserRenderProcessWillLaunch                                   Hook = 393
+	BrowserSetBrowserStartupIsCompleteForTesting                     Hook = 394
+	BrowserSetIsMinimalMode                                          Hook = 395
+	BrowserShouldAllowBackForwardCacheForCacheControlNoStorePage     Hook = 396
+	BrowserShouldAllowCrossProcessSandboxedFrameForPrecursor         Hook = 397
+	BrowserShouldAllowMojoJsBindingsForFrame                         Hook = 398
+	BrowserShouldAllowNoLongerUsedProcessToExit                      Hook = 399
+	BrowserShouldAllowPrefetchRedirection                            Hook = 400
+	BrowserShouldAllowProcessPerSiteForMultipleMainFrames            Hook = 401
+	BrowserShouldAnimateBackForwardTransitions                       Hook = 402
+	BrowserShouldBlockRendererDebugURL                               Hook = 403
+	BrowserShouldBtmDeleteInteractionRecords                         Hook = 404
+	BrowserShouldCompareEffectiveURLsForSiteInstanceSelection        Hook = 405
+	BrowserShouldDenyRequestOnCertificateError                       Hook = 406
+	BrowserShouldDisableOriginAgentClusterDefault                    Hook = 407
+	BrowserShouldDisableOriginIsolation                              Hook = 408
+	BrowserShouldDisableSiteIsolation                                Hook = 409
+	BrowserShouldDisallowCredentialRequest                           Hook = 410
+	BrowserShouldEmbeddedFramesTryToReuseExistingProcess             Hook = 411
+	BrowserShouldEnableBtm                                           Hook = 412
+	BrowserShouldEnableStrictSiteIsolation                           Hook = 413
+	BrowserShouldEnableSubframeZoom                                  Hook = 414
+	BrowserShouldIgnoreSameSiteCookieRestrictionsWhenTopLevel        Hook = 415
+	BrowserShouldInheritCrossOriginEmbedderPolicyImplicitly          Hook = 416
+	BrowserShouldIsolateErrorPage                                    Hook = 417
+	BrowserShouldLockProcessToSite                                   Hook = 418
+	BrowserShouldPreconnectNavigation                                Hook = 419
+	BrowserShouldPrioritizeForBackForwardCache                       Hook = 420
+	BrowserShouldReduceAcceptLanguage                                Hook = 421
+	BrowserShouldReuseAnyExistingProcessForNewMainFrameSiteInstance  Hook = 422
+	BrowserShouldRunOutOfProcessSystemDnsResolution                  Hook = 423
+	BrowserShouldSandboxAudioService                                 Hook = 424
+	BrowserShouldSandboxNetworkService                               Hook = 425
+	BrowserShouldSandboxWebNNCompilerService                         Hook = 426
+	BrowserShouldSendOutermostOriginToRenderer                       Hook = 427
+	BrowserShouldServiceWorkerInheritPolicyContainerFromCreator      Hook = 428
+	BrowserShouldServiceWorkerRequireForegroundPriorityDuringStartup Hook = 429
+	BrowserShouldSkipBeforeUnloadDialog                              Hook = 430
+	BrowserShouldStayInParentProcessForNTP                           Hook = 431
+	BrowserShouldSuppressAXLoadComplete                              Hook = 432
+	BrowserShouldSwapBrowsingInstancesForNavigation                  Hook = 433
+	BrowserShouldTreatAsFirstPartyWhenTopLevel                       Hook = 434
+	BrowserShouldTryToUpdateServiceWorkerRegistration                Hook = 435
+	BrowserShouldTryToUseExistingProcessHost                         Hook = 436
+	BrowserShouldUrlUseApplicationIsolationLevel                     Hook = 437
+	BrowserShouldUseFirstPartyStorageKey                             Hook = 438
+	BrowserShouldUseSpareRenderProcessHost                           Hook = 439
+	BrowserShowCaptionSettings                                       Hook = 440
+	BrowserSiteInstanceGotProcessAndSite                             Hook = 441
+	BrowserSupportsAvoidUnnecessaryBeforeUnloadCheckSync             Hook = 442
+	BrowserSupportsBaselinePermissionsPolicyForIsolatedApp           Hook = 443
+	BrowserSuppressDifferentOriginSubframeJSDialogs                  Hook = 444
+	BrowserUpdateDevToolsBackgroundServiceExpiration                 Hook = 445
+	BrowserUseOutermostMainFrameOrEmbedderForSubCaptureTargets       Hook = 446
+	BrowserUsePrefetchPrerenderIntegration                           Hook = 447
+	BrowserWebPreferencesNeedUpdateForColorRelatedStateChanges       Hook = 448
+	BrowserWillComputeSiteForNavigation                              Hook = 449
+	BrowserWillInterceptWebSocket                                    Hook = 450
+	BrowserWillProvidePublicFirstPartySets                           Hook = 451
+	ThrottleResume                                                   Hook = 452
+	ThrottleWillCommitWithoutUrlLoader                               Hook = 453
+	ThrottleWillFailRequest                                          Hook = 454
+	ThrottleWillProcessResponse                                      Hook = 455
+	ThrottleWillRedirectRequest                                      Hook = 456
+	ThrottleWillStartRequest                                         Hook = 457
 )
 
 // Where each class's numbers start, so Dispatch can pick the class.
 const (
 	FirstHook     Hook = 100
 	firstObserver Hook = 100
-	firstDelegate Hook = 203
-	firstBrowser  Hook = 290
-	firstThrottle Hook = 448
+	firstDelegate Hook = 204
+	firstBrowser  Hook = 291
+	firstThrottle Hook = 452
 )
 
 // Names gives each hook's content name, for stats and logs.
@@ -395,6 +399,7 @@ var Names = map[Hook]string{
 	ObserverDidGetIgnoredUIEvent:                                     "WebContentsObserver.DidGetIgnoredUIEvent",
 	ObserverDidGetUserInteraction:                                    "WebContentsObserver.DidGetUserInteraction",
 	ObserverDidLoadResourceFromMemoryCache:                           "WebContentsObserver.DidLoadResourceFromMemoryCache",
+	ObserverDidOpenRequestedURL:                                      "WebContentsObserver.DidOpenRequestedURL",
 	ObserverDidRedirectNavigation:                                    "WebContentsObserver.DidRedirectNavigation",
 	ObserverDidStartLoading:                                          "WebContentsObserver.DidStartLoading",
 	ObserverDidStartNavigation:                                       "WebContentsObserver.DidStartNavigation",
@@ -569,6 +574,7 @@ var Names = map[Hook]string{
 	BrowserAllowGpuLaunchRetryOnIOThread:                             "ContentBrowserClient.AllowGpuLaunchRetryOnIOThread",
 	BrowserAllowNonActivatedCrossOriginPaintHolding:                  "ContentBrowserClient.AllowNonActivatedCrossOriginPaintHolding",
 	BrowserAllowServiceWorkerToControlSrcdocIframe:                   "ContentBrowserClient.AllowServiceWorkerToControlSrcdocIframe",
+	BrowserAllowSharedWorker:                                         "ContentBrowserClient.AllowSharedWorker",
 	BrowserAllowSharedWorkerBlobURLFix:                               "ContentBrowserClient.AllowSharedWorkerBlobURLFix",
 	BrowserAllowSharedWorkerExtendedLifetime:                         "ContentBrowserClient.AllowSharedWorkerExtendedLifetime",
 	BrowserAllowSignedExchange:                                       "ContentBrowserClient.AllowSignedExchange",
@@ -624,6 +630,7 @@ var Names = map[Hook]string{
 	BrowserIsFileSystemURLNavigationAllowed:                          "ContentBrowserClient.IsFileSystemURLNavigationAllowed",
 	BrowserIsFindInPageDisabledForOrigin:                             "ContentBrowserClient.IsFindInPageDisabledForOrigin",
 	BrowserIsFirstPartySetsEnabled:                                   "ContentBrowserClient.IsFirstPartySetsEnabled",
+	BrowserIsFullCookieAccessAllowed:                                 "ContentBrowserClient.IsFullCookieAccessAllowed",
 	BrowserIsFullscreenAllowedForUnfocusedWebContents:                "ContentBrowserClient.IsFullscreenAllowedForUnfocusedWebContents",
 	BrowserIsHandledURL:                                              "ContentBrowserClient.IsHandledURL",
 	BrowserIsInitialWebUIURL:                                         "ContentBrowserClient.IsInitialWebUIURL",
@@ -681,6 +688,7 @@ var Names = map[Hook]string{
 	BrowserShouldDenyRequestOnCertificateError:                       "ContentBrowserClient.ShouldDenyRequestOnCertificateError",
 	BrowserShouldDisableOriginAgentClusterDefault:                    "ContentBrowserClient.ShouldDisableOriginAgentClusterDefault",
 	BrowserShouldDisableOriginIsolation:                              "ContentBrowserClient.ShouldDisableOriginIsolation",
+	BrowserShouldDisableSiteIsolation:                                "ContentBrowserClient.ShouldDisableSiteIsolation",
 	BrowserShouldDisallowCredentialRequest:                           "ContentBrowserClient.ShouldDisallowCredentialRequest",
 	BrowserShouldEmbeddedFramesTryToReuseExistingProcess:             "ContentBrowserClient.ShouldEmbeddedFramesTryToReuseExistingProcess",
 	BrowserShouldEnableBtm:                                           "ContentBrowserClient.ShouldEnableBtm",
@@ -730,6 +738,26 @@ var Names = map[Hook]string{
 	ThrottleWillRedirectRequest:                                      "NavigationThrottle.WillRedirectRequest",
 	ThrottleWillStartRequest:                                         "NavigationThrottle.WillStartRequest",
 }
+
+// WindowOpenDisposition is WindowOpenDisposition.
+type WindowOpenDisposition int64
+
+const (
+	WindowOpenDispositionUnknown             WindowOpenDisposition = 0
+	WindowOpenDispositionCurrentTab          WindowOpenDisposition = 1
+	WindowOpenDispositionSingletonTab        WindowOpenDisposition = 2
+	WindowOpenDispositionNewForegroundTab    WindowOpenDisposition = 3
+	WindowOpenDispositionNewBackgroundTab    WindowOpenDisposition = 4
+	WindowOpenDispositionNewPopup            WindowOpenDisposition = 5
+	WindowOpenDispositionNewWindow           WindowOpenDisposition = 6
+	WindowOpenDispositionSaveToDisk          WindowOpenDisposition = 7
+	WindowOpenDispositionOffTheRecord        WindowOpenDisposition = 8
+	WindowOpenDispositionIgnoreAction        WindowOpenDisposition = 9
+	WindowOpenDispositionSwitchToTab         WindowOpenDisposition = 10
+	WindowOpenDispositionNewPictureInPicture WindowOpenDisposition = 11
+	WindowOpenDispositionNewSplitView        WindowOpenDisposition = 12
+	WindowOpenDispositionMaxValue            WindowOpenDisposition = 12
+)
 
 // TerminationStatus is base::TerminationStatus.
 type TerminationStatus int64
@@ -952,6 +980,16 @@ const (
 	PreferredColorSchemeMaxValue PreferredColorScheme = 1
 )
 
+// SharedWorkerSameSiteCookies is blink::mojom::SharedWorkerSameSiteCookies.
+type SharedWorkerSameSiteCookies int64
+
+const (
+	SharedWorkerSameSiteCookiesAll      SharedWorkerSameSiteCookies = 0
+	SharedWorkerSameSiteCookiesNone     SharedWorkerSameSiteCookies = 1
+	SharedWorkerSameSiteCookiesMinValue SharedWorkerSameSiteCookies = 0
+	SharedWorkerSameSiteCookiesMaxValue SharedWorkerSameSiteCookies = 1
+)
+
 // ChildProcessSecurityPolicyIsolatedOriginSource is content::ChildProcessSecurityPolicy::IsolatedOriginSource.
 type ChildProcessSecurityPolicyIsolatedOriginSource int64
 
@@ -1134,6 +1172,14 @@ const (
 	RenderFrameHostLifecycleStatePrerendering       RenderFrameHostLifecycleState = 2
 	RenderFrameHostLifecycleStateInBackForwardCache RenderFrameHostLifecycleState = 3
 	RenderFrameHostLifecycleStatePendingDeletion    RenderFrameHostLifecycleState = 4
+)
+
+// SiteIsolationMode is content::SiteIsolationMode.
+type SiteIsolationMode int64
+
+const (
+	SiteIsolationModeStrictSiteIsolation  SiteIsolationMode = 0
+	SiteIsolationModePartialSiteIsolation SiteIsolationMode = 1
 )
 
 // Visibility is content::Visibility.
@@ -1488,6 +1534,19 @@ const (
 	VerticalScrollDirectionDown VerticalScrollDirection = 1
 	VerticalScrollDirectionUp   VerticalScrollDirection = 2
 )
+
+// StorageKey is a copy of blink::StorageKey taken when the hook fired.
+type StorageKey struct {
+	Origin       string
+	TopLevelSite string
+}
+
+func (r *reader) storageKey() StorageKey {
+	return StorageKey{
+		Origin:       r.str(),
+		TopLevelSite: r.str(),
+	}
+}
 
 // WebInputEvent is a copy of blink::WebInputEvent taken when the hook fired.
 type WebInputEvent struct {

@@ -77,6 +77,11 @@ is already that table) can produce the C header, the shims, the exports and the
 `main.cc` initialiser. About a hundred lines of Go, run from `engine/build_go.py`. Until
 then every feature pays the six-file toll and a junior will miss one of the six.
 
+*Done for the engine-to-Go direction on branch `hooks` (2026-11-09): `PBGoCalls` is one
+`hook` function and content's hooks are generated, so a new use of one is a Go change
+only. The Go-to-engine direction still pays its toll; [content-hooks.md](content-hooks.md)
+says what the same approach would do there.*
+
 ## 4. One shared library and two thin binaries: good
 
 Untouched this session and it never got in the way. Incremental builds of an adapter
@@ -190,6 +195,7 @@ header (`engine/BUILD.gn`). Leave it alone.
 
 1. **Generate the C glue** from the Go interface: header, shims, exports and the
    `main.cc` table. Removes the six-file toll and the namespace clash class of error.
+   *The C++-to-Go half is done (`tools/gen_hooks.py`); the Go-to-C++ half is not.*
 2. **Move focus policy into Go.** Let the tabs manager call `FocusPage` or
    `FocusShell` when the active tab changes, so Cmd+W followed by Cmd+W works and the
    shell stops deciding where the keyboard goes.

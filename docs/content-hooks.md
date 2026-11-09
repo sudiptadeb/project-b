@@ -8,11 +8,11 @@ where it is carried or why it is left.
 
 | Class | Hooks | Carried, plain data | Carried, struct copy | Left |
 |---|---:|---:|---:|---:|
-| `WebContentsObserver` | 124 | 45 | 58 | 21 |
+| `WebContentsObserver` | 124 | 45 | 59 | 20 |
 | `WebContentsDelegate` | 120 | 32 | 55 | 33 |
-| `ContentBrowserClient` | 347 | 76 | 82 | 189 |
+| `ContentBrowserClient` | 347 | 77 | 84 | 186 |
 | `NavigationThrottle` | 7 | 6 | 0 | 1 |
-| **Total** | **598** | **159** | **195** | **244** |
+| **Total** | **598** | **160** | **198** | **240** |
 | `ContentRendererClient` (renderer process) | 62 | 0 | 0 | 62 |
 | `ContentUtilityClient` (utility process) | 5 | 0 | 0 | 5 |
 
@@ -20,9 +20,9 @@ Left, by group:
 
 | Group | `WebContentsObserver` | `WebContentsDelegate` | `ContentBrowserClient` | `NavigationThrottle` | Total |
 |---|---:|---:|---:|---:|---:|
-| objects without a copier | 21 | 13 | 75 | 1 | 110 |
-| factories and object returns | 0 | 8 | 66 | 0 | 74 |
-| callbacks | 0 | 6 | 12 | 0 | 18 |
+| objects without a copier | 20 | 13 | 70 | 1 | 104 |
+| factories and object returns | 0 | 8 | 67 | 0 | 75 |
+| callbacks | 0 | 6 | 13 | 0 | 19 |
 | off the main thread | 0 | 0 | 15 | 0 | 15 |
 | Mojo | 0 | 0 | 10 | 0 | 10 |
 | other returns | 0 | 2 | 5 | 0 | 7 |
@@ -30,6 +30,175 @@ Left, by group:
 | out-parameters | 0 | 1 | 4 | 0 | 5 |
 
 <!-- hand -->
+## How it works
+
+Every carried hook has a number. A generated C++ class (`engine/browser/hooks_gen.h`)
+overrides it, checks one bit, and when Go subscribed copies the arguments into a flat
+list of plain values and calls Go once: `hook(number, values)`. Go decodes the list with
+a generated reader (`core/content/*_gen.go`) and calls the typed functions registered for
+that number. A hook that wants an answer gets it from the one function set with
+`Answer…`, or runs content's default when Go returns false. Content's objects never
+cross: a `WebContents` crosses as a `content.WebContents` copy, a `NavigationHandle` as a
+`content.NavigationHandle` copy, and so on. The copiers are the `COPIERS` table at the top
+of `tools/gen_hooks.py`: each line is a field Go may know about the object.
+
+Raw hooks stop in `core/content`. `wire.go` turns the ones the app uses into
+`engine.Listener` calls; managers never see content's names, so the mock and any second
+engine still fit the same interface.
+
+Every tab hook arrives with the tab's state at that moment (`content.WebContents`: id, URL,
+title, back and forward, loading, visibility) as its first argument, so Go never has to
+ask content anything. The shell's own page is tab 0.
+
+**To use a hook nobody uses yet:** find it in the table at the bottom, subscribe to it in
+`core/content/wire.go`, say what it means in `engine.Listener`, and wire the manager in
+`core/app/app.go`. No C, no C++, no library rebuild. `LoadProgressChanged` was added this
+way: the library kept the same bytes and mtime, and the incremental build took 17 s
+(`project_b` relinked, nothing else).
+
+**When Chromium is upgraded:** run `python3 tools/gen_hooks.py` against the fresh
+`out/pb` (about five minutes the first time, under a minute with its cache under
+`build/gen_hooks/`), check the result in, rebuild. The numbers may move; both sides come
+from one run, the library carries the table's hash, and Go refuses to start against a
+library built from a different table.
+
+## What it costs
+
+Measured by the driver's `stats` command on the M3 Ultra, non-official build, DCHECKs on:
+
+| What | Cost |
+|---|---:|
+| A hook Go did not subscribe to | 2 ns (the bit check, then content's own call) |
+| A bare crossing, no values | 120 ns |
+| A subscribed tab hook: copy the tab's state, cross, decode in Go | 2.3 to 2.8 µs |
+| Library, before and after 358 generated overrides | 415,435,168 B → 415,544,448 B (+109 KB, 0.03%); `__TEXT` +65 KB |
+| `project_b` (the Go side) | 2,594,384 B → 2,898,560 B (+304 KB) |
+| Key press to next frames, inside the shell | median 8.3 to 10.0 ms, max 21 to 27 ms over three runs (was 8.6 to 12.1 ms, max 33) |
+
+The 2.5 µs of a subscribed crossing is the copy of the tab's state (the title's UTF-16 to
+UTF-8, can-go-back walking the entries) and seven Go allocations on decode. A key press
+or a navigation pays it once; nothing carried here fires per frame. A leaner copy is one
+line less in `COPIERS`.
+
+## What is left, by group, and what to do about each
+
+The table above has the counts. In plain words:
+
+**Objects without a copier (the biggest group).** A hook whose argument is a content
+object this file has no copier for. Each one is ten lines in `COPIERS` (the fields Go may
+know) and no new mechanism. Do it when a hook is wanted, not before; the generator then
+carries every hook that was waiting on that type. Types with enterprise value here:
+`MediaStreamRequest` (media permission), `net::SSLInfo` and `net::SSLCertRequestInfo`
+(certificates), `net::AuthChallengeInfo` (proxy and HTTP auth), `ClipboardEndpoint` and
+`DropData` (DLP), `WebPreferences` (per-site settings; also an out-parameter, below).
+
+**Factories and object returns.** Content asks for an object it will own and call:
+`CreateBrowserMainParts`, `GetWebContentsViewDelegate`, `CreateClientCertStore`,
+`CreateDevToolsManagerDelegate`, the `JavaScriptDialogManager`. Go cannot make content
+objects. The right shape is the one the navigation gate already has: a C++ class whose
+hooks are generated, made by a five-line hand-written factory. `NavigationThrottle` is in
+`CLASSES` for that reason, and the throttle it produces costs one bit check per hook when
+Go has not subscribed. Add a class the same way when it is needed. Worth adding first:
+`JavaScriptDialogManager` (dialogs), `LoginDelegate` (auth), `WebContentsViewDelegate`
+(context menu), `DownloadManagerDelegate` (downloads; not a `ContentBrowserClient` hook
+but the same shape).
+
+**Callbacks.** The hook hands over a `base::OnceCallback` and expects the answer later:
+`RequestMediaAccessPermission`, `HandleExternalProtocol`, `CanDownload`, `CreateURLLoaderThrottles`.
+The mechanism is small: C++ keeps the callback in a table under an id, passes the id as a
+value, and one new engine call, `answer(id, values)`, runs it; the generator classifies
+`OnceCallback<void(T...)>` as an id argument and writes the Go side as a function Go
+calls when it has decided. About a hundred lines in `hooks.cc`, one `PBEngineCalls`
+entry and a generator change. The same mechanism gives the navigation gate `DEFER` and
+resume, which is what holding a navigation for a prompt needs. Do it when the first
+prompt is built.
+
+**Mojo.** `PendingReceiver` and `PendingRemote` arguments: content asking the embedder to
+implement a Mojo interface for another process (`BindHostReceiverForRenderer`,
+`RegisterBrowserInterfaceBindersForFrame`, `CreateMediaRemoter`). Go would have to speak
+Mojo. Leave them; when one is needed, implement it in C++ and let that implementation
+raise generated hooks, as the throttle does.
+
+**Off the main thread.** Fifteen `ContentBrowserClient` hooks whose header comment says
+they run on the IO thread, any thread or the thread pool. Go managers live on the main
+thread, so a crossing there would race them. Leave them. The only one with enterprise
+weight, `WillCreateURLLoaderRequestInterceptors`, is covered under URL policy below. The
+classification is from content's comments; `hooks::Fire` and `hooks::Ask` CHECK the
+thread, so a wrong one shows in development, not in production.
+
+**Out-parameters and mutable references.** `OverrideWebPreferences(WebPreferences&)`,
+`GetAdditionalWebUISchemes(std::vector<std::string>*)`, `BeforeUnloadFired(bool* proceed)`.
+The pattern is a Go answer that is a struct of the fields to change; the generator does
+not have it yet. Per hook when needed, half a day for the mechanism.
+
+**Other returns.** Seven return `std::optional`: a second answer slot, thirty lines. Two
+return a struct copy (`GetSizeForNewRenderView`): the same slot. Do when needed.
+
+**Ownership.** `AddNewContents` and `RunFileChooser` receive a `unique_ptr`. C++ by hand,
+as `PageTab::AddNewContents` is today: adopt the object, then tell Go through an engine
+event.
+
+**Pure virtual.** `GetNameForLogging`, implemented inside the generated throttle.
+
+**Renderer and utility.** 62 `ContentRendererClient` and 5 `ContentUtilityClient` hooks run
+in processes that have no Go by design (the helper has zero Go symbols). Leave them. An
+enterprise browser's policy belongs in the browser process; if a renderer-side hook is
+ever needed, implement it in C++ in the renderer and forward over Mojo to the browser
+process, where it becomes a hook like any other.
+
+## Enterprise needs that fall in the hard groups
+
+- **URL policy on every request.** Top-level navigations are gated today
+  (`NavigationThrottle`, carried). Subresources, XHR, WebSockets and WebTransport do not
+  pass through any main-process hook that could be carried: the renderer talks to the
+  network service directly, and the throttles for those requests are made in the renderer
+  (`ContentRendererClient::CreateURLLoaderThrottleProvider`, no Go there). Two honest
+  options. (a) A proxying `URLLoaderFactory` in the browser process, installed from
+  `WillCreateURLLoaderFactory` (Mojo group): every request then passes through our C++,
+  which crosses to Go once per request on the main thread. This is how Chrome's extension
+  `webRequest` works; it costs a hop per request and about two thousand lines of C++, and
+  it is the only way Go sees every request and response header. (b) Compile the policy in
+  Go, serialize it, and evaluate it in a C++ renderer-side throttle fed over Mojo: no hop,
+  no Go in the renderer, but Go only decides the rules, not the requests. Recommendation:
+  (b) for allow and block lists, (a) when DLP or logging needs the request itself.
+- **Downloads.** `CanDownload` (callback) and the `DownloadManagerDelegate` (factory):
+  the callback mechanism plus one generated class.
+- **Prompts and permissions.** Callbacks, and `DEFER` on the gate: the callback mechanism.
+- **Certificates.** `SelectClientCertificate`, `AllowCertificateError`: copiers for
+  `SSLInfo` and `SSLCertRequestInfo`, and the callback mechanism.
+- **Cookies and storage.** `OnCookiesAccessed` (carried, with `CookieAccessDetails`),
+  `IsFullCookieAccessAllowed` (carried), `AllowServiceWorker` (returns a result object:
+  the second answer slot).
+- **Clipboard and drag DLP.** `IsClipboardPasteAllowedByPolicy` and the `DropData` hooks:
+  copiers plus callbacks.
+
+## The other direction: Go to content
+
+The same shape fits: `PBEngineCalls` would become one `call(number, values, result)` and
+the engine's sixteen functions a numbered list generated from `engine.Engine`, which
+removes the C shim per function in `cmd/lib/main.go` and the table entry in `engine.cc`.
+What it cannot remove is the C++ body of each call (ours, by hand, such as `CloseTab`'s
+`DeleteSoon`) and the `engine.Engine` method itself, so the toll per engine call goes from
+five files to three. About a hundred lines in the generator; half a day. Not done here
+because it changes the price of an engine call, not what is possible. Content's own API
+(`WebContents` methods and the like) should not be exposed to Go the same way: everything
+crossing the engine interface stays ours and generalised.
+
+## Decisions taken here
+
+- Every tab hook carries the tab's state as its first argument. That is where the 2.5 µs
+  goes; leaner is one `COPIERS` line less.
+- Titles cross as the page's own title, empty when it has none. Content's `GetTitle()`
+  would put the URL there; the shell does that fallback itself.
+- The shell's `WebContents` is tab 0: its keyboard hook crosses like a tab's, its observer
+  hooks do not (`ShellPage` observes content directly).
+- Reserved keys (Cmd+L, Cmd+T, Cmd+W, Cmd+1..9, Ctrl+Tab) are decided in Go,
+  `core/content/wire.go`, with the generated `KeyboardCode` and modifier constants.
+- The gate throttle is added to every navigation; Go answers only for tabs' primary main
+  frames, and the rest run content's default.
+- Hooks that fire while `app.Start` runs, before `Wire`, are dropped. None matter today.
+- A Go panic inside a hook still ends the process, as it did before.
+- Thread classification comes from content's header comments, with a CHECK as the net.
 <!-- /hand -->
 
 ## Every hook
@@ -60,7 +229,7 @@ Left, by group:
 | `WebContentsObserver` | `DidGetIgnoredUIEvent` | carried | `WebContentsObserverHooks::DidGetIgnoredUIEvent` · `Hooks.Observer.OnDidGetIgnoredUIEvent` |
 | `WebContentsObserver` | `DidGetUserInteraction` | carried, struct copy | `WebContentsObserverHooks::DidGetUserInteraction` · `Hooks.Observer.OnDidGetUserInteraction` |
 | `WebContentsObserver` | `DidLoadResourceFromMemoryCache` | carried, struct copy | `WebContentsObserverHooks::DidLoadResourceFromMemoryCache` · `Hooks.Observer.OnDidLoadResourceFromMemoryCache` |
-| `WebContentsObserver` | `DidOpenRequestedURL` | left: no copier for WindowOpenDisposition | `content/public/browser/web_contents_observer.h:619` |
+| `WebContentsObserver` | `DidOpenRequestedURL` | carried, struct copy | `WebContentsObserverHooks::DidOpenRequestedURL` · `Hooks.Observer.OnDidOpenRequestedURL` |
 | `WebContentsObserver` | `DidRedirectNavigation` | carried, struct copy | `WebContentsObserverHooks::DidRedirectNavigation` · `Hooks.Observer.OnDidRedirectNavigation` |
 | `WebContentsObserver` | `DidStartLoading` | carried | `WebContentsObserverHooks::DidStartLoading` · `Hooks.Observer.OnDidStartLoading` · used by `core/content/wire.go` |
 | `WebContentsObserver` | `DidStartNavigation` | carried, struct copy | `WebContentsObserverHooks::DidStartNavigation` · `Hooks.Observer.OnDidStartNavigation` |
@@ -81,7 +250,7 @@ Left, by group:
 | `WebContentsObserver` | `InnerWebContentsAttached` | carried, struct copy | `WebContentsObserverHooks::InnerWebContentsAttached` · `Hooks.Observer.OnInnerWebContentsAttached` |
 | `WebContentsObserver` | `InnerWebContentsCreated` | carried, struct copy | `WebContentsObserverHooks::InnerWebContentsCreated` · `Hooks.Observer.OnInnerWebContentsCreated` |
 | `WebContentsObserver` | `KeyboardLockRequested` | carried | `WebContentsObserverHooks::KeyboardLockRequested` · `Hooks.Observer.OnKeyboardLockRequested` |
-| `WebContentsObserver` | `LoadProgressChanged` | carried | `WebContentsObserverHooks::LoadProgressChanged` · `Hooks.Observer.OnLoadProgressChanged` |
+| `WebContentsObserver` | `LoadProgressChanged` | carried | `WebContentsObserverHooks::LoadProgressChanged` · `Hooks.Observer.OnLoadProgressChanged` · used by `core/content/wire.go` |
 | `WebContentsObserver` | `MediaDestroyed` | carried, struct copy | `WebContentsObserverHooks::MediaDestroyed` · `Hooks.Observer.OnMediaDestroyed` |
 | `WebContentsObserver` | `MediaEffectivelyFullscreenChanged` | carried | `WebContentsObserverHooks::MediaEffectivelyFullscreenChanged` · `Hooks.Observer.OnMediaEffectivelyFullscreenChanged` |
 | `WebContentsObserver` | `MediaMetadataChanged` | carried, struct copy | `WebContentsObserverHooks::MediaMetadataChanged` · `Hooks.Observer.OnMediaMetadataChanged` |
@@ -97,42 +266,42 @@ Left, by group:
 | `WebContentsObserver` | `NavigationListPruned` | carried, struct copy | `WebContentsObserverHooks::NavigationListPruned` · `Hooks.Observer.OnNavigationListPruned` |
 | `WebContentsObserver` | `NavigationStopped` | carried | `WebContentsObserverHooks::NavigationStopped` · `Hooks.Observer.OnNavigationStopped` |
 | `WebContentsObserver` | `NotifyStorageAccessed` | left: no copier for blink::mojom::StorageTypeAccessed | `content/public/browser/web_contents_observer.h:575` |
-| `WebContentsObserver` | `OnAudioStateChanged` | carried | `WebContentsObserverHooks::OnAudioStateChanged` · `Hooks.Observer.OnOnAudioStateChanged` |
-| `WebContentsObserver` | `OnBackgroundColorChanged` | carried | `WebContentsObserverHooks::OnBackgroundColorChanged` · `Hooks.Observer.OnOnBackgroundColorChanged` |
-| `WebContentsObserver` | `OnCapabilityTypesChanged` | carried | `WebContentsObserverHooks::OnCapabilityTypesChanged` · `Hooks.Observer.OnOnCapabilityTypesChanged` |
+| `WebContentsObserver` | `OnAudioStateChanged` | carried | `WebContentsObserverHooks::OnAudioStateChanged` · `Hooks.Observer.OnAudioStateChanged` |
+| `WebContentsObserver` | `OnBackgroundColorChanged` | carried | `WebContentsObserverHooks::OnBackgroundColorChanged` · `Hooks.Observer.OnBackgroundColorChanged` |
+| `WebContentsObserver` | `OnCapabilityTypesChanged` | carried | `WebContentsObserverHooks::OnCapabilityTypesChanged` · `Hooks.Observer.OnCapabilityTypesChanged` |
 | `WebContentsObserver` | `OnCaptureHandleConfigUpdate` | left: no copier for blink::mojom::CaptureHandleConfig | `content/public/browser/web_contents_observer.h:245` |
-| `WebContentsObserver` | `OnCapturedSurfaceControl` | carried | `WebContentsObserverHooks::OnCapturedSurfaceControl` · `Hooks.Observer.OnOnCapturedSurfaceControl` |
-| `WebContentsObserver` | `OnColorProviderChanged` | carried | `WebContentsObserverHooks::OnColorProviderChanged` · `Hooks.Observer.OnOnColorProviderChanged` |
-| `WebContentsObserver` | `OnCookiesAccessed` | carried, struct copy | `WebContentsObserverHooks::OnCookiesAccessed` · `Hooks.Observer.OnOnCookiesAccessed1` |
-| `WebContentsObserver` | `OnCookiesAccessed` | carried, struct copy | `WebContentsObserverHooks::OnCookiesAccessed` · `Hooks.Observer.OnOnCookiesAccessed2` |
+| `WebContentsObserver` | `OnCapturedSurfaceControl` | carried | `WebContentsObserverHooks::OnCapturedSurfaceControl` · `Hooks.Observer.OnCapturedSurfaceControl` |
+| `WebContentsObserver` | `OnColorProviderChanged` | carried | `WebContentsObserverHooks::OnColorProviderChanged` · `Hooks.Observer.OnColorProviderChanged` |
+| `WebContentsObserver` | `OnCookiesAccessed` | carried, struct copy | `WebContentsObserverHooks::OnCookiesAccessed` · `Hooks.Observer.OnCookiesAccessed1` |
+| `WebContentsObserver` | `OnCookiesAccessed` | carried, struct copy | `WebContentsObserverHooks::OnCookiesAccessed` · `Hooks.Observer.OnCookiesAccessed2` |
 | `WebContentsObserver` | `OnDeviceBoundSessionAccessed` | left: no copier for net::device_bound_sessions::SessionAccess | `content/public/browser/web_contents_observer.h:568` |
 | `WebContentsObserver` | `OnDeviceBoundSessionAccessed` | left: no copier for net::device_bound_sessions::SessionAccess | `content/public/browser/web_contents_observer.h:561` |
-| `WebContentsObserver` | `OnDidAddMessageToConsole` | carried, struct copy | `WebContentsObserverHooks::OnDidAddMessageToConsole` · `Hooks.Observer.OnOnDidAddMessageToConsole` |
-| `WebContentsObserver` | `OnFedCmFederatedLogin` | carried | `WebContentsObserverHooks::OnFedCmFederatedLogin` · `Hooks.Observer.OnOnFedCmFederatedLogin` |
-| `WebContentsObserver` | `OnFirstContentfulPaintInPrimaryMainFrame` | carried | `WebContentsObserverHooks::OnFirstContentfulPaintInPrimaryMainFrame` · `Hooks.Observer.OnOnFirstContentfulPaintInPrimaryMainFrame` |
-| `WebContentsObserver` | `OnFocusChangedInPage` | carried, struct copy | `WebContentsObserverHooks::OnFocusChangedInPage` · `Hooks.Observer.OnOnFocusChangedInPage` |
-| `WebContentsObserver` | `OnFrameAudioStateChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameAudioStateChanged` · `Hooks.Observer.OnOnFrameAudioStateChanged` |
-| `WebContentsObserver` | `OnFrameIsCapturingMediaStreamChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameIsCapturingMediaStreamChanged` · `Hooks.Observer.OnOnFrameIsCapturingMediaStreamChanged` |
-| `WebContentsObserver` | `OnFrameVisibilityChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameVisibilityChanged` · `Hooks.Observer.OnOnFrameVisibilityChanged` |
-| `WebContentsObserver` | `OnKeepAliveRequestCreated` | carried, struct copy | `WebContentsObserverHooks::OnKeepAliveRequestCreated` · `Hooks.Observer.OnOnKeepAliveRequestCreated` |
-| `WebContentsObserver` | `OnLargestContentfulPaintInPrimaryMainFrame` | carried | `WebContentsObserverHooks::OnLargestContentfulPaintInPrimaryMainFrame` · `Hooks.Observer.OnOnLargestContentfulPaintInPrimaryMainFrame` |
-| `WebContentsObserver` | `OnPageScaleFactorChanged` | carried | `WebContentsObserverHooks::OnPageScaleFactorChanged` · `Hooks.Observer.OnOnPageScaleFactorChanged` |
-| `WebContentsObserver` | `OnPaste` | carried | `WebContentsObserverHooks::OnPaste` · `Hooks.Observer.OnOnPaste` |
+| `WebContentsObserver` | `OnDidAddMessageToConsole` | carried, struct copy | `WebContentsObserverHooks::OnDidAddMessageToConsole` · `Hooks.Observer.OnDidAddMessageToConsole` |
+| `WebContentsObserver` | `OnFedCmFederatedLogin` | carried | `WebContentsObserverHooks::OnFedCmFederatedLogin` · `Hooks.Observer.OnFedCmFederatedLogin` |
+| `WebContentsObserver` | `OnFirstContentfulPaintInPrimaryMainFrame` | carried | `WebContentsObserverHooks::OnFirstContentfulPaintInPrimaryMainFrame` · `Hooks.Observer.OnFirstContentfulPaintInPrimaryMainFrame` |
+| `WebContentsObserver` | `OnFocusChangedInPage` | carried, struct copy | `WebContentsObserverHooks::OnFocusChangedInPage` · `Hooks.Observer.OnFocusChangedInPage` |
+| `WebContentsObserver` | `OnFrameAudioStateChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameAudioStateChanged` · `Hooks.Observer.OnFrameAudioStateChanged` |
+| `WebContentsObserver` | `OnFrameIsCapturingMediaStreamChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameIsCapturingMediaStreamChanged` · `Hooks.Observer.OnFrameIsCapturingMediaStreamChanged` |
+| `WebContentsObserver` | `OnFrameVisibilityChanged` | carried, struct copy | `WebContentsObserverHooks::OnFrameVisibilityChanged` · `Hooks.Observer.OnFrameVisibilityChanged` |
+| `WebContentsObserver` | `OnKeepAliveRequestCreated` | carried, struct copy | `WebContentsObserverHooks::OnKeepAliveRequestCreated` · `Hooks.Observer.OnKeepAliveRequestCreated` |
+| `WebContentsObserver` | `OnLargestContentfulPaintInPrimaryMainFrame` | carried | `WebContentsObserverHooks::OnLargestContentfulPaintInPrimaryMainFrame` · `Hooks.Observer.OnLargestContentfulPaintInPrimaryMainFrame` |
+| `WebContentsObserver` | `OnPageScaleFactorChanged` | carried | `WebContentsObserverHooks::OnPageScaleFactorChanged` · `Hooks.Observer.OnPageScaleFactorChanged` |
+| `WebContentsObserver` | `OnPaste` | carried | `WebContentsObserverHooks::OnPaste` · `Hooks.Observer.OnPaste` |
 | `WebContentsObserver` | `OnRemoteSubframeViewportIntersectionStateChanged` | left: no copier for blink::mojom::ViewportIntersectionState | `content/public/browser/web_contents_observer.h:791` |
-| `WebContentsObserver` | `OnRendererResponsive` | carried, struct copy | `WebContentsObserverHooks::OnRendererResponsive` · `Hooks.Observer.OnOnRendererResponsive` |
-| `WebContentsObserver` | `OnRendererUnresponsive` | carried, struct copy | `WebContentsObserverHooks::OnRendererUnresponsive` · `Hooks.Observer.OnOnRendererUnresponsive` |
+| `WebContentsObserver` | `OnRendererResponsive` | carried, struct copy | `WebContentsObserverHooks::OnRendererResponsive` · `Hooks.Observer.OnRendererResponsive` |
+| `WebContentsObserver` | `OnRendererUnresponsive` | carried, struct copy | `WebContentsObserverHooks::OnRendererUnresponsive` · `Hooks.Observer.OnRendererUnresponsive` |
 | `WebContentsObserver` | `OnServiceWorkerAccessed` | left: no copier for content::AllowServiceWorkerResult | `content/public/browser/web_contents_observer.h:998` |
 | `WebContentsObserver` | `OnServiceWorkerAccessed` | left: no copier for content::AllowServiceWorkerResult | `content/public/browser/web_contents_observer.h:992` |
 | `WebContentsObserver` | `OnSharedDictionaryAccessed` | left: no copier for network::mojom::SharedDictionaryAccessDetails | `content/public/browser/web_contents_observer.h:554` |
 | `WebContentsObserver` | `OnSharedDictionaryAccessed` | left: no copier for network::mojom::SharedDictionaryAccessDetails | `content/public/browser/web_contents_observer.h:551` |
-| `WebContentsObserver` | `OnTextCopiedToClipboard` | carried, struct copy | `WebContentsObserverHooks::OnTextCopiedToClipboard` · `Hooks.Observer.OnOnTextCopiedToClipboard` |
-| `WebContentsObserver` | `OnTextSelectionChanged` | carried, struct copy | `WebContentsObserverHooks::OnTextSelectionChanged` · `Hooks.Observer.OnOnTextSelectionChanged` |
+| `WebContentsObserver` | `OnTextCopiedToClipboard` | carried, struct copy | `WebContentsObserverHooks::OnTextCopiedToClipboard` · `Hooks.Observer.OnTextCopiedToClipboard` |
+| `WebContentsObserver` | `OnTextSelectionChanged` | carried, struct copy | `WebContentsObserverHooks::OnTextSelectionChanged` · `Hooks.Observer.OnTextSelectionChanged` |
 | `WebContentsObserver` | `OnTrustTokensAccessed` | left: no copier for content::TrustTokenAccessDetails | `content/public/browser/web_contents_observer.h:548` |
 | `WebContentsObserver` | `OnTrustTokensAccessed` | left: no copier for content::TrustTokenAccessDetails | `content/public/browser/web_contents_observer.h:542` |
-| `WebContentsObserver` | `OnVisibilityChanged` | carried | `WebContentsObserverHooks::OnVisibilityChanged` · `Hooks.Observer.OnOnVisibilityChanged` |
-| `WebContentsObserver` | `OnVisibilityWillChange` | carried | `WebContentsObserverHooks::OnVisibilityWillChange` · `Hooks.Observer.OnOnVisibilityWillChange` |
-| `WebContentsObserver` | `OnWebContentsFocused` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsFocused` · `Hooks.Observer.OnOnWebContentsFocused` |
-| `WebContentsObserver` | `OnWebContentsLostFocus` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsLostFocus` · `Hooks.Observer.OnOnWebContentsLostFocus` |
+| `WebContentsObserver` | `OnVisibilityChanged` | carried | `WebContentsObserverHooks::OnVisibilityChanged` · `Hooks.Observer.OnVisibilityChanged` |
+| `WebContentsObserver` | `OnVisibilityWillChange` | carried | `WebContentsObserverHooks::OnVisibilityWillChange` · `Hooks.Observer.OnVisibilityWillChange` |
+| `WebContentsObserver` | `OnWebContentsFocused` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsFocused` · `Hooks.Observer.OnWebContentsFocused` |
+| `WebContentsObserver` | `OnWebContentsLostFocus` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsLostFocus` · `Hooks.Observer.OnWebContentsLostFocus` |
 | `WebContentsObserver` | `PointerLockRequested` | carried | `WebContentsObserverHooks::PointerLockRequested` · `Hooks.Observer.OnPointerLockRequested` |
 | `WebContentsObserver` | `PrimaryMainDocumentElementAvailable` | carried | `WebContentsObserverHooks::PrimaryMainDocumentElementAvailable` · `Hooks.Observer.OnPrimaryMainDocumentElementAvailable` |
 | `WebContentsObserver` | `PrimaryMainFrameRenderProcessGone` | carried | `WebContentsObserverHooks::PrimaryMainFrameRenderProcessGone` · `Hooks.Observer.OnPrimaryMainFrameRenderProcessGone` · used by `core/content/wire.go` |
@@ -177,7 +346,7 @@ Left, by group:
 | `WebContentsDelegate` | `ContentsMouseEvent` | left: no copier for ui::Event | `content/public/browser/web_contents_delegate.h:249` |
 | `WebContentsDelegate` | `ContentsZoomChange` | carried | `WebContentsDelegateHooks::ContentsZoomChange` · `Hooks.Delegate.OnContentsZoomChange` |
 | `WebContentsDelegate` | `CreateAudioStreamBrokerFactory` | left: returns ownership | `content/public/browser/web_contents_delegate.h:685` |
-| `WebContentsDelegate` | `CreateCustomWebContents` | left: no copier for WindowOpenDisposition | `content/public/browser/web_contents_delegate.h:397` |
+| `WebContentsDelegate` | `CreateCustomWebContents` | left: no copier for content::StoragePartitionConfig | `content/public/browser/web_contents_delegate.h:397` |
 | `WebContentsDelegate` | `CreateSmsPrompt` | left: callback | `content/public/browser/web_contents_delegate.h:505` |
 | `WebContentsDelegate` | `DidAddMessageToConsole` | carried, struct copy | `WebContentsDelegateHooks::DidAddMessageToConsole` · `Hooks.Delegate.AnswerDidAddMessageToConsole` |
 | `WebContentsDelegate` | `DidChangeCloseSignalInterceptStatus` | carried | `WebContentsDelegateHooks::DidChangeCloseSignalInterceptStatus` · `Hooks.Delegate.OnDidChangeCloseSignalInterceptStatus` |
@@ -230,7 +399,7 @@ Left, by group:
 | `WebContentsDelegate` | `MaybeCopyContentAreaAsBitmap` | left: callback | `content/public/browser/web_contents_delegate.h:903` |
 | `WebContentsDelegate` | `MinimizeFromWebAPI` | carried | `WebContentsDelegateHooks::MinimizeFromWebAPI` · `Hooks.Delegate.OnMinimizeFromWebAPI` |
 | `WebContentsDelegate` | `NavigationStateChanged` | carried, struct copy | `WebContentsDelegateHooks::NavigationStateChanged` · `Hooks.Delegate.OnNavigationStateChanged` |
-| `WebContentsDelegate` | `OnDidBlockNavigation` | carried, struct copy | `WebContentsDelegateHooks::OnDidBlockNavigation` · `Hooks.Delegate.OnOnDidBlockNavigation` |
+| `WebContentsDelegate` | `OnDidBlockNavigation` | carried, struct copy | `WebContentsDelegateHooks::OnDidBlockNavigation` · `Hooks.Delegate.OnDidBlockNavigation` |
 | `WebContentsDelegate` | `OnGoToEntryOffset` | carried | `WebContentsDelegateHooks::OnGoToEntryOffset` · `Hooks.Delegate.AnswerOnGoToEntryOffset` |
 | `WebContentsDelegate` | `OnlyExpandTopControlsAtPageTop` | carried | `WebContentsDelegateHooks::OnlyExpandTopControlsAtPageTop` · `Hooks.Delegate.AnswerOnlyExpandTopControlsAtPageTop` |
 | `WebContentsDelegate` | `OpenEyeDropper` | left: no copier for content::EyeDropperListener | `content/public/browser/web_contents_delegate.h:479` |
@@ -286,9 +455,9 @@ Left, by group:
 | `ContentBrowserClient` | `AllowGpuLaunchRetryOnIOThread` | carried | `ContentBrowserClientHooks::AllowGpuLaunchRetryOnIOThread` · `Hooks.Browser.AnswerAllowGpuLaunchRetryOnIOThread` |
 | `ContentBrowserClient` | `AllowNonActivatedCrossOriginPaintHolding` | carried | `ContentBrowserClientHooks::AllowNonActivatedCrossOriginPaintHolding` · `Hooks.Browser.AnswerAllowNonActivatedCrossOriginPaintHolding` |
 | `ContentBrowserClient` | `AllowRenderingMhtmlOverHttp` | left: off the main thread | `content/public/browser/content_browser_client.h:2233` |
-| `ContentBrowserClient` | `AllowServiceWorker` | left: no copier for blink::StorageKey | `content/public/browser/content_browser_client.h:946` |
+| `ContentBrowserClient` | `AllowServiceWorker` | left: returns no copier for content::AllowServiceWorkerResult | `content/public/browser/content_browser_client.h:946` |
 | `ContentBrowserClient` | `AllowServiceWorkerToControlSrcdocIframe` | carried, struct copy | `ContentBrowserClientHooks::AllowServiceWorkerToControlSrcdocIframe` · `Hooks.Browser.AnswerAllowServiceWorkerToControlSrcdocIframe` |
-| `ContentBrowserClient` | `AllowSharedWorker` | left: no copier for blink::StorageKey | `content/public/browser/content_browser_client.h:973` |
+| `ContentBrowserClient` | `AllowSharedWorker` | carried, struct copy | `ContentBrowserClientHooks::AllowSharedWorker` · `Hooks.Browser.AnswerAllowSharedWorker` |
 | `ContentBrowserClient` | `AllowSharedWorkerBlobURLFix` | carried, struct copy | `ContentBrowserClientHooks::AllowSharedWorkerBlobURLFix` · `Hooks.Browser.AnswerAllowSharedWorkerBlobURLFix` |
 | `ContentBrowserClient` | `AllowSharedWorkerExtendedLifetime` | carried, struct copy | `ContentBrowserClientHooks::AllowSharedWorkerExtendedLifetime` · `Hooks.Browser.AnswerAllowSharedWorkerExtendedLifetime` |
 | `ContentBrowserClient` | `AllowSignedExchange` | carried, struct copy | `ContentBrowserClientHooks::AllowSignedExchange` · `Hooks.Browser.AnswerAllowSignedExchange` |
@@ -404,7 +573,7 @@ Left, by group:
 | `ContentBrowserClient` | `GetLocalTracesDirectory` | left: returns optional | `content/public/browser/content_browser_client.h:1377` |
 | `ContentBrowserClient` | `GetLoggingFileName` | left: no copier for base::CommandLine | `content/public/browser/content_browser_client.h:926` |
 | `ContentBrowserClient` | `GetMaxRendererProcessCountOverride` | carried | `ContentBrowserClientHooks::GetMaxRendererProcessCountOverride` · `Hooks.Browser.AnswerGetMaxRendererProcessCountOverride` |
-| `ContentBrowserClient` | `GetMediaDeviceIDSalt` | left: no copier for blink::StorageKey | `content/public/browser/content_browser_client.h:2561` |
+| `ContentBrowserClient` | `GetMediaDeviceIDSalt` | left: callback | `content/public/browser/content_browser_client.h:2561` |
 | `ContentBrowserClient` | `GetMediaObserver` | left: returns no copier for content::MediaObserver | `content/public/browser/content_browser_client.h:1246` |
 | `ContentBrowserClient` | `GetNavigationUIData` | left: off the main thread | `content/public/browser/content_browser_client.h:1609` |
 | `ContentBrowserClient` | `GetNetLogConstants` | left: returns no copier for base::DictValue | `content/public/browser/content_browser_client.h:2170` |
@@ -469,7 +638,7 @@ Left, by group:
 | `ContentBrowserClient` | `IsFileSystemURLNavigationAllowed` | carried, struct copy | `ContentBrowserClientHooks::IsFileSystemURLNavigationAllowed` · `Hooks.Browser.AnswerIsFileSystemURLNavigationAllowed` |
 | `ContentBrowserClient` | `IsFindInPageDisabledForOrigin` | carried | `ContentBrowserClientHooks::IsFindInPageDisabledForOrigin` · `Hooks.Browser.AnswerIsFindInPageDisabledForOrigin` |
 | `ContentBrowserClient` | `IsFirstPartySetsEnabled` | carried | `ContentBrowserClientHooks::IsFirstPartySetsEnabled` · `Hooks.Browser.AnswerIsFirstPartySetsEnabled` |
-| `ContentBrowserClient` | `IsFullCookieAccessAllowed` | left: no copier for blink::StorageKey | `content/public/browser/content_browser_client.h:1089` |
+| `ContentBrowserClient` | `IsFullCookieAccessAllowed` | carried, struct copy | `ContentBrowserClientHooks::IsFullCookieAccessAllowed` · `Hooks.Browser.AnswerIsFullCookieAccessAllowed` |
 | `ContentBrowserClient` | `IsFullscreenAllowedForUnfocusedWebContents` | carried, struct copy | `ContentBrowserClientHooks::IsFullscreenAllowedForUnfocusedWebContents` · `Hooks.Browser.AnswerIsFullscreenAllowedForUnfocusedWebContents` |
 | `ContentBrowserClient` | `IsHandledURL` | carried | `ContentBrowserClientHooks::IsHandledURL` · `Hooks.Browser.AnswerIsHandledURL` |
 | `ContentBrowserClient` | `IsInitialWebUIURL` | carried | `ContentBrowserClientHooks::IsInitialWebUIURL` · `Hooks.Browser.AnswerIsInitialWebUIURL` |
@@ -507,21 +676,21 @@ Left, by group:
 | `ContentBrowserClient` | `ModifyRequestHeadersForPrefetch` | left: no copier for net::HttpRequestHeaders | `content/public/browser/content_browser_client.h:3343` |
 | `ContentBrowserClient` | `NotifyMultiCaptureStateChanged` | left: callback | `content/public/browser/content_browser_client.h:3092` |
 | `ContentBrowserClient` | `OnBtmServiceCreated` | left: no copier for content::BtmService | `content/public/browser/content_browser_client.h:3105` |
-| `ContentBrowserClient` | `OnDisplayInsecureContent` | carried, struct copy | `ContentBrowserClientHooks::OnDisplayInsecureContent` · `Hooks.Browser.OnOnDisplayInsecureContent` |
-| `ContentBrowserClient` | `OnFetchKeepAliveRequestCreated` | carried, struct copy | `ContentBrowserClientHooks::OnFetchKeepAliveRequestCreated` · `Hooks.Browser.OnOnFetchKeepAliveRequestCreated` |
-| `ContentBrowserClient` | `OnFetchKeepAliveRequestDestroyed` | carried, struct copy | `ContentBrowserClientHooks::OnFetchKeepAliveRequestDestroyed` · `Hooks.Browser.OnOnFetchKeepAliveRequestDestroyed` |
-| `ContentBrowserClient` | `OnKeepaliveRequestFinished` | carried | `ContentBrowserClientHooks::OnKeepaliveRequestFinished` · `Hooks.Browser.OnOnKeepaliveRequestFinished` |
-| `ContentBrowserClient` | `OnKeepaliveRequestStarted` | carried, struct copy | `ContentBrowserClientHooks::OnKeepaliveRequestStarted` · `Hooks.Browser.OnOnKeepaliveRequestStarted` |
+| `ContentBrowserClient` | `OnDisplayInsecureContent` | carried, struct copy | `ContentBrowserClientHooks::OnDisplayInsecureContent` · `Hooks.Browser.OnDisplayInsecureContent` |
+| `ContentBrowserClient` | `OnFetchKeepAliveRequestCreated` | carried, struct copy | `ContentBrowserClientHooks::OnFetchKeepAliveRequestCreated` · `Hooks.Browser.OnFetchKeepAliveRequestCreated` |
+| `ContentBrowserClient` | `OnFetchKeepAliveRequestDestroyed` | carried, struct copy | `ContentBrowserClientHooks::OnFetchKeepAliveRequestDestroyed` · `Hooks.Browser.OnFetchKeepAliveRequestDestroyed` |
+| `ContentBrowserClient` | `OnKeepaliveRequestFinished` | carried | `ContentBrowserClientHooks::OnKeepaliveRequestFinished` · `Hooks.Browser.OnKeepaliveRequestFinished` |
+| `ContentBrowserClient` | `OnKeepaliveRequestStarted` | carried, struct copy | `ContentBrowserClientHooks::OnKeepaliveRequestStarted` · `Hooks.Browser.OnKeepaliveRequestStarted` |
 | `ContentBrowserClient` | `OnNetworkServiceCreated` | left: no copier for network::mojom::NetworkService | `content/public/browser/content_browser_client.h:2130` |
 | `ContentBrowserClient` | `OnNetworkServiceDataUseUpdate` | left: no copier for base::ByteSize | `content/public/browser/content_browser_client.h:2440` |
-| `ContentBrowserClient` | `OnNewSCTAuditingReportSent` | carried, struct copy | `ContentBrowserClientHooks::OnNewSCTAuditingReportSent` · `Hooks.Browser.OnOnNewSCTAuditingReportSent` |
-| `ContentBrowserClient` | `OnRendererProcessLockedStateUpdated` | carried, struct copy | `ContentBrowserClientHooks::OnRendererProcessLockedStateUpdated` · `Hooks.Browser.OnOnRendererProcessLockedStateUpdated` |
-| `ContentBrowserClient` | `OnSharedStorageSelectURLCalled` | carried, struct copy | `ContentBrowserClientHooks::OnSharedStorageSelectURLCalled` · `Hooks.Browser.OnOnSharedStorageSelectURLCalled` |
-| `ContentBrowserClient` | `OnSharedStorageWorkletHostCreated` | carried, struct copy | `ContentBrowserClientHooks::OnSharedStorageWorkletHostCreated` · `Hooks.Browser.OnOnSharedStorageWorkletHostCreated` |
-| `ContentBrowserClient` | `OnTracingServiceStarted` | carried | `ContentBrowserClientHooks::OnTracingServiceStarted` · `Hooks.Browser.OnOnTracingServiceStarted` |
-| `ContentBrowserClient` | `OnTracingServiceStopped` | carried | `ContentBrowserClientHooks::OnTracingServiceStopped` · `Hooks.Browser.OnOnTracingServiceStopped` |
+| `ContentBrowserClient` | `OnNewSCTAuditingReportSent` | carried, struct copy | `ContentBrowserClientHooks::OnNewSCTAuditingReportSent` · `Hooks.Browser.OnNewSCTAuditingReportSent` |
+| `ContentBrowserClient` | `OnRendererProcessLockedStateUpdated` | carried, struct copy | `ContentBrowserClientHooks::OnRendererProcessLockedStateUpdated` · `Hooks.Browser.OnRendererProcessLockedStateUpdated` |
+| `ContentBrowserClient` | `OnSharedStorageSelectURLCalled` | carried, struct copy | `ContentBrowserClientHooks::OnSharedStorageSelectURLCalled` · `Hooks.Browser.OnSharedStorageSelectURLCalled` |
+| `ContentBrowserClient` | `OnSharedStorageWorkletHostCreated` | carried, struct copy | `ContentBrowserClientHooks::OnSharedStorageWorkletHostCreated` · `Hooks.Browser.OnSharedStorageWorkletHostCreated` |
+| `ContentBrowserClient` | `OnTracingServiceStarted` | carried | `ContentBrowserClientHooks::OnTracingServiceStarted` · `Hooks.Browser.OnTracingServiceStarted` |
+| `ContentBrowserClient` | `OnTracingServiceStopped` | carried | `ContentBrowserClientHooks::OnTracingServiceStopped` · `Hooks.Browser.OnTracingServiceStopped` |
 | `ContentBrowserClient` | `OnUiTaskRunnerReady` | left: callback | `content/public/browser/content_browser_client.h:383` |
-| `ContentBrowserClient` | `OnWebContentsCreated` | carried, struct copy | `ContentBrowserClientHooks::OnWebContentsCreated` · `Hooks.Browser.OnOnWebContentsCreated` |
+| `ContentBrowserClient` | `OnWebContentsCreated` | carried, struct copy | `ContentBrowserClientHooks::OnWebContentsCreated` · `Hooks.Browser.OnWebContentsCreated` |
 | `ContentBrowserClient` | `OpenURL` | left: callback | `content/public/browser/content_browser_client.h:1563` |
 | `ContentBrowserClient` | `OriginSupportsConcreteCrossOriginIsolation` | carried, struct copy | `ContentBrowserClientHooks::OriginSupportsConcreteCrossOriginIsolation` · `Hooks.Browser.AnswerOriginSupportsConcreteCrossOriginIsolation` |
 | `ContentBrowserClient` | `OverrideNavigationParams` | left: out-param | `content/public/browser/content_browser_client.h:672` |
@@ -572,7 +741,7 @@ Left, by group:
 | `ContentBrowserClient` | `ShouldDenyRequestOnCertificateError` | carried | `ContentBrowserClientHooks::ShouldDenyRequestOnCertificateError` · `Hooks.Browser.AnswerShouldDenyRequestOnCertificateError` |
 | `ContentBrowserClient` | `ShouldDisableOriginAgentClusterDefault` | carried, struct copy | `ContentBrowserClientHooks::ShouldDisableOriginAgentClusterDefault` · `Hooks.Browser.AnswerShouldDisableOriginAgentClusterDefault` |
 | `ContentBrowserClient` | `ShouldDisableOriginIsolation` | carried | `ContentBrowserClientHooks::ShouldDisableOriginIsolation` · `Hooks.Browser.AnswerShouldDisableOriginIsolation` |
-| `ContentBrowserClient` | `ShouldDisableSiteIsolation` | left: no copier for content::SiteIsolationMode | `content/public/browser/content_browser_client.h:812` |
+| `ContentBrowserClient` | `ShouldDisableSiteIsolation` | carried | `ContentBrowserClientHooks::ShouldDisableSiteIsolation` · `Hooks.Browser.AnswerShouldDisableSiteIsolation` |
 | `ContentBrowserClient` | `ShouldDisallowCredentialRequest` | carried, struct copy | `ContentBrowserClientHooks::ShouldDisallowCredentialRequest` · `Hooks.Browser.AnswerShouldDisallowCredentialRequest` |
 | `ContentBrowserClient` | `ShouldEmbeddedFramesTryToReuseExistingProcess` | carried, struct copy | `ContentBrowserClientHooks::ShouldEmbeddedFramesTryToReuseExistingProcess` · `Hooks.Browser.AnswerShouldEmbeddedFramesTryToReuseExistingProcess` |
 | `ContentBrowserClient` | `ShouldEnableBtm` | carried, struct copy | `ContentBrowserClientHooks::ShouldEnableBtm` · `Hooks.Browser.AnswerShouldEnableBtm` |

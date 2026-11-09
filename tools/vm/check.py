@@ -223,6 +223,27 @@ def leave_full_screen(name):
     return True
 
 
+def layout_click_works(win):
+    """Clicks the layout button and, if the tabs moved, clicks it again to put them back.
+
+    Returns whether the first click moved them.
+    """
+    def strip():
+        return float(np.mean(near(crop(vnc.image(), win[0] + win[2] - 200, win[1] + 6, 150, 20), FRAME)))
+
+    row = field_middle(vnc.image(), win, 500)
+    if row is None:
+        return False
+    before = strip()
+    vnc.click(win[0] + win[2] - 20, win[1] + row)
+    time.sleep(1)
+    moved = abs(strip() - before) > 0.5
+    if moved:
+        vnc.click(win[0] + win[2] - 20, win[1] + field_middle(vnc.image(), win, 500))
+        time.sleep(1)
+    return moved
+
+
 def full_screen(name, enter, home, first_control):
     enter()
     time.sleep(ANIMATION)
@@ -246,7 +267,16 @@ def full_screen(name, enter, home, first_control):
     # frame rather than where these checks moved it, so any window frame counts.
     check(f"{name}: the green button in the shown title bar brings the window back",
           clicked and win is not None and win[2:] != SCREEN and lights(img, win) is not None, f"window {win}")
-    if win is not None and win[2:] == SCREEN:
+    if win is not None and win[2:] != SCREEN:
+        # Coming back to a frame other than the one it left from has left the shell deaf to clicks.
+        takes = layout_click_works(win)
+        check(f"{name}: after leaving, the shell takes clicks", takes, "" if takes else f"the layout button did nothing, window {win}")
+        if not takes:
+            # Start the app again, so the checks after this still mean something.
+            quit_app()
+            launch()
+            time.sleep(1.5)
+    if window() is not None and window()[2:] == SCREEN:
         # Leave without the green button, so the checks after this still mean something.
         guest("/usr/bin/osascript", "-e",
               f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '

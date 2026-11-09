@@ -318,9 +318,19 @@ def side():
 
 one = side()
 vnc.key("cmd+t")
-time.sleep(1)
+start = time.time()
+two = one
+while changed(one, two) <= 0.005 and time.time() - start < 5:
+    time.sleep(0.05)
+    two = crop(vnc.image(), PX + SIDE[0], PY + SIDE[1], SIDE[2], SIDE[3])
+took = time.time() - start
+check("Cmd+T adds a tab within 0.5 s", changed(one, two) > 0.005 and took <= 0.5,
+      f"the tab showed after {took:.2f} s" if changed(one, two) > 0.005 else "no tab after 5 s")
+if changed(one, two) <= 0.005:
+    # So the checks below still have their two tabs.
+    vnc.key("cmd+t")
+time.sleep(0.5)
 two = side()
-check("Cmd+T adds a tab", changed(one, two) > 0.005, f"sidebar changed {changed(one, two):.3f}")
 shot("two-tabs")
 vnc.click(PX + 100, PY + 78)
 time.sleep(1)

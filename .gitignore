@@ -1,0 +1,8 @@
+# Upstream and toolchains, fetched by tools/fetch-chromium.sh, never committed.
+/chromium/
+/depot_tools/
+# Build outputs.
+/build/
+/shell/node_modules/
+/shell/dist/
+.DS_Store

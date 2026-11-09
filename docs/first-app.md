@@ -71,6 +71,11 @@ empty when there are none) and the shell leaves exactly that space on whichever 
 they are. Hit-testing from the window's frame view, as AppKit does, shows the title bar
 does not swallow clicks over the shell: a point on a control returns the shell, a point
 on the empty strip returns the frame, a point on a window button returns the button.
+The window server, though, moves a window by itself, without asking the app, from any
+part of the title bar that AppKit says no view needs, and a transparent view needs
+none, so a drag across the address field moved the window. The content view claims the
+whole title bar from it (`_opaqueRectForWindowMoveWhenInTitlebar`, as Chrome's does), so
+every press there goes through the hit test.
 
 The window goes on screen once Go has given it the frame colour and width, so even its
 first frame has them. Until the shell's first frame, content paints the shell's view

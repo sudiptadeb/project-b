@@ -44,6 +44,11 @@
 #include "ui/gfx/codec/png_codec.h"
 #include "url/gurl.h"
 
+// Private, for the driver only: AppKit's description of the window's drag region.
+@interface NSWindow (PBDriverPrivate)
+- (id)_lastDragRegionDataDescription;
+@end
+
 namespace project_b {
 
 namespace {
@@ -311,6 +316,15 @@ void Run(const std::string& line) {
     // Who would get a mouse event here: shell, page, container, frame (AppKit drags the
     // window), or a native view such as a window button.
     Reply(id, Classify(HitFromFrame(number(2), number(3))));
+  } else if (cmd == "dragregion") {
+    // What AppKit last told the window server it may drag by itself, as AppKit
+    // describes it: rectangles in window points, y from the bottom.
+    NSString* text =
+        [TheWindow() respondsToSelector:@selector(_lastDragRegionDataDescription)]
+            ? [[TheWindow() _lastDragRegionDataDescription] description]
+            : @"unknown";
+    Reply(id, base::SysNSStringToUTF8(
+                  [text stringByReplacingOccurrencesOfString:@"\n" withString:@" | "]));
   } else if (cmd == "type") {
     NSString* text = base::SysUTF8ToNSString(rest(2));
     for (NSUInteger i = 0; i < text.length; i++) {

@@ -27,7 +27,7 @@ POINTS_WIDE = 1440  # The VM's display, from DISPLAY_SIZE in vars.sh.
 INPUT_SETTLE = 1.0  # Screen Sharing drops input for about half a second after a connection opens.
 
 KEYS = {
-    "cmd": 0xffe7, "opt": 0xffe9, "ctrl": 0xffe3, "shift": 0xffe1,
+    "cmd": 0xffeb, "opt": 0xffe9, "ctrl": 0xffe3, "shift": 0xffe1,
     "return": 0xff0d, "esc": 0xff1b, "tab": 0xff09, "delete": 0xff08, "space": 0x20,
     "left": 0xff51, "up": 0xff52, "right": 0xff53, "down": 0xff54,
 }

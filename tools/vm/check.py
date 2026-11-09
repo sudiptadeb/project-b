@@ -122,21 +122,6 @@ def field_middle(img, win, x):
     return None if len(ys) == 0 else (ys.min() + ys.max() + 1) / 2 / vnc.scale
 
 
-def find_cmd_key():
-    """Screen Sharing's name for Command isn't documented, so find the one that opens Spotlight."""
-    for sym in (0xffe7, 0xffeb, 0xffe9):
-        rfb.KEYS["cmd"] = sym
-        before = vnc.image()
-        vnc.key("cmd+space")
-        time.sleep(1.5)
-        if changed(before, vnc.image()) > 0.005:
-            vnc.key("esc")
-            time.sleep(1)
-            print(f"Command is keysym {sym:#x}", flush=True)
-            return
-    sys.exit("no key opens Spotlight, so nothing below would mean anything")
-
-
 def launch():
     """Opens the app from Finder's Applications folder. Returns seconds to the shell's first paint, or None."""
     vnc.click(SCREEN[0] - 40, SCREEN[1] - 40)  # The desktop, so Finder is in front.
@@ -210,7 +195,6 @@ guest("/bin/rm", "-rf", "/Users/admin/.project-b")
 time.sleep(1)
 vnc = rfb.Vnc()
 print(f"display {vnc.width}x{vnc.height}, shots in {SHOTS}", flush=True)
-find_cmd_key()
 shot("desktop")
 
 # First paint: the first launch of an install, then three more.

@@ -23,9 +23,15 @@
 
 namespace project_b {
 
+// --user-data-dir names the profile as it does for Chrome, so tools that drive Chrome
+// (ChromeDriver gives every session a fresh one) drive us the same way. --profile is
+// our older name for it.
 base::FilePath ProfileDir() {
-  base::FilePath profile =
-      base::CommandLine::ForCurrentProcess()->GetSwitchValuePath("profile");
+  const base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  base::FilePath profile = command_line->GetSwitchValuePath("user-data-dir");
+  if (profile.empty()) {
+    profile = command_line->GetSwitchValuePath("profile");
+  }
   return profile.empty() ? base::GetHomeDir().Append(".project-b/default")
                          : profile;
 }

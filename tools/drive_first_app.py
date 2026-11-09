@@ -12,6 +12,7 @@ Results go to build/real/. Each screenshot is what content rendered, drawn shell
 page by the driver. It is not read back from the window.
 """
 
+import http.server
 import json
 import os
 import re
@@ -31,6 +32,30 @@ URL_A = "https://example.com/"
 URL_B = "https://www.iana.org/help/example-domains"
 
 failures = 0
+
+
+# Pages served on this machine for the tests that need a server's answer.
+class Pages(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/redirect":
+            self.send_response(302)
+            self.send_header("Location", "chrome://shell/")
+            self.end_headers()
+            return
+        body = b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>'
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+pages = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Pages)
+threading.Thread(target=pages.serve_forever, daemon=True).start()
+PAGES = f"http://127.0.0.1:{pages.server_port}/"
 
 
 def check(name, ok, detail=""):
@@ -355,6 +380,48 @@ def main():
         check("going back clears the blocked chip", True)
     except TimeoutError as e:
         check("going back clears the blocked chip", False, e)
+
+    # The shell's own page never loads in a tab, however it's asked for: a copy there
+    # would talk to Go as the shell. Content's other internal pages are let through.
+    def typed(url):
+        focus_bar(app)
+        app.cmd("type", url)
+        app.wait(f"{VALUE}==={json.dumps(url)}")
+        app.cmd("key", "enter")
+
+    status = "(document.querySelector('.status')||{}).innerText||''"
+    visit(app, PAGES + "links")
+    typed("chrome://shell/")
+    try:
+        app.wait(f"{status}==='Blocked'", 10)
+        check("typing chrome://shell/ is refused by the gate", True)
+    except TimeoutError as e:
+        check("typing chrome://shell/ is refused by the gate", False, e)
+    check("and the tab stays on the page it had", app.js("location.href", page=True) == PAGES + "links", app.js("location.href", page=True))
+    print(app.cmd("capture", os.path.join(OUT, "4-shell-refused.png")), flush=True)
+    app.js("document.querySelector('a').click(), 1", page=True)
+    time.sleep(1)
+    landed = app.js("[location.href, typeof (window.chrome && chrome.send)]", page=True)
+    check("a page's link to chrome://shell/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/" and landed[1] == "undefined", (landed, app.js(status)))
+    typed(PAGES + "redirect")
+    time.sleep(2)
+    landed = app.js("[location.href, typeof (window.chrome && chrome.send)]", page=True)
+    check("a redirect to chrome://shell/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/" and landed[1] == "undefined", landed)
+    # Content serves chrome://gpu/ itself. The gate lets it through; whether it renders
+    # depends on the resources the app bundles.
+    typed("chrome://gpu/")
+    time.sleep(2)
+    check("typing an internal page content serves, chrome://gpu/, is not refused", app.js(status) != "Blocked" and app.js(VALUE) == "chrome://gpu/", (app.js(status), app.js(VALUE), app.js("location.href", page=True)))
+    click(app, "[aria-label='Tabs on top']")
+    try:
+        app.wait("!!document.querySelector('.strip')", 5)
+        click(app, "[aria-label='Tabs on the side']")
+        app.wait("!!document.querySelector('nav')", 5)
+        check("after those attempts the shell still takes clicks: the layout toggle works", True)
+    except TimeoutError as e:
+        check("after those attempts the shell still takes clicks: the layout toggle works", False, e)
+    time.sleep(0.3)
+    visit(app, URL_A)
 
     # Key press to paint, measured inside the shell. Not a display measurement.
     focus_bar(app)

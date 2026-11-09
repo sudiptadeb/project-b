@@ -147,6 +147,17 @@ func TestBlockedURLNeverLoadsOrEntersHistory(t *testing.T) {
 	}
 }
 
+func TestTheShellNeverLoadsInATab(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"navigate","text":"chrome://shell/"}`)
+	r.waitForTab(func(tab map[string]any) bool { return tab["url"] == "chrome://shell/" && tab["blocked"] == true })
+	r.shell(`{"t":"navigate","text":"chrome://gpu/"}`)
+	r.waitForTab(func(tab map[string]any) bool {
+		return tab["url"] == "chrome://gpu/" && tab["blocked"] == false && tab["title"] == "Mock gpu"
+	})
+}
+
 func TestStaleNavigationDoesNotCommit(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()

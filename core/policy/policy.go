@@ -1,4 +1,5 @@
-// Package policy decides what's allowed. The first app only has a host blocklist.
+// Package policy decides what's allowed. The first app has a host blocklist, and the
+// shell's own page, which no tab may load.
 package policy
 
 import (
@@ -30,6 +31,11 @@ func (m *Manager) IsAllowedURL(raw string) bool {
 		return false
 	}
 	host := strings.ToLower(u.Hostname())
+	// The shell's page talks to Go as the shell, so a tab must never hold a copy of it.
+	// Other chrome:// pages content serves load as they would in Chrome.
+	if u.Scheme == "chrome" && host == "shell" {
+		return false
+	}
 	for _, b := range m.blocked {
 		if host == b || strings.HasSuffix(host, "."+b) {
 			return false

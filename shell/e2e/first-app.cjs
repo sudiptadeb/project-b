@@ -186,6 +186,34 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
 
+  // The shell's own page never loads in a tab: a copy there would talk to Go as the
+  // shell. Content's own internal pages still load when typed.
+  const mockShows = async (state, url) => {
+    for (let i = 0; i < 100; i++) {
+      if ((await mock.locator('#url').textContent()) === url && (await mock.locator('#state').textContent()) === state) return true;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    return false;
+  };
+  await bar.fill('chrome://gpu/');
+  await bar.press('Enter');
+  check('typing an internal page content serves, such as chrome://gpu/, is let through', await mockShows('Loaded', 'chrome://gpu/'));
+  await bar.fill('chrome://shell/');
+  await bar.press('Enter');
+  check('typing chrome://shell/ is refused by the gate', await mockShows('Blocked', 'chrome://shell/'));
+  await bar.fill('https://links.test/');
+  await bar.press('Enter');
+  await mockShows('Loaded', 'https://links.test/');
+  await mock.locator('form[data-kind=navigate] input').fill('chrome://shell/');
+  await mock.getByRole('button', { name: 'Navigate' }).click();
+  check('a page linking to chrome://shell/ is refused', await mockShows('Blocked', 'chrome://shell/'));
+  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await page.locator('.strip').waitFor();
+  await page.getByRole('button', { name: 'Tabs on the side' }).click();
+  await page.locator('nav').waitFor();
+  await settle(page);
+  check('after those attempts the shell still takes clicks: the layout toggle works', (await page.locator('.strip').count()) === 0);
+
   // The engine says where the window controls are; the shell leaves exactly that space.
   // In full screen there are none, so the first control moves into their place.
   const toggle = page.getByRole('button', { name: /sidebar/ });

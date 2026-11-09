@@ -3,6 +3,7 @@
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "base/functional/callback.h"
 #include "base/json/json_writer.h"
 #include "base/memory/ref_counted.h"
+#include "base/no_destructor.h"
 #include "base/process/process.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
@@ -22,6 +24,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -38,6 +41,7 @@
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkRect.h"
 #include "ui/gfx/codec/png_codec.h"
+#include "url/gurl.h"
 
 namespace project_b {
 
@@ -193,6 +197,37 @@ void Eval(const std::string& id, content::WebContents* contents, const std::stri
             std::string json;
             base::JSONWriter::Write(value, &json);
             Reply(id, json);
+          },
+          id),
+      /*world_id=*/0);
+}
+
+// A WebContents that is neither the shell nor a tab, holding chrome://shell/: a copy of
+// the shell that got past the gate, which only sees tabs.
+std::unique_ptr<content::WebContents>& Stray() {
+  static base::NoDestructor<std::unique_ptr<content::WebContents>> stray;
+  return *stray;
+}
+
+// Once the stray copy has loaded, replies with its URL and what its page can call.
+void AskStrayShell(std::string id, int tries) {
+  content::WebContents* contents = Stray().get();
+  if (tries > 0 && (contents->IsLoading() ||
+                    contents->GetLastCommittedURL() != GURL("chrome://shell/"))) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+                     AskStrayShell(id, tries - 1);
+                   });
+    return;
+  }
+  contents->GetPrimaryMainFrame()->ExecuteJavaScriptForTests(
+      u"location.href + ' ' + typeof (window.chrome && chrome.send)",
+      base::BindOnce(
+          [](const std::string& id, base::Value value) {
+            Reply(id, value.is_string() ? value.GetString() : "no answer");
+            dispatch_async(dispatch_get_main_queue(), ^{
+              Stray().reset();
+            });
           },
           id),
       /*world_id=*/0);
@@ -395,6 +430,12 @@ void Run(const std::string& line) {
     Reply(id, "ok");
     volatile int* nothing = nullptr;
     *nothing = 1;
+  } else if (cmd == "strayshell") {
+    Stray() = content::WebContents::Create(content::WebContents::CreateParams(
+        Engine::Get()->shell()->contents()->GetBrowserContext()));
+    Stray()->GetController().LoadURLWithParams(
+        content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
+    AskStrayShell(id, 100);
   } else if (cmd == "crashpage") {
     Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
     Reply(id, "ok");

@@ -76,7 +76,7 @@ class App:
         self.started = time.time()
         self.proc = subprocess.Popen(
             [BIN, f"--profile={profile}", f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1,
         )
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_reply("start", 60)
@@ -412,6 +412,15 @@ def main():
     typed("chrome://gpu/")
     time.sleep(2)
     check("typing an internal page content serves, chrome://gpu/, is not refused", app.js(status) != "Blocked" and app.js(VALUE) == "chrome://gpu/", (app.js(status), app.js(VALUE), app.js("location.href", page=True)))
+    # Behind the gate, the engine gives the shell's bridge to the shell's own WebContents
+    # only. A copy of the shell anywhere else, here in a WebContents no gate sees, gets no
+    # chrome.send, and Go hears nothing from it.
+    shell_messages = lambda: json.loads(app.cmd("stats", timeout=60))["go"]["hooks"].get("engine.ShellMessage", 0)
+    before = shell_messages()
+    stray = app.cmd("strayshell", timeout=30)
+    time.sleep(1)
+    check("a chrome://shell/ page outside the shell gets no bridge", stray == "chrome://shell/ undefined", stray)
+    check("and Go receives no shell message from it", shell_messages() == before, (before, shell_messages()))
     click(app, "[aria-label='Tabs on top']")
     try:
         app.wait("!!document.querySelector('.strip')", 5)

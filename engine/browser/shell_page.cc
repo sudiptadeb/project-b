@@ -23,6 +23,7 @@
 #include "content/public/browser/web_ui_controller.h"
 #include "content/public/browser/web_ui_controller_factory.h"
 #include "content/public/browser/web_ui_message_handler.h"
+#include "content/public/common/bindings_policy.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/window.h"
@@ -53,14 +54,39 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
   }
 };
 
+// The bridge to Go belongs to the shell's own WebContents. The factory sees only the URL,
+// so content makes a controller for chrome://shell/ wherever it loads; anywhere else the
+// controller takes away the page's bindings, so it has no chrome.send, and drops
+// whatever arrives anyway.
 class ShellController : public content::WebUIController {
  public:
   explicit ShellController(content::WebUI* web_ui)
-      : content::WebUIController(web_ui) {
+      : content::WebUIController(web_ui),
+        is_shell_(web_ui->GetWebContents() ==
+                  Engine::Get()->shell()->contents()) {
+    if (!is_shell_) {
+      LOG(WARNING) << "chrome://shell/ outside the shell: no bindings";
+      web_ui->SetBindings(content::BindingsPolicySet());
+      return;
+    }
     web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>());
   }
 
+  bool OverrideHandleWebUIMessage(const GURL& source_url,
+                                  const std::string& message,
+                                  const base::ListValue& args) override {
+    if (is_shell_) {
+      return false;
+    }
+    LOG(WARNING) << "dropped \"" << message
+                 << "\" from chrome://shell/ outside the shell";
+    return true;
+  }
+
   WEB_UI_CONTROLLER_TYPE_DECL();
+
+ private:
+  const bool is_shell_;
 };
 
 WEB_UI_CONTROLLER_TYPE_IMPL(ShellController)

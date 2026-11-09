@@ -508,6 +508,8 @@ def main():
     check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")
     strip_empty = app.cmd("hit", 1000, BAR_Y)
     check("the empty strip falls through to the frame, which drags", strip_empty == "frame", strip_empty)
+    joint = app.js("(()=>{const a=document.querySelector('.strip .shape').getBoundingClientRect();const b=document.querySelector('.strip').getBoundingClientRect();return [a.bottom,b.bottom]})()")
+    check("the active tab's shape runs under the bar, so no line shows between them", joint[0] > joint[1], joint)
     n = app.js(ROWS)
     app.cmd("key", "cmd+t")
     app.wait(f"{ROWS}==={n + 1}", 10)

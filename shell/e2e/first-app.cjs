@@ -291,6 +291,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await settle(page);
   check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await page.locator('.strip [aria-selected=true]').count()) === 1);
   check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 19 + 60 + 8, String((await rows.first().boundingBox()).x));
+  const joint = await page.evaluate(() => { const shape = document.querySelector('.strip .shape').getBoundingClientRect(); const strip = document.querySelector('.strip').getBoundingClientRect(); return [shape.bottom, strip.bottom]; });
+  check('the active tab\'s shape runs under the bar, so no line shows between them', joint[0] > joint[1], JSON.stringify(joint));
   r = await regions();
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');

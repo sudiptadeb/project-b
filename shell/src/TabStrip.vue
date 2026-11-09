@@ -91,11 +91,14 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
   color: var(--text);
 }
 
+/* The design's path ends half a unit above its bottom edge, which left a hairline of
+   frame colour between the tab and the bar. Drawn 2px taller, that edge lies under the
+   bar, which paints over it. */
 .shape {
   position: absolute;
   inset: 0 -4px;
   width: calc(100% + 8px);
-  height: 100%;
+  height: calc(100% + 2px);
   fill: var(--bar);
 }
 

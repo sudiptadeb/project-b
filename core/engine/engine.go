@@ -44,6 +44,9 @@ type Engine interface {
 	// SetShellRegions replaces the rectangles the shell owns. Mouse events inside
 	// them go to the shell; everything else goes to the page.
 	SetShellRegions(rects []Rect)
+	// SetDragRegions replaces the rectangles where a mouse down moves the window
+	// instead: the empty parts of the shell. They win over shell regions.
+	SetDragRegions(rects []Rect)
 	FocusPage()
 
 	// SendToShell delivers one message to the shell page.

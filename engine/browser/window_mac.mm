@@ -12,14 +12,20 @@
 // Answers the OS hit test. Content's own views ask this same question, so a view that
 // loses the answer ignores the event (see shouldIgnoreMouseEvent: in
 // content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm).
+//
+// In a drag region the answer is nil, so the event falls through to the window's own
+// frame, which moves the window and, inside the title bar, zooms on a double-click.
+// That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
 @property(nonatomic, weak) NSView* pageView;
 - (void)setRegions:(std::vector<gfx::RectF>)regions;
+- (void)setDragRegions:(std::vector<gfx::RectF>)regions;
 @end
 
 @implementation PBContainerView {
   std::vector<gfx::RectF> _regions;
+  std::vector<gfx::RectF> _dragRegions;
 }
 
 @synthesize shellView = _shellView;
@@ -27,6 +33,10 @@
 
 - (void)setRegions:(std::vector<gfx::RectF>)regions {
   _regions = std::move(regions);
+}
+
+- (void)setDragRegions:(std::vector<gfx::RectF>)regions {
+  _dragRegions = std::move(regions);
 }
 
 - (NSView*)hitTest:(NSPoint)point {
@@ -37,6 +47,11 @@
   }
   // Shell rectangles measure y from the top; Cocoa measures it from the bottom.
   const float y = self.bounds.size.height - p.y;
+  for (const gfx::RectF& r : _dragRegions) {
+    if (r.Contains(p.x, y)) {
+      return nil;
+    }
+  }
   for (const gfx::RectF& r : _regions) {
     if (r.Contains(p.x, y)) {
       return [self.shellView hitTest:p];
@@ -64,6 +79,26 @@
 
 - (BOOL)isMainWindow {
   return _forceKeyForDriver || [super isMainWindow];
+}
+
+// AppKit zooms on a double-click in the title bar by itself. A drag region below the
+// title bar gets the same, following the user's "double-click a window's title bar to"
+// setting, as Chrome does (native_widget_mac_nswindow.mm).
+- (void)sendEvent:(NSEvent*)event {
+  if (event.type == NSEventTypeLeftMouseUp && event.clickCount == 2 &&
+      NSPointInRect(event.locationInWindow, self.contentLayoutRect) &&
+      [self.contentView hitTest:event.locationInWindow] == nil) {
+    NSString* action = [NSUserDefaults.standardUserDefaults
+        stringForKey:@"AppleActionOnDoubleClick"];
+    if (!action || [action isEqualToString:@"Maximize"] ||
+        [action isEqualToString:@"Fill"]) {
+      [self performZoom:nil];
+    } else if ([action isEqualToString:@"Minimize"]) {
+      [self performMiniaturize:nil];
+    }
+    return;
+  }
+  [super sendEvent:event];
 }
 
 @end
@@ -228,6 +263,10 @@ void Window::SetPageBounds(const gfx::RectF& bounds,
 
 void Window::SetShellRegions(std::vector<gfx::RectF> regions) {
   [impl_->container setRegions:std::move(regions)];
+}
+
+void Window::SetDragRegions(std::vector<gfx::RectF> regions) {
+  [impl_->container setDragRegions:std::move(regions)];
 }
 
 void Window::ListenForControls(

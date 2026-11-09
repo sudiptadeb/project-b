@@ -58,6 +58,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "regions":
 		m.eng.SetShellRegions(c.Rects)
+	case "dragRegions":
+		m.eng.SetDragRegions(c.Rects)
 	case "pageBounds":
 		m.eng.SetPageBounds(c.Rect, c.ViewW, c.ViewH)
 	case "focusPage":

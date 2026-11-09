@@ -74,12 +74,12 @@ func main() {
 		e.Fire(r.FormValue("kind"), r.FormValue("value"))
 	})
 	mux.HandleFunc("GET /mock/regions", func(w http.ResponseWriter, r *http.Request) {
-		regions, bounds := e.Regions()
-		out := map[string]any{"regions": regions, "bounds": bounds}
+		regions, drag, bounds := e.Regions()
+		out := map[string]any{"regions": regions, "drag": drag, "bounds": bounds}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)
-			out["hitShell"] = e.HitShell(x, y)
+			out["hit"] = e.Hit(x, y)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(out)

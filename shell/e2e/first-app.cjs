@@ -119,9 +119,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const box = await list.boundingBox();
   const over = await regions(`?x=${box.x + 20}&y=${box.y + 10}`);
   check('the box extends over the page', box.y + box.height > r.bounds.y + 40, JSON.stringify({ box, bounds: r.bounds }));
-  check('a click on the box goes to the shell', over.hitShell === true);
+  check('a click on the box goes to the shell', over.hit === 'shell');
   const beside = await regions(`?x=${box.x - 40}&y=${box.y + 10}`);
-  check('a click beside the box goes to the page', beside.hitShell === false);
+  check('a click beside the box goes to the page', beside.hit === 'page');
 
   // Bar and list behave as one UI.
   await page.keyboard.press('ArrowDown');
@@ -193,6 +193,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const tab = page.locator('.tab');
   const windowLeft = (await tab.boundingBox()).x;
   check('the tab starts after the window controls the engine reported', windowLeft === 9 + 60 + 8, String(windowLeft));
+  r = await regions('?x=600&y=16');
+  check('the empty strip beside the tab drags the window', r.drag.length === 2 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the tab itself is shell, not drag', (await regions(`?x=${windowLeft + 20}&y=16`)).hit === 'shell');
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction(() => document.querySelector('.tab').getBoundingClientRect().x < 20);
   check('in full screen the tab moves into the controls\' place', (await tab.boundingBox()).x === 4, String((await tab.boundingBox()).x));

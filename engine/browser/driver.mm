@@ -54,10 +54,49 @@ NSTimeInterval Now() {
   return NSProcessInfo.processInfo.systemUptime;
 }
 
+// The view AppKit would send a mouse event at this point to, asked the way AppKit asks:
+// from the window's frame view, which holds the title bar and its buttons above our
+// content view. x and y are shell coordinates, y from the top.
+NSView* HitFromFrame(double x, double y) {
+  NSWindow* window = TheWindow();
+  NSView* content = window.contentView;
+  NSView* frame = content.superview;
+  NSPoint in_window = [content convertPoint:NSMakePoint(x, content.bounds.size.height - y)
+                                     toView:nil];
+  return [frame hitTest:in_window];
+}
+
+// What a hit view is, as the driver reports it.
+std::string Classify(NSView* hit) {
+  if (!hit) {
+    return "nil";
+  }
+  NSView* shell =
+      Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView();
+  NSView* page =
+      Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
+  if ([hit isDescendantOf:shell]) {
+    return "shell";
+  }
+  if ([hit isDescendantOf:page]) {
+    return "page";
+  }
+  if (hit == TheWindow().contentView) {
+    return "container";
+  }
+  if (hit == TheWindow().contentView.superview) {
+    return "frame";
+  }
+  return std::string("native:") + hit.className.UTF8String;
+}
+
 // In a session with no real GUI, [window sendEvent:] doesn't deliver anything, so this
-// does what AppKit's routing does: ask the window's own hitTest:, make the answer first
-// responder on mouse down, and hand it the event.
-void SendMouse(NSEventType type, double x, double y, int clicks) {
+// does what AppKit's routing does: ask the frame's hitTest:, make the answer first
+// responder on mouse down, and hand it the event. Only our own views get events here;
+// a native area (the frame, a window button) is reported and left alone, because
+// AppKit's own handling of it would start a tracking loop that never ends without a
+// display.
+std::string SendMouse(NSEventType type, double x, double y, int clicks) {
   NSWindow* window = TheWindow();
   static NSInteger number = 0;
   NSView* content = window.contentView;
@@ -71,10 +110,10 @@ void SendMouse(NSEventType type, double x, double y, int clicks) {
                                    eventNumber:++number
                                     clickCount:clicks
                                       pressure:clicks ? 1.0 : 0.0];
-  NSView* hit = [content hitTest:[content.superview convertPoint:p
-                                                        fromView:content]];
-  if (!hit) {
-    return;
+  NSView* hit = HitFromFrame(x, y);
+  const std::string kind = Classify(hit);
+  if (kind != "shell" && kind != "page") {
+    return kind;
   }
   switch (type) {
     case NSEventTypeMouseMoved:
@@ -92,6 +131,7 @@ void SendMouse(NSEventType type, double x, double y, int clicks) {
     default:
       break;
   }
+  return kind;
 }
 
 void SendKey(NSString* chars, unsigned short code, NSEventModifierFlags flags) {
@@ -200,27 +240,15 @@ void Run(const std::string& line) {
   };
 
   if (cmd == "move") {
-    SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0);
-    Reply(id, "ok");
+    Reply(id, SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0));
   } else if (cmd == "click") {
     SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0);
     SendMouse(NSEventTypeLeftMouseDown, number(2), number(3), 1);
-    SendMouse(NSEventTypeLeftMouseUp, number(2), number(3), 1);
-    Reply(id, "ok");
+    Reply(id, SendMouse(NSEventTypeLeftMouseUp, number(2), number(3), 1));
   } else if (cmd == "hit") {
-    // The window's real answer, from the same hitTest: the OS uses.
-    NSWindow* window = TheWindow();
-    NSView* content = window.contentView;
-    NSPoint p = NSMakePoint(number(2), content.bounds.size.height - number(3));
-    NSPoint in_super = [content.superview convertPoint:p fromView:content];
-    NSView* hit = [content hitTest:in_super];
-    NSView* shell =
-        Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView();
-    NSView* page =
-        Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
-    Reply(id, [hit isDescendantOf:shell] ? "shell"
-              : [hit isDescendantOf:page] ? "page"
-                                          : "neither");
+    // Who would get a mouse event here: shell, page, container, frame (AppKit drags the
+    // window), or a native view such as a window button.
+    Reply(id, Classify(HitFromFrame(number(2), number(3))));
   } else if (cmd == "type") {
     NSString* text = base::SysUTF8ToNSString(rest(2));
     for (NSUInteger i = 0; i < text.length; i++) {

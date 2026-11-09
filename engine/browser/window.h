@@ -36,6 +36,7 @@ class Window {
   // follows because the resize made the shell measure again.
   void SetPageBounds(const gfx::RectF& bounds, const gfx::SizeF& viewport);
   void SetShellRegions(std::vector<gfx::RectF> regions);
+  void SetDragRegions(std::vector<gfx::RectF> regions);
 
   // Reports where the native window controls are, in shell coordinates, now and
   // whenever they move or hide. Empty in full screen.

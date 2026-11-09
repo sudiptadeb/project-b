@@ -33,6 +33,7 @@ type Engine struct {
 	// Written on the main thread, read by the dev server's goroutines.
 	mu      sync.Mutex
 	regions []engine.Rect
+	drag    []engine.Rect
 	bounds  engine.Rect
 	current string
 
@@ -105,29 +106,41 @@ func (e *Engine) SetShellRegions(rects []engine.Rect) {
 	e.regions = rects
 }
 
+func (e *Engine) SetDragRegions(rects []engine.Rect) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.drag = rects
+}
+
 func (e *Engine) FocusPage() {}
 
 func (e *Engine) SendToShell(msg []byte) { e.Shell.Publish(msg) }
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
 
-// Regions returns the shell's rectangles and the page's bounds.
-func (e *Engine) Regions() ([]engine.Rect, engine.Rect) {
+// Regions returns the shell's rectangles, the drag rectangles and the page's bounds.
+func (e *Engine) Regions() (shell, drag []engine.Rect, bounds engine.Rect) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return append([]engine.Rect(nil), e.regions...), e.bounds
+	return append([]engine.Rect(nil), e.regions...), append([]engine.Rect(nil), e.drag...), e.bounds
 }
 
-// HitShell answers what the real engine's hit test answers.
-func (e *Engine) HitShell(x, y float64) bool {
+// Hit answers what the real engine's hit test answers for a point: "drag", "shell" or
+// "page".
+func (e *Engine) Hit(x, y float64) string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, r := range e.regions {
+	for _, r := range e.drag {
 		if r.Contains(x, y) {
-			return true
+			return "drag"
 		}
 	}
-	return false
+	for _, r := range e.regions {
+		if r.Contains(x, y) {
+			return "shell"
+		}
+	}
+	return "page"
 }
 
 // Fire makes the engine do what a button on the mock page says. Any goroutine.

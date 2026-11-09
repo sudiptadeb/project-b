@@ -188,8 +188,18 @@ def main():
     app.wait("document.querySelector('form').getBoundingClientRect().height>0")
     time.sleep(0.3)
     print("bounds", app.cmd("bounds"), flush=True)
+    # Hit tests start from the window's frame view, as AppKit's do, so the title bar and
+    # its buttons take part.
     check("bar belongs to the shell", app.cmd("hit", 400, BAR_Y) == "shell")
     check("below the bar belongs to the page", app.cmd("hit", 400, 300) == "page")
+    time.sleep(0.3)
+    tab_x = app.js("document.querySelector('.tab').getBoundingClientRect().x")
+    check("the tab, at title bar height, belongs to the shell and not the title bar", app.cmd("hit", tab_x + 20, 16) == "shell", app.cmd("hit", tab_x + 20, 16))
+    empty_strip = app.cmd("hit", 600, 16)
+    check("the empty strip beside the tab falls through to the window frame, which drags", empty_strip == "frame", empty_strip)
+    over_buttons = app.cmd("hit", 40, 16)
+    check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
+    print("hit over window buttons:", over_buttons, flush=True)
     window = json.loads(app.cmd("bounds"))
     print("title bar", window["titlebar"], "buttons", window["buttonsStart"], window["buttonsEnd"], "middle", window["buttonsMiddleY"], "size", window["buttonSize"], "screen", app.js("[screen.width,screen.height]"), flush=True)
     check("the title bar ends above the address bar, so clicks reach it", window["titlebar"] <= 32, window)

@@ -71,15 +71,24 @@ void CallSetPageBounds(double x,
                                     gfx::SizeF(view_w, view_h));
 }
 
-void CallSetShellRegions(const double* rects, size_t count) {
-  CheckMainThread();
-  std::vector<gfx::RectF> regions;
-  regions.reserve(count);
+std::vector<gfx::RectF> ToRects(const double* rects, size_t count) {
+  std::vector<gfx::RectF> out;
+  out.reserve(count);
   for (size_t i = 0; i < count; i++) {
     const double* r = UNSAFE_BUFFERS(rects + i * 4);
-    UNSAFE_BUFFERS(regions.emplace_back(r[0], r[1], r[2], r[3]));
+    UNSAFE_BUFFERS(out.emplace_back(r[0], r[1], r[2], r[3]));
   }
-  g_engine->window()->SetShellRegions(std::move(regions));
+  return out;
+}
+
+void CallSetShellRegions(const double* rects, size_t count) {
+  CheckMainThread();
+  g_engine->window()->SetShellRegions(ToRects(rects, count));
+}
+
+void CallSetDragRegions(const double* rects, size_t count) {
+  CheckMainThread();
+  g_engine->window()->SetDragRegions(ToRects(rects, count));
 }
 
 void CallFocusPage() {
@@ -134,6 +143,7 @@ const PBEngineCalls* Engine::Calls() {
       .reload = CallReload,
       .set_page_bounds = CallSetPageBounds,
       .set_shell_regions = CallSetShellRegions,
+      .set_drag_regions = CallSetDragRegions,
       .focus_page = CallFocusPage,
       .send_to_shell = CallSendToShell,
       .post_wakeup = CallPostWakeup,

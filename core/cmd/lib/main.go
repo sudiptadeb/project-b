@@ -16,6 +16,7 @@ static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_
 static inline void call_reload(const PBEngineCalls* c, int64_t tab) { c->reload(tab); }
 static inline void call_set_page_bounds(const PBEngineCalls* c, double x, double y, double w, double h, double vw, double vh) { c->set_page_bounds(x, y, w, h, vw, vh); }
 static inline void call_set_shell_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_shell_regions(rects, count); }
+static inline void call_set_drag_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_drag_regions(rects, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
@@ -65,12 +66,23 @@ func (e *nativeEngine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
 }
 
 func (e *nativeEngine) SetShellRegions(rects []engine.Rect) {
+	flat := flatten(rects)
+	C.call_set_shell_regions(e.calls, &flat[0], C.size_t(len(rects)))
+}
+
+func (e *nativeEngine) SetDragRegions(rects []engine.Rect) {
+	flat := flatten(rects)
+	C.call_set_drag_regions(e.calls, &flat[0], C.size_t(len(rects)))
+}
+
+// flatten lays rectangles out as x, y, w, h, with a spare value so there is always an
+// address to take.
+func flatten(rects []engine.Rect) []C.double {
 	flat := make([]C.double, 0, len(rects)*4+1)
 	for _, r := range rects {
 		flat = append(flat, C.double(r.X), C.double(r.Y), C.double(r.W), C.double(r.H))
 	}
-	flat = append(flat, 0) // Never empty, so there's always an address to take.
-	C.call_set_shell_regions(e.calls, &flat[0], C.size_t(len(rects)))
+	return append(flat, 0)
 }
 
 func (e *nativeEngine) FocusPage() { C.call_focus_page(e.calls) }

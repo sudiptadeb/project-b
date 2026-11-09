@@ -154,15 +154,16 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
 	r.shell(`{"t":"regions","rects":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}]}`)
+	r.shell(`{"t":"dragRegions","rects":[{"x":300,"y":0,"w":500,"h":32}]}`)
 	r.shell(`{"t":"ready"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
 
 	for _, c := range []struct {
 		x, y float64
-		want bool
-	}{{10, 10, true}, {120, 100, true}, {10, 100, false}, {600, 300, false}} {
-		if got := r.e.HitShell(c.x, c.y); got != c.want {
-			t.Errorf("HitShell(%v,%v) = %v", c.x, c.y, got)
+		want string
+	}{{10, 10, "shell"}, {120, 100, "shell"}, {10, 100, "page"}, {600, 300, "page"}, {400, 10, "drag"}, {400, 40, "shell"}} {
+		if got := r.e.Hit(c.x, c.y); got != c.want {
+			t.Errorf("Hit(%v,%v) = %v, want %v", c.x, c.y, got, c.want)
 		}
 	}
 }

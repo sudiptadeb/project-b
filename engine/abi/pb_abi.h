@@ -29,6 +29,8 @@ typedef struct PBEngineCalls {
                           double view_h);
   // rects is x, y, w, h repeated count times.
   void (*set_shell_regions)(const double* rects, size_t count);
+  // Same layout. A mouse down here drags the window.
+  void (*set_drag_regions)(const double* rects, size_t count);
   void (*focus_page)(void);
   void (*send_to_shell)(const char* json, size_t length);
   // Asks the main thread to call run_posted soon.

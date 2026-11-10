@@ -69,6 +69,7 @@ func (m *Manager) Handle(msg []byte) {
 			"controls":     m.window.Controls(),
 			"cornerRadius": m.window.CornerRadius(),
 			"tabLayout":    m.prefs.TabLayout(),
+			"theme":        m.prefs.Theme(),
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"crashLog":     m.crash.Last(),
@@ -130,6 +131,11 @@ func (m *Manager) TabChanged(t tabs.Tab) {
 // TabsChanged tells the shell which tabs exist now and which is active.
 func (m *Manager) TabsChanged() {
 	m.send(map[string]any{"t": "tabs", "tabs": m.tabs.All(), "active": m.tabs.ActiveID()})
+}
+
+// ThemeChanged tells the shell to be light, dark or as the system is.
+func (m *Manager) ThemeChanged(theme string) {
+	m.send(map[string]any{"t": "theme", "theme": theme})
 }
 
 // TabLayoutChanged tells the shell where the tabs go now.

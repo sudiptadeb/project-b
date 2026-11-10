@@ -53,7 +53,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Suggest = suggest.New(a.History)
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
-	a.Window = window.New(e, a.Prefs.FrameColor())
+	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()))
 	closeWindow := func() { a.Window.Request(engine.WindowClose) }
 	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
@@ -73,6 +73,9 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Window.OnColorChanged(a.Shell.WindowColorChanged)
 	a.Window.OnColorChanged(a.Settings.WindowColorChanged)
 	a.Prefs.OnFrameColorChanged(a.Window.SetColor)
+	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
+	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
+	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
 	a.Prefs.OnAutoUpdateChanged(a.Update.SetAuto)
@@ -142,6 +145,17 @@ func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 
 func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
+
+// themeOf is the window's theme for a theme pref.
+func themeOf(t string) engine.Theme {
+	switch t {
+	case prefs.ThemeLight:
+		return engine.ThemeLight
+	case prefs.ThemeDark:
+		return engine.ThemeDark
+	}
+	return engine.ThemeSystem
+}
 
 // Key hands a key press to the commands manager, which decides what it runs.
 func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {

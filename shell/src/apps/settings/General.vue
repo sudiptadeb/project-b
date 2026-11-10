@@ -22,6 +22,12 @@ function setColor(color) {
   send({ t: 'setFrameColor', text: color });
 }
 
+const themes = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
 const layouts = [
   { value: 'vertical', label: 'Vertical' },
   { value: 'horizontal', label: 'Horizontal' },
@@ -47,6 +53,19 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
       <div class="card">
+        <div class="row" role="radiogroup" aria-labelledby="theme">
+          <span id="theme" class="label">Theme</span>
+          <label v-for="t in themes" :key="t.value" class="choice">
+            <input
+              type="radio"
+              name="theme"
+              :value="t.value"
+              :checked="state.theme === t.value"
+              @change="send({ t: 'setTheme', text: t.value })"
+            />
+            {{ t.label }}
+          </label>
+        </div>
         <div class="row" role="radiogroup" aria-labelledby="tab-layout">
           <span id="tab-layout" class="label">Tab layout</span>
           <label v-for="l in layouts" :key="l.value" class="choice">

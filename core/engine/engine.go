@@ -237,7 +237,17 @@ type WindowLayout struct {
 	Regions      []Region // In order. The first that holds a point decides.
 	FrameColor   string   // "#rrggbb", painted under the shell and the page.
 	FrameWidth   float64  // The band drawn around the window's edge, over both.
+	Theme        Theme    // Light or dark for the window's own parts, or the system's.
 }
+
+// Theme is how the window's own parts, its buttons and title bar, are drawn.
+type Theme int
+
+const (
+	ThemeSystem Theme = iota // Whatever the system is.
+	ThemeLight
+	ThemeDark
+)
 
 // At is the one hit test: what a press at x, y does.
 func (l WindowLayout) At(x, y float64) Area {

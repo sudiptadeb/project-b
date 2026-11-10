@@ -187,6 +187,7 @@ func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
 		view_w: C.double(l.ViewW), view_h: C.double(l.ViewH),
 		page_x: C.double(l.Page.X), page_y: C.double(l.Page.Y), page_w: C.double(l.Page.W), page_h: C.double(l.Page.H),
 		frame_rgb: C.int32_t(rgb), frame_width: C.double(l.FrameWidth),
+		theme: C.int32_t(l.Theme),
 	}
 	C.call_set_window_layout(e.calls, &layout, first, C.size_t(len(regions)))
 }

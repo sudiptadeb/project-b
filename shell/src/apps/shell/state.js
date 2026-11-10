@@ -12,6 +12,8 @@ export const state = reactive({
   active: 0,
   // Where the tabs go: 'vertical' (a sidebar) or 'horizontal' (a strip on top).
   tabLayout: 'vertical',
+  // 'system', 'light' or 'dark', as Go's theme pref says.
+  theme: 'system',
   // Where the native window controls are. Zero size when there are none.
   controls: { x: 0, y: 0, w: 0, h: 0 },
   // The radius the OS rounds the window's corners with, in CSS pixels. 0 in full screen.
@@ -86,6 +88,7 @@ export function connect() {
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;
+          state.theme = m.theme;
           state.update = m.update;
           state.running = m.running;
           state.crashLog = m.crashLog;
@@ -110,6 +113,9 @@ export function connect() {
           if (i >= 0) state.tabs[i] = m.tab;
           break;
         }
+        case 'theme':
+          state.theme = m.theme;
+          break;
         case 'tabLayout':
           state.tabLayout = m.tabLayout;
           break;

@@ -1,19 +1,13 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { tones } from '@/tones.js';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useTheme } from '@/theme.js';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
 import { send, state } from './state.js';
 
 // The settings page: a page of its own over the whole window. Its colours come from the
-// frame colour, as the shell's do.
-watchEffect(() => {
-  if (state.windowColor) {
-    for (const [name, value] of Object.entries(tones(state.windowColor))) {
-      document.documentElement.style.setProperty(name, value);
-    }
-  }
-});
+// frame colour and the theme, as the shell's do.
+useTheme(state);
 
 const sections = [
   { id: 'general', label: 'General' },
@@ -70,11 +64,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 /* Type and surfaces from the Ulaa preferences design, at a page's size. The frame colour's
    tones (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint) come from tones.js. */
 :root {
-  --surface: #ffffff;
-  --text: #1f1f1f;
-  --muted: #5c6270;
-  --line: rgba(15, 20, 25, 0.1);
-  --danger: #ea3323;
   font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;

@@ -42,6 +42,9 @@ class Window {
     // own corner radius, so the page's square corners never show at the curve.
     uint32_t frame_rgb;
     double frame_width;
+    // How the window's own parts are drawn: 0 as the system is, 1 light, 2 dark. Only
+    // this window: pages keep following the system.
+    int theme;
   };
   struct State {
     gfx::SizeF size;  // The content area.

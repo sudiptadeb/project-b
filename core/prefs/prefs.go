@@ -17,14 +17,26 @@ const (
 	TabsHorizontal = "horizontal"
 )
 
+// Themes: the shell and the window follow the system's light or dark, or stay one.
+const (
+	ThemeSystem = "system"
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+)
+
 // Prefs is every setting, as the file holds them.
 type Prefs struct {
 	TabLayout  string `json:"tabLayout"`
 	AutoUpdate bool   `json:"autoUpdate"`
 	FrameColor string `json:"frameColor"`
+	Theme      string `json:"theme"`
 }
 
-func defaults() Prefs { return Prefs{TabLayout: TabsVertical, AutoUpdate: true, FrameColor: "#4f9e9e"} }
+func defaults() Prefs {
+	return Prefs{TabLayout: TabsVertical, AutoUpdate: true, FrameColor: "#4f9e9e", Theme: ThemeSystem}
+}
+
+func isTheme(t string) bool { return t == ThemeSystem || t == ThemeLight || t == ThemeDark }
 
 // A frame colour is "#rrggbb", as a colour input gives it.
 var frameColor = regexp.MustCompile(`^#[0-9a-f]{6}$`)
@@ -36,6 +48,7 @@ type Manager struct {
 	onLayout     []func(string)
 	onAutoUpdate []func(bool)
 	onFrameColor []func(string)
+	onTheme      []func(string)
 }
 
 // New returns a manager with the settings saved under dir, or the defaults. A setting the
@@ -51,6 +64,9 @@ func New(dir string) *Manager {
 			}
 			if !frameColor.MatchString(s.FrameColor) {
 				s.FrameColor = defaults().FrameColor
+			}
+			if !isTheme(s.Theme) {
+				s.Theme = ThemeSystem
 			}
 			m.prefs = s
 		}
@@ -118,6 +134,24 @@ func (m *Manager) SetFrameColor(color string) {
 	m.save()
 	for _, f := range m.onFrameColor {
 		f(color)
+	}
+}
+
+// Theme is ThemeSystem, ThemeLight or ThemeDark.
+func (m *Manager) Theme() string { return m.prefs.Theme }
+
+// OnThemeChanged subscribes to the theme changing.
+func (m *Manager) OnThemeChanged(f func(string)) { m.onTheme = append(m.onTheme, f) }
+
+// SetTheme changes the theme. Anything but the three themes is ignored.
+func (m *Manager) SetTheme(theme string) {
+	if !isTheme(theme) || theme == m.prefs.Theme {
+		return
+	}
+	m.prefs.Theme = theme
+	m.save()
+	for _, f := range m.onTheme {
+		f(theme)
 	}
 }
 

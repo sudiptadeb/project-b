@@ -13,6 +13,8 @@ export const state = reactive({
   frameWidth: 0,
   controls: { x: 0, y: 0, w: 0, h: 0 },
   tabLayout: 'vertical',
+  // 'system', 'light' or 'dark', as Go's theme pref says.
+  theme: 'system',
   autoUpdate: true,
   update: { phase: '' },
   running: '',
@@ -29,12 +31,16 @@ export function connect() {
             frameWidth: m.frameWidth,
             controls: m.controls,
             tabLayout: m.tabLayout,
+            theme: m.theme,
             autoUpdate: m.autoUpdate,
             update: m.update,
             running: m.running,
             keyboard: m.keyboard,
             ready: true,
           });
+          break;
+        case 'theme':
+          state.theme = m.theme;
           break;
         case 'tabLayout':
           state.tabLayout = m.tabLayout;

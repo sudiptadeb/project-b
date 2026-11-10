@@ -155,6 +155,7 @@ void CallSetWindowLayout(const PBWindowLayout* l,
       .page = gfx::RectF(l->page_x, l->page_y, l->page_w, l->page_h),
       .frame_rgb = static_cast<uint32_t>(l->frame_rgb),
       .frame_width = l->frame_width,
+      .theme = l->theme,
   };
   layout.regions.reserve(region_count);
   for (size_t i = 0; i < region_count; i++) {

@@ -95,6 +95,9 @@ typedef struct PBWindowLayout {
   // and the width of the band it draws around its edge, in points.
   int32_t frame_rgb;
   double frame_width;
+  // How the window's own parts (buttons, title bar) are drawn: 0 as the system is,
+  // 1 light, 2 dark.
+  int32_t theme;
 } PBWindowLayout;
 
 // Matches engine.WindowRequest. Each does what pressing that window button does.

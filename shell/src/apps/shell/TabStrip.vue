@@ -153,7 +153,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
 }
 
 .close:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--press);
 }
 
 .new-tab {

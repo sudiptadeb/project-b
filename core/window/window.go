@@ -24,6 +24,7 @@ type ShellLayout struct {
 type Manager struct {
 	eng        engine.Engine
 	color      string
+	theme      engine.Theme
 	frameWidth float64
 	shell      ShellLayout
 	state      engine.WindowState
@@ -33,9 +34,10 @@ type Manager struct {
 }
 
 // New returns a manager and gives the window its first layout, which carries the
-// frame: color, "#rrggbb", 4px wide. The engine reports its state after it starts.
-func New(eng engine.Engine, color string) *Manager {
-	m := &Manager{eng: eng, color: color, frameWidth: 4}
+// frame, color, "#rrggbb", 4px wide, and the theme. The engine reports its state after
+// it starts.
+func New(eng engine.Engine, color string, theme engine.Theme) *Manager {
+	m := &Manager{eng: eng, color: color, theme: theme, frameWidth: 4}
 	m.sent = m.layout()
 	eng.SetWindowLayout(m.sent)
 	return m
@@ -50,6 +52,7 @@ func (m *Manager) layout() engine.WindowLayout {
 		Page:       m.shell.Page,
 		FrameColor: m.color,
 		FrameWidth: m.frameWidth,
+		Theme:      m.theme,
 	}
 	if !m.state.FullScreen {
 		for _, r := range m.shell.Drag {
@@ -66,7 +69,7 @@ func (m *Manager) layout() engine.WindowLayout {
 func (m *Manager) update() {
 	l := m.layout()
 	if l.ViewW == m.sent.ViewW && l.ViewH == m.sent.ViewH && l.Page == m.sent.Page &&
-		l.FrameColor == m.sent.FrameColor && l.FrameWidth == m.sent.FrameWidth &&
+		l.FrameColor == m.sent.FrameColor && l.FrameWidth == m.sent.FrameWidth && l.Theme == m.sent.Theme &&
 		slices.Equal(l.Regions, m.sent.Regions) {
 		return
 	}
@@ -125,6 +128,12 @@ func (m *Manager) SetColor(color string) {
 	for _, f := range m.onColor {
 		f(color)
 	}
+}
+
+// SetTheme draws the window's own parts light, dark or as the system does.
+func (m *Manager) SetTheme(t engine.Theme) {
+	m.theme = t
+	m.update()
 }
 
 // FrameWidth is the width of the frame band, in CSS pixels, for the window and the

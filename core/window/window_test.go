@@ -31,7 +31,7 @@ var (
 
 func TestTheFirstLayoutCarriesTheFrame(t *testing.T) {
 	e := &recorder{}
-	New(e, "#4f9e9e")
+	New(e, "#4f9e9e", engine.ThemeSystem)
 	if len(e.layouts) != 1 || e.last().FrameColor != "#4f9e9e" || e.last().FrameWidth != 4 || len(e.last().Regions) != 0 {
 		t.Fatalf("layouts %+v", e.layouts)
 	}
@@ -39,7 +39,7 @@ func TestTheFirstLayoutCarriesTheFrame(t *testing.T) {
 
 func TestWhatEachPointDoes(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.HandleWindowChanged(engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
 	m.HandleShellLayout(report)
 	l := e.last()
@@ -64,7 +64,7 @@ func TestWhatEachPointDoes(t *testing.T) {
 
 func TestFullScreenSendsNoDragAreas(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.HandleShellLayout(report)
 	m.HandleWindowChanged(engine.WindowState{W: 1440, H: 900, FullScreen: true})
 	if got := e.last().At(100, 20); got != engine.AreaShell {
@@ -83,7 +83,7 @@ func TestFullScreenSendsNoDragAreas(t *testing.T) {
 
 func TestAnUnchangedLayoutIsNotSentTwice(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.HandleShellLayout(report)
 	m.HandleShellLayout(report)
 	// A resize changes the window's size, but not what the shell last reported.
@@ -97,7 +97,7 @@ func TestAnUnchangedLayoutIsNotSentTwice(t *testing.T) {
 
 func TestColorRepaintsTheWindowAndTellsSubscribers(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.HandleShellLayout(report)
 	var got []string
 	m.OnColorChanged(func(c string) { got = append(got, c) })
@@ -109,7 +109,7 @@ func TestColorRepaintsTheWindowAndTellsSubscribers(t *testing.T) {
 }
 
 func TestControlsChangeOnlyWhenDifferent(t *testing.T) {
-	m := New(&recorder{}, "#4f9e9e")
+	m := New(&recorder{}, "#4f9e9e", engine.ThemeSystem)
 	var got []engine.Rect
 	var radii []float64
 	m.OnControlsChanged(func(r engine.Rect, radius float64) {
@@ -129,7 +129,7 @@ func TestControlsChangeOnlyWhenDifferent(t *testing.T) {
 
 func TestAShellCrashGivesThePageEveryPress(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.HandleShellLayout(report)
 	m.HandleShellCrashed()
 	if l := e.last(); len(l.Regions) != 0 || l.Page != report.Page || l.At(300, 20) != engine.AreaPage {
@@ -144,7 +144,7 @@ func TestAShellCrashGivesThePageEveryPress(t *testing.T) {
 
 func TestRequestsGoToTheEngine(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e")
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
 	m.Request(engine.WindowFullScreen)
 	m.Request(engine.WindowZoom)
 	m.Request(engine.WindowMinimise)

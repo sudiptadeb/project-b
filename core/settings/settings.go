@@ -79,6 +79,7 @@ func (m *Manager) Handle(msg []byte) {
 			"controls":     m.window.Controls(),
 			"cornerRadius": m.window.CornerRadius(),
 			"tabLayout":    m.prefs.TabLayout(),
+			"theme":        m.prefs.Theme(),
 			"autoUpdate":   m.prefs.AutoUpdate(),
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
@@ -88,6 +89,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.Close()
 	case "setTabLayout":
 		m.prefs.SetTabLayout(c.Text)
+	case "setTheme":
+		m.prefs.SetTheme(c.Text)
 	case "setAutoUpdate":
 		m.prefs.SetAutoUpdate(c.On)
 	case "setFrameColor":
@@ -117,10 +120,14 @@ func (m *Manager) Handle(msg []byte) {
 	}
 }
 
-// TabLayoutChanged, AutoUpdateChanged, UpdateChanged, WindowColorChanged and
+// TabLayoutChanged, ThemeChanged, AutoUpdateChanged, UpdateChanged, WindowColorChanged and
 // WindowControlsChanged tell an open settings page what the managers now say.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+func (m *Manager) ThemeChanged(theme string) {
+	m.send(map[string]any{"t": "theme", "theme": theme})
 }
 
 func (m *Manager) AutoUpdateChanged(on bool) {

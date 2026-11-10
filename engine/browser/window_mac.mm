@@ -187,6 +187,7 @@ struct Window::Impl {
   uint32_t shown_rgb = 0;
   // The frame last painted; none yet.
   int64_t frame_rgb = -1;
+  int theme = -1;
   double frame_width = -1;
   base::RepeatingCallback<void(const State&)> on_state;
   State last_state;
@@ -379,6 +380,16 @@ void Window::SetLayout(Layout layout) {
     impl_->container.layer.backgroundColor = color.CGColor;
     impl_->container.layer.borderColor = color.CGColor;
     impl_->container.layer.borderWidth = layout.frame_width;
+  }
+
+  // The window's own appearance only: NSApp's would change what pages see as the
+  // system's light or dark too.
+  if (layout.theme != impl_->theme) {
+    impl_->theme = layout.theme;
+    impl_->window.appearance =
+        layout.theme == 1   ? [NSAppearance appearanceNamed:NSAppearanceNameAqua]
+        : layout.theme == 2 ? [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]
+                            : nil;
   }
 
   const NSSize size = impl_->container.bounds.size;

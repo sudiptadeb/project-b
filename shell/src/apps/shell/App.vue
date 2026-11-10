@@ -5,7 +5,7 @@ import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
 import { state } from './state.js';
-import { tones } from '@/tones.js';
+import { useTheme } from '@/theme.js';
 
 // Both layouts show the same tabs from the same state; only where they sit differs.
 const horizontal = computed(() => state.tabLayout === 'horizontal');
@@ -14,13 +14,9 @@ const horizontal = computed(() => state.tabLayout === 'horizontal');
 // and become CSS variables on the root: the shell paints its bands in the colour and
 // width the window paints natively, so there is one source for both, and every other
 // tone of the shell derives from that colour. The curve over the corners is the window's
-// own border, drawn by the engine.
+// own border, drawn by the engine. Light or dark follows Go's theme pref.
+useTheme(state);
 watchEffect(() => {
-  if (state.windowColor) {
-    for (const [name, value] of Object.entries(tones(state.windowColor))) {
-      document.documentElement.style.setProperty(name, value);
-    }
-  }
   document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
   document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');
 });
@@ -50,12 +46,6 @@ watchEffect(() => {
    tones.js. Icons and the sidebar's New Tab take a deeper ink, so the frame is the one
    thing in the full accent. */
 :root {
-  --hover: rgba(255, 255, 255, 0.6);
-  --surface: #ffffff;
-  --text: #1f1f1f;
-  --muted: #5c6270;
-  --line: rgba(15, 20, 25, 0.1);
-  --danger: #ea3323;
   font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;

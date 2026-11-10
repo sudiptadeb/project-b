@@ -391,6 +391,19 @@ func TestTheSettingsPageReadsAndSetsTheSettings(t *testing.T) {
 	if !strings.Contains(string(b), `"autoUpdate":false`) {
 		t.Fatalf("prefs.json = %s", b)
 	}
+	// The theme: saved, the shell told, the window's own parts dark.
+	if snap["theme"] != "system" || r.e.Layout().Theme != engine.ThemeSystem {
+		t.Fatalf("theme starts as %v, window %v", snap["theme"], r.e.Layout().Theme)
+	}
+	r.settings(`{"t":"setTheme","text":"dark"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "theme" && m["theme"] == "dark" })
+	if r.e.Layout().Theme != engine.ThemeDark {
+		t.Fatalf("window theme = %v", r.e.Layout().Theme)
+	}
+	b, _ = os.ReadFile(filepath.Join(dir, "prefs.json"))
+	if !strings.Contains(string(b), `"theme":"dark"`) {
+		t.Fatalf("prefs.json = %s", b)
+	}
 	r.settings(`{"t":"close"}`)
 	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "closed" })
 }

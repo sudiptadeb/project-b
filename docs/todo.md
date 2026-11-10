@@ -44,4 +44,3 @@ Take an item off when it lands or is dropped.
 - `tools/drive_first_app.py`: the check for typing `chrome://shell/` is flaky.
 - `tools/vm/check.py` times clicks by pixels, so it measures the VM's display; time inside the
   app instead.
-- The ChromeDriver suite looks for a window named `project_b`; the packaged app's is "Project B".

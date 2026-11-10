@@ -34,7 +34,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 CHROMEDRIVER = os.environ.get("CHROMEDRIVER") or os.path.join(
     ROOT, ".tools/chromedriver/chromedriver-mac-arm64/chromedriver")
-DESK = os.environ.get("DESK") or os.path.join(ROOT, ".tools/desk/desk")
 OUT = os.path.join(ROOT, "build/cdp")
 VERSION = "155.0.8059.41"
 
@@ -353,12 +352,6 @@ def session(fixture, extra_args=(), full=True):
     want = {"x": 60, "y": 80, "width": 1000, "height": 640}
     got = wd_call("POST", "/window/rect", want)
     check("set window rect", all(got.get(k) == v for k, v in want.items()), got)
-
-    # A picture of the real window while it is being driven, if the Mac has a desktop.
-    if os.path.exists(DESK):
-        shot = os.path.join(OUT, "desk.png")
-        r = subprocess.run([DESK, "shot", shot, "project_b"], capture_output=True, text=True)
-        print(f"desk shot: {shot}" if r.returncode == 0 and os.path.exists(shot) else f"no desk shot: {r.stdout}{r.stderr}".strip(), flush=True)
 
     first = wd_call("GET", "/window")
     check("Go starts with one tab", driver.js(ROWS) == 1)

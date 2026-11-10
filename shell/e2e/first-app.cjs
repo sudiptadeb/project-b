@@ -305,7 +305,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('Cmd+1 picks the first tab', true);
   await shortcut('nextTab');
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]')[1].getAttribute('aria-selected') === 'true');
-  check('Ctrl+Tab picks the next tab', true);
+  check('Shift+Cmd+] picks the next tab', true);
   await shortcut('closeTab');
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('Cmd+W closes the active tab and its right neighbour takes over', (await activeRow.innerText()).includes('opened.test'), await activeRow.innerText());

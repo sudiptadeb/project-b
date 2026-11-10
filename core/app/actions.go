@@ -93,6 +93,10 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 
 	add("tab.next", "Select Next Tab", func() { a.Tabs.ActivateNext(false) })
 	add("tab.previous", "Select Previous Tab", func() { a.Tabs.ActivateNext(true) })
+	// Held like the OS's app switcher: each press goes one tab further back in recent
+	// order, and letting go of the modifier settles on the tab it reached.
+	add("tab.recentNext", "Select Recent Tab", func() { a.Tabs.CycleRecent(false) }).Release = a.Tabs.EndCycle
+	add("tab.recentPrevious", "Select Recent Tab Backward", func() { a.Tabs.CycleRecent(true) }).Release = a.Tabs.EndCycle
 	add("tab.duplicate", "Duplicate Tab", a.Tabs.Duplicate).Enabled = active
 	for i := range 8 {
 		add(fmt.Sprintf("tab.select%d", i+1), fmt.Sprintf("Tab %d", i+1), func() { a.Tabs.ActivateAt(i) })

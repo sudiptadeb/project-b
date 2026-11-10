@@ -44,6 +44,11 @@ type Manager struct {
 	tabs   map[engine.TabID]*Tab
 	order  []engine.TabID
 	active engine.TabID
+	// recent is every tab, the most recently shown first. While a cycle through it runs,
+	// cycle is the order it started with and at is where it has got to.
+	recent []engine.TabID
+	cycle  []engine.TabID
+	at     int
 
 	gates      []Gate
 	onChanged  []func(Tab)
@@ -97,6 +102,7 @@ func (m *Manager) add(id engine.TabID) *Tab {
 	t := &Tab{ID: id}
 	m.tabs[id] = t
 	m.order = append(m.order, id)
+	m.recent = append(m.recent, id)
 	return t
 }
 
@@ -107,7 +113,47 @@ func (m *Manager) Activate(id engine.TabID) {
 	}
 	m.active = id
 	m.eng.ShowTab(id)
+	if m.cycle == nil {
+		m.touch(id)
+	}
 	m.listChanged()
+}
+
+// touch makes a tab the most recent.
+func (m *Manager) touch(id engine.TabID) {
+	if i := slices.Index(m.recent, id); i >= 0 {
+		m.recent = slices.Delete(m.recent, i, i+1)
+	}
+	m.recent = slices.Insert(m.recent, 0, id)
+}
+
+// CycleRecent shows the next tab back in recent order, as the OS's app switcher does
+// while its key is held: each press goes one further, past the oldest it comes round to
+// the newest, and the order stays as it was until EndCycle. Reverse goes the other way.
+func (m *Manager) CycleRecent(reverse bool) {
+	if len(m.recent) < 2 {
+		return
+	}
+	if m.cycle == nil {
+		m.cycle = slices.Clone(m.recent)
+		m.at = 0
+	}
+	n := len(m.cycle)
+	if reverse {
+		m.at = (m.at + n - 1) % n
+	} else {
+		m.at = (m.at + 1) % n
+	}
+	m.Activate(m.cycle[m.at])
+}
+
+// EndCycle ends a cycle through recent tabs: the tab it stopped on becomes the most recent.
+func (m *Manager) EndCycle() {
+	if m.cycle == nil {
+		return
+	}
+	m.cycle = nil
+	m.touch(m.active)
 }
 
 // ActivateAt shows the tab at a position, counting from zero. Out of range does nothing.
@@ -140,9 +186,13 @@ func (m *Manager) Close(id engine.TabID) {
 	if m.tabs[id] == nil {
 		return
 	}
+	m.EndCycle()
 	i := slices.Index(m.order, id)
 	delete(m.tabs, id)
 	m.order = slices.Delete(m.order, i, i+1)
+	if j := slices.Index(m.recent, id); j >= 0 {
+		m.recent = slices.Delete(m.recent, j, j+1)
+	}
 	m.eng.CloseTab(id)
 	if len(m.order) == 0 {
 		m.active = 0

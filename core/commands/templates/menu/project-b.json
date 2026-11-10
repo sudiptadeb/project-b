@@ -192,6 +192,15 @@
           "separator": true
         },
         {
+          "action": "tab.recentNext"
+        },
+        {
+          "action": "tab.recentPrevious"
+        },
+        {
+          "separator": true
+        },
+        {
           "action": "tab.duplicate"
         },
         {

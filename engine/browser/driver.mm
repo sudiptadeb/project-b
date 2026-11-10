@@ -33,6 +33,7 @@
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/hooks_gen.h"
+#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/shell_page.h"
@@ -408,6 +409,10 @@ void Run(const std::string& line) {
     } else {
       Reply(id, "ERR no settings page");
     }
+  } else if (cmd == "mods") {
+    // What the app reports when the modifiers change; "mods 0" lets go of them all.
+    ReportModifiers(static_cast<uint64_t>(number(2)));
+    Reply(id, "ok");
   } else if (cmd == "menu") {
     Reply(id, MenuJson(NSApp.mainMenu));
   } else if (cmd == "capture") {

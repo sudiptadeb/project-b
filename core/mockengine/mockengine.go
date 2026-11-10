@@ -33,8 +33,10 @@ var Keys = map[string]engine.Key{
 	"focusAddressBar": {Code: 'L', Mods: engine.ModCmd},
 	"newTab":          {Code: 'T', Mods: engine.ModCmd},
 	"closeTab":        {Code: 'W', Mods: engine.ModCmd},
-	"nextTab":         {Code: 0x09, Mods: engine.ModCtrl},
-	"previousTab":     {Code: 0x09, Mods: engine.ModCtrl | engine.ModShift},
+	"nextTab":         {Code: 0xDD, Mods: engine.ModCmd | engine.ModShift},
+	"previousTab":     {Code: 0xDB, Mods: engine.ModCmd | engine.ModShift},
+	"recentTab":       {Code: 0x09, Mods: engine.ModCtrl},
+	"recentTabBack":   {Code: 0x09, Mods: engine.ModCtrl | engine.ModShift},
 	"tab1":            {Code: '1', Mods: engine.ModCmd},
 	"tab2":            {Code: '2', Mods: engine.ModCmd},
 	"tab3":            {Code: '3', Mods: engine.ModCmd},
@@ -351,6 +353,9 @@ func (e *Engine) Fire(kind, value string) {
 			if k, ok := Keys[value]; ok && !e.listener.Key(k, engine.KeyBeforePage, engine.SurfacePage) {
 				e.listener.Key(k, engine.KeyUnhandled, engine.SurfacePage)
 			}
+		case "release":
+			// Every modifier let go.
+			e.listener.ModsChanged(0)
 		case "fullscreen":
 			// The system's own button, which asks no one.
 			e.full = !e.full

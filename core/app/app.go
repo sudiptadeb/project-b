@@ -149,6 +149,8 @@ func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
 	return a.Commands.Key(k, phase)
 }
 
+func (a *App) ModsChanged(m engine.Mods) { a.Commands.ModsChanged(m) }
+
 func (a *App) MenuChosen(action string) { a.Commands.Run(action) }
 
 func (a *App) OSBindings(byTitle map[string]engine.Key) { a.Commands.OSBindings(byTitle) }

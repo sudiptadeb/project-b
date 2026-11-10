@@ -43,6 +43,7 @@ typedef enum PBEvent {
   PB_EVENT_MENU_CHOSEN = 8,             // s: the chosen item's action id
   PB_EVENT_OS_BINDINGS = 9,             // s: json, {title: {code, mods}}, the keys the
                                         // OS gives our menu items (macOS App Shortcuts)
+  PB_EVENT_MODS_CHANGED = 10,           // i: the modifiers held now, PBMods
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.

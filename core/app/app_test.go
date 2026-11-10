@@ -446,6 +446,36 @@ func TestAKeyAddedInSettingsRunsItsAction(t *testing.T) {
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
 }
 
+// Ctrl+Tab goes back through recent tabs while Ctrl is held, as Cmd+Tab does through apps,
+// and letting go settles on the tab it reached.
+func TestCtrlTabCyclesRecentTabs(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"newTab"}`)
+	r.shell(`{"t":"newTab"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 3 })
+	active := func(id float64) {
+		t.Helper()
+		r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == id })
+	}
+	// Recent: 3, 2, 1.
+	r.e.Fire("key", "recentTab")
+	active(2)
+	r.e.Fire("key", "recentTab")
+	active(1)
+	r.e.Fire("release", "")
+	// Recent: 1, 3, 2.
+	r.e.Fire("key", "recentTab")
+	active(3)
+	r.e.Fire("release", "")
+	// Recent: 3, 1, 2. Backward from the newest comes round to the oldest.
+	r.e.Fire("key", "recentTabBack")
+	active(2)
+	r.e.Fire("release", "")
+	r.e.Fire("key", "recentTab")
+	active(3)
+}
+
 // The menu comes from the tree: Edit has Redo, View has Full Screen with its macOS key,
 // and the hidden Select Tab submenu isn't there.
 func TestTheMenuComesFromTheTree(t *testing.T) {

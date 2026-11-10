@@ -195,6 +195,8 @@ type Listener interface {
 	// Key asks about one key press in any of our pages, at either phase. Returning true
 	// means the app used it.
 	Key(k Key, phase KeyPhase, in Surface) bool
+	// ModsChanged says which modifiers are held now, whenever that changes.
+	ModsChanged(m Mods)
 	// MenuChosen says the user chose a menu item, by its action id.
 	MenuChosen(action string)
 	// OSBindings carries the keys the OS lets people give our menu items, by item

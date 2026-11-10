@@ -529,10 +529,6 @@
     "tab.next": {
       "mac": [
         {
-          "keys": "Ctrl+Tab",
-          "reserve": "windowed"
-        },
-        {
           "keys": "Shift+Cmd+]",
           "reserve": "windowed"
         },
@@ -547,19 +543,11 @@
       ],
       "windows": [
         {
-          "keys": "Ctrl+Tab",
-          "reserve": "windowed"
-        },
-        {
           "keys": "Ctrl+PageDown",
           "reserve": "windowed"
         }
       ],
       "linux": [
-        {
-          "keys": "Ctrl+Tab",
-          "reserve": "windowed"
-        },
         {
           "keys": "Ctrl+PageDown",
           "reserve": "windowed"
@@ -568,10 +556,6 @@
     },
     "tab.previous": {
       "mac": [
-        {
-          "keys": "Ctrl+Shift+Tab",
-          "reserve": "windowed"
-        },
         {
           "keys": "Shift+Cmd+[",
           "reserve": "windowed"
@@ -587,19 +571,11 @@
       ],
       "windows": [
         {
-          "keys": "Ctrl+Shift+Tab",
-          "reserve": "windowed"
-        },
-        {
           "keys": "Ctrl+PageUp",
           "reserve": "windowed"
         }
       ],
       "linux": [
-        {
-          "keys": "Ctrl+Shift+Tab",
-          "reserve": "windowed"
-        },
         {
           "keys": "Ctrl+PageUp",
           "reserve": "windowed"
@@ -844,6 +820,46 @@
     "window.bringAllToFront": {},
     "app.about": {},
     "app.checkUpdate": {},
-    "app.showAll": {}
+    "app.showAll": {},
+    "tab.recentNext": {
+      "mac": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "tab.recentPrevious": {
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        }
+      ]
+    }
   }
 }

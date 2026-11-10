@@ -12,6 +12,9 @@ void InitMacApp();
 // Replaces the menu bar with Go's engine.Menu, as JSON. Choosing an item tells Go.
 void SetMainMenu(const std::string& json);
 
+// Tells Go which modifiers are held now, from NSEventModifierFlags.
+void ReportModifiers(uint64_t flags);
+
 // Runs a PBAppCommand.
 void RunAppCommand(int32_t command);
 

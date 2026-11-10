@@ -87,6 +87,7 @@ func (r *recorder) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) b
 	r.note(fmt.Sprintf("key %d %d %d %d", k.Code, k.Mods, phase, in))
 	return k.Mods&engine.ModCmd != 0
 }
+func (r *recorder) ModsChanged(m engine.Mods)                { r.note(fmt.Sprint("mods ", m)) }
 func (r *recorder) MenuChosen(action string)                 { r.note("menu " + action) }
 func (r *recorder) OSBindings(byTitle map[string]engine.Key) { r.note(fmt.Sprint("os ", byTitle)) }
 func (r *recorder) SettingsMessage(msg []byte)               { r.note("settings " + string(msg)) }

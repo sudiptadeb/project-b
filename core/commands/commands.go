@@ -27,6 +27,10 @@ type Action struct {
 	// its menu item show a check.
 	Enabled func() bool
 	Checked func() bool
+	// Release, when set, makes the action one that lasts while its key's modifiers are
+	// held, as the OS's app switcher does: it runs when they are let go. Run from a menu
+	// or a button, where nothing is held, it runs at once.
+	Release func()
 }
 
 // Missing is an action an update brought that the user's own keymap doesn't have yet,
@@ -40,6 +44,12 @@ type Missing struct {
 type match struct {
 	id      string
 	reserve string
+}
+
+// held is an action waiting for the modifiers of the key that ran it to be let go.
+type held struct {
+	mods    engine.Mods
+	release func()
 }
 
 // Manager owns the actions, the tree and the keymap.
@@ -60,6 +70,7 @@ type Manager struct {
 	missing   []Missing
 	problems  []string
 	recording bool
+	holding   *held
 	sent      string // the menu last sent, as JSON
 	onChanged []func()
 }
@@ -253,7 +264,8 @@ func (m *Manager) order() []string {
 	return ids
 }
 
-// Run runs an action by id, if it exists and can run now.
+// Run runs an action by id, if it exists and can run now, as a menu item or a button
+// does: with nothing held.
 func (m *Manager) Run(id string) {
 	a, ok := m.actions[id]
 	if !ok {
@@ -263,7 +275,44 @@ func (m *Manager) Run(id string) {
 	if a.Enabled != nil && !a.Enabled() {
 		return
 	}
+	m.run(a, 0)
+}
+
+// run runs an action whose key had these modifiers. An action that lasts while they are
+// held ends when they are let go, Shift aside: as with the OS's app switcher, Shift only
+// turns the direction, so Ctrl+Tab and Ctrl+Shift+Tab are one hold on Ctrl. Any other
+// action ends it first.
+func (m *Manager) run(a *Action, mods engine.Mods) {
+	watch := mods &^ engine.ModShift
+	if watch == 0 {
+		watch = mods
+	}
+	if m.holding != nil && (a.Release == nil || m.holding.mods != watch) {
+		m.letGo()
+	}
 	a.Run()
+	if a.Release == nil {
+		return
+	}
+	if mods == 0 {
+		a.Release()
+		return
+	}
+	m.holding = &held{mods: watch, release: a.Release}
+}
+
+func (m *Manager) letGo() {
+	h := m.holding
+	m.holding = nil
+	h.release()
+}
+
+// ModsChanged takes the modifiers held now. Letting go of those an action is held by
+// ends it.
+func (m *Manager) ModsChanged(mods engine.Mods) {
+	if m.holding != nil && mods&m.holding.mods != m.holding.mods {
+		m.letGo()
+	}
 }
 
 // Key decides about one key press. Before the page, only a reserved binding takes it;
@@ -287,7 +336,7 @@ func (m *Manager) Key(k engine.Key, phase engine.KeyPhase) bool {
 	if !ok || a.Enabled != nil && !a.Enabled() {
 		return false
 	}
-	a.Run()
+	m.run(a, k.Mods)
 	return true
 }
 

@@ -48,6 +48,11 @@
   content::ScopedNotifyNativeEventProcessorObserver scopedObserverNotifier(
       &self->_observers, event);
   [super sendEvent:event];
+  // Content drops a modifier's release after a key the browser handled, so Go hears
+  // about modifiers here, from the app, for actions held like the app switcher.
+  if (event.type == NSEventTypeFlagsChanged) {
+    project_b::ReportModifiers(event.modifierFlags);
+  }
 }
 
 - (void)addNativeEventProcessorObserver:
@@ -200,6 +205,25 @@ bool ParseKeyEquivalent(NSString* text, int* code, int* mods) {
 }
 
 }  // namespace
+
+void ReportModifiers(uint64_t flags) {
+  int mods = 0;
+  if (flags & NSEventModifierFlagControl) {
+    mods |= PB_MOD_CTRL;
+  }
+  if (flags & NSEventModifierFlagOption) {
+    mods |= PB_MOD_ALT;
+  }
+  if (flags & NSEventModifierFlagShift) {
+    mods |= PB_MOD_SHIFT;
+  }
+  if (flags & NSEventModifierFlagCommand) {
+    mods |= PB_MOD_CMD;
+  }
+  hooks::Args args;
+  args.Int(mods);
+  hooks::Fire(PB_EVENT_MODS_CHANGED, args);
+}
 
 void InitMacApp() {
   CHECK_EQ(NSApp, nil);

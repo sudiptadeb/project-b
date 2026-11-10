@@ -318,6 +318,25 @@ def settings_checks():
     except TimeoutError as e:
         check("the new key opens a tab", False, e)
 
+    # Ctrl+Tab goes back through recent tabs while Ctrl is held; letting go settles.
+    while app.js(ROWS) < 3:
+        app.cmd("key", "cmd+t")
+        time.sleep(0.3)
+    selected = "[...document.querySelectorAll('[role=tab]')].findIndex(e=>e.getAttribute('aria-selected')==='true')"
+    last = app.js(ROWS) - 1
+    app.wait(f"{selected}==={last}", 5)
+    app.cmd("key", "ctrl+tab")
+    one_back = app.js(selected)
+    app.cmd("key", "ctrl+tab")
+    two_back = app.js(selected)
+    app.cmd("mods", 0)
+    app.cmd("key", "ctrl+tab")
+    time.sleep(0.2)
+    back = app.js(selected)
+    check("held Ctrl+Tab goes back through three tabs, and after letting go one press returns to where it started",
+          len({last, one_back, two_back}) == 3 and back == last, (last, one_back, two_back, back))
+    app.cmd("mods", 0)
+
     app.cmd("key", "ctrl+cmd+f")
     deadline = time.time() + 5
     while time.time() < deadline and '"fullScreen":true' not in app.cmd("state"):

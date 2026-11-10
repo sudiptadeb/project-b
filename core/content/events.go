@@ -19,6 +19,7 @@ const (
 	eventSettingsMsg    Hook = 7
 	eventMenuChosen     Hook = 8
 	eventOSBindings     Hook = 9
+	eventModsChanged    Hook = 10
 )
 
 var eventNames = map[Hook]string{
@@ -31,6 +32,7 @@ var eventNames = map[Hook]string{
 	eventSettingsMsg:    "engine.SettingsMessage",
 	eventMenuChosen:     "engine.MenuChosen",
 	eventOSBindings:     "engine.OSBindings",
+	eventModsChanged:    "engine.ModsChanged",
 }
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
@@ -43,6 +45,7 @@ type Events struct {
 	OnSettingsMessage func(msg []byte)
 	OnMenuChosen      func(action string)
 	OnOSBindings      func(byTitle map[string]engine.Key)
+	OnModsChanged     func(m engine.Mods)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -80,6 +83,10 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	case eventMenuChosen:
 		if e.OnMenuChosen != nil {
 			e.OnMenuChosen(r.str())
+		}
+	case eventModsChanged:
+		if e.OnModsChanged != nil {
+			e.OnModsChanged(engine.Mods(r.int()))
 		}
 	case eventOSBindings:
 		// JSON: each title with the key's Windows virtual-key code and our modifiers.

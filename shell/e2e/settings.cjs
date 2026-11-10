@@ -158,6 +158,29 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await shell.locator('nav').waitFor();
   check('a change from the toolbar reaches the panel', await until(async () => await radio('Vertical').isChecked()));
 
+  // Colours. The default is the dusty teal, marked; a preset goes to Go, which saves it,
+  // paints the window and tells the shell, whose tones follow.
+  const root = (name) => shell.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+  const swatchOf = (name) => panel.getByRole('radio', { name });
+  check('the frame colour starts as the dusty teal, marked', (await swatchOf('Dusty teal').getAttribute('aria-checked')) === 'true' && (await root('--frame')) === '#4f9e9e' && prefsFile().frameColor === '#4f9e9e', JSON.stringify(prefsFile()));
+  check('six presets and a custom colour', (await panel.locator('.swatch[role=radio]').count()) === 6 && (await panel.getByLabel('Custom colour').count()) === 1);
+  const barBefore = await root('--bar');
+  for (const [name, color, file] of [['Blue', '#3470d0', 'blue'], ['Amber', '#faa804', 'amber']]) {
+    await swatchOf(name).click();
+    const ok = await until(async () => (await root('--frame')) === color && (await regions()).windowColor === color && prefsFile().frameColor === color);
+    check(`${name} recolours the window and the shell, and is saved`, ok, `${await root('--frame')} ${(await regions()).windowColor} ${prefsFile().frameColor}`);
+    check(`${name} is the one marked`, (await swatchOf(name).getAttribute('aria-checked')) === 'true' && (await panel.locator('.swatch[aria-checked=true]').count()) === 1);
+    await settle(shell);
+    await shell.screenshot({ path: path.join(out, `settings-colour-${file}.png`) });
+  }
+  check('the bar tint follows the frame colour', (await root('--bar')) !== barBefore, await root('--bar'));
+  // A custom colour from the picker goes the same way, and no preset is marked.
+  await panel.getByLabel('Custom colour').evaluate((e) => { e.value = '#7a5c99'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  check('a custom colour reaches Go and the shell', await until(async () => (await root('--frame')) === '#7a5c99' && (await regions()).windowColor === '#7a5c99' && prefsFile().frameColor === '#7a5c99'), await root('--frame'));
+  check('and no preset is marked', (await panel.locator('.swatch[aria-checked=true]').count()) === 0);
+  await swatchOf('Dusty teal').click();
+  await until(async () => (await root('--frame')) === '#4f9e9e');
+
   // Updates. A check asked for goes to the update manager, which says what it found. The
   // manager's own check two seconds after launch comes first, so it isn't counted here.
   const status = panel.locator('.status');
@@ -183,6 +206,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
   errors.length = 0; // Stopping the server broke the old page's event stream, as it should.
   check('the panel starts closed', (await panel.count()) === 0);
+  check('the frame colour survived the restart', (await (await regions()).windowColor) === '#4f9e9e' && (await root('--frame')) === '#4f9e9e');
   await gear.click();
   await panel.waitFor();
   check('after a restart the switch is still off', !(await autoUpdate.isChecked()) && (await autoUpdate.getAttribute('aria-checked')) === 'false');

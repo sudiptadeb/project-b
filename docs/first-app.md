@@ -120,6 +120,21 @@ shell, so both change together, and `shell/src/tones.js` derives the shell's oth
 from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
 fills the colour itself, faint.
 
+## Crashes
+
+When Go crashes, from an unrecovered panic or a fatal error in any goroutine, cgo callbacks
+included, the runtime writes its own report, with every goroutine's stack, to `crash.log` in
+the profile (`~/.project-b/default/` unless `--user-data-dir` names another; `core/crash`,
+through `debug.SetCrashOutput`). The app still dies. At the next start Go renames a report it
+finds there to `crash-<yyyy-mm-dd-hhmmss>.log`, the time it was written, so one crash never
+overwrites another, and puts its path in the shell's snapshot as `crashLog`. The shell shows
+one line over the page's top-left corner, "Project B crashed last time. The log is at" the
+path, with a close button, which sends `dismissCrash`; Go forgets it and says so. Dev mode
+shows it too: `kill -QUIT` the dev server and start it again on the same `--profile`.
+
+A nil dereference in Go isn't in that report in a non-official build: Chromium's stack
+dumper owns SIGSEGV there (see the findings below), so it is Chromium's crash, not Go's.
+
 ## Not in the first app
 
 - Gates cover the top-level navigation only: not iframes, subresources, WebSockets or

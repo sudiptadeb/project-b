@@ -9,8 +9,6 @@ Take an item off when it lands or is dropped.
   far: a proxy in the browser process, or rules in content's network layer, before each
   request is sent. Not discussed yet; nothing to build until it is.
 - **Menus and shortcuts.** Designed by the owner. Ctrl+Cmd+F for full screen waits on this.
-- **Go crashes.** A panic in Go has to be captured, and at least logged; how it is shown is
-  open.
 - **The certificate error page.** Mock and two ways to wire it (in the tab, or painted by the
   shell) in `project-b-research/morning-2026-11-10/cert-error-mock-notes.md`.
 - **Certificate revocation.** Recommendation: Go fetches Google's CRLSet, with a copy in the

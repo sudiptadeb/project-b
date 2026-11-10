@@ -1,6 +1,6 @@
 # One window manager
 
-A design note for review, 2026-11-10. No code yet.
+A design note, 2026-11-10, with the owner's decisions at the end.
 
 Every desktop asks one question about a mouse press in our window: does it move the
 window, go to the shell, or go to the page? Each platform asks it differently. macOS asks
@@ -142,15 +142,40 @@ walks the list, so none of them knows the rule.
   layout isn't sent twice, and full screen sends no drag areas. `core/engine` tests `At`.
   `core/app`'s hit-test test sends one `layout` message and checks the same points.
 
-## Open questions for you
+## Decided (2026-11-10)
 
-1. Should the window manager also own requests to enter full screen or zoom, from the
-   shell or a shortcut, or do those stay with the system's own buttons and double-click?
-2. Are the resize edges ours or the system's? macOS and Windows give them to us outside
-   the content. On Linux with our own title bar, someone has to say how wide they are.
-   If they are ours, they become areas in the description, and that is the only thing
-   in Go that needs the window size.
-3. On Linux, do we draw our own title bar at all, or let the window manager draw its
-   own above the top row, which makes the drag question go away there?
-4. On Windows and Linux, who draws the close, minimise and maximise buttons? If the shell
-   does, the description needs areas for them.
+1. **Full screen and zoom are the window manager's.** The shell asks the manager, the
+   manager tells the engine, and the engine reports the result in `WindowState`. There is
+   one path; the shell never talks to the engine about the window. The same goes for
+   minimise and close.
+2. **The resize edges are the system's,** wherever it provides them. On macOS and Windows
+   the manager never marks an edge. The one exception is Linux with our own title bar,
+   where the Linux engine turns a press on an edge into "resize from this edge". The
+   manager's contract is the same everywhere.
+3. **On Linux we draw our own title bar,** everywhere, with one look and one path through
+   the standard move and resize requests on X11 and Wayland. GNOME draws no frames for
+   apps, so we would have to anyway.
+4. **Window buttons are the system's** where it has them: macOS keeps its traffic lights,
+   Windows its system-drawn buttons, snap layouts included. The engine reports where they
+   are, or that there are none. Where there are none (Linux), the shell draws them, and
+   they send close, minimise and zoom requests through the manager.
+
+So the requests get one call of their own beside the description:
+
+```go
+// WindowRequest is what the user asked the window to do. Each is what pressing that
+// window button does, so zoom and full screen go in or out.
+type WindowRequest int
+
+const (
+	WindowClose WindowRequest = iota + 1
+	WindowMinimise
+	WindowZoom
+	WindowFullScreen
+)
+```
+
+`RequestWindow(r WindowRequest)` on `Engine` replaces `CloseWindow`: the tabs closing the
+last tab and the updater relaunching ask the window manager too. The shell sends
+`{"t":"window","text":"close" | "minimise" | "zoom" | "fullScreen"}`. On macOS nothing in
+the shell sends one yet, since the system's buttons do the job.

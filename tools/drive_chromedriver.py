@@ -425,6 +425,12 @@ def session(fixture, extra_args=(), full=True):
 
 
 def main():
+    if not os.access(CHROMEDRIVER, os.X_OK):
+        # Exit 2: something this needs is missing, and nothing ran.
+        print(f"can't run the ChromeDriver checks: no ChromeDriver at {CHROMEDRIVER}. README.md, "
+              f"\"Test it\", says how to get ChromeDriver {VERSION}; or point CHROMEDRIVER at one.",
+              file=sys.stderr)
+        sys.exit(2)
     if os.path.exists(OUT):
         shutil.rmtree(OUT)
     os.makedirs(OUT)

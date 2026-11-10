@@ -10,6 +10,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.
 - [devtools.md](devtools.md): the DevTools endpoint, as Chrome opens it, for ChromeDriver and CDP.
+- [menus-shortcuts.md](menus-shortcuts.md): the design for actions, menus and key bindings, not built yet; Chrome's full list is in [chrome-shortcuts.md](chrome-shortcuts.md).
 - [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
 
 ## Daily commands

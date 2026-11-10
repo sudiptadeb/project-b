@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"projectb/crash"
 	"projectb/engine"
 	"projectb/prefs"
 	"projectb/suggest"
@@ -38,11 +39,12 @@ type Manager struct {
 	window  *window.Manager
 	prefs   *prefs.Manager
 	update  *update.Manager
+	crash   *crash.Manager
 }
 
 // New returns a manager.
-func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u}
+func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager) *Manager {
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c}
 }
 
 // Handle takes one command from the shell.
@@ -67,6 +69,7 @@ func (m *Manager) Handle(msg []byte) {
 			"autoUpdate":   m.prefs.AutoUpdate(),
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
+			"crashLog":     m.crash.Last(),
 		})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
@@ -92,6 +95,9 @@ func (m *Manager) Handle(msg []byte) {
 		m.update.CheckNow()
 	case "relaunch":
 		m.update.Relaunch()
+	case "dismissCrash":
+		m.crash.Dismiss()
+		m.send(map[string]any{"t": "crashLog", "crashLog": ""})
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "layout":

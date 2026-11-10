@@ -49,7 +49,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	closeWindow := func() { a.Window.Request(engine.WindowClose) }
 	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
-	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update)
+	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })

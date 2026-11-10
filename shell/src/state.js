@@ -32,6 +32,8 @@ export const state = reactive({
   update: { phase: '' },
   // The version running, '' for a development build.
   running: '',
+  // The report of the last run's crash, '' when it didn't crash or the notice was closed.
+  crashLog: '',
 });
 
 // activeTab is the tab whose page is showing.
@@ -88,6 +90,10 @@ export function connect() {
           state.autoUpdate = m.autoUpdate;
           state.update = m.update;
           state.running = m.running;
+          state.crashLog = m.crashLog;
+          break;
+        case 'crashLog':
+          state.crashLog = m.crashLog;
           break;
         case 'update':
           state.update = m.update;

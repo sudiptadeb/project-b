@@ -84,26 +84,32 @@ white over all of it, as it does any view it has no frame for yet. A new tab loa
 the start. The tab still reads as new: no address, titled New Tab, and `about:blank`
 stays out of history. A crashed page has no view, so the frame colour shows there.
 
-## Our own pages
+## Our own page
 
-The engine knows exactly two pages of ours. Both are built from `shell/`, one Vite build
-each, and served by one data source from the app's `Resources/shell`.
+The engine knows exactly one page of ours, `chrome://shell/`, built from `shell/` and served
+from the app's `Resources/shell`. It gets its bridge only in the shell's own WebContents;
+anywhere else its WebUI controller gives it no bindings and drops whatever it sends, and
+the policy gate refuses it in every tab, however it is reached. No other page has
+`chrome.send`, and Chromium itself refuses a web page's link to a `chrome://` page or a
+frame of one.
 
-- `chrome://shell/` belongs to the shell's own WebContents. The policy gate refuses it in
-  every tab, however it is reached.
-- `chrome://settings/` belongs to a tab. Typing it opens it there, and the toolbar's gear
-  button asks Go to open it in a new, active tab. It shows the prefs (the tab layout,
-  automatic updates) and the updater (the running version, Check for updates), in the
-  system's colours.
+## Settings
 
-Each gets its bridge only in its own kind of WebContents. Anywhere else its WebUI
-controller gives it no bindings and drops whatever it sends, so nothing reaches Go. The
-engine tags every message with its sender, 0 for the shell or the tab's id, and the page
-can't change that. `allowed` in `core/shell` is the one list of what each sender may ask:
-the shell anything; the settings page only to read and set prefs, read the update state
-and ask for a check. Anything else is dropped and logged. Go pushes changes to every
-settings tab as it does to the shell. No other page has `chrome.send`, and Chromium itself
-refuses a web page's link to a `chrome://` page or a frame of one.
+Settings are part of the shell, not a page. The toolbar's gear opens a panel the shell
+draws over the page's top-right corner, under the gear, in either layout; the gear again,
+Escape or its close button closes it, and there is only ever one. Like any shell component
+it marks itself `v-shell`, so its rectangle is a shell region and clicks inside it never
+reach the page. It shows the tab layout, the frame colour, the running version with Check
+for updates, and the automatic updates switch. Go owns all of it: the snapshot carries it,
+the panel sends the user's changes, and Go says when they change.
+
+The frame colour is a pref, `frameColor`, by default a dusty teal, `#4f9e9e`. The panel
+offers it and the frames of the Ulaa design's modes (Personal's teal, Work's blue, Kids'
+amber, Open Season's red, Incognito's slate), and a colour input for any other. The
+window manager paints the window's frame with it through `SetWindowFrame` and tells the
+shell, so both change together, and `shell/src/tones.js` derives the shell's other tones
+from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
+fills the colour itself, faint.
 
 ## Not in the first app
 
@@ -115,8 +121,8 @@ refuses a web page's link to a `chrome://` page or a frame of one.
 - No popup blocking: every `window.open` becomes a tab. No window features (size,
   position) are honoured, because there is one window.
 - No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
-  are not saved; the prefs, the tab layout and automatic updates, are, in `prefs.json` in
-  the profile.
+  are not saved; the prefs, the tab layout, automatic updates and the frame colour, are, in
+  `prefs.json` in the profile.
 - No downloads, permissions, dialogs, autofill or extensions. An installed copy does update
   itself: [updates.md](updates.md).
 - Content's own `chrome://` pages, such as `chrome://gpu`, pass the gate but fail to

@@ -16,9 +16,9 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
     tools/build-and-wait.sh                    # incremental build of out/pb
     (cd core && go test ./...)
     node shell/e2e/first-app.cjs               # mock engine in Playwright
-    node shell/e2e/settings.cjs                # the settings page alone, on the mock
+    node shell/e2e/settings.cjs                # the settings panel alone, on the mock
     python3 tools/drive_first_app.py           # real app; PB_BIN picks another binary
-    python3 tools/drive_first_app.py settings  # the settings page alone, real app
+    python3 tools/drive_first_app.py settings  # the settings panel alone, real app
     python3 tools/drive_chromedriver.py        # ChromeDriver drives the real app; PB_BIN as above
     python3 tools/check_first_paint.py         # its first page shows in the real window (desk)
 

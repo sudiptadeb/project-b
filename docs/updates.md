@@ -54,14 +54,14 @@ start; a release that was ready but not relaunched into is downloaded again.
 
 ## Settings
 
-`chrome://settings/` shows the running version, a Check for updates button and the
-automatic updates switch.
+The settings panel, which the toolbar's gear opens over the window, shows the running
+version, a Check for updates button and the automatic updates switch.
 
 - **Check for updates** runs one check at once, whatever the switch says (`CheckNow`). The
-  page shows what the manager says: checking, up to date, downloading a version, ready to
+  panel shows what the manager says: checking, up to date, downloading a version, ready to
   relaunch, or the error it hit, including a manifest it couldn't read. A release it finds
   goes the way an automatic one does, and the bubble stays the one place to relaunch.
-  Automatic checks never set the page's check result, so the bubble is unchanged.
+  Automatic checks never set the panel's check result, so the bubble is unchanged.
 - **Automatic updates** is a pref, `autoUpdate` in `prefs.json`, on by default. Off, the
   manager's timer stops at once; on again, it starts as it does at launch.
 
@@ -84,7 +84,7 @@ version has to be installed by hand from its DMG, once; from then on the app upd
   is reported without downloading; the same version shows nothing.
 - `core/update` tests also cover a check asked for (up to date, a manifest that can't be
   read, a newer release) and the timer stopping and starting with the switch.
-- `shell/e2e/settings.cjs` checks the settings page's version, Check and switch against a
+- `shell/e2e/settings.cjs` checks the settings panel's version, Check and switch against a
   local release server, including that the switch survives a restart.
 - `shell/e2e/first-app.cjs` runs the real manager against a local release server with a
   slow asset, in both layouts, through to the relaunch helper starting the new bundle.

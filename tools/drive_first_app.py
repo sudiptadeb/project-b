@@ -4,8 +4,8 @@
 The driver asks the window's own hitTest:, sets first responder and hands the event to
 the view, because [window sendEvent:] delivers nothing without a GUI session. Content's
 view checks the same hitTest: before accepting the event. AppKit's own dispatch isn't
-exercised, and neither is full screen, which needs a real screen
-(tools/check_full_screen.py). This needs no display. Run it from the repo root:
+exercised, and neither are full screen and the clipboard, which need a person's desktop
+session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no display. Run it from the repo root:
 
     python3 tools/drive_first_app.py
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
@@ -276,21 +276,6 @@ def settings_checks():
     check("Edit has Redo", bool(edit) and find(edit["items"], "Redo") is not None)
     check("the hidden Select Tab submenu isn't drawn", bool(tab) and find(tab["items"], "Select Tab") is None)
     check("AppKit added no Full Screen item of its own", sum(1 for m in menu for i in m.get("items", []) if isinstance(i, dict) and "Full Screen" in i["title"]) == 1)
-
-    # Copy and paste go through Go to the page that has the keyboard.
-    focus_bar(app)
-    app.cmd("type", "copied text")
-    app.wait(f"{VALUE}==='copied text'")
-    app.cmd("key", "cmd+a")
-    app.cmd("key", "cmd+c")
-    app.js(f"{INPUT}.value=''")
-    app.cmd("key", "cmd+v")
-    try:
-        app.wait(f"{VALUE}==='copied text'", 5)
-        check("Cmd+A, Cmd+C and Cmd+V work in the address bar", True)
-    except TimeoutError as e:
-        check("Cmd+A, Cmd+C and Cmd+V work in the address bar", False, e)
-    app.cmd("key", "escape")
 
     # Cmd+, opens the settings page over the whole window.
     settings = lambda expr: json.loads(app.cmd("evalsettings", expr))

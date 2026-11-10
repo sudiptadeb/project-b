@@ -5,7 +5,8 @@
 #                           Needs Go and `npm install`. No Chromium build, runs anywhere.
 #   tools/test.sh app       The real app through its driver and through ChromeDriver.
 #                           Needs the build, or PB_BIN, and ChromeDriver. No display.
-#   tools/test.sh screen    The real app's real window: full screen and first paint.
+#   tools/test.sh screen    The real app in a person's desktop session: full screen, copy and
+#                           paste, and first paint in the real window.
 #                           NEEDS A PERSON LOGGED IN at this Mac's screen, with it unlocked,
 #                           and desk allowed to record the screen.
 #   tools/test.sh vm        Real clicks, drags and keys in the macOS VM.
@@ -69,6 +70,7 @@ screen() {
     echo "The screen group NEEDS A PERSON LOGGED IN at this Mac's screen. The app's window will show there."
     python3 tools/on_screen.py || exit 2
     run "full screen on the real screen" python3 tools/on_screen.py python3 tools/check_full_screen.py
+    run "copy and paste through the Mac's clipboard" python3 tools/on_screen.py python3 tools/check_clipboard.py
     run "first paint in the real window" python3 tools/on_screen.py python3 tools/check_first_paint.py
 }
 

@@ -478,6 +478,11 @@ void Run(const std::string& line) {
                   "%.1f", (base::TimeTicks::Now() - start).InMicrosecondsF()));
   } else if (cmd == "gopanic") {
     Reply(id, Go().recover_nil_deref() ? "recovered" : "not recovered");
+  } else if (cmd == "gocrash") {
+    Reply(id, "ok");
+    int kind = 0;
+    base::StringToInt(parts[2], &kind);
+    Go().crash(kind);
   } else if (cmd == "segv") {
     Reply(id, "ok");
     volatile int* nothing = nullptr;

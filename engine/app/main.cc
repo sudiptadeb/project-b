@@ -12,6 +12,7 @@ int main(int argc, const char** argv) {
       .hook = PBHook,
       .force_gc = PBForceGC,
       .recover_nil_deref = PBRecoverNilDeref,
+      .crash = PBCrash,
       .go_stats = PBGoStats,
   };
   return ProjectBMain(argc, argv, &go);

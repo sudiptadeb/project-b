@@ -168,6 +168,10 @@ typedef struct PBGoCalls {
   void (*force_gc)(void);
   // Returns 1 if a nil dereference in Go was recovered as a normal panic.
   int (*recover_nil_deref)(void);
+  // Crashes on purpose, to test the crash log: 0 a nil dereference in Go on the calling
+  // thread, 1 a panic there, 2 a nil dereference in a new goroutine, 3 a nil
+  // dereference in C called from Go.
+  void (*crash)(int32_t kind);
   // Returns a string the caller frees with free().
   char* (*go_stats)(void);
 } PBGoCalls;

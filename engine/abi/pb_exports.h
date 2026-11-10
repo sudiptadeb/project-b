@@ -21,6 +21,7 @@ int PBHook(int32_t hook, const PBValue* args, size_t count, PBValue* result);
 
 void PBForceGC(void);
 int PBRecoverNilDeref(void);
+void PBCrash(int32_t kind);
 char* PBGoStats(void);
 
 #ifdef __cplusplus

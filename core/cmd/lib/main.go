@@ -34,6 +34,7 @@ static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); 
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
 static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
+static inline void native_nil_deref(void) { *(volatile int*)0 = 1; }
 */
 import "C"
 
@@ -295,6 +296,24 @@ func PBRecoverNilDeref() (result C.int) {
 	var p *int
 	*p = 1
 	return 0
+}
+
+// PBCrash crashes on purpose, as pb_abi.h describes, for the crash log's tests.
+//
+//export PBCrash
+func PBCrash(kind C.int32_t) {
+	var p *int
+	switch kind {
+	case 0:
+		*p = 1
+	case 1:
+		panic("PBCrash on the calling thread")
+	case 2:
+		go func() { *p = 1 }()
+		select {}
+	case 3:
+		C.native_nil_deref()
+	}
 }
 
 // PBGoStats returns runtime numbers as JSON. The caller frees the string.

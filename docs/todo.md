@@ -41,6 +41,5 @@ Take an item off when it lands or is dropped.
   supported: no tab hook takes the window to full screen, so the page's promise never settles.
   Supporting it is the fix; how it behaves is for the owner.
 - The first real click after leaving full screen doesn't land; keys work.
-- `tools/drive_first_app.py`: the check for typing `chrome://shell/` is flaky.
 - `tools/vm/check.py` times clicks by pixels, so it measures the VM's display; time inside the
   app instead.

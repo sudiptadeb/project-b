@@ -579,7 +579,12 @@ def browsing_checks():
         check("typing chrome://shell/ is refused by the gate", True)
     except TimeoutError as e:
         check("typing chrome://shell/ is refused by the gate", False, e)
-    check("and the tab stays on the page it had", app.js("location.href", page=True) == PAGES + "links", app.js("location.href", page=True))
+    # A refused load leaves the tab on content's error page, a moment after the chip shows.
+    try:
+        app.wait("location.href==='chrome-error://chromewebdata/'", 10, page=True)
+        check("and the tab ends on the error page a refused load leaves, not on the shell's page", True)
+    except TimeoutError as e:
+        check("and the tab ends on the error page a refused load leaves, not on the shell's page", False, e)
     print(app.cmd("capture", os.path.join(OUT, "4-shell-refused.png")), flush=True)
     app.js("document.querySelector('a').click(), 1", page=True)
     time.sleep(1)

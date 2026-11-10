@@ -400,6 +400,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await phone.screenshot({ path: path.join(out, '3-phone.png') });
   const scroll = await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   check('no horizontal scroll on a phone', scroll);
+  // The mock engine keeps one layout, the last any page sent. Left open, this page sends its
+  // own again when the server restarts below, and now and then it lands after the other's.
+  await phone.close();
 
   // Updates. The real manager runs against a release server here: a manifest and a zip of a
   // bundle, as tools/release.sh publishes, served slowly enough to watch the download.

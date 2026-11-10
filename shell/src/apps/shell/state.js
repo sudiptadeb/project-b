@@ -35,6 +35,8 @@ export const state = reactive({
   keys: {},
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
+  // macOS's report of that crash, or the folder it keeps its reports in.
+  crashReport: '',
 });
 
 // activeTab is the tab whose page is showing.
@@ -92,6 +94,7 @@ export function connect() {
           state.update = m.update;
           state.running = m.running;
           state.crashLog = m.crashLog;
+          state.crashReport = m.crashReport;
           state.platform = m.platform;
           state.keys = m.keys;
           break;
@@ -100,6 +103,7 @@ export function connect() {
           break;
         case 'crashLog':
           state.crashLog = m.crashLog;
+          state.crashReport = m.crashReport;
           break;
         case 'update':
           state.update = m.update;

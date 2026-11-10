@@ -55,6 +55,7 @@ func main() {
 				StateDir: filepath.Join(*profile, "updates"),
 				App:      *appPath,
 			},
+			CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 		})
 		e.SetListener(a)
 		close(started)

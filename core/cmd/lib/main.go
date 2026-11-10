@@ -234,7 +234,13 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 		blocked = strings.Split(s, ",")
 	}
 	profile := C.GoString(profileDir)
-	theApp = app.Start(native, app.Config{ProfileDir: profile, BlockedHosts: blocked, Update: updateConfig(profile)})
+	home, _ := os.UserHomeDir()
+	theApp = app.Start(native, app.Config{
+		ProfileDir:   profile,
+		BlockedHosts: blocked,
+		Update:       updateConfig(profile),
+		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
+	})
 	content.Wire(hooks, theApp)
 }
 

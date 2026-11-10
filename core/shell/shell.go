@@ -73,6 +73,7 @@ func (m *Manager) Handle(msg []byte) {
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"crashLog":     m.crash.Last(),
+			"crashReport":  m.crash.Report(),
 			"platform":     m.os,
 			"keys":         m.keys(),
 		})
@@ -98,7 +99,7 @@ func (m *Manager) Handle(msg []byte) {
 		m.update.Relaunch()
 	case "dismissCrash":
 		m.crash.Dismiss()
-		m.send(map[string]any{"t": "crashLog", "crashLog": ""})
+		m.send(map[string]any{"t": "crashLog", "crashLog": "", "crashReport": ""})
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
 	case "layout":

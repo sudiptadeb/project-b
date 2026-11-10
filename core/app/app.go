@@ -22,6 +22,8 @@ type Config struct {
 	ProfileDir   string
 	BlockedHosts []string
 	Update       update.Config
+	// CrashReports is the folder macOS writes its crash reports to.
+	CrashReports string
 }
 
 // App holds the managers and is the engine's listener: each function only forwards.
@@ -47,7 +49,7 @@ type App struct {
 // to the engine as its listener.
 func Start(e engine.Engine, cfg Config) *App {
 	a := &App{}
-	a.Crash = crash.New(cfg.ProfileDir)
+	a.Crash = crash.New(cfg.ProfileDir, cfg.CrashReports)
 	a.Policy = policy.New(cfg.BlockedHosts)
 	a.History = history.New(cfg.ProfileDir, e.Post)
 	a.Suggest = suggest.New(a.History)
@@ -98,10 +100,11 @@ func Start(e engine.Engine, cfg Config) *App {
 	return a
 }
 
-// Stop flushes what's pending. Call it on the way out.
+// Stop flushes what's pending and says the run ended cleanly. Call it on the way out.
 func (a *App) Stop() {
 	a.Update.Stop()
 	a.History.Close()
+	a.Crash.Stop()
 }
 
 func (a *App) ShellMessage(msg []byte) { a.Shell.Handle(msg) }

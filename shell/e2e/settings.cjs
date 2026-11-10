@@ -7,7 +7,7 @@ const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
-const { chromium } = require(path.join(os.homedir(), '.local/playwright/node_modules/playwright'));
+const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');

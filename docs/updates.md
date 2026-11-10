@@ -17,9 +17,8 @@ new version. Nothing shows when nothing is happening.
 | `tools/release.sh` | Publishes a release. |
 
 The app is a signed folder (two binaries, a library, resources), not the one binary amarit
-swaps in place, so the swap is ours. `amarit.Client` was added to amarit for this; it is on
-amarit's `bundle-client` branch until it is merged and released, and `core/go.mod` points at
-that commit.
+swaps in place, so the swap is ours. `amarit.Client` was added to amarit for this, and released in
+amarit v0.7.0.
 
 ## What happens
 

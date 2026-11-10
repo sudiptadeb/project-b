@@ -122,18 +122,43 @@ fills the colour itself, faint.
 
 ## Crashes
 
-When Go crashes, from an unrecovered panic or a fatal error in any goroutine, cgo callbacks
-included, the runtime writes its own report, with every goroutine's stack, to `crash.log` in
-the profile (`~/.project-b/default/` unless `--user-data-dir` names another; `core/crash`,
-through `debug.SetCrashOutput`). The app still dies. At the next start Go renames a report it
-finds there to `crash-<yyyy-mm-dd-hhmmss>.log`, the time it was written, so one crash never
-overwrites another, and puts its path in the shell's snapshot as `crashLog`. The shell shows
-one line over the page's top-left corner, "Project B crashed last time. The log is at" the
-path, with a close button, which sends `dismissCrash`; Go forgets it and says so. Dev mode
-shows it too: `kill -QUIT` the dev server and start it again on the same `--profile`.
+While the app runs, `crash.log` in the profile (`~/.project-b/default/` unless
+`--user-data-dir` names another) starts with the process id (`core/crash`). A clean stop
+deletes it, so one found at the next start means the last run crashed, whatever crashed;
+a force quit counts too. Go renames it `crash-<yyyy-mm-dd-hhmmss>.log`, the time it was
+last written, and the shell shows a notice over the page's top-left corner, wrapped so
+both paths show whole: "Project B crashed last time. The log is at" that file, "macOS's
+report at" macOS's report of that process, with a close button, which sends
+`dismissCrash`. The snapshot carries both, as `crashLog` and `crashReport`.
 
-A nil dereference in Go isn't in that report in a non-official build: Chromium's stack
-dumper owns SIGSEGV there (see the findings below), so it is Chromium's crash, not Go's.
+- **Go**, from an unrecovered panic or a fatal error in any goroutine, cgo callbacks and
+  nil dereferences included: the runtime writes its report, with every goroutine's stack,
+  into `crash.log` (`debug.SetCrashOutput`). A fault in C++ called from Go is reported
+  there too, as "signal arrived during cgo execution".
+- **Native, in the main process**: macOS writes a report with every thread's stack,
+  symbolized, to `~/Library/Logs/DiagnosticReports/project_b-<time>.ips` (a run outside
+  the desktop session gets `/Library/Logs/DiagnosticReports`). Go finds the one with the
+  last run's pid. macOS writes it a few seconds after the crash and sometimes not at all
+  (it stopped after about a dozen crashes in an hour here), so when there is none the
+  notice names the folder. Nothing waits for it.
+- **Child processes** (renderers, GPU, utility): `engine/browser/child_processes.cc` sends
+  each one that ends other than normally to Go, which adds a line to `crashes.log` in the
+  profile: time, type, how it ended, exit code, pid, and a renderer's page. It is kept,
+  and brings up no notice. macOS writes a `project_b_helper` report for these as well.
+
+Go's handlers for SIGSEGV, SIGBUS and SIGFPE are installed when the binary loads, before
+`ContentMain`, which would reset them and, outside official builds, put Chromium's stack
+dumper in their place. So the main process gives itself content's
+`--disable-in-process-stack-traces` (`engine/project_b_main.cc`). Go then passes a fault
+that isn't Go's on, as documented for c-archive, to the default action, and macOS reports
+it. Content copies the switch to child processes, so a dev build's children no longer
+print their stack to stderr; macOS's reports have it.
+
+The driver forces each: `gocrash 0` to `3` (nil dereference on the calling thread, panic
+there, nil dereference in a goroutine, nil dereference in C called from Go), `segv` (C++
+on the main thread), and typing `chrome://crash`, `chrome://gpucrash` or
+`chrome://inducebrowsercrashforrealz`. Dev mode shows the notice too: `kill -QUIT` the
+dev server and start it again on the same `--profile`.
 
 ## Not in the first app
 
@@ -191,11 +216,9 @@ driver, not read back from the window.
   `+[NSTextInputContext initialize]`, in a synchronous XPC call to macOS's ViewBridge
   service, which doesn't answer without a GUI session. It should be measured again on a
   real desktop.
-- **A Go nil dereference kills the whole app by default.** Chromium's
-  `EnableInProcessStackDumping` replaces Go's SIGSEGV handler, so it never becomes a Go
-  panic. With `--disable-in-process-stack-traces` it recovers normally. Content only
-  enables that dumper in non-official builds, and what Crashpad does in an official build
-  isn't tested. A C++ crash on the main thread is still caught and dumped by Chromium.
+- **A Go nil dereference killed the whole app.** Chromium's
+  `EnableInProcessStackDumping` replaced Go's SIGSEGV handler, so it never became a Go
+  panic. The main process now turns that dumper off; see "Crashes" above.
 - **Sharing content took about 270 MB out of the app.** With two full binaries, the
   installed app was 572 MB and the DMG 153 MB. With the library they're 305 MB and 82 MB.
 - **Sharing doesn't change what each process reports.** RSS and dirty footprint are the

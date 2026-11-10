@@ -23,29 +23,28 @@ Steps, in order, each with how to know it worked
 5. ChromeDriver 155.0.8059.41 for mac-arm64 from Chrome for Testing, unzipped so the binary
    is .tools/chromedriver/chromedriver-mac-arm64/chromedriver in the repo. .tools/ is
    git-ignored. Its version must match the Chromium tag.
-6. Run, from the repo root, and expect each to end with "all passed":
-   (cd core && go test ./...)          # ends with ok lines, no FAIL
-   node shell/e2e/first-app.cjs
-   node shell/e2e/settings.cjs
-   python3 tools/drive_first_app.py
-   python3 tools/drive_first_app.py settings
-   python3 tools/drive_chromedriver.py
-7. Only if a person is at this Mac: tools/deskctl/install.sh, then ask them to allow
-   .tools/desk/deskctl under Screen & System Audio Recording and Accessibility in System
-   Settings (you can't do that part), then python3 tools/check_first_paint.py.
-8. Report each command's result, with any FAIL lines in full.
+6. Run, from the repo root, the two groups that need no screen. Each ends with one line
+   per test, and every line should say "passed":
+   tools/test.sh mock       # Go's tests, and the shell on the mock engine
+   tools/test.sh app        # the real app, through its driver and through ChromeDriver
+7. Only if a person is logged in at this Mac's screen (tools/on_screen.py says):
+   tools/deskctl/install.sh, then ask them to allow .tools/desk/deskctl under Screen &
+   System Audio Recording and Accessibility in System Settings (you can't do that part),
+   then tools/test.sh screen. The app's window shows on their screen while it runs.
+8. Report each group's result, with any FAIL lines in full.
 
 Known traps
 - The real-app tests start the app themselves; don't start it first. If an earlier run
   left project_b processes behind, stop only those you started.
-- check_first_paint.py prints "skipped" when deskctl isn't allowed or nobody is logged in
-  with the screen unlocked. That is not a failure.
+- A group or a test that lacks what it needs prints why, says DID NOT RUN and exits 2. For the screen
+  group that means nobody is logged in at the screen, it is locked, or deskctl isn't
+  allowed. That is not a failure of the app; say so and go on.
+- tools/test.sh vm and tools/test.sh android need a macOS VM and an Android emulator
+  (docs/vm-testing.md, docs/android.md). Not part of this setup.
 - A machine that already has ChromeDriver 155.0.8059.41 or deskctl elsewhere: link
   .tools/chromedriver or .tools/desk to that folder, or set CHROMEDRIVER / DESK.
 - deskctl's permissions are tied to its path and its signing key (.tools/desk/signing.pem).
   Rebuild with install.sh, which keeps both; deleting the key means allowing it again.
-- Real clicks, drags and full screen at scale need the macOS VM in tools/vm
-  (docs/vm-testing.md). Not part of this setup.
 - Packaging and releases need the signing key, which isn't on a fresh machine. Not part of
   this setup.
 - Don't edit Chromium's source; the project builds it unpatched.

@@ -17,20 +17,21 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 ## Daily commands
 
     tools/build-and-wait.sh                    # incremental build of out/pb
-    (cd core && go test ./...)
-    node shell/e2e/first-app.cjs               # mock engine in Playwright
-    node shell/e2e/settings.cjs                # the settings page alone, on the mock
-    python3 tools/drive_first_app.py           # real app; PB_BIN picks another binary
-    python3 tools/drive_first_app.py settings  # menus, keys and the settings page, real app
-    python3 tools/drive_chromedriver.py        # ChromeDriver drives the real app; PB_BIN as above
-    python3 tools/check_first_paint.py         # its first page shows in the real window (desk)
+    tools/test.sh mock                         # Go's tests, and the shell on the mock engine in Playwright
+    tools/test.sh app                          # the real app, by its driver and by ChromeDriver; no display
+    tools/test.sh screen                       # full screen, the clipboard, first paint; NEEDS A PERSON logged in at the screen
+    tools/test.sh vm                           # real clicks in the macOS VM; needs a desktop login once per boot
+    tools/test.sh android                      # the Android app on the emulator (amarit start project-b-emu)
+
+`PB_BIN` picks another Mac binary and `PB_APK` another APK. The README's "Test it" says what
+each group needs.
 
 ## Shipping a build to try
 
     amarit restart projectb-release            # RELEASE=1 OUT=out/rel tools/build.sh
     OUT=out/rel tools/package.sh               # signed build/project-b.dmg
     hdiutil attach -nobrowse -readonly -mountpoint <dir> build/project-b.dmg
-    PB_BIN="<dir>/Project B.app/Contents/MacOS/project_b" python3 tools/drive_first_app.py
+    PB_BIN="<dir>/Project B.app/Contents/MacOS/project_b" tools/test.sh app
     ~/my-claude-setup/dropd/drop build/project-b.dmg     # prints the link
 
 A Mac installs `project-b-trust.mobileconfig` once, from `tools/signing-setup.sh`. The key
@@ -44,10 +45,14 @@ Installed copies pick it up within a minute and offer a relaunch; see [updates.m
 
 ## Limits of the tests
 
-The build Mac's agent sessions have no display, so `drive_first_app.py` calls views directly
-and its pictures are composites without the native window buttons. Dragging, zoom, real
-full screen and tearing need a person, or the macOS VM in `tools/vm/`, which needs someone
-logged in to the Mac's desktop once after each boot.
+The build Mac's agent sessions have no display, so the `app` group's `drive_first_app.py`
+calls views directly and its pictures are composites without the native window buttons.
+Real full screen, copy and paste, and the real window's first paint are the `screen`
+group, which starts the app inside the desktop session of a person logged in at the Mac
+and refuses to run without one. Dragging, zoom and tearing need a person's hand, or the `vm` group's macOS
+VM, which needs someone logged in to the Mac's desktop once after each boot. An app
+started from a background job such as amarit can't enter full screen or reach the
+clipboard at all, which is why those checks aren't in the `app` group.
 
 ## Open decisions and to do
 

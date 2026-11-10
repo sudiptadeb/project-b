@@ -1,8 +1,9 @@
 # Testing on a real macOS desktop
 
 `tools/drive_first_app.py` runs with no display, so it can't exercise AppKit's event dispatch,
-the window buttons, dragging or real full screen. `tools/vm/` is for those: a macOS VM with a
-real desktop, driven from outside through its display, mouse and keyboard.
+the window buttons or dragging. `tools/vm/` is for those: a macOS VM with a
+real desktop, driven from outside through its display, mouse and keyboard. It is the `vm`
+group of `tools/test.sh`.
 
 ## Status (2026-11-09)
 
@@ -124,8 +125,19 @@ Not tried, on purpose: `sudo`, the keychain, or anything that goes around the en
     tools/vm/setup.sh                 # once: Tart, Python, the image, the VM
     tools/vm/start.sh                 # boots it and waits for the desktop
     tools/vm/install-dmg.sh <path or URL>
-    "$HOME/PW_TOOLS/macos-vm/venv/bin/python" tools/vm/check.py
+    tools/test.sh vm                  # check.py, under the VM's own Python
     tools/vm/stop.sh
+
+What the checks need, and what they say when it's missing:
+
+- **The VM's own Python**, `~/PW_TOOLS/macos-vm/venv/bin/python`, which `setup.sh` makes with
+  numpy, pillow and cryptography. The system's Python has none of them, and `check.py` and
+  `rfb.py` say so under it. `tools/test.sh vm` uses the right one.
+- **The VM running**, by `start.sh`, which needs the desktop login below once per boot.
+- **`~/PW_TOOLS/macos-vm/vnc-url`**, the VM's Screen Sharing address. `start.sh` writes it
+  when the desktop is up and `stop.sh` removes it. If the VM runs and the file is gone,
+  run `start.sh` again: it leaves a running VM alone and only writes the address.
+- **The app installed in the VM**, by `install-dmg.sh`.
 
 `check.py` prints pass or FAIL for each check with what it measured, and saves a shot per step
 under `~/PW_TOOLS/macos-vm/shots/`. Look at the shots; a check only compares pixels.
@@ -134,7 +146,7 @@ To drive it by hand, with coordinates in points:
 
     rfb.py shot out.png | click X Y | dbl X Y | move X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
 
-Run those with the same Python. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
+Run those with the VM's Python. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
 runs a command inside the VM with no password and no network.
 
 ## Decisions

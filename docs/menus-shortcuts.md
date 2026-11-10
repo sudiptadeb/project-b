@@ -485,8 +485,10 @@ Where the build differs from the design, or decided something the design left op
 Tests: `core/commands` (keys, who wins a key, the first edit, the update merge, a bad
 file, macOS bindings), `core/app` (the menu from the tree, a key added in settings, the
 settings page's prefs), `shell/e2e/settings.cjs` (26 checks on the mock) and
-`tools/drive_first_app.py settings` (15 checks in the real app: the menu bar, copy and
-paste through Go, Cmd+, opening settings over the window, recording a key, Cmd+W closing
-settings, Ctrl+Tab through recent tabs, Ctrl+Cmd+F, and the key surviving a restart). The
+`tools/drive_first_app.py settings` (the real app: the menu bar, Cmd+, opening settings
+over the window, recording a key, Cmd+W closing settings, Ctrl+Tab through recent tabs,
+and the key surviving a restart). Copy and paste through Go and Ctrl+Cmd+F need a person's
+desktop session, so they are in the `screen` group: `tools/check_clipboard.py` and
+`tools/check_full_screen.py`. The
 real-app check lets go of Ctrl by calling what `sendEvent:` calls, since the driver
 doesn't go through AppKit's dispatch.

@@ -268,8 +268,8 @@ unpacks them at install, which costs about 200 MB of phone storage. The version 
 
 ### What was tested
 
-Before tabs, `tools/drive_android.py`, on an Android 14 emulator and an Android 16 emulator with 16 KB memory pages,
-both headless, 29 checks, all passing on both. For this shell, see [The shell on a phone](#the-shell-on-a-phone). Results and screenshots land in `build/android-drive-content`.
+`tools/drive_android.py`, on an Android 14 emulator and an Android 16 emulator with 16 KB memory pages, both
+headless. Before tabs, 29 checks passed on both. For this shell, see [The shell on a phone](#the-shell-on-a-phone). Results and screenshots land in `build/android-drive-content`.
 
 - Typing a URL, a tap on a link, back, forward, reload, the phone's back key.
 - Suggestions from history, over the page, with the keyboard up. A tap on one loads it.
@@ -374,7 +374,13 @@ Open:
 - **The colour before Go starts.** The window shows the default frame colour from `styles.xml` until Go's first
   layout, so a phone set to another colour sees the default for about a second at a cold start.
 
-`tools/drive_android.py` taps fixed points of the shell from before tabs, so it needs new coordinates before it
-checks this shell. This round was checked by hand on the Android 14 emulator: the app starts, a typed address loads
-`example.com`, New Tab in the drawer opens a second tab that loads Wikipedia with its favicon, the strip switches
-between them, and settings opens over the window and closes with the back key.
+`tools/drive_android.py` checks this shell too: New Tab in the drawer, the strip switching tabs, and settings
+opening over the window and closing with the back key, along with everything under
+[What was tested](#what-was-tested). It holds no positions. Content fills Android's accessibility tree with the
+shell's controls by their labels, the settings page and the shown page, each with its place on the screen, and the
+driver reads that tree (`uiautomator dump`) to find what to touch and to wait for what a touch caused. A change to
+the shell's layout needs no new numbers; a control that loses its label does.
+
+    amarit start project-b-emu          # the emulator: AVD project-b-test, adb serial emulator-5600
+    tools/test.sh android               # PB_APK picks another APK than build/android/project-b-content.apk
+    amarit stop project-b-emu

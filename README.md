@@ -55,33 +55,51 @@ ChromeDriver, pinned to the Chromium we build:
     curl -LO https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.41/mac-arm64/chromedriver-mac-arm64.zip
     unzip chromedriver-mac-arm64.zip && cd ../..
 
-Then:
+The tests come in five groups, by what each needs. One command runs a group, and a group
+that lacks what it needs says so and stops before running anything:
 
-    (cd core && go test ./...)                     # Go managers
-    node shell/e2e/first-app.cjs                   # the shell on the mock engine
-    node shell/e2e/settings.cjs                    # the settings page on the mock
-    python3 tools/drive_first_app.py               # the real app; PB_BIN picks another binary
-    python3 tools/drive_first_app.py settings      # menus, keys and the settings page in the real app
-    python3 tools/drive_chromedriver.py            # Google's ChromeDriver drives the real app
+| Group | What it runs | What it needs |
+|---|---|---|
+| `tools/test.sh mock` | Go's tests, and the shell and the settings page in a browser on the mock engine | Go, `npm install`, Playwright's browser. No Chromium build; runs anywhere |
+| `tools/test.sh app` | The real app through its own driver, and through Google's ChromeDriver | The build, and ChromeDriver. No display: it runs from ssh or an agent session |
+| `tools/test.sh screen` | The real app in a person's desktop session: full screen, copy and paste, and the first page's paint in the real window | **A person logged in at this Mac's screen**, with it unlocked, and `desk` (below) |
+| `tools/test.sh vm` | Real clicks, drags and keys in a macOS VM | **A person to have logged in at this Mac's desktop once since it booted**, then the VM: [docs/vm-testing.md](docs/vm-testing.md) |
+| `tools/test.sh android` | The Android app on an emulator | The emulator running, and the APK: [docs/android.md](docs/android.md) |
 
-Each prints `ok` or `FAIL` per check and ends with `all passed` or a count of failures.
+`PB_BIN` points the Mac groups at another binary, such as an installed app's
+`Contents/MacOS/project_b`, and `PB_APK` the Android group at another APK. Each test prints
+`ok` or `FAIL` per check, and the group ends with one line per test: `passed`, `FAILED` or
+`DID NOT RUN`.
+A test also runs alone, as the top of its file says: `python3 tools/drive_first_app.py settings`
+runs only the menus, keys and settings page.
 
-### Checks on the real screen
+### The groups that need a person
 
-`tools/check_first_paint.py` looks at the real window, through `deskctl`, a small tool in
-`tools/deskctl/` that takes window captures and gives real clicks and keys, even from an
-agent or ssh session with no display:
+A session over ssh, an agent's session and a background job have no screen of their own.
+An app a background job starts can't enter full screen or reach the clipboard, and its
+window may not be on the screen at all.
+So the `screen` group starts its tests inside the desktop session of whoever is logged in,
+through `tools/on_screen.py`, and refuses to run when nobody is. Run alone, that says
+whether someone is there:
+
+    tools/on_screen.py
+
+The app's window shows on that person's screen while the group runs, and takes all of it
+for a few seconds; the copy and paste check replaces what they had copied. Logging in
+over Screen Sharing counts.
+
+First paint looks at the real window through `deskctl`, a small tool in `tools/deskctl/`
+that takes window captures and gives real clicks and keys from any session:
 
     tools/deskctl/install.sh          # builds .tools/desk/desk, signed with a local key
 
 Then allow `.tools/desk/deskctl` once in System Settings, Privacy & Security, under both
-Screen & System Audio Recording and Accessibility, and keep someone logged in with the
-screen unlocked. `.tools/desk/desk status` says what's missing. Without it the check skips
-itself. `DESK` and `CHROMEDRIVER` point the tests at other copies; a machine that already
+Screen & System Audio Recording and Accessibility. `.tools/desk/desk status` says what's
+missing. `DESK` and `CHROMEDRIVER` point the tests at other copies; a machine that already
 has these tools elsewhere can also link `.tools/desk` and `.tools/chromedriver` to them.
 
-Real clicks, drags and full screen at scale run in a macOS VM:
-[docs/vm-testing.md](docs/vm-testing.md).
+The `vm` group needs the login for another reason: macOS only starts a macOS VM after
+someone has logged in at the desktop since the last boot. Nobody has to stay at the screen.
 
 Packaging a signed DMG and publishing a release need the signing key, which stays on the
 build Mac: [docs/updates.md](docs/updates.md).

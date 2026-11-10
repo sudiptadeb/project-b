@@ -116,6 +116,14 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('it shows automatic updates on, the default', await autoUpdate.isChecked());
   await page.screenshot({ path: path.join(out, 'settings-general.png') });
 
+  await page.getByRole('radio', { name: 'Dark' }).check();
+  check('Dark turns the shell dark and is saved', await until(async () => (await root('--text')) === '#e8eaed' && prefsFile().theme === 'dark'), await root('--text'));
+  check('and the settings page too', await until(async () => (await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === 'dark'));
+  await page.getByRole('radio', { name: 'Light' }).check();
+  check('Light turns it back', await until(async () => (await root('--text')) === '#1f1f1f' && prefsFile().theme === 'light'));
+  await page.getByRole('radio', { name: 'System' }).check();
+  await until(() => prefsFile().theme === 'system');
+
   await radio('Horizontal').check();
   check('choosing Horizontal switches the shell and is saved', await until(async () => (await shell.locator('.strip').count()) > 0 && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
   await shell.getByRole('button', { name: 'Tabs on the side' }).click();
@@ -132,20 +140,27 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
 
   // Keyboard.
   await page.getByRole('button', { name: 'Keyboard' }).click();
+  // The list only shows; clicking an action opens its editor.
+  const openRow = (title) => page.locator('button.action').filter({ has: page.locator('.name', { hasText: new RegExp('^\\s*' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$') }) }).click();
+  check('the list has no buttons of its own: no plus, remove or reset', (await page.getByRole('button', { name: /^(Add a key for|Remove |Reset (?!all))/ }).count()) === 0);
   check('the keymap follows its template until an edit', keymapFile() === null);
-  await page.getByRole('button', { name: 'Add a key for New Tab' }).click();
+  await openRow('New Tab');
+  await page.getByRole('button', { name: 'Add key' }).click();
   await page.keyboard.press('Meta+Shift+KeyK');
   check('a recorded key is added, and the keymap becomes the user\'s', await until(() => {
     const k = keymapFile();
     return k && !k.follows && k.template === 'project-b' && k.actions['tab.new'].mac.some((b) => b.keys === 'Shift+Cmd+K');
   }), JSON.stringify(keymapFile()?.actions?.['tab.new']));
   check('the page shows it', await until(async () => (await page.getByRole('region', { name: 'File' }).textContent()).includes('⇧⌘K')));
-  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0);
+  await openRow('Quit Project B');
+  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked').count()) === 1);
   check('Quit can\'t leave the menu', await page.getByRole('switch', { name: 'Quit Project B in the menu' }).isDisabled());
 
+  await openRow('Reload This Page');
   await page.getByRole('switch', { name: 'Reload This Page in the menu', exact: true }).click();
   check('hiding an action takes it out of the menu', await until(async () => !menuHas((await regions()).menu, 'Reload This Page')));
-  await page.getByRole('button', { name: 'Reset Reload This Page', exact: true }).click();
+  check('and the list marks it Hidden', await until(async () => (await page.locator('button.action', { hasText: 'Reload This Page' }).filter({ hasText: 'Hidden' }).count()) === 1));
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
   check('reset puts it back', await until(async () => menuHas((await regions()).menu, 'Reload This Page')));
 
   await page.getByLabel('Template').selectOption('chrome');

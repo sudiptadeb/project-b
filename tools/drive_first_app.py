@@ -295,7 +295,9 @@ def settings_checks():
     # A key recorded on the settings page reaches Go, and runs its action.
     settings("[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Keyboard').click()")
     time.sleep(0.3)
-    settings("document.querySelector('[aria-label=\"Add a key for New Tab\"]').click()")
+    settings("[...document.querySelectorAll('button.action')].find(b=>b.querySelector('.name').textContent.trim()==='New Tab').click()")
+    time.sleep(0.3)
+    settings("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add key').click()")
     time.sleep(0.3)
     app.cmd("key", "cmd+shift+k")
     keymap = os.path.join(profile, "keymap.json")

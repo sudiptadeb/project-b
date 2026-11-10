@@ -3,8 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "project_b/engine/browser/hooks_gen.h"
 
@@ -48,6 +50,14 @@ class ShellPage : public content::WebContentsObserver,
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
+#if BUILDFLAG(IS_ANDROID)
+  // Android has no colour picker inside the page, so settings' custom colour asks for one.
+  std::unique_ptr<content::ColorChooser> OpenColorChooser(
+      content::WebContents* web_contents,
+      SkColor color,
+      const std::vector<blink::mojom::ColorSuggestionPtr>& suggestions)
+      override;
+#endif
 
   std::unique_ptr<content::WebContents> contents_;
   base::TimeDelta first_paint_;

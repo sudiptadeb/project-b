@@ -7,7 +7,7 @@ view checks the same hitTest: before accepting the event. AppKit's own dispatch 
 exercised. Run it from the repo root:
 
     python3 tools/drive_first_app.py
-    python3 tools/drive_first_app.py settings   # only the settings page's checks
+    python3 tools/drive_first_app.py settings   # only the settings panel's checks
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -44,8 +44,8 @@ class Pages(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
         body = {
-            "/settings-link": b'<!doctype html><title>Links</title><a href="chrome://settings/">Settings</a>',
-            "/settings-frame": b'<!doctype html><title>Frame</title><iframe src="chrome://settings/"></iframe>',
+            # Counts the clicks that reach the page, in its title.
+            "/clicks": b'<!doctype html><title>0</title><body style="height:100vh;margin:0" onclick="document.title=+document.title+1">',
         }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>')
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
@@ -236,116 +236,127 @@ def bundle_version():
 
 
 def settings_checks():
-    """The settings page, chrome://settings/: how it opens, what it shows, that changing the
-    layout there moves the real shell, what its sender may ask Go, and that no other page
-    gets a bridge or reaches it."""
+    """The settings panel the shell draws over the window: how it opens and closes, that its
+    clicks stay in the shell, that its layout and colour reach the real window, and that
+    chrome://settings/ is gone."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
     app.wait("!!document.querySelector('input')", 30)
     time.sleep(0.5)
-    on_settings = "location.href==='chrome://settings/'&&typeof (window.chrome&&chrome.send)==='function'&&!!document.querySelector('.version')"
+    panel = "!!document.querySelector('[role=dialog]')"
+    panels = "document.querySelectorAll('[role=dialog]').length"
+    frame_var = "getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()"
     checked = lambda value: f"document.querySelector('input[value={value}]').checked"
-    has_bridge = "[location.href, typeof (window.chrome && chrome.send)]"
 
-    def typed(url):
-        focus_bar(app)
-        app.cmd("type", url)
-        app.wait(f"{VALUE}==={json.dumps(url)}")
-        app.cmd("key", "enter")
+    # chrome://settings/ is no page of ours any more: typed, it loads nothing with a bridge.
+    focus_bar(app)
+    app.cmd("type", "chrome://settings/")
+    app.wait(f"{VALUE}==='chrome://settings/'")
+    app.cmd("key", "enter")
+    time.sleep(2)
+    page = app.js("[location.href, typeof (window.chrome && chrome.send), !!document.querySelector('.version')]", page=True)
+    tab = app.js("document.querySelector('[role=tab][aria-selected=true]').textContent.trim()")
+    check("chrome://settings/ no longer exists: no page of ours, no bridge", page[1] == "undefined" and not page[2], (page, tab))
 
-    typed("chrome://settings/")
+    # A page that counts its clicks, under where the panel opens.
+    visit(app, PAGES + "clicks")
+    app.wait("document.title==='0'", 10, page=True)
+
+    # The gear opens the panel, once, and the panel is shell.
+    click(app, "[aria-label=Settings]")
     try:
-        app.wait(on_settings, 15, page=True)
-        check("typing chrome://settings/ opens it in the tab, with its bridge", True)
+        app.wait(panel, 10)
+        check("the gear opens the settings panel", app.js(panels) == 1)
     except TimeoutError as e:
-        check("typing chrome://settings/ opens it in the tab, with its bridge", False, e)
+        check("the gear opens the settings panel", False, e)
         app.close()
         return
-    app.wait(ACTIVE_ROW_TITLE + "==='Settings'", 10)
-    check("the tab is titled Settings", True)
-    app.wait(checked("vertical"), 10, page=True)
-    check("it shows the current layout", not app.js(checked("horizontal"), page=True))
-    expected = bundle_version() or "Development build"
-    shown = app.wait("document.querySelector('.version').textContent", 10, page=True)
-    check("it shows the running version", shown == expected, (shown, expected))
     time.sleep(0.3)
+    x, y = center(app, "[role=dialog] h1")
+    check("the panel is a shell region in the real window", app.cmd("hit", x, y) == "shell", app.cmd("hit", x, y))
+    app.cmd("click", x, y)
+    time.sleep(0.5)
+    check("a click inside it doesn't reach the page", app.js("document.title", page=True) == "0", app.js("document.title", page=True))
+    px, py, pw, ph = json.loads(app.cmd("bounds"))["reported"]
+    app.cmd("click", px + 40, py + ph - 40)
+    try:
+        app.wait("document.title==='1'", 5, page=True)
+        check("while a click beside it does", True)
+    except TimeoutError as e:
+        check("while a click beside it does", False, e)
+    check("and the panel stays open", app.js(panels) == 1)
+
+    app.wait(checked("vertical"), 5)
+    expected = bundle_version() or "Development build"
+    shown = app.js("document.querySelector('.version').textContent")
+    check("it shows the layout and the running version", shown == expected, (shown, expected))
     print(app.cmd("capture", os.path.join(OUT, "settings-vertical.png")), flush=True)
 
-    # A real click on the page's radio moves the real shell; the shell's own switch moves
-    # the page back.
-    page_click(app, "input[value=horizontal]")
+    # A real click on its radio moves the real shell, and the panel stays, under the gear.
+    click(app, "input[value=horizontal]")
     try:
         app.wait("!!document.querySelector('.strip')", 10)
-        check("choosing Horizontal on the page switches the real shell", True)
+        check("choosing Horizontal in the panel switches the real shell", app.js(panels) == 1)
     except TimeoutError as e:
-        check("choosing Horizontal on the page switches the real shell", False, e)
-    app.wait(checked("horizontal"), 10, page=True)
+        check("choosing Horizontal in the panel switches the real shell", False, e)
     time.sleep(0.4)
+    x, y = center(app, "[role=dialog] h1")
+    check("with the tabs on top the panel is still shell", app.cmd("hit", x, y) == "shell", app.cmd("hit", x, y))
     print(app.cmd("capture", os.path.join(OUT, "settings-horizontal.png")), flush=True)
-    click(app, "[aria-label='Tabs on the side']")
-    app.wait("!!document.querySelector('nav')", 5)
-    try:
-        app.wait(checked("vertical"), 10, page=True)
-        check("a change from the shell reaches the page", True)
-    except TimeoutError as e:
-        check("a change from the shell reaches the page", False, e)
-
-    # The settings sender may read and set prefs, read the update state and ask for a check.
-    # Anything else is dropped by Go and logged.
-    rows = app.js(ROWS)
-    logged = os.path.getsize(os.path.join(OUT, "app.log"))
-    app.js("chrome.send('shell',[JSON.stringify({t:'newTab'})]),1", page=True)
-    app.js("chrome.send('shell',[JSON.stringify({t:'navigate',text:'https://example.com/'})]),1", page=True)
-    time.sleep(1)
-    with open(os.path.join(OUT, "app.log")) as f:
-        f.seek(logged)
-        log = f.read()
-    check("a shell command sent from the settings page is dropped and logged", app.js(ROWS) == rows and app.js("location.href", page=True) == "chrome://settings/" and 'dropped "newTab" from tab' in log, (app.js(ROWS), app.js("location.href", page=True)))
+    click(app, "input[value=vertical]")
+    app.wait("!!document.querySelector('nav')", 10)
 
     # Check for updates asks the update manager, which says what it found. A development
     # build has no version and says it doesn't update; a release that is the newest says
     # it is up to date.
-    page_click(app, "button")
+    click(app, ".text-button")
     status = "document.querySelector('.status').textContent"
     want = "a development build doesn't update" if bundle_version() is None else "Up to date"
     try:
-        app.wait(f"{status}==={json.dumps(want)}", 30, page=True)
+        app.wait(f"{status}==={json.dumps(want)}", 30)
         check(f"Check for updates says: {want}", True)
     except TimeoutError as e:
         check(f"Check for updates says: {want}", False, e)
-    time.sleep(0.3)
-    print(app.cmd("capture", os.path.join(OUT, "settings-checked.png")), flush=True)
 
-    # The toolbar's settings button opens it in a new, active tab, in both layouts.
-    for layout in ("vertical", "horizontal"):
-        n = app.js(ROWS)
-        click(app, "[aria-label=Settings]")
+    # A preset recolours the window and the shell together.
+    check("the frame starts dusty teal, in the window and the shell", app.cmd("color") == "#4f9e9e" and app.js(frame_var) == "#4f9e9e", (app.cmd("color"), app.js(frame_var)))
+    for name, color in (("Blue", "#3470d0"), ("Amber", "#faa804"), ("Slate", "#384562")):
+        click(app, f"[role=radio][aria-label={name}]")
         try:
-            app.wait(f"{ROWS}==={n + 1}", 10)
-            app.wait(on_settings, 15, page=True)
-            check(f"the toolbar's settings button opens it in a new, active tab ({layout})", app.js(VALUE) == "chrome://settings/", app.js(VALUE))
+            app.wait(f"{frame_var}==={json.dumps(color)}", 5)
+            check(f"{name} recolours the window and the shell", app.cmd("color") == color and json.loads(app.cmd("frame"))["color"] == color, (app.cmd("color"), app.cmd("frame")))
         except TimeoutError as e:
-            check(f"the toolbar's settings button opens it in a new, active tab ({layout})", False, e)
-        if layout == "vertical":
-            click(app, "[aria-label='Tabs on top']")
-            app.wait("!!document.querySelector('.strip')", 5)
-            time.sleep(0.4)
-    click(app, "[aria-label='Tabs on the side']")
-    app.wait("!!document.querySelector('nav')", 5)
+            check(f"{name} recolours the window and the shell", False, e)
+        time.sleep(0.3)
+        print(app.cmd("capture", os.path.join(OUT, f"settings-{name.lower()}.png")), flush=True)
+    click(app, "[role=radio][aria-label='Dusty teal']")
+    app.wait(f"{frame_var}==='#4f9e9e'", 5)
 
-    # No other page has a bridge, and a page can't reach chrome://settings/: Chromium
-    # won't let a web page display a chrome:// page, by link or in a frame. A refused frame
-    # stays on its first about:blank, which the page can still read.
-    visit(app, PAGES + "settings-link")
-    check("an ordinary page has no chrome.send", app.js(has_bridge, page=True) == [PAGES + "settings-link", "undefined"], app.js(has_bridge, page=True))
-    app.js("document.querySelector('a').click(), 1", page=True)
-    time.sleep(1.5)
-    landed = app.js(has_bridge, page=True)
-    check("a page's link to chrome://settings/ is refused by Chromium", landed == [PAGES + "settings-link", "undefined"], (landed, app.js(VALUE)))
-    visit(app, PAGES + "settings-frame")
-    time.sleep(1.5)
-    frame = app.js("(()=>{try{return document.querySelector('iframe').contentWindow.location.href}catch(e){return 'cross-origin: '+e.name}})()", page=True)
-    check("and so is a frame of it", frame == "about:blank", frame)
+    # Escape, the close button and the gear each close it. A new panel's region reaches
+    # the window a frame or two after it shows, so the driver waits before clicking it.
+    app.cmd("key", "escape")
+    try:
+        app.wait(f"{panels}===0", 5)
+        check("Escape closes it", True)
+    except TimeoutError as e:
+        check("Escape closes it", False, e)
+    click(app, "[aria-label=Settings]")
+    app.wait(panel, 5)
+    time.sleep(0.3)
+    click(app, "[aria-label='Close settings']")
+    try:
+        app.wait(f"{panels}===0", 5)
+        check("the close button closes it", True)
+    except TimeoutError as e:
+        check("the close button closes it", False, e)
+    click(app, "[aria-label=Settings]")
+    app.wait(panel, 5)
+    time.sleep(0.3)
+    x, y = center(app, "[role=dialog] h1")
+    click(app, "[aria-label=Settings]")
+    app.wait(f"{panels}===0", 5)
+    time.sleep(0.3)
+    check("the gear closes it too, and its region goes", app.cmd("hit", x, y) == "page", app.cmd("hit", x, y))
     app.close()
 
 
@@ -401,7 +412,7 @@ def main():
     # over a few seconds in, so this looks after ten.
     time.sleep(max(0, 10 - (time.time() - app.started)))
     color = app.cmd("pagecolor")
-    check("ten seconds on, an empty tab's page area is the page's colour, not the frame colour", color not in ("none", "#0faaaa"), color)
+    check("ten seconds on, an empty tab's page area is the page's colour, not the frame colour", color not in ("none", "#4f9e9e"), color)
     print(app.cmd("capture", os.path.join(OUT, "1-empty.png")), flush=True)
 
     # Real pages through the address bar.
@@ -624,7 +635,7 @@ def main():
 
     # The frame colour has one owner: Go gave it to the window and to the shell.
     frame = app.js("getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()")
-    check("the window and the shell paint the frame colour Go owns", frame == "#0faaaa" and app.cmd("color") == frame, (frame, app.cmd("color")))
+    check("the window and the shell paint the frame colour Go owns", frame == "#4f9e9e" and app.cmd("color") == frame, (frame, app.cmd("color")))
     check("the window already had the frame colour when it went on screen", app.cmd("showncolor") == frame, app.cmd("showncolor"))
 
     # The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
@@ -638,7 +649,7 @@ def main():
     native = lambda: json.loads(app.cmd("frame"))  # The border the window itself draws.
     windowed = radius()
     print("window corner radius", windowed, "native frame", native(), flush=True)
-    check("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": "#0faaaa"}, (windowed, native()))
+    check("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": "#4f9e9e"}, (windowed, native()))
     app.cmd("fullscreen")
     try:
         app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
@@ -664,7 +675,7 @@ def main():
         if color != "none":
             break
         time.sleep(0.1)
-    check("the new tab's page area is the page's colour too", color not in ("none", "#0faaaa"), color)
+    check("the new tab's page area is the page's colour too", color not in ("none", "#4f9e9e"), color)
     app.cmd("type", URL_B)
     app.wait(f"{VALUE}==={json.dumps(URL_B)}")
     app.cmd("key", "enter")

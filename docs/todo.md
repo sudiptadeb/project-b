@@ -8,9 +8,11 @@ Take an item off when it lands or is dropped.
 - **URL policy on every request.** Each request is allowed or blocked by policy. The options so
   far: a proxy in the browser process, or rules in content's network layer, before each
   request is sent. Not discussed yet; nothing to build until it is.
-- **Menus and shortcuts.** Designed with the owner in [menus-shortcuts.md](menus-shortcuts.md);
-  six points from the guidelines at its end are not discussed yet. Ctrl+Cmd+F for full screen
-  waits on this.
+- **Menus and shortcuts, what is left.** Built for macOS ([menus-shortcuts.md](menus-shortcuts.md)).
+  Not discussed yet: the six points from the guidelines at its end. Decided, not built:
+  catching keys at the window (the late keys after clicking a suggestion), the menu editor,
+  the in-app menu for Windows and Linux. Ctrl+Cmd+F works through the driver; the VM test
+  should confirm it with AppKit's own dispatch.
 - **The certificate error page.** Mock and two ways to wire it (in the tab, or painted by the
   shell) in `project-b-research/morning-2026-11-10/cert-error-mock-notes.md`.
 - **Certificate revocation.** Recommendation: Go fetches Google's CRLSet, with a copy in the

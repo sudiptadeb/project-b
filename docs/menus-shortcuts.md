@@ -1,25 +1,28 @@
 # Menus, shortcuts and actions
 
-A design note, 2026-11-10, from a discussion with the owner. Nothing here is built yet.
-Chrome's full list of menus and keys, read from its source, is in
+A design note, 2026-11-10, from a discussion with the owner, and built for macOS the same
+day. [What was built](#built-2026-11-10) says where the build differs from the design and
+what is left. Chrome's full list of menus and keys, read from its source, is in
 [chrome-shortcuts.md](chrome-shortcuts.md).
 
-## Today
+## Before
 
-- **Go reserves a fixed list of keys:** Cmd+L, Cmd+T, Cmd+W, Cmd+1 to 9, Ctrl+Tab and
+What there was before this work:
+
+- **Go reserved a fixed list of keys:** Cmd+L, Cmd+T, Cmd+W, Cmd+1 to 9, Ctrl+Tab and
   Ctrl+Shift+Tab. `shortcutFor` in `core/content/wire.go` matches them in content's
   `PreHandleKeyboardEvent`, before the page sees the key. `App.Shortcut` in
   `core/app/app.go` is a switch that calls one manager for each. `engine.Shortcut` in
   `core/engine/engine.go` is the enum between them.
-- **The Mac menu bar is written by hand in Objective-C:** an app menu with Quit, and Edit
+- **The Mac menu bar was written by hand in Objective-C:** an app menu with Quit, and Edit
   with Undo, Cut, Copy, Paste and Select All (`InstallMainMenu` in
   `engine/browser/mac_app.mm`). There is no Redo.
-- **A key the page doesn't use** comes back through `HandleKeyboardEvent` in
+- **A key the page didn't use** came back through `HandleKeyboardEvent` in
   `page_tab.cc` and `shell_page.cc`, and `Window::HandleUnhandledKey` hands it to the menu
   bar (`window_mac.mm`).
-- **The shell has no shortcuts of its own.** It handles keys only inside the address bar
-  and the settings panel.
-- **Windows and Linux have nothing yet.**
+- **The shell had no shortcuts of its own.** It handled keys only inside the address bar
+  and the settings panel, which it drew itself.
+- **Windows and Linux had nothing.**
 
 Two bugs from the VM tests ([vm-testing.md](vm-testing.md)) belong here:
 
@@ -264,23 +267,32 @@ hidden or not, and macOS remaps work for all of them.
   and the page never sees the key.
 - Anything else goes to the page. If the page doesn't use it, the engine hands it back and
   Go runs the action if it is bound.
-- On Mac the engine catches keys at the window, before they join the page's input queue.
-  That is expected to fix the late keys after clicking a suggestion; the VM test checks it.
+- On Mac the engine is to catch keys at the window, before they join the page's input
+  queue, which is expected to fix the late keys after clicking a suggestion. Not built
+  yet; see below.
 - The native menu only shows keys; Go does the matching. A menu click runs the action by
   id.
 - A page's request to capture keys (the Keyboard Lock API, content's `RequestKeyboardLock`)
-  is answered from Go, and it never gets an `always` key.
+  is to be answered from Go, and never get an `always` key. Today no page can lock the
+  keyboard: our delegate doesn't grant it.
 - Text fields keep their editing keys. The shell never matches shortcuts itself.
 
-### The settings panel
+### The settings page
+
+Settings is a page of its own, `chrome://shell/settings`, in a WebContents of its own that
+the gear (or Settings…, Cmd+,) puts over the whole window and takes away again, so the
+shell never carries it. There is still one settings page and no new scheme: it comes from
+the shell's own host. It has two sections, General (what the shell's panel had: tab
+layout, frame colour, updates) and Keyboard:
 
 - Every action, grouped by menu, with its keys for this platform and a show-in-menu switch.
 - Click an action, press the new keys. Add a second binding, remove one, choose its
   `reserve`.
 - A template picker (a reset), reset one action, reset all.
 - A conflict warning when two actions want the same keys.
-- macOS bindings shown read-only. Admin-locked bindings, later, shown with a lock.
-- The update notice.
+- macOS bindings shown read-only, locked ones with a lock. Admin-locked bindings, later,
+  the same way.
+- The update notice, and any file that couldn't be read.
 
 ### Keys we can't fully control
 
@@ -311,74 +323,37 @@ neither. Policy sits on top of the current file and is never written into it.
 
 ## The `project-b` menu tree
 
-This is the proposed default, on Mac, made from Chrome's menus with only the actions we
-have or can wire through content. Chrome actions for features we don't have are left
-out and are added with their feature: private windows, split view, tab groups, printing,
-bookmarks, the history and downloads pages, profiles, extensions, spelling, the task
-manager, Cast, Translate and the Google services. Keys are the Chrome-style defaults; `*`
-marks the ones reserved outside full screen.
+The default tree is `core/commands/templates/menu/project-b.json`. The keymap templates
+`project-b.json` and `chrome.json` are the same for now. The tree has only actions that
+work today; Chrome actions for features we don't have are added with their feature
+(private windows, split view, tab groups, printing, bookmarks, the history and downloads
+pages, profiles, extensions, spelling, the task manager, Cast, Translate, the Google
+services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full screen.
 
-Each item is marked: **now** (exists, needs only the item), **wire** (a content call we
-haven't wired yet), **build** (a small Go or shell feature) or **OS** (macOS provides it).
+- **Project B** (locked): About Project B; Settings…, Cmd+, (locked); Check for Updates…;
+  Services; Hide Project B, Cmd+H; Hide Others, Option+Cmd+H; Show All; Quit Project B,
+  Cmd+Q (locked).
+- **File**: New Tab, Cmd+T*; Open Location…, Cmd+L; Close Window, Shift+Cmd+W*; Close
+  Tab, Cmd+W*.
+- **Edit** (locked): Undo, Cmd+Z; Redo, Shift+Cmd+Z; Cut, Copy, Paste; Paste and Match
+  Style, Shift+Cmd+V and Option+Shift+Cmd+V; Delete; Select All, Cmd+A.
+- **View**: Tabs on Side, Tabs on Top (checked); Stop, Cmd+.; Reload This Page, Cmd+R;
+  Force Reload This Page, Shift+Cmd+R; Full Screen, Ctrl+Cmd+F, `always` (checked); Actual
+  Size, Cmd+0; Zoom In, Cmd+= and Shift+Cmd+=; Zoom Out, Cmd+-; Developer: View Source,
+  Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;
+  Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up.
+- **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
+- **Tab**: Select Next Tab, Ctrl+Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*;
+  Select Previous Tab, the mirror keys*; Duplicate Tab; Select Tab (hidden): Tab 1 to 8,
+  Cmd+1 to 8, and Last Tab, Cmd+9.
+- **Window** (locked): Minimize, Cmd+M; Zoom; Bring All to Front; macOS adds the window
+  list.
 
-- **Project B**
-  - About Project B, `app.about`, build
-  - Settings…, `app.settings`, Cmd+,, now
-  - Check for Updates…, `app.checkUpdate`, now
-  - Services, OS
-  - Hide Project B, Cmd+H; Hide Others, Cmd+Option+H; Show All, OS
-  - Quit Project B, `app.quit`, Cmd+Q, `always`, now
-- **File**
-  - New Tab, `tab.new`, Cmd+T*, now
-  - New Window, `window.new`, Cmd+N*, build (one window today)
-  - Reopen Closed Tab, `tab.reopenClosed`, Cmd+Shift+T*, build
-  - Open File…, `file.open`, Cmd+O, build
-  - Open Location…, `address.focus`, Cmd+L, now
-  - Close Window, `window.close`, Cmd+Shift+W*, now
-  - Close Tab, `tab.close`, Cmd+W*, now
-  - Save Page As…, `page.save`, Cmd+S, wire
-  - Email Link, `page.emailLink`, Cmd+Shift+I, build
-- **Edit**
-  - Undo, Cmd+Z; Redo, Cmd+Shift+Z, now on Mac (Redo is new)
-  - Cut, Copy, Paste, Cmd+X, C, V; Paste and Match Style, Cmd+Shift+V; Delete;
-    Select All, Cmd+A, now on Mac
-  - Find: Search the Web…, Cmd+Option+F; Find…, Cmd+F; Find Next, Cmd+G; Find Previous,
-    Cmd+Shift+G; Use Selection for Find, Cmd+E; Jump to Selection, Cmd+J, wire
-  - Substitutions, Transformations, Speech, wire (they go to content's view)
-  - AutoFill, Dictation, Emoji & Symbols, OS
-- **View**
-  - Tabs on Top or Tabs on Side, `view.tabLayout`, checked, now
-  - Always Show Full URLs, `view.showFullUrls`, build
-  - Stop, `nav.stop`, Cmd+., wire
-  - Reload This Page, `nav.reload`, Cmd+R, now
-  - Force Reload This Page, `nav.reloadHard`, Cmd+Shift+R, wire
-  - Enter Full Screen, `view.fullscreen`, Ctrl+Cmd+F, `windowed` except in full screen,
-    now (the VM bug)
-  - Actual Size, Cmd+0; Zoom In, Cmd+=; Zoom Out, Cmd+-, wire
-  - Developer: View Source, Cmd+Option+U; Developer Tools, Cmd+Option+I; Inspect
-    Elements, Cmd+Option+C; JavaScript Console, Cmd+Option+J, wire
-  - Keyboard (hidden): Focus Next Pane, F6 and Cmd+Option+Down; Focus Previous Pane;
-    Focus Page; Caret Browsing, F7, build or wire
-- **History**
-  - Home, `nav.home`, Cmd+Shift+H, build
-  - Back, `nav.back`, Cmd+[, now
-  - Forward, `nav.forward`, Cmd+], now
-- **Tab**
-  - Select Next Tab, `tab.next`, Ctrl+Tab, Cmd+Shift+], Cmd+Option+Right, Ctrl+PgDn*, now.
-    Chrome splits these over two commands; here they are one action with four keys.
-  - Select Previous Tab, `tab.previous`, the mirror keys*, now
-  - Duplicate Tab, wire; Mute Tab, wire; Pin Tab, build
-  - Move Tab to New Window, build; Close Other Tabs, build; Close Tabs Below, build
-  - Search Tabs…, `tab.search`, Cmd+Shift+A, build
-  - Select Tab (hidden): Tab 1 to 8, Cmd+1 to 8; Last Tab, Cmd+9, now
-  - Move Tab (hidden): Up or Left, Ctrl+Shift+PgUp; Down or Right, Ctrl+Shift+PgDn, build
-- **Window**
-  - Minimize, Cmd+M; Zoom, now
-  - Bring All to Front and the window list, OS
-- **Help**
-  - macOS's own search field, OS
+Later, each with its feature: New Window, Reopen Closed Tab, Open File, Save Page, Email
+Link, the find bar, Pin and Mute Tab, Search Tabs, Move Tab, Developer Tools, Home, Show
+Full History, a Help menu.
 
-Counted from Chrome's source, it has 194 actions: 58 need only Go and the shell, 49 a
+Counted from Chrome's source, Chrome has 194 actions: 58 need only Go and the shell, 49 a
 content call, 13 come from the OS, and 74 open features we don't have.
 
 ## From the guidelines, not yet discussed
@@ -407,3 +382,76 @@ building the Mac menu bar from the tree, catching keys at the window and handing
 Go, answering keyboard lock, and watching macOS's remaps. Each "wire" item above is one
 engine call into content (`WebContents::Copy`, `Find`, `Stop`, `SavePage`, `HostZoomMap`
 and so on).
+
+## Decided (2026-11-10)
+
+1. **One Go `commands` manager** holds the actions, the menu tree and the keys. Every key,
+   menu item and shell button runs an action by its id.
+2. **Two files with one shape each:** `keymap.json` and `menu.json`, each following a
+   template until the first edit, then owned. Same shape for the file and its templates,
+   so a template file copied over the current one works. A separate `keymap.json` so it
+   can be imported and exported later, once there is a file manager.
+3. **The default template is `project-b`.** For now `chrome` is the same.
+4. **Picking a template resets** to it. Reset always fixes whatever a user's change did.
+5. **Updates:** a following file gets the new template. An owned keymap is a flat list, so
+   new actions merge in, without keys the user already uses; those go in a notice at
+   startup and in settings. An owned menu tree only gets the notice.
+6. **The user chooses who wins each key:** Always, Outside full screen, Page first. No page
+   can take a key the user reserved.
+7. **Several keys per action,** and macOS App Shortcuts are just more bindings in the same
+   list, marked `fromOS`, written by Go. Both apply.
+8. **Every action has a place in the tree;** `hidden` is on actions only, and a submenu
+   shows when any of its items does. The user can show keys-only actions such as Tab 1
+   in the menu, which also helps accessibility tools.
+9. **Locked keys** come from their own file; **locked menu items** (Quit, Settings) live
+   only inside locked menus, so updates can always place them.
+10. **Users can't change the tree for now.** Moving items, user separators and submenus
+    come with a menu editor, later.
+11. **Settings is a self-contained page in a WebContents of its own,** placed over the
+    whole window by the gear, so it can't bloat the shell.
+
+## Built (2026-11-10)
+
+Mac only, on branch `menus-shortcuts`.
+
+- **Go:** `core/commands` (the manager, the templates in `templates/`, the keymap and
+  menu files, the merge, macOS bindings, the view the settings page shows) and
+  `core/settings` (the settings page's contract, as `core/shell` is the shell's).
+  `core/app/actions.go` registers every action with the one manager call it makes. The
+  engine contract lost `Shortcut` and gained `Key`, `MenuChosen`, `OSBindings` and
+  `SettingsMessage` on the listener, and the content calls each action needs.
+- **Engine:** the menu bar is built from Go's menu (`SetMainMenu` in `mac_app.mm`), each
+  item telling Go its action. Keys reach Go twice through content's own hooks:
+  `PreHandleKeyboardEvent` before the page and `HandleKeyboardEvent` after it, for the
+  shell, the tabs and the settings page alike; a key Go doesn't use goes to the menu bar.
+  macOS App Shortcuts are read at start and on every change (key-value observing on our
+  defaults, All Applications included) and sent to Go. `settings_page.cc` is the settings
+  page; `Window::SetOverlayView` puts it over everything and gives it every press.
+- **Shell:** `shell/src/settings/` is the settings page, built as its own script
+  (`npm run build` builds both pages). The shell's panel is gone; the gear runs
+  `app.settings`, and the sidebar's New Tab hint shows whatever key New Tab has now.
+
+Where the build differs from the design, or decided something the design left open:
+
+- **Keys aren't caught at the window yet.** They go through content's hooks as before, so
+  the late keys after clicking a suggestion ([vm-testing.md](vm-testing.md), bug 5) may
+  still happen; catching them at the window is its own change, to test in the VM.
+- **`menu.json` can only follow a template** until the menu editor exists.
+- **The update notice lasts for the run;** an action added from it is in the file, so it
+  isn't shown again.
+- **Closing a tab while settings is open closes settings,** as closing a settings tab
+  would in another browser. While settings is open it keeps the keyboard: a focus request
+  from the shell or Go waits until it closes.
+- **F6 moves between the shell and the page,** whichever had the keyboard last.
+- **Full Screen keeps one title,** checked while in full screen, so a macOS remap of it
+  keeps working.
+- **No Help menu yet,** as there's nothing in it.
+- **Holding Escape to leave a page's full screen** isn't built: pages can't go full screen
+  yet.
+
+Tests: `core/commands` (keys, who wins a key, the first edit, the update merge, a bad
+file, macOS bindings), `core/app` (the menu from the tree, a key added in settings, the
+settings page's prefs), `shell/e2e/settings.cjs` (26 checks on the mock) and
+`tools/drive_first_app.py settings` (14 checks in the real app: the menu bar, copy and
+paste through Go, Cmd+, opening settings over the window, recording a key, Cmd+W closing
+settings, Ctrl+Cmd+F, and the key surviving a restart).

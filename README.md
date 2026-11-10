@@ -58,9 +58,9 @@ Then:
 
     (cd core && go test ./...)                     # Go managers
     node shell/e2e/first-app.cjs                   # the shell on the mock engine
-    node shell/e2e/settings.cjs                    # the settings panel on the mock
+    node shell/e2e/settings.cjs                    # the settings page on the mock
     python3 tools/drive_first_app.py               # the real app; PB_BIN picks another binary
-    python3 tools/drive_first_app.py settings      # the settings panel in the real app
+    python3 tools/drive_first_app.py settings      # menus, keys and the settings page in the real app
     python3 tools/drive_chromedriver.py            # Google's ChromeDriver drives the real app
 
 Each prints `ok` or `FAIL` per check and ends with `all passed` or a count of failures.

@@ -6,10 +6,15 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "build/build_config.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/native_ui_types.h"
+
+namespace content {
+class WebContents;
+}
 
 namespace input {
 struct NativeWebKeyboardEvent;
@@ -62,6 +67,13 @@ class Window {
   void Show();
   void Close();
   void SetTitle(const std::u16string& title);
+#if BUILDFLAG(IS_ANDROID)
+  // Android's views need the Java WebContents, which a native view can't lead back to.
+  void SetShellContents(content::WebContents* contents);
+  void AddPageContents(content::WebContents* contents);
+  void ShowPageContents(content::WebContents* contents);
+  void RemovePageContents(content::WebContents* contents);
+#else
   void SetShellView(gfx::NativeView view);
 
   // Page views all sit where the layout's page says. AddPageView adds one hidden;
@@ -69,6 +81,7 @@ class Window {
   void AddPageView(gfx::NativeView view);
   void ShowPageView(gfx::NativeView view);
   void RemovePageView(gfx::NativeView view);
+#endif
 
   // The overlay covers the whole window, over the shell, and takes every press while it
   // is there. The settings page is one.
@@ -80,12 +93,14 @@ class Window {
   // Reports the window's state now and whenever it changes.
   void ListenForState(base::RepeatingCallback<void(const State&)> on_change);
 
-  // What the window buttons do: zoom and full screen go in or out.
+  // What the window buttons do: minimise, and zoom and full screen go in or out.
+  void Minimize();
   void Zoom();
   void ToggleFullScreen();
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 
+#if !BUILDFLAG(IS_ANDROID)
   // The window's frame on screen, y measured down from the top of the main screen, and
   // its state, as Chrome's views report and change them on a Mac
   // (ui/views/widget/native_widget_mac.mm): maximised is AppKit's zoomed, and Restore
@@ -95,7 +110,6 @@ class Window {
   bool IsMinimized() const;
   bool IsMaximized() const;
   bool IsFullscreen() const;
-  void Minimize();
   void Maximize();
   void SetFullscreen(bool fullscreen);
   void Restore();
@@ -107,6 +121,7 @@ class Window {
   size_t ignored_stale_bounds() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;
+#endif
 
  private:
   struct Impl;

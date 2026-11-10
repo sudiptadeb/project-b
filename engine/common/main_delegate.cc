@@ -1,14 +1,27 @@
 #include "project_b/engine/common/main_delegate.h"
 
-#include "base/apple/bundle_locations.h"
-#include "base/apple/foundation_util.h"
 #include "base/check.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
 #include "base/logging/logging_settings.h"
 #include "base/path_service.h"
+#include "build/build_config.h"
 #include "project_b/engine/common/content_client.h"
 #include "ui/base/resource/resource_bundle.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "base/apple/bundle_locations.h"
+#include "base/apple/foundation_util.h"
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/apk_assets.h"
+#include "base/files/file.h"
+#include "base/posix/global_descriptors.h"
+#include "content/public/browser/android/compositor.h"
+#include "content/public/browser/browser_main_runner.h"
+#include "project_b/engine/android/descriptors.h"
+#endif
 
 namespace project_b {
 
@@ -16,12 +29,17 @@ MainDelegate::MainDelegate() = default;
 MainDelegate::~MainDelegate() = default;
 
 std::optional<int> MainDelegate::BasicStartupComplete() {
+#if BUILDFLAG(IS_MAC)
   // Inside an app, content looks for its files under the "framework bundle". We have
   // no framework, so that's the app's Contents folder.
   if (base::apple::AmIBundled()) {
     base::apple::SetOverrideFrameworkBundlePath(
         base::apple::MainBundlePath().Append(FILE_PATH_LITERAL("Contents")));
   }
+#endif
+#if BUILDFLAG(IS_ANDROID)
+  content::Compositor::Initialize();
+#endif
 
   logging::LoggingSettings settings;
   settings.logging_dest =
@@ -34,10 +52,47 @@ std::optional<int> MainDelegate::BasicStartupComplete() {
 }
 
 void MainDelegate::PreSandboxStartup() {
+#if BUILDFLAG(IS_ANDROID)
+  // A renderer has a different user and can't open the APK, so it was handed an open file.
+  auto* descriptors = base::GlobalDescriptors::GetInstance();
+  int pak_fd = descriptors->MaybeGet(kPakDescriptor);
+  base::MemoryMappedFile::Region region;
+  if (pak_fd >= 0) {
+    region = descriptors->GetRegion(kPakDescriptor);
+  } else {
+    pak_fd = base::android::OpenApkAsset("assets/project_b.pak", &region);
+    CHECK_GE(pak_fd, 0);
+    descriptors->Set(kPakDescriptor, pak_fd, region);
+  }
+  base::File pak_file(pak_fd);
+  ui::ResourceBundle::InitSharedInstanceWithPakFileRegion(pak_file.Duplicate(),
+                                                          region);
+  ui::ResourceBundle::GetSharedInstance().AddDataPackFromFileRegion(
+      std::move(pak_file), region, ui::k100Percent);
+#else
   base::FilePath pak;
   CHECK(base::PathService::Get(base::DIR_ASSETS, &pak));
   ui::ResourceBundle::InitSharedInstanceWithPakPath(
       pak.Append(FILE_PATH_LITERAL("project_b.pak")));
+#endif
 }
+
+#if BUILDFLAG(IS_ANDROID)
+// Android's looper is the message loop, so this only starts the browser and returns. Content never
+// shuts down on Android, so the runner is left alive on purpose.
+std::variant<int, content::MainFunctionParams> MainDelegate::RunProcess(
+    const std::string& process_type,
+    content::MainFunctionParams main_function_params) {
+  if (!process_type.empty()) {
+    return std::move(main_function_params);
+  }
+  std::unique_ptr<content::BrowserMainRunner> runner =
+      content::BrowserMainRunner::Create();
+  int code = runner->Initialize(std::move(main_function_params));
+  CHECK_LT(code, 0);
+  std::ignore = runner.release();
+  return 0;
+}
+#endif
 
 }  // namespace project_b

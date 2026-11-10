@@ -3,7 +3,10 @@
 
 #include <memory>
 #include <optional>
+#include <string>
+#include <variant>
 
+#include "build/build_config.h"
 #include "content/public/app/content_main_delegate.h"
 
 namespace content {
@@ -24,6 +27,11 @@ class MainDelegate : public content::ContentMainDelegate {
  protected:
   std::optional<int> BasicStartupComplete() override;
   void PreSandboxStartup() override;
+#if BUILDFLAG(IS_ANDROID)
+  std::variant<int, content::MainFunctionParams> RunProcess(
+      const std::string& process_type,
+      content::MainFunctionParams main_function_params) override;
+#endif
 
  private:
   std::unique_ptr<content::ContentClient> content_client_;

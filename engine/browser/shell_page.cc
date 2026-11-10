@@ -9,11 +9,13 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/memory/ref_counted_memory.h"
+#include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/process/process.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -31,6 +33,13 @@
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/apk_assets.h"
+#include "base/files/file.h"
+#include "base/files/memory_mapped_file.h"
+#include "base/strings/string_view_util.h"
+#endif
 
 namespace project_b {
 
@@ -168,6 +177,18 @@ class AppDataSource : public content::URLDataSource {
   void StartDataRequest(const GURL& url,
                         const content::WebContents::Getter& wc_getter,
                         GotDataCallback callback) override {
+#if BUILDFLAG(IS_ANDROID)
+    // On Android the shell is in the APK, not in a folder.
+    base::MemoryMappedFile::Region region;
+    base::File asset(base::android::OpenApkAsset(
+        "assets/shell/" + Name(url), &region));
+    base::MemoryMappedFile mapped;
+    CHECK(mapped.Initialize(std::move(asset), region));
+    std::string data(base::as_string_view(mapped.bytes()));
+    std::move(callback).Run(
+        base::MakeRefCounted<base::RefCountedString>(std::move(data)));
+    return;
+#else
     base::FilePath dir;
     CHECK(base::PathService::Get(base::DIR_ASSETS, &dir));
     base::FilePath file =
@@ -184,6 +205,7 @@ class AppDataSource : public content::URLDataSource {
             },
             file),
         std::move(callback));
+#endif
   }
 
   std::string GetMimeType(const GURL& url) override {

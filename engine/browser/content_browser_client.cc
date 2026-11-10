@@ -8,7 +8,14 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "project_b/engine/browser/browser_main_parts.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/posix/global_descriptors.h"
+#include "content/public/browser/posix_file_descriptor_info.h"
+#include "project_b/engine/android/descriptors.h"
+#else
 #include "project_b/engine/browser/devtools.h"
+#endif
 
 namespace project_b {
 
@@ -20,6 +27,17 @@ ContentBrowserClient::CreateBrowserMainParts(bool is_integration_test) {
   return std::make_unique<BrowserMainParts>();
 }
 
+#if BUILDFLAG(IS_ANDROID)
+// A renderer can't open the APK, so the pak goes along as an open file.
+void ContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
+    const base::CommandLine& command_line,
+    int child_process_id,
+    content::PosixFileDescriptorInfo* mappings) {
+  auto* descriptors = base::GlobalDescriptors::GetInstance();
+  mappings->ShareWithRegion(kPakDescriptor, descriptors->Get(kPakDescriptor),
+                            descriptors->GetRegion(kPakDescriptor));
+}
+#else
 // Every child process runs the helper, which has no Go in it.
 base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
   base::FilePath dir;
@@ -31,6 +49,7 @@ std::unique_ptr<content::DevToolsManagerDelegate>
 ContentBrowserClient::CreateDevToolsManagerDelegate() {
   return std::make_unique<DevToolsManagerDelegate>();
 }
+#endif
 
 // Every navigation gets the generated throttle, whose hooks cross to Go only when Go
 // subscribed to them (core/content/wire.go decides which navigations it gates).

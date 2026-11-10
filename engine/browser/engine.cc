@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/task/single_thread_task_runner.h"
+#include "build/build_config.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/host_zoom_map.h"
@@ -286,7 +287,11 @@ PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   auto tab = std::make_unique<PageTab>(id, std::move(contents));
   PageTab* raw = tab.get();
   tab->contents()->WasHidden();
+#if BUILDFLAG(IS_ANDROID)
+  window_->AddPageContents(tab->contents());
+#else
   window_->AddPageView(tab->contents()->GetNativeView());
+#endif
   tabs_[id] = std::move(tab);
   return raw;
 }
@@ -298,7 +303,11 @@ void Engine::CloseTab(int64_t tab) {
   if (it == tabs_.end()) {
     return;
   }
+#if BUILDFLAG(IS_ANDROID)
+  window_->RemovePageContents(it->second->contents());
+#else
   window_->RemovePageView(it->second->contents()->GetNativeView());
+#endif
   if (active_tab_ == tab) {
     active_tab_ = 0;
   }
@@ -313,7 +322,11 @@ void Engine::ShowTab(int64_t tab) {
     return;
   }
   active_tab_ = tab;
+#if BUILDFLAG(IS_ANDROID)
+  window_->ShowPageContents(it->second->contents());
+#else
   window_->ShowPageView(it->second->contents()->GetNativeView());
+#endif
   window_->SetTitle(it->second->contents()->GetTitle());
   it->second->contents()->WasShown();
   for (const auto& [id, other] : tabs_) {

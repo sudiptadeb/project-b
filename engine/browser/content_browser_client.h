@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "build/build_config.h"
 #include "project_b/engine/browser/hooks_gen.h"
 
 namespace project_b {
@@ -21,9 +22,16 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
  private:
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;
+#if BUILDFLAG(IS_ANDROID)
+  void GetAdditionalMappedFilesForChildProcess(
+      const base::CommandLine& command_line,
+      int child_process_id,
+      content::PosixFileDescriptorInfo* mappings) override;
+#else
   base::FilePath GetChildProcessPath(int flags) override;
   std::unique_ptr<content::DevToolsManagerDelegate>
   CreateDevToolsManagerDelegate() override;
+#endif
   void CreateThrottlesForNavigation(
       content::NavigationThrottleRegistry& registry) override;
   std::string GetProduct() override;

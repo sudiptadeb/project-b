@@ -2,9 +2,11 @@
 #define PROJECT_B_ENGINE_BROWSER_BROWSER_MAIN_PARTS_H_
 
 #include <memory>
+#include <string>
 
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
+#include "build/build_config.h"
 #include "content/public/browser/browser_main_parts.h"
 #include "ui/display/screen.h"
 
@@ -28,13 +30,21 @@ class BrowserMainParts : public content::BrowserMainParts {
   BrowserMainParts& operator=(const BrowserMainParts&) = delete;
   ~BrowserMainParts() override;
 
+#if BUILDFLAG(IS_ANDROID)
+  static BrowserMainParts* Get();
+  // Java calls this once content is up and the window exists.
+  void StartApp(const std::string& blocked_hosts);
+#endif
+
  private:
   int PreMainMessageLoopRun() override;
   void WillRunMainMessageLoop(
       std::unique_ptr<base::RunLoop>& run_loop) override;
   void PostMainMessageLoopRun() override;
 
+#if BUILDFLAG(IS_MAC)
   std::unique_ptr<display::ScopedNativeScreen> screen_;
+#endif
   std::unique_ptr<BrowserContext> browser_context_;
   std::unique_ptr<Window> window_;
   std::unique_ptr<ShellPage> shell_;

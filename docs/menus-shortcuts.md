@@ -279,10 +279,14 @@ hidden or not, and macOS remaps work for all of them.
 
 ### The settings page
 
-Settings is a page of its own, `chrome://shell/settings`, in a WebContents of its own that
+Settings is an app of its own at `chrome://settings/`, in a WebContents of its own that
 the gear (or Settings…, Cmd+,) puts over the whole window and takes away again, so the
-shell never carries it. There is still one settings page and no new scheme: it comes from
-the shell's own host. It has two sections, General (what the shell's panel had: tab
+shell never carries it. Each of our pages is a separate app, built the way pweb builds its
+pages: `shell/src/apps/<app>/` has the app's `index.html` and code, what apps share sits in
+`shell/src/` (imported as `@/`), and `VITE_APP=<app> vite build` builds one app into
+`dist/<app>/` as `index.html`, `<app>.js` and `<app>.css`; `npm run build` builds them all.
+The engine serves each app at `chrome://<app>/` from its own folder, and gives the bridge
+to Go only to the WebContents the app belongs in. It has two sections, General (what the shell's panel had: tab
 layout, frame colour, updates) and Keyboard:
 
 - Every action, grouped by menu, with its keys for this platform and a show-in-menu switch.
@@ -343,8 +347,9 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
   Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;
   Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up.
 - **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
-- **Tab**: Select Next Tab, Ctrl+Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*;
-  Select Previous Tab, the mirror keys*; Duplicate Tab; Select Tab (hidden): Tab 1 to 8,
+- **Tab**: Select Next Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*; Select
+  Previous Tab, the mirror keys*; Select Recent Tab, Ctrl+Tab*; Select Recent Tab
+  Backward, Ctrl+Shift+Tab*; Duplicate Tab; Select Tab (hidden): Tab 1 to 8,
   Cmd+1 to 8, and Last Tab, Cmd+9.
 - **Window** (locked): Minimize, Cmd+M; Zoom; Bring All to Front; macOS adds the window
   list.
@@ -408,7 +413,11 @@ and so on).
 10. **Users can't change the tree for now.** Moving items, user separators and submenus
     come with a menu editor, later.
 11. **Settings is a self-contained page in a WebContents of its own,** placed over the
-    whole window by the gear, so it can't bloat the shell.
+    whole window by the gear, so it can't bloat the shell. It is `chrome://settings/`:
+    each page is a different app, built the way pweb builds its pages.
+12. **Ctrl+Tab and Ctrl+Shift+Tab cycle through recent tabs,** as Cmd+Tab and
+    Cmd+Shift+Tab cycle through apps on a Mac. Next and previous by position keep
+    Chrome's other keys.
 
 ## Built (2026-11-10)
 
@@ -427,8 +436,8 @@ Mac only, on branch `menus-shortcuts`.
   macOS App Shortcuts are read at start and on every change (key-value observing on our
   defaults, All Applications included) and sent to Go. `settings_page.cc` is the settings
   page; `Window::SetOverlayView` puts it over everything and gives it every press.
-- **Shell:** `shell/src/settings/` is the settings page, built as its own script
-  (`npm run build` builds both pages). The shell's panel is gone; the gear runs
+- **Shell:** `shell/src/apps/settings/` is the settings app and `shell/src/apps/shell/`
+  the shell, each built on its own (`npm run build` builds both). The shell's panel is gone; the gear runs
   `app.settings`, and the sidebar's New Tab hint shows whatever key New Tab has now.
 
 Where the build differs from the design, or decided something the design left open:
@@ -443,6 +452,15 @@ Where the build differs from the design, or decided something the design left op
   would in another browser. While settings is open it keeps the keyboard: a focus request
   from the shell or Go waits until it closes.
 - **F6 moves between the shell and the page,** whichever had the keyboard last.
+- **Recent tabs, held like the app switcher.** The tabs manager keeps every tab in the
+  order it was last shown. Each Ctrl+Tab goes one further back, past the oldest round to
+  the newest, showing each tab as it goes; Ctrl+Shift+Tab goes the other way. The order
+  stays as it was until Ctrl is let go, and the tab it stopped on becomes the most recent.
+  Shift only turns the direction, so letting go of Shift doesn't end it, and any other
+  action does. An action holds like this when it has `Release` (`core/commands`); run from
+  the menu, where nothing is held, it settles at once. Content drops a modifier's release
+  after a key the browser handled, so the app reports modifier changes itself
+  (`PBApplication sendEvent:`, `ModsChanged`). There is no switcher overlay.
 - **Full Screen keeps one title,** checked while in full screen, so a macOS remap of it
   keeps working.
 - **No Help menu yet,** as there's nothing in it.
@@ -452,6 +470,8 @@ Where the build differs from the design, or decided something the design left op
 Tests: `core/commands` (keys, who wins a key, the first edit, the update merge, a bad
 file, macOS bindings), `core/app` (the menu from the tree, a key added in settings, the
 settings page's prefs), `shell/e2e/settings.cjs` (26 checks on the mock) and
-`tools/drive_first_app.py settings` (14 checks in the real app: the menu bar, copy and
+`tools/drive_first_app.py settings` (15 checks in the real app: the menu bar, copy and
 paste through Go, Cmd+, opening settings over the window, recording a key, Cmd+W closing
-settings, Ctrl+Cmd+F, and the key surviving a restart).
+settings, Ctrl+Tab through recent tabs, Ctrl+Cmd+F, and the key surviving a restart). The
+real-app check lets go of Ctrl by calling what `sendEvent:` calls, since the driver
+doesn't go through AppKit's dispatch.

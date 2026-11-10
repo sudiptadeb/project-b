@@ -86,9 +86,13 @@ void ChildProcesses::ChildGone(
   pids_.erase(data.id);
 }
 
+// Content calls this again when a renderer that died is started again in the same host,
+// as for a reload after a page crash. The host is still observed from the first time.
 void ChildProcesses::OnRenderProcessHostCreated(
     content::RenderProcessHost* host) {
-  hosts_.AddObservation(host);
+  if (!hosts_.IsObservingSource(host)) {
+    hosts_.AddObservation(host);
+  }
 }
 
 void ChildProcesses::RenderProcessReady(content::RenderProcessHost* host) {

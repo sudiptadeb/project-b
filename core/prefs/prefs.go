@@ -1,5 +1,5 @@
-// Package prefs owns the user's settings: where the tabs go, and whether the app checks for
-// updates on its own. They live in one small JSON file in the profile, read when the app
+// Package prefs owns the user's settings: where the tabs go, whether the app checks for
+// updates on its own, and the frame colour. They live in one small JSON file in the profile, read when the app
 // starts and written when one changes.
 package prefs
 
@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // Tab layouts.
@@ -20,9 +21,13 @@ const (
 type Prefs struct {
 	TabLayout  string `json:"tabLayout"`
 	AutoUpdate bool   `json:"autoUpdate"`
+	FrameColor string `json:"frameColor"`
 }
 
-func defaults() Prefs { return Prefs{TabLayout: TabsVertical, AutoUpdate: true} }
+func defaults() Prefs { return Prefs{TabLayout: TabsVertical, AutoUpdate: true, FrameColor: "#4f9e9e"} }
+
+// A frame colour is "#rrggbb", as a colour input gives it.
+var frameColor = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 // Manager owns the settings.
 type Manager struct {
@@ -30,6 +35,7 @@ type Manager struct {
 	prefs        Prefs
 	onLayout     []func(string)
 	onAutoUpdate []func(bool)
+	onFrameColor []func(string)
 }
 
 // New returns a manager with the settings saved under dir, or the defaults. A setting the
@@ -42,6 +48,9 @@ func New(dir string) *Manager {
 		if json.Unmarshal(b, &s) == nil {
 			if s.TabLayout != TabsVertical && s.TabLayout != TabsHorizontal {
 				s.TabLayout = TabsVertical
+			}
+			if !frameColor.MatchString(s.FrameColor) {
+				s.FrameColor = defaults().FrameColor
 			}
 			m.prefs = s
 		}
@@ -88,6 +97,27 @@ func (m *Manager) SetAutoUpdate(on bool) {
 	m.save()
 	for _, f := range m.onAutoUpdate {
 		f(on)
+	}
+}
+
+// FrameColor is the colour the window's frame is painted, "#rrggbb". The shell's other
+// tones derive from it.
+func (m *Manager) FrameColor() string { return m.prefs.FrameColor }
+
+// OnFrameColorChanged subscribes to the frame colour changing.
+func (m *Manager) OnFrameColorChanged(f func(string)) {
+	m.onFrameColor = append(m.onFrameColor, f)
+}
+
+// SetFrameColor changes the frame colour. Anything but "#rrggbb" is ignored.
+func (m *Manager) SetFrameColor(color string) {
+	if !frameColor.MatchString(color) || color == m.prefs.FrameColor {
+		return
+	}
+	m.prefs.FrameColor = color
+	m.save()
+	for _, f := range m.onFrameColor {
+		f(color)
 	}
 }
 

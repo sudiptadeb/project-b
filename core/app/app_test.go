@@ -288,7 +288,7 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if m["cornerRadius"] != mockengine.CornerRadius {
 		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
 	}
-	if m["windowColor"] != "#0faaaa" || r.e.WindowColor() != "#0faaaa" || m["frameWidth"] != 4.0 || r.e.FrameWidth() != 4 {
+	if m["windowColor"] != "#4f9e9e" || r.e.WindowColor() != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.FrameWidth() != 4 {
 		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.WindowColor(), r.e.FrameWidth())
 	}
 
@@ -317,5 +317,26 @@ func TestTheShellReadsAndSetsTheSettings(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(dir, "prefs.json"))
 	if !strings.Contains(string(b), `"autoUpdate":false`) {
 		t.Fatalf("prefs.json = %s", b)
+	}
+}
+
+// The frame colour is a pref: setting it from the shell repaints the window and tells the
+// shell, together, and it survives a restart.
+func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	r.shell(`{"t":"setFrameColor","text":"#3470d0"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#3470d0" })
+	if r.e.WindowColor() != "#3470d0" {
+		t.Fatalf("window = %v", r.e.WindowColor())
+	}
+	r.stop()
+
+	r = start(t, dir)
+	defer r.stop()
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if m["windowColor"] != "#3470d0" || r.e.WindowColor() != "#3470d0" || r.e.ShownColor() != "#3470d0" {
+		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.WindowColor(), r.e.ShownColor())
 	}
 }

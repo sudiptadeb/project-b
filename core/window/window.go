@@ -1,26 +1,47 @@
-// Package window owns what the app knows about its native window: its colour, where
-// the window controls are, and how round its corners are.
+// Package window owns what the app knows about its native window: its frame, where the
+// window controls are, and how round its corners are.
 package window
 
 import "projectb/engine"
 
 // Manager owns the window state.
 type Manager struct {
+	eng          engine.Engine
 	color        string
 	frameWidth   float64
 	controls     engine.Rect
 	cornerRadius float64
 	onChanged    []func(engine.Rect, float64)
+	onColor      []func(string)
 }
 
-// New returns a manager with the window's frame: the colour of the Ulaa design's
-// Personal mode, 4px wide. The engine reports the controls and the corner radius after
-// it starts.
-func New() *Manager { return &Manager{color: "#0faaaa", frameWidth: 4} }
+// New returns a manager and gives the window its frame: color, "#rrggbb", 4px wide. The
+// engine reports the controls and the corner radius after it starts.
+func New(eng engine.Engine, color string) *Manager {
+	m := &Manager{eng: eng, color: color, frameWidth: 4}
+	eng.SetWindowFrame(m.color, m.frameWidth)
+	return m
+}
 
 // Color is the one colour the window paints natively and the shell paints its frame
 // with, "#rrggbb".
 func (m *Manager) Color() string { return m.color }
+
+// OnColorChanged subscribes to the frame colour changing.
+func (m *Manager) OnColorChanged(f func(string)) { m.onColor = append(m.onColor, f) }
+
+// SetColor repaints the window's frame in color, and tells whoever subscribed, so the
+// window and the shell change together.
+func (m *Manager) SetColor(color string) {
+	if color == m.color {
+		return
+	}
+	m.color = color
+	m.eng.SetWindowFrame(m.color, m.frameWidth)
+	for _, f := range m.onColor {
+		f(color)
+	}
+}
 
 // FrameWidth is the width of the frame band, in CSS pixels, for the window and the
 // shell alike.

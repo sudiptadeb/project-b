@@ -229,7 +229,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   // The frame colour has one owner: Go gave it to the window and to the shell.
   const frame = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
-  check('the window and the shell paint the frame colour Go owns', frame === '#0faaaa' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
+  check('the window and the shell paint the frame colour Go owns', frame === '#4f9e9e' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
   check('the window already had the frame colour when it went on screen', (await regions()).shownColor === frame, (await regions()).shownColor);
 
   // The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
@@ -268,7 +268,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
     if (!blank) await new Promise((r) => setTimeout(r, 30));
   }
   const pageColour = await mock.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor);
-  check("a new tab holds the blank page, in the page's colour, not the frame colour", blank && pageColour !== 'rgb(15, 170, 170)', pageColour);
+  check("a new tab holds the blank page, in the page's colour, not the frame colour", blank && pageColour !== 'rgb(79, 158, 158)', pageColour);
   check('and reads as a new tab: no address, titled New Tab', (await bar.inputValue()) === '' && (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   r = await regions();
   check('the first tab was told it is hidden', JSON.stringify(r.hidden) === '[1]', JSON.stringify(r.hidden));

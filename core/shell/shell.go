@@ -82,6 +82,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.prefs.SetTabLayout(c.Text)
 	case "setAutoUpdate":
 		m.prefs.SetAutoUpdate(c.On)
+	case "setFrameColor":
+		m.prefs.SetFrameColor(c.Text)
 	case "checkUpdate":
 		m.update.CheckNow()
 	case "relaunch":
@@ -133,6 +135,11 @@ func (m *Manager) UpdateChanged(s update.State) {
 // how round the window's corners are.
 func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
 	m.send(map[string]any{"t": "controls", "controls": r, "cornerRadius": cornerRadius})
+}
+
+// WindowColorChanged tells the shell the frame's new colour, which the window now paints.
+func (m *Manager) WindowColorChanged(color string) {
+	m.send(map[string]any{"t": "windowColor", "windowColor": color})
 }
 
 // FocusAddressBar gives the shell focus and asks it to put that focus in the address bar.

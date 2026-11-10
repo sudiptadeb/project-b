@@ -47,3 +47,22 @@ func TestAutoUpdateIsOnByDefaultAndSurvivesARestart(t *testing.T) {
 		t.Fatalf("after restart = %+v", again.All())
 	}
 }
+
+func TestFrameColorIsDustyTealByDefaultAndSurvivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir)
+	if m.FrameColor() != "#4f9e9e" {
+		t.Fatalf("default = %q", m.FrameColor())
+	}
+	var got []string
+	m.OnFrameColorChanged(func(c string) { got = append(got, c) })
+	m.SetFrameColor("teal")
+	m.SetFrameColor("#3470d0")
+	m.SetFrameColor("#3470d0")
+	if len(got) != 1 || got[0] != "#3470d0" {
+		t.Fatalf("changes = %v", got)
+	}
+	if New(dir).FrameColor() != "#3470d0" {
+		t.Fatal("colour not saved")
+	}
+}

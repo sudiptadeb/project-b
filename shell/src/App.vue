@@ -5,16 +5,22 @@ import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
 import { state } from './state.js';
+import { tones } from './tones.js';
 
 // Both layouts show the same tabs from the same state; only where they sit differs.
 const horizontal = computed(() => state.tabLayout === 'horizontal');
 
 // The frame's colour and width and the window's corner radius come from the managers
 // and become CSS variables on the root: the shell paints its bands in the colour and
-// width the window paints natively, so there is one source for both. The curve over the
-// corners is the window's own border, drawn by the engine.
+// width the window paints natively, so there is one source for both, and every other
+// tone of the shell derives from that colour. The curve over the corners is the window's
+// own border, drawn by the engine.
 watchEffect(() => {
-  document.documentElement.style.setProperty('--frame', state.windowColor);
+  if (state.windowColor) {
+    for (const [name, value] of Object.entries(tones(state.windowColor))) {
+      document.documentElement.style.setProperty(name, value);
+    }
+  }
   document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
   document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');
 });
@@ -38,22 +44,17 @@ watchEffect(() => {
 </template>
 
 <style>
-/* Colours from the Ulaa Browser design, Personal mode. The frame's colour and width come
-   from Go with the snapshot (--frame, --frame-width), the same values the window paints
-   natively. */
+/* Colours from the Ulaa Browser design. The frame's colour and width come from Go with the
+   snapshot, the same values the window paints natively, and the frame colour's tones
+   (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint) are set from it by
+   tones.js. Icons and the sidebar's New Tab take a deeper ink, so the frame is the one
+   thing in the full accent. */
 :root {
-  --bar: #e2f2f2;
-  --accent: #0faaaa;
-  /* Icons and the sidebar's New Tab take the design's deeper ink for this mode, so the
-     frame is the one thing in the full accent. */
-  --icon: #0b8f8f;
   --hover: rgba(255, 255, 255, 0.6);
   --surface: #ffffff;
   --text: #1f1f1f;
   --muted: #5c6270;
   --line: rgba(15, 20, 25, 0.1);
-  --accent-soft: rgba(15, 170, 170, 0.18);
-  --accent-tint: rgba(15, 170, 170, 0.1);
   --danger: #ea3323;
   font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);

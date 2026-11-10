@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"projectb/engine"
+	"projectb/mockengine"
 )
 
 func TestControlsChangeOnlyWhenDifferent(t *testing.T) {
-	m := New()
+	m := New(mockengine.New(), "#4f9e9e")
 	var got []engine.Rect
 	var radii []float64
 	m.OnControlsChanged(func(r engine.Rect, radius float64) {
@@ -28,5 +29,20 @@ func TestControlsChangeOnlyWhenDifferent(t *testing.T) {
 	}
 	if m.Controls() != (engine.Rect{}) || m.CornerRadius() != 0 {
 		t.Fatalf("controls = %v radius = %v", m.Controls(), m.CornerRadius())
+	}
+}
+
+func TestColorRepaintsTheWindowAndTellsSubscribers(t *testing.T) {
+	e := mockengine.New()
+	m := New(e, "#4f9e9e")
+	if e.WindowColor() != "#4f9e9e" || e.FrameWidth() != 4 {
+		t.Fatalf("window frame %v %v", e.WindowColor(), e.FrameWidth())
+	}
+	var got []string
+	m.OnColorChanged(func(c string) { got = append(got, c) })
+	m.SetColor("#3470d0")
+	m.SetColor("#3470d0")
+	if e.WindowColor() != "#3470d0" || m.Color() != "#3470d0" || len(got) != 1 || got[0] != "#3470d0" {
+		t.Fatalf("window %v, manager %v, changes %v", e.WindowColor(), m.Color(), got)
 	}
 }

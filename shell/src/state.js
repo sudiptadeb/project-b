@@ -107,6 +107,9 @@ export function connect() {
         case 'autoUpdate':
           state.autoUpdate = m.autoUpdate;
           break;
+        case 'windowColor':
+          state.windowColor = m.windowColor;
+          break;
         case 'controls':
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;

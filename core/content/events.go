@@ -22,7 +22,7 @@ var eventNames = map[Hook]string{
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
 type Events struct {
-	OnShellMessage          func(from engine.TabID, msg []byte)
+	OnShellMessage          func(msg []byte)
 	OnTabOpened             func(opener, tab engine.TabID, url string, foreground bool)
 	OnFaviconChanged        func(tab engine.TabID, dataURL string)
 	OnWindowControlsChanged func(r engine.Rect, cornerRadius float64)
@@ -32,7 +32,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	switch id {
 	case eventShellMessage:
 		if e.OnShellMessage != nil {
-			e.OnShellMessage(engine.TabID(r.int()), []byte(r.str()))
+			e.OnShellMessage([]byte(r.str()))
 		}
 	case eventTabOpened:
 		if e.OnTabOpened != nil {

@@ -42,10 +42,10 @@ func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manag
 }
 
 // Handle takes one command from the shell.
-func (m *Manager) Handle(from engine.TabID, msg []byte) {
+func (m *Manager) Handle(msg []byte) {
 	var c command
 	if err := json.Unmarshal(msg, &c); err != nil {
-		log.Printf("shell: bad message from %d: %v", from, err)
+		log.Printf("shell: bad message: %v", err)
 		return
 	}
 	switch c.T {

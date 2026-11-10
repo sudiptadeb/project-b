@@ -41,7 +41,7 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	return r
 }
 
-func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage(0, []byte(cmd)) }) }
+func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage([]byte(cmd)) }) }
 
 // waitFor reads shell messages until one matches.
 func (r *rig) waitFor(match func(map[string]any) bool) map[string]any {

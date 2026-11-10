@@ -37,12 +37,9 @@ namespace {
 
 constexpr char kHost[] = "shell";
 
-// Forwards chrome.send('shell', [json]) to Go, tagged with who sent it: 0 for the shell,
-// or the id of the tab the page is in. Go decides what each sender may do.
+// Forwards chrome.send('shell', [json]) to Go.
 class ShellMessageHandler : public content::WebUIMessageHandler {
  public:
-  explicit ShellMessageHandler(int64_t sender) : sender_(sender) {}
-
   void RegisterMessages() override {
     web_ui()->RegisterMessageCallback(
         "shell", base::BindRepeating(&ShellMessageHandler::OnMessage,
@@ -52,16 +49,13 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
  private:
   void OnMessage(const base::ListValue& args) {
     if (args.size() != 1 || !args[0].is_string()) {
-      LOG(WARNING) << "dropped a malformed message from sender " << sender_;
+      LOG(WARNING) << "dropped a malformed message from the shell";
       return;
     }
     hooks::Args hook_args;
-    hook_args.Int(sender_);
     hook_args.Str(args[0].GetString());
     hooks::Fire(PB_EVENT_SHELL_MESSAGE, hook_args);
   }
-
-  const int64_t sender_;
 };
 
 // The bridge to Go belongs to the shell's own WebContents. The factory sees only the URL,
@@ -79,7 +73,7 @@ class ShellController : public content::WebUIController {
       web_ui->SetBindings(content::BindingsPolicySet());
       return;
     }
-    web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>(0));
+    web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>());
   }
 
   bool OverrideHandleWebUIMessage(const GURL& source_url,

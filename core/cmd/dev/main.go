@@ -80,7 +80,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		e.Post(func() { a.ShellMessage(0, msg) })
+		e.Post(func() { a.ShellMessage(msg) })
 	})
 	mux.HandleFunc("GET /mock/page", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := mockPage.ReadFile("mock_page.html")

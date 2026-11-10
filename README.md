@@ -19,10 +19,10 @@ tools), about 150 GB free, and:
     sudo xcode-select -s /Applications/Xcode.app
     brew install go node python
 
-**2. The repo.** The build scripts expect this exact path for now:
+**2. The repo,** anywhere you like:
 
-    git clone https://github.com/sudiptadeb/project-b ~/Official/workspace/ulaa/project-b
-    cd ~/Official/workspace/ulaa/project-b
+    git clone https://github.com/sudiptadeb/project-b
+    cd project-b
     (cd shell && npm install)
 
 **3. Chromium**, about 60 GB, no patches:
@@ -43,14 +43,14 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
 
 ## Test it
 
-The test tools live outside the repo for now:
+Test tools go in `.tools/` inside the repo, which git ignores. `npm install` in step 2
+already brought Playwright. ChromeDriver, pinned to the Chromium we build:
 
-    mkdir -p ~/.local/playwright && (cd ~/.local/playwright && npm install playwright && npx playwright install chromium)
-    mkdir -p ~/PW_TOOLS/chromedriver && cd ~/PW_TOOLS/chromedriver
+    mkdir -p .tools/chromedriver && cd .tools/chromedriver
     curl -LO https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.41/mac-arm64/chromedriver-mac-arm64.zip
-    unzip chromedriver-mac-arm64.zip && cd -
+    unzip chromedriver-mac-arm64.zip && cd ../..
 
-Then, from the repo:
+Then:
 
     (cd core && go test ./...)                     # Go managers
     node shell/e2e/first-app.cjs                   # the shell on the mock engine
@@ -61,9 +61,21 @@ Then, from the repo:
 
 Each prints `ok` or `FAIL` per check and ends with `all passed` or a count of failures.
 
-`tools/check_first_paint.py` captures the real window. It needs a person logged in with
-the screen unlocked and a screen-capture tool, and skips itself otherwise. Real clicks,
-drags and full screen are covered by a macOS VM: [docs/vm-testing.md](docs/vm-testing.md).
+### Checks on the real screen
+
+`tools/check_first_paint.py` looks at the real window, through `deskctl`, a small tool in
+`tools/deskctl/` that takes window captures and gives real clicks and keys, even from an
+agent or ssh session with no display:
+
+    tools/deskctl/install.sh          # builds .tools/desk/desk, signed with a local key
+
+Then allow `.tools/desk/deskctl` once in System Settings, Privacy & Security, under both
+Screen & System Audio Recording and Accessibility, and keep someone logged in with the
+screen unlocked. `.tools/desk/desk status` says what's missing. Without it the check skips
+itself. `DESK` points the tests at another copy.
+
+Real clicks, drags and full screen at scale run in a macOS VM:
+[docs/vm-testing.md](docs/vm-testing.md).
 
 Packaging a signed DMG and publishing a release need the signing key, which stays on the
 build Mac: [docs/updates.md](docs/updates.md).

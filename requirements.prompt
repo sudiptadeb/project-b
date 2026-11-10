@@ -12,36 +12,37 @@ The machine
 - About 150 GB free: the Chromium source is about 60 GB, a build output about as much again.
 
 Steps, in order, each with how to know it worked
-1. The repo at ~/Official/workspace/ulaa/project-b. tools/build.sh, package.sh and
-   release.sh have that path written in for now, so clone it there.
-2. npm install in shell/.
+1. Clone the repo anywhere; every script finds the repo from where it sits.
+2. npm install in shell/. That also brings Playwright for the mock tests.
 3. tools/fetch-chromium.sh. Long download. Done when it prints RESULT=ok and
    chromium/src is checked out at tag 155.0.8059.41.
 4. tools/build.sh. Done when it prints RESULT=ok and chromium/src/out/pb/project_b exists.
    The first build is a full Chromium build: about an hour on 32 cores, several hours on a
    laptop. Run it in the background and wait for it once; don't poll in a tight loop.
-5. Test tools, outside the repo for now:
-   - Playwright under ~/.local/playwright (npm install playwright there, then install its
-     Chromium). shell/e2e/*.cjs load it from that path.
-   - ChromeDriver 155.0.8059.41 for mac-arm64 from Chrome for Testing, unzipped so the
-     binary is ~/PW_TOOLS/chromedriver/chromedriver-mac-arm64/chromedriver. The
-     CHROMEDRIVER environment variable can point elsewhere.
-6. Run, from the repo, and expect each to end with "all passed":
+5. ChromeDriver 155.0.8059.41 for mac-arm64 from Chrome for Testing, unzipped so the binary
+   is .tools/chromedriver/chromedriver-mac-arm64/chromedriver in the repo. .tools/ is
+   git-ignored. Its version must match the Chromium tag.
+6. Run, from the repo root, and expect each to end with "all passed":
    (cd core && go test ./...)          # ends with ok lines, no FAIL
    node shell/e2e/first-app.cjs
    node shell/e2e/settings.cjs
    python3 tools/drive_first_app.py
    python3 tools/drive_first_app.py settings
    python3 tools/drive_chromedriver.py
-7. Report each command's result, with any FAIL lines in full.
+7. Only if a person is at this Mac: tools/deskctl/install.sh, then ask them to allow
+   .tools/desk/deskctl under Screen & System Audio Recording and Accessibility in System
+   Settings (you can't do that part), then python3 tools/check_first_paint.py.
+8. Report each command's result, with any FAIL lines in full.
 
 Known traps
 - The real-app tests start the app themselves; don't start it first. If an earlier run
   left project_b processes behind, stop only those you started.
-- tools/check_first_paint.py needs a logged-in, unlocked screen and a screen-capture tool
-  with Screen Recording permission. Without them it prints "skipped"; that is not a failure.
-- Real clicks, drags and full screen need the macOS VM in tools/vm (docs/vm-testing.md).
-  Not part of this setup.
+- check_first_paint.py prints "skipped" when deskctl isn't allowed or nobody is logged in
+  with the screen unlocked. That is not a failure.
+- deskctl's permissions are tied to its path and its signing key (.tools/desk/signing.pem).
+  Rebuild with install.sh, which keeps both; deleting the key means allowing it again.
+- Real clicks, drags and full screen at scale need the macOS VM in tools/vm
+  (docs/vm-testing.md). Not part of this setup.
 - Packaging and releases need the signing key, which isn't on a fresh machine. Not part of
   this setup.
 - Don't edit Chromium's source; the project builds it unpatched.

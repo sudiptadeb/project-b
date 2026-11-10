@@ -6,6 +6,9 @@ nothing listens on this Mac's network. Coordinates are points; shots are pixels.
 
 As a tool, one action per run:
     rfb.py shot out.png | click X Y | dbl X Y | move X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
+
+Run it with the VM's own Python, ~/PW_TOOLS/macos-vm/venv/bin/python, which setup.sh makes
+with numpy, pillow and cryptography. The VM's address comes from the file start.sh writes.
 """
 
 import hashlib
@@ -17,12 +20,25 @@ import threading
 import time
 from urllib.parse import urlparse
 
-import numpy as np
-from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from PIL import Image
+VM_HOME = os.path.expanduser("~/PW_TOOLS/macos-vm")
+URL_FILE = VM_HOME + "/vnc-url"
 
-URL_FILE = os.path.expanduser("~/PW_TOOLS/macos-vm/vnc-url")
+
+def refuse(message):
+    """Stops before anything ran, with exit 2: something this needs is missing."""
+    print(message, file=sys.stderr)
+    sys.exit(2)
+
+
+try:
+    import numpy as np
+    from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from PIL import Image
+except ImportError as e:
+    refuse(f"{e}: this Python, {sys.executable}, lacks what the VM tools need. Run them with the VM's own, "
+           f"{VM_HOME}/venv/bin/python (tools/test.sh vm does). tools/vm/setup.sh makes it.")
+
 POINTS_WIDE = 1440  # The VM's display, from DISPLAY_SIZE in vars.sh.
 INPUT_SETTLE = 1.0  # Screen Sharing drops input for about half a second after a connection opens.
 
@@ -40,6 +56,9 @@ def keysym(name):
 
 class Vnc:
     def __init__(self):
+        if not os.path.exists(URL_FILE):
+            refuse(f"{URL_FILE} is missing: it holds the VM's Screen Sharing address. Run tools/vm/start.sh, "
+                   "which writes it once the VM's desktop is up and leaves a VM that already runs alone.")
         url = urlparse(open(URL_FILE).read().strip())
         self.sock = socket.create_connection((url.hostname, url.port))
         self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

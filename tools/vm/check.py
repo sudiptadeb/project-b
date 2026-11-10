@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Checks the installed app in the VM with real clicks and keys.
 
-Start the VM and install a DMG first (docs/vm-testing.md). Prints pass or FAIL for each check
+Start the VM and install a DMG first (docs/vm-testing.md); it says which of those is missing.
+Run it with the VM's own Python, as tools/test.sh vm does. Prints pass or FAIL for each check
 with what it measured, and saves a shot per step. Everything the app receives comes through
 VNC; window positions are read from macOS's window list inside the VM. Where the shell draws
 its controls is asked from the installed app itself, through its driver, in a launch of its
@@ -14,12 +15,12 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import rfb  # Stops here, saying so, under a Python without numpy.
+
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import rfb
-
-VM_HOME = os.path.expanduser("~/PW_TOOLS/macos-vm")
+VM_HOME = rfb.VM_HOME
 TART = VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
 VM = "pb-test"
 SHOTS = time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
@@ -35,7 +36,6 @@ ANIMATION = 2.0
 MOVE = (60, 40)
 
 os.environ["TART_HOME"] = VM_HOME + "/tart-home"
-os.makedirs(SHOTS)
 passed = failed = 0
 
 
@@ -386,6 +386,25 @@ def full_screen(name, enter, home, first_control, on_top=False):
     if window() != home:
         set_window(home)
 
+
+def missing():
+    """What the checks still need before they can run, or None."""
+    if not os.path.exists(TART):
+        return "Tart and the VM aren't set up: run tools/vm/setup.sh once"
+    if subprocess.run(["pgrep", "-f", f"tart run .* {VM}$"], capture_output=True).returncode != 0:
+        return ("the VM isn't running: run tools/vm/start.sh. macOS only starts it after someone has logged in "
+                "at this Mac's desktop since the last boot")
+    if not os.path.exists(rfb.URL_FILE):
+        return (f"the VM runs, but {rfb.URL_FILE}, its Screen Sharing address, is missing: run tools/vm/start.sh, "
+                "which writes it and leaves a VM that already runs alone")
+    if not guest("/bin/ls", "-d", APP):
+        return "Project B isn't installed in the VM: run tools/vm/install-dmg.sh <path or URL of a DMG>"
+    return None
+
+
+if why := missing():
+    rfb.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
+os.makedirs(SHOTS)
 
 # Start clean: nothing running, no profile, so the tabs start on the side.
 guest("/usr/bin/killall", "project_b")

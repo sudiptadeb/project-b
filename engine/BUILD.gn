@@ -197,6 +197,7 @@ shared_library("project_b_content") {
     ":pak",
     "//base",
     "//content/public/app",
+    "//content/public/common",
     "//sandbox/mac:seatbelt",
   ]
   data_deps = [ "//tools/v8_context_snapshot" ]

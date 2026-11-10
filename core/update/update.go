@@ -44,14 +44,14 @@ const (
 	CheckFailed = "failed"
 )
 
-// State is what the shell's bubble and the settings page show.
+// State is what the shell shows: the bubble, and the settings panel.
 type State struct {
 	Phase   string `json:"phase"`
 	Version string `json:"version,omitempty"` // the release being downloaded, ready, or refused
 	Error   string `json:"error,omitempty"`   // why it failed, in words a person can read
 	// Check is how a check the user asked for went: Checking while it runs, then UpToDate,
 	// or CheckFailed with CheckError when the manifest couldn't be read. A check that finds
-	// a release moves Phase instead. Only the settings page shows these; the bubble shows
+	// a release moves Phase instead. Only the settings panel shows these; the bubble shows
 	// Phase alone, so automatic checks never set them.
 	Check      string `json:"check,omitempty"`
 	CheckError string `json:"checkError,omitempty"`

@@ -24,7 +24,6 @@ static inline void call_set_window_frame(const PBEngineCalls* c, int32_t rgb, do
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
-static inline void call_send_to_tab(const PBEngineCalls* c, int64_t tab, const char* json, size_t length) { c->send_to_tab(tab, json, length); }
 static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
 */
@@ -160,13 +159,6 @@ func (e *nativeEngine) SendToShell(msg []byte) {
 		return
 	}
 	C.call_send_to_shell(e.calls, (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
-}
-
-func (e *nativeEngine) SendToTab(tab engine.TabID, msg []byte) {
-	if len(msg) == 0 {
-		return
-	}
-	C.call_send_to_tab(e.calls, C.int64_t(tab), (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
 }
 
 // Post runs fn on the main thread. Any goroutine may call it.

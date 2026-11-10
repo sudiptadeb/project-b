@@ -61,7 +61,6 @@ class Engine {
   void FocusPage();
   void FocusShell();
   void SendToShell(const char* json, size_t length);
-  void SendToTab(int64_t tab, const char* json, size_t length);
 
  private:
   PageTab* Add(std::unique_ptr<content::WebContents> contents);

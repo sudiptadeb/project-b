@@ -35,15 +35,7 @@ namespace project_b {
 
 namespace {
 
-// Our two internal pages. Each binds only in its own kind of WebContents: the shell's page
-// in the shell's, the settings page in a tab's.
-constexpr char kShellHost[] = "shell";
-constexpr char kSettingsHost[] = "settings";
-
-bool IsOurs(const GURL& url) {
-  return url.SchemeIs("chrome") &&
-         (url.host() == kShellHost || url.host() == kSettingsHost);
-}
+constexpr char kHost[] = "shell";
 
 // Forwards chrome.send('shell', [json]) to Go, tagged with who sent it: 0 for the shell,
 // or the id of the tab the page is in. Go decides what each sender may do.
@@ -72,84 +64,72 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
   const int64_t sender_;
 };
 
-// The factory sees only the URL, so content makes a controller for our page wherever it
-// loads. The controller gives the page its bridge only in the page's own WebContents: the
-// shell's page in the shell's, tagged 0; the settings page in a tab's, tagged with the
-// tab's id. Anywhere else it takes away the page's bindings, so it has no chrome.send,
-// and drops whatever arrives anyway.
-class PageController : public content::WebUIController {
+// The bridge to Go belongs to the shell's own WebContents. The factory sees only the URL,
+// so content makes a controller for chrome://shell/ wherever it loads; anywhere else the
+// controller takes away the page's bindings, so it has no chrome.send, and drops
+// whatever arrives anyway.
+class ShellController : public content::WebUIController {
  public:
-  PageController(content::WebUI* web_ui, const GURL& url)
-      : content::WebUIController(web_ui) {
-    content::WebContents* contents = web_ui->GetWebContents();
-    if (url.host() == kShellHost) {
-      bound_ = contents == Engine::Get()->shell()->contents();
-    } else {
-      sender_ = hooks::TabOf(contents);
-      bound_ = sender_ != 0;
-    }
-    if (!bound_) {
-      LOG(WARNING) << url.spec() << " outside its own WebContents: no bindings";
+  explicit ShellController(content::WebUI* web_ui)
+      : content::WebUIController(web_ui),
+        is_shell_(web_ui->GetWebContents() ==
+                  Engine::Get()->shell()->contents()) {
+    if (!is_shell_) {
+      LOG(WARNING) << "chrome://shell/ outside the shell: no bindings";
       web_ui->SetBindings(content::BindingsPolicySet());
       return;
     }
-    web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>(sender_));
+    web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>(0));
   }
-
-  bool bound() const { return bound_; }
 
   bool OverrideHandleWebUIMessage(const GURL& source_url,
                                   const std::string& message,
                                   const base::ListValue& args) override {
-    if (bound_) {
+    if (is_shell_) {
       return false;
     }
-    LOG(WARNING) << "dropped \"" << message << "\" from " << source_url.spec()
-                 << " outside its own WebContents";
+    LOG(WARNING) << "dropped \"" << message
+                 << "\" from chrome://shell/ outside the shell";
     return true;
   }
 
   WEB_UI_CONTROLLER_TYPE_DECL();
 
  private:
-  bool bound_ = false;
-  int64_t sender_ = 0;
+  const bool is_shell_;
 };
 
-WEB_UI_CONTROLLER_TYPE_IMPL(PageController)
+WEB_UI_CONTROLLER_TYPE_IMPL(ShellController)
 
-class PageControllerFactory : public content::WebUIControllerFactory {
+class ShellControllerFactory : public content::WebUIControllerFactory {
  public:
   std::unique_ptr<content::WebUIController> CreateWebUIControllerForURL(
       content::WebUI* web_ui,
       const GURL& url) override {
-    return IsOurs(url) ? std::make_unique<PageController>(web_ui, url) : nullptr;
+    return IsShell(url) ? std::make_unique<ShellController>(web_ui) : nullptr;
   }
 
   content::WebUI::TypeID GetWebUIType(content::BrowserContext* browser_context,
                                       const GURL& url) override {
-    if (!IsOurs(url)) {
-      return content::WebUI::kNoWebUI;
-    }
-    return url.host() == kShellHost
-               ? reinterpret_cast<content::WebUI::TypeID>(0x1)
-               : reinterpret_cast<content::WebUI::TypeID>(0x2);
+    return IsShell(url) ? reinterpret_cast<content::WebUI::TypeID>(0x1)
+                        : content::WebUI::kNoWebUI;
   }
 
   bool UseWebUIForURL(content::BrowserContext* browser_context,
                       const GURL& url) override {
-    return IsOurs(url);
+    return IsShell(url);
+  }
+
+ private:
+  static bool IsShell(const GURL& url) {
+    return url.SchemeIs("chrome") && url.host() == kHost;
   }
 };
 
-// Serves one of our pages from the folder the Vue repo builds into, beside the binary: the
-// shell from index.html, shell.js and shell.css; the settings page from settings.html,
-// settings.js and settings.css. No remote content ever reaches either.
-class PageDataSource : public content::URLDataSource {
+// Serves the built shell from disk. No remote content ever reaches this page.
+class ShellDataSource : public content::URLDataSource {
  public:
-  explicit PageDataSource(std::string host) : host_(std::move(host)) {}
-
-  std::string GetSource() override { return host_; }
+  std::string GetSource() override { return kHost; }
 
   void StartDataRequest(const GURL& url,
                         const content::WebContents::Getter& wc_getter,
@@ -193,7 +173,7 @@ class PageDataSource : public content::URLDataSource {
         return "default-src 'none';";
       case Name::ScriptSrc:
         return "script-src 'self';";
-      // The inline <style> in each page paints before any JS has run.
+      // The inline <style> in index.html paints before any JS has run.
       case Name::StyleSrc:
         return "style-src 'self' 'unsafe-inline';";
       case Name::ImgSrc:
@@ -209,42 +189,25 @@ class PageDataSource : public content::URLDataSource {
 
  private:
   // Only these files exist, so a path can't reach outside the folder.
-  std::string Name(const GURL& url) const {
-    const std::string path(url.path());
-    if (path == "/" + host_ + ".js") {
-      return host_ + ".js";
+  static std::string Name(const GURL& url) {
+    std::string path(url.path());
+    if (path == "/shell.js") {
+      return "shell.js";
     }
-    if (path == "/" + host_ + ".css") {
-      return host_ + ".css";
+    if (path == "/shell.css") {
+      return "shell.css";
     }
-    return host_ == kShellHost ? "index.html" : host_ + ".html";
+    return "index.html";
   }
-
-  const std::string host_;
 };
 
 }  // namespace
 
 void RegisterShellWebUI(content::BrowserContext* browser_context) {
-  static base::NoDestructor<PageControllerFactory> factory;
+  static base::NoDestructor<ShellControllerFactory> factory;
   content::WebUIControllerFactory::RegisterFactory(factory.get());
   content::URLDataSource::Add(browser_context,
-                              std::make_unique<PageDataSource>(kShellHost));
-  content::URLDataSource::Add(browser_context,
-                              std::make_unique<PageDataSource>(kSettingsHost));
-}
-
-void SendToOurPage(content::WebContents* contents, const std::string& json) {
-  content::WebUI* web_ui = contents->GetWebUI();
-  if (!web_ui) {
-    return;
-  }
-  auto* page = web_ui->GetController()->GetAs<PageController>();
-  if (!page || !page->bound()) {
-    return;
-  }
-  std::vector<base::ValueView> args = {json};
-  web_ui->CallJavascriptFunctionUnsafe("__shellReceive", args);
+                              std::make_unique<ShellDataSource>());
 }
 
 ShellPage::ShellPage(content::BrowserContext* browser_context)
@@ -265,7 +228,10 @@ void ShellPage::Load() {
 }
 
 void ShellPage::Send(const std::string& json) {
-  SendToOurPage(contents_.get(), json);
+  if (content::WebUI* web_ui = contents_->GetWebUI()) {
+    std::vector<base::ValueView> args = {json};
+    web_ui->CallJavascriptFunctionUnsafe("__shellReceive", args);
+  }
 }
 
 // The shell's view is transparent wherever the shell paints nothing, so the page under

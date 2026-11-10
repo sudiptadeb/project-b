@@ -20,11 +20,18 @@ export const state = reactive({
   // colour and width.
   windowColor: '',
   frameWidth: 0,
-  // Whether the sidebar is open. The shell's own, so it stays here.
+  // Whether the sidebar is open, and whether the settings panel is. The shell's own, so
+  // they stay here.
   sidebar: true,
+  settings: false,
+  // Whether the app checks for updates on its own.
+  autoUpdate: true,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
-  // with the release's version and, when it failed, why.
+  // with the release's version and, when it failed, why; and how a check the user asked
+  // for went.
   update: { phase: '' },
+  // The version running, '' for a development build.
+  running: '',
 });
 
 // activeTab is the tab whose page is showing.
@@ -78,7 +85,9 @@ export function connect() {
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;
+          state.autoUpdate = m.autoUpdate;
           state.update = m.update;
+          state.running = m.running;
           break;
         case 'update':
           state.update = m.update;
@@ -94,6 +103,9 @@ export function connect() {
         }
         case 'tabLayout':
           state.tabLayout = m.tabLayout;
+          break;
+        case 'autoUpdate':
+          state.autoUpdate = m.autoUpdate;
           break;
         case 'controls':
           state.controls = m.controls;

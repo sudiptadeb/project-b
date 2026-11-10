@@ -15,13 +15,8 @@ class WebContents;
 
 namespace project_b {
 
-// Makes our two pages loadable, chrome://shell/ and chrome://settings/, served from the
-// shell folder beside the binary.
+// Makes chrome://shell/ loadable, served from the shell folder beside the binary.
 void RegisterShellWebUI(content::BrowserContext* browser_context);
-
-// Calls window.__shellReceive(json) in the page contents holds, only when that page is one
-// of ours with its bridge. Any other page gets nothing.
-void SendToOurPage(content::WebContents* contents, const std::string& json);
 
 // The shell: one transparent page covering the window. It talks to the Go core with
 // chrome.send, and the core answers by calling window.__shellReceive.

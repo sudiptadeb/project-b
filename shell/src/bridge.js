@@ -1,8 +1,5 @@
-// How our pages, the shell and the settings page, talk to the managers. In the real app
-// that's chrome.send and a global the main process calls; the engine tags each message
-// with the page's WebContents. Under the mock it's HTTP, relative to the page, so the dev
-// server can tell the shell at / from the settings page in a tab at /tab/<id>/. Nothing
-// else in either page knows.
+// How the shell talks to the managers. In the real app that's chrome.send and a global
+// the main process calls. Under the mock it's HTTP. Nothing else in the shell knows.
 
 const real = typeof window.chrome?.send === 'function';
 
@@ -16,7 +13,7 @@ export function send(msg) {
     return;
   }
   sending = sending
-    .then(() => fetch('shell/send', { method: 'POST', body }))
+    .then(() => fetch('/shell/send', { method: 'POST', body }))
     .catch((err) => console.error('send failed', err));
 }
 
@@ -27,7 +24,7 @@ export function listen(onMessage, onOpen) {
     onOpen();
     return;
   }
-  const events = new EventSource('shell/events');
+  const events = new EventSource('/shell/events');
   events.onmessage = (e) => onMessage(JSON.parse(e.data));
   events.onopen = onOpen;
 }

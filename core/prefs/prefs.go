@@ -16,7 +16,7 @@ const (
 	TabsHorizontal = "horizontal"
 )
 
-// Prefs is every setting, as the file holds them and the settings page reads them.
+// Prefs is every setting, as the file holds them.
 type Prefs struct {
 	TabLayout  string `json:"tabLayout"`
 	AutoUpdate bool   `json:"autoUpdate"`

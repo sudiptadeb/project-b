@@ -43,11 +43,6 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 
 func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage(0, []byte(cmd)) }) }
 
-// fromTab sends a command as our page in a tab would.
-func (r *rig) fromTab(tab engine.TabID, cmd string) {
-	r.e.Post(func() { r.a.ShellMessage(tab, []byte(cmd)) })
-}
-
 // waitFor reads shell messages until one matches.
 func (r *rig) waitFor(match func(map[string]any) bool) map[string]any {
 	r.t.Helper()
@@ -306,95 +301,21 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 
 var _ engine.Listener = (*app.App)(nil)
 
-// Only the shell may give the shell's commands. A page in a tab that sends one is
-// dropped: here, a new tab and a navigation.
-func TestATabsPageCannotGiveTheShellsCommands(t *testing.T) {
-	r := start(t, t.TempDir())
-	defer r.stop()
-	r.fromTab(1, `{"t":"newTab"}`)
-	r.fromTab(1, `{"t":"navigate","text":"https://evil.test/"}`)
-	r.shell(`{"t":"ready"}`)
-	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	tabs := snap["tabs"].([]any)
-	if len(tabs) != 1 || tabs[0].(map[string]any)["url"] != "" {
-		t.Fatalf("tabs = %v", tabs)
-	}
-}
-
-// readTab reads what our page in a tab is sent until one matches.
-func readTab(t *testing.T, got <-chan []byte, match func(map[string]any) bool) map[string]any {
-	t.Helper()
-	deadline := time.After(5 * time.Second)
-	for {
-		select {
-		case b := <-got:
-			var m map[string]any
-			if err := json.Unmarshal(b, &m); err != nil {
-				t.Fatalf("bad message %s: %v", b, err)
-			}
-			if match(m) {
-				return m
-			}
-		case <-deadline:
-			t.Fatal("timed out waiting for a message to the tab")
-		}
-	}
-}
-
-// The settings page reads and sets the prefs and reads the update state; what it sets
-// reaches the shell, and every change reaches every settings tab.
-func TestTheSettingsPageReadsAndSetsPrefs(t *testing.T) {
+// The settings panel is the shell's: the snapshot carries what it shows, the shell sets
+// the prefs, and Go says when they change.
+func TestTheShellReadsAndSetsTheSettings(t *testing.T) {
 	dir := t.TempDir()
 	r := start(t, dir)
 	defer r.stop()
-	r.visit("chrome://settings/")
-	got, stop := r.e.TabFeed(1).Subscribe()
-	defer stop()
-	prefs := func(m map[string]any) map[string]any { p, _ := m["prefs"].(map[string]any); return p }
-
-	r.fromTab(1, `{"t":"prefs"}`)
-	p := prefs(readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" }))
-	if p["tabLayout"] != "vertical" || p["autoUpdate"] != true {
-		t.Fatalf("prefs = %v", p)
+	r.shell(`{"t":"ready"}`)
+	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if snap["autoUpdate"] != true || snap["running"] != "" {
+		t.Fatalf("snapshot = %v", snap)
 	}
-	r.fromTab(1, `{"t":"setTabLayout","text":"horizontal"}`)
-	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabLayout" && m["tabLayout"] == "horizontal" })
-	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["tabLayout"] == "horizontal" })
-	r.fromTab(1, `{"t":"setAutoUpdate","on":false}`)
-	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["autoUpdate"] == false })
-	r.fromTab(1, `{"t":"updateState"}`)
-	u := readTab(t, got, func(m map[string]any) bool { return m["t"] == "update" })
-	if _, ok := u["running"]; !ok {
-		t.Fatalf("update = %v", u)
-	}
-	// From the shell, too.
-	r.shell(`{"t":"setTabLayout","text":"vertical"}`)
-	readTab(t, got, func(m map[string]any) bool { return m["t"] == "prefs" && prefs(m)["tabLayout"] == "vertical" })
-
+	r.shell(`{"t":"setAutoUpdate","on":false}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "autoUpdate" && m["autoUpdate"] == false })
 	b, _ := os.ReadFile(filepath.Join(dir, "prefs.json"))
 	if !strings.Contains(string(b), `"autoUpdate":false`) {
 		t.Fatalf("prefs.json = %s", b)
-	}
-}
-
-// The shell's settings button opens the settings page in a new, active tab.
-func TestOpenSettingsOpensItInANewActiveTab(t *testing.T) {
-	r := start(t, t.TempDir())
-	defer r.stop()
-	r.shell(`{"t":"openSettings"}`)
-	r.waitForTab(func(tab map[string]any) bool {
-		return tab["id"] == float64(2) && tab["url"] == "chrome://settings/" && tab["loading"] == false
-	})
-	r.shell(`{"t":"ready"}`)
-	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if len(snap["tabs"].([]any)) != 2 || snap["active"] != float64(2) {
-		t.Fatalf("snapshot = %v", snap)
-	}
-	// A settings page can't ask for it.
-	r.fromTab(2, `{"t":"openSettings"}`)
-	r.shell(`{"t":"ready"}`)
-	snap = r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if len(snap["tabs"].([]any)) != 2 {
-		t.Fatalf("snapshot = %v", snap)
 	}
 }

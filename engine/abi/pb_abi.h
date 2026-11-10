@@ -66,8 +66,6 @@ typedef struct PBEngineCalls {
   void (*focus_page)(void);
   void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);
-  // To our own page in a tab, the settings page, if the tab holds one with its bridge.
-  void (*send_to_tab)(int64_t tab, const char* json, size_t length);
   // Lets a content hook cross to Go, or stops it. Unsubscribed hooks never cross.
   void (*set_hook_subscribed)(int32_t hook, int on);
   // Asks the main thread to call run_posted soon.

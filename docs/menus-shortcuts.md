@@ -191,6 +191,41 @@ action's keys and whether it is hidden.
   shown as no longer available. The same rule covers a file from a newer version of the
   app.
 
+### Locked keys and items
+
+Some keys and menu items exist so the user can always get back. They are not the user's
+to change.
+
+- **Locked keys come from their own file,** `templates/locked.json`, shipped in the app,
+  in the keymap's shape. They always apply, whatever `keymap.json` says, and they win a
+  clash with a user binding. The panel shows them with a lock and no edit controls.
+- **Proposed locked keys:**
+  - Quit, Cmd+Q on Mac.
+  - Settings, Cmd+, on Mac, so reset is always one key away.
+  - F6 and Shift+F6, between the shell and the page, so the keyboard can't get stuck in a
+    page.
+  - Holding Escape to leave full screen, which is a behaviour rather than a binding, but
+    belongs on the same list.
+- **The tree marks locked menus and items** with `"locked": true` in the tree template.
+  A locked menu can't be removed or renamed: the app menu, Edit (macOS adds its own items
+  there, and copy and paste on Mac only work through it), Window (macOS adds the window
+  list) and Help. A locked item can't be hidden or deleted: Quit and Settings. When the
+  menu editor comes, locked items can be moved but never deleted.
+- **If a hand edit drops a locked item or menu** from `menu.json`, Go puts it back where
+  the template has it.
+
+### A bad file
+
+A user's change may stop things from working, and that's theirs to choose, as long as it
+can't break the app and a reset always fixes it.
+
+- A current file that doesn't parse is ignored: the app follows its template, and the
+  notice says so and offers reset. The bad file is kept beside it, not deleted.
+- An unknown action id, an unknown key name or an unknown `reserve` value is skipped on its
+  own; the rest of the file still applies.
+- Locked keys and locked items mean Settings, and with it reset, is always reachable by
+  key and by menu.
+
 ### macOS App Shortcuts
 
 macOS lets people rebind any app's menu items in System Settings, Keyboard, Keyboard
@@ -240,6 +275,27 @@ hidden or not, and macOS remaps work for all of them.
 - A conflict warning when two actions want the same keys.
 - macOS bindings shown read-only. Admin-locked bindings, later, shown with a lock.
 - The update notice.
+
+### Keys we can't fully control
+
+- **Copy and paste differ by platform.** On Mac the page engine ignores Cmd+C, V, X, A and
+  Z on purpose (`third_party/blink/renderer/core/editing/editing_behavior.cc`, lines 171
+  to 182); they work only through our Edit menu, so they are fully ours to rebind. On
+  Windows and Linux the page engine handles Ctrl+C and the rest itself as text editing.
+  A second key for copy works there, through content's `WebContents::Copy`. Taking Ctrl+C
+  away, or giving it to another action, works only with `always`, and then the page never
+  sees that key. With `page`, the engine is expected to use the key for editing and never
+  hand it back, so the action wouldn't run inside text; not tested yet. The panel marks
+  these keys on Windows and Linux.
+- **Keys the OS keeps never reach us:** Cmd+Tab, Cmd+Space, the screenshot keys, Mission
+  Control and Cmd+` on Mac; Alt+Tab, Ctrl+Alt+Delete and the Windows key on Windows; the
+  desktop's own keys on Linux. The panel warns that a binding on one won't work.
+- **Accessibility tools take keys first:** VoiceOver's Control+Option, and screen readers'
+  own keys on Windows.
+- **While an input method is composing,** for Chinese or Japanese, keys go to it first, so
+  shortcuts don't fire mid-word.
+- **Text-editing keys inside fields on Mac,** such as Ctrl+A for the start of a line, come
+  from macOS's text system. They stay out of our keymap.
 
 ### Admin policy, later
 
@@ -331,13 +387,11 @@ JetBrains, ChromeOS, Firefox and Vivaldi do it raised these:
    its own shortcut editor may turn off (`allowsAutomaticKeyEquivalentLocalization`).
 2. **Single-key shortcuts** must be possible to turn off, and fire only outside text fields
    (WCAG 2.1.4).
-3. **Keys that can never be given away:** holding Escape to leave full screen, F6 between
-   the shell and the page, and Quit, so the keyboard can't get stuck in a page.
-4. **Panel warnings** when a binding takes a standard system shortcut, uses Option+letter
+3. **Panel warnings** when a binding takes a standard system shortcut, uses Option+letter
    on Mac (which breaks accented characters), or a key the OS keeps for itself.
-5. **Grey out, don't hide,** an item that can't be used now. Apple's rule.
-6. **Windows access keys,** the underlined Alt letters, translated per language.
-7. **Per-site priority,** as in Vivaldi and Arc: let one site win the keys. Later.
+4. **Grey out, don't hide,** an item that can't be used now. Apple's rule.
+5. **Windows access keys,** the underlined Alt letters, translated per language.
+6. **Per-site priority,** as in Vivaldi and Arc: let one site win the keys. Later.
 
 ## What touches content
 

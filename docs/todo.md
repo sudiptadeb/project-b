@@ -9,7 +9,7 @@ Take an item off when it lands or is dropped.
   far: a proxy in the browser process, or rules in content's network layer, before each
   request is sent. Not discussed yet; nothing to build until it is.
 - **Menus and shortcuts.** Designed with the owner in [menus-shortcuts.md](menus-shortcuts.md);
-  seven points from the guidelines at its end are not discussed yet. Ctrl+Cmd+F for full screen
+  six points from the guidelines at its end are not discussed yet. Ctrl+Cmd+F for full screen
   waits on this.
 - **The certificate error page.** Mock and two ways to wire it (in the tab, or painted by the
   shell) in `project-b-research/morning-2026-11-10/cert-error-mock-notes.md`.

@@ -27,6 +27,8 @@ source_set("browser") {
     "../browser/browser_context.cc",
     "../browser/browser_context.h",
     "../browser/browser_main_parts.h",
+    "../browser/child_processes.cc",
+    "../browser/child_processes.h",
     "../browser/content_browser_client.cc",
     "../browser/content_browser_client.h",
     "../browser/engine.cc",
@@ -39,6 +41,8 @@ source_set("browser") {
     "../browser/hooks_gen.h",
     "../browser/page_tab.cc",
     "../browser/page_tab.h",
+    "../browser/settings_page.cc",
+    "../browser/settings_page.h",
     "../browser/shell_page.cc",
     "../browser/shell_page.h",
     "../browser/window.h",
@@ -110,15 +114,22 @@ repack("pak") {
 
 android_assets("assets") {
   sources = [ "$root_out_dir/project_b.pak" ]
+  # Each app of shell/src/apps, as tools/package.sh lays them out for the Mac.
   renaming_sources = [
-    "../../shell/dist/index.html",
-    "../../shell/dist/shell.css",
-    "../../shell/dist/shell.js",
+    "../../shell/dist/settings/index.html",
+    "../../shell/dist/settings/settings.css",
+    "../../shell/dist/settings/settings.js",
+    "../../shell/dist/shell/index.html",
+    "../../shell/dist/shell/shell.css",
+    "../../shell/dist/shell/shell.js",
   ]
   renaming_destinations = [
-    "shell/index.html",
-    "shell/shell.css",
-    "shell/shell.js",
+    "shell/settings/index.html",
+    "shell/settings/settings.css",
+    "shell/settings/settings.js",
+    "shell/shell/index.html",
+    "shell/shell/shell.css",
+    "shell/shell/shell.js",
   ]
   disable_compression = true
   deps = [

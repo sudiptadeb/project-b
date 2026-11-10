@@ -68,6 +68,15 @@ class BrowserWindow : public content::CompositorClient {
     root_->InsertChild(contents->GetNativeView()->GetLayer(), 0);
   }
 
+  // Over the shell, last in the tree.
+  void SetOverlay(content::WebContents* contents) {
+    root_->AddChild(contents->GetNativeView()->GetLayer());
+  }
+
+  void RemoveOverlay(content::WebContents* contents) {
+    contents->GetNativeView()->GetLayer()->RemoveFromParent();
+  }
+
   void RemovePage(content::WebContents* contents) {
     if (shown_ == contents) {
       contents->GetNativeView()->GetLayer()->RemoveFromParent();
@@ -128,8 +137,15 @@ class BrowserWindow : public content::CompositorClient {
     view->OnPhysicalBackingSizeChanged(gfx::Size(width, height));
   }
 
-  // The phone's back key is the shell's back button while the tab has somewhere to go back to.
+  // The phone's back key closes settings while it is open, as its close button does, and is
+  // otherwise the shell's back button while the tab has somewhere to go back to.
   bool BackKey(JNIEnv* env) {
+    if (Engine::Get()->settings()) {
+      hooks::Args args;
+      args.Str(R"({"t":"close"})");
+      hooks::Fire(PB_EVENT_SETTINGS_MESSAGE, args);
+      return true;
+    }
     PageTab* tab = Engine::Get()->active_tab();
     if (!tab || !tab->contents()->GetController().CanGoBack()) {
       return false;
@@ -183,6 +199,7 @@ static int64_t JNI_BrowserWindow_Start(JNIEnv* env,
 struct Window::Impl {
   uint32_t frame_rgb = 0;
   bool has_frame = false;
+  int theme = -1;
 };
 
 Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
@@ -218,6 +235,17 @@ void Window::ShowPageContents(content::WebContents* contents) {
                               contents->GetJavaWebContents());
 }
 
+void Window::SetOverlayContents(content::WebContents* contents) {
+  g_browser_window->SetOverlay(contents);
+  Java_BrowserWindow_setOverlay(AttachCurrentThread(), g_browser_window->java(),
+                                contents->GetJavaWebContents());
+}
+
+void Window::RemoveOverlayContents(content::WebContents* contents) {
+  g_browser_window->RemoveOverlay(contents);
+  Java_BrowserWindow_removeOverlay(AttachCurrentThread(), g_browser_window->java());
+}
+
 void Window::RemovePageContents(content::WebContents* contents) {
   g_browser_window->RemovePage(contents);
   Java_BrowserWindow_removePage(AttachCurrentThread(), g_browser_window->java(),
@@ -234,6 +262,10 @@ void Window::SetLayout(Layout layout) {
     g_browser_window->SetColor(layout.frame_rgb);
     Java_BrowserWindow_setFrameColor(env, g_browser_window->java(),
                                      static_cast<int32_t>(layout.frame_rgb));
+  }
+  if (layout.theme != impl_->theme) {
+    impl_->theme = layout.theme;
+    Java_BrowserWindow_setTheme(env, g_browser_window->java(), layout.theme);
   }
 
   std::vector<double> flat;

@@ -18,9 +18,11 @@
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
-#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/settings_page.h"
+#if !BUILDFLAG(IS_ANDROID)
+#include "project_b/engine/browser/mac_app.h"
+#endif
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
@@ -121,12 +123,16 @@ void CallSendToSettings(const char* json, size_t length) {
 
 void CallSetMenu(const char* json, size_t length) {
   CheckMainThread();
+#if !BUILDFLAG(IS_ANDROID)  // A phone has no menu bar.
   SetMainMenu(std::string(json, length));
+#endif
 }
 
 void CallAppCommand(int32_t command) {
   CheckMainThread();
+#if !BUILDFLAG(IS_ANDROID)
   RunAppCommand(command);
+#endif
 }
 
 void CallRequestWindow(int32_t request) {
@@ -473,7 +479,11 @@ void Engine::OpenSettings() {
     return;
   }
   settings_ = std::make_unique<SettingsPage>(browser_context_);
+#if BUILDFLAG(IS_ANDROID)
+  window_->SetOverlayContents(settings_->contents());
+#else
   window_->SetOverlayView(settings_->contents()->GetNativeView());
+#endif
   settings_->Load();
   settings_->contents()->Focus();
 }
@@ -484,7 +494,11 @@ void Engine::CloseSettings() {
   if (!settings_) {
     return;
   }
+#if BUILDFLAG(IS_ANDROID)
+  window_->RemoveOverlayContents(settings_->contents());
+#else
   window_->RemoveOverlayView(settings_->contents()->GetNativeView());
+#endif
   content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
                                                  std::move(settings_));
   FocusPage();

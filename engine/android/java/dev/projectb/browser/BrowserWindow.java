@@ -3,6 +3,7 @@ package dev.projectb.browser;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.view.MotionEvent;
@@ -48,6 +49,11 @@ final class BrowserWindow extends FrameLayout {
     private final Map<WebContents, ContentView> pages = new HashMap<>();
     private WebContents shownContents;
     private ContentView shownView;
+    // The settings page while it is open, over everything.
+    private WebContents overlayContents;
+    private ContentView overlayView;
+    // Go's theme for the window's own parts: 0 as the system is, 1 light, 2 dark.
+    private int theme;
     private FrameLayout.LayoutParams pageParams = matchParent();
     // Five numbers a region, x, y, w, h and what a press there does, in order: the first that
     // holds a point decides. None holds it: the page.
@@ -106,6 +112,9 @@ final class BrowserWindow extends FrameLayout {
         if (shownContents != null) {
             shownContents.updateWebContentsVisibility(visibility);
         }
+        if (overlayContents != null) {
+            overlayContents.updateWebContentsVisibility(visibility);
+        }
     }
 
     @Override
@@ -136,7 +145,9 @@ final class BrowserWindow extends FrameLayout {
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
         if (e.getActionMasked() == MotionEvent.ACTION_DOWN && shellView != null) {
-            if (inShell(e.getX(), e.getY())) {
+            if (overlayView != null) {
+                overlayView.requestFocus();
+            } else if (inShell(e.getX(), e.getY())) {
                 shellView.requestFocus();
             } else if (shownView != null) {
                 shownView.requestFocus();
@@ -213,7 +224,29 @@ final class BrowserWindow extends FrameLayout {
         }
     }
 
+    /** The settings page: a view over everything, which takes every touch while it is there. */
+    @CalledByNative
+    private void setOverlay(WebContents contents) {
+        overlayContents = contents;
+        overlayView = attach(contents, this, matchParent(), -1);
+        contents.updateWebContentsVisibility(Visibility.VISIBLE);
+        overlayView.requestFocus();
+    }
+
+    @CalledByNative
+    private void removeOverlay() {
+        removeView(overlayView);
+        overlayContents = null;
+        overlayView = null;
+    }
+
     private ContentView attach(WebContents contents, ViewGroup parent, FrameLayout.LayoutParams params) {
+        // At the bottom: pages go under the shell, and the surface under them all.
+        return attach(contents, parent, params, 0);
+    }
+
+    private ContentView attach(
+            WebContents contents, ViewGroup parent, FrameLayout.LayoutParams params, int index) {
         ContentView view = ContentView.createContentView(getContext(), contents);
         contents.setDelegates(
                 "",
@@ -227,8 +260,7 @@ final class BrowserWindow extends FrameLayout {
                     BrowserWindowJni.get()
                             .contentsMoved(nativeWindow, contents, left, top, right - left, bottom - top);
                 });
-        // At the bottom: pages go under the shell, and the surface under them all.
-        parent.addView(view, 0, params);
+        parent.addView(view, index, params);
         return view;
     }
 
@@ -258,6 +290,32 @@ final class BrowserWindow extends FrameLayout {
         int color = 0xff000000 | rgb;
         activity.getWindow().setBackgroundDrawable(new ColorDrawable(color));
         activity.getWindow().setStatusBarColor(color);
+    }
+
+    /**
+     * The window's own parts follow Go's theme, as the Mac's title bar does: here that's the
+     * navigation bar, white or the dark theme's near-black. The status bar is the frame colour.
+     */
+    @CalledByNative
+    private void setTheme(int theme) {
+        this.theme = theme;
+        applyTheme();
+    }
+
+    /** As the system is, the phone's own dark mode decides, now and when it changes. */
+    void applyTheme() {
+        boolean dark =
+                theme == 2
+                        || (theme == 0
+                                && (getResources().getConfiguration().uiMode
+                                                & Configuration.UI_MODE_NIGHT_MASK)
+                                        == Configuration.UI_MODE_NIGHT_YES);
+        activity.getWindow().setNavigationBarColor(dark ? 0xff1b1c1e : 0xffffffff);
+        int flags = getSystemUiVisibility();
+        setSystemUiVisibility(
+                dark
+                        ? flags & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                        : flags | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
     }
 
     @CalledByNative

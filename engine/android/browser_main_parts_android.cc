@@ -7,6 +7,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "project_b/engine/browser/browser_context.h"
+#include "project_b/engine/browser/child_processes.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
@@ -59,6 +60,7 @@ void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
   shell_->Load();
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              blocked_hosts.c_str(), hooks::kTableHash);
+  child_processes_ = std::make_unique<ChildProcesses>();
   window_->Show();
   window_->ListenForState(base::BindRepeating([](const Window::State& s) {
     hooks::Args args;

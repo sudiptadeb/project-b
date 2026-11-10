@@ -11,6 +11,10 @@
 #include "project_b/engine/browser/window.h"
 #include "url/gurl.h"
 
+#if BUILDFLAG(IS_ANDROID)
+#include "components/embedder_support/android/delegate/html_color_picker_bridge.h"
+#endif
+
 namespace project_b {
 
 SettingsPage::SettingsPage(content::BrowserContext* browser_context)
@@ -44,6 +48,16 @@ bool SettingsPage::HandleKeyboardEvent(
   return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
          Engine::Get()->window()->HandleUnhandledKey(event);
 }
+
+#if BUILDFLAG(IS_ANDROID)
+std::unique_ptr<content::ColorChooser> SettingsPage::OpenColorChooser(
+    content::WebContents* web_contents,
+    SkColor color,
+    const std::vector<blink::mojom::ColorSuggestionPtr>& suggestions) {
+  return std::make_unique<web_contents_delegate_android::HtmlColorPickerBridge>(
+      web_contents, color, suggestions);
+}
+#endif
 
 content::WebContents* SettingsPage::hook_contents() const {
   return contents_.get();

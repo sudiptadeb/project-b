@@ -74,6 +74,11 @@ class Window {
   void ShowPageContents(content::WebContents* contents);
   void RemovePageContents(content::WebContents* contents);
 
+  // The overlay covers the whole window, over the shell, and takes every touch while it
+  // is there. The settings page is one.
+  void SetOverlayContents(content::WebContents* contents);
+  void RemoveOverlayContents(content::WebContents* contents);
+
   // Opens Android's package installer for the APK at path, where the user confirms.
   void InstallPackage(const std::string& path);
 #else

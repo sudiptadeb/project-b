@@ -36,7 +36,6 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/apk_assets.h"
-#include "components/embedder_support/android/delegate/html_color_picker_bridge.h"
 #include "base/files/file.h"
 #include "base/files/memory_mapped_file.h"
 #include "base/strings/string_view_util.h"
@@ -179,10 +178,10 @@ class AppDataSource : public content::URLDataSource {
                         const content::WebContents::Getter& wc_getter,
                         GotDataCallback callback) override {
 #if BUILDFLAG(IS_ANDROID)
-    // On Android the shell is in the APK, not in a folder.
+    // On Android the apps are in the APK, not in a folder.
     base::MemoryMappedFile::Region region;
     base::File asset(base::android::OpenApkAsset(
-        "assets/shell/" + Name(url), &region));
+        "assets/shell/" + host_ + "/" + Name(url), &region));
     base::MemoryMappedFile mapped;
     CHECK(mapped.Initialize(std::move(asset), region));
     std::string data(base::as_string_view(mapped.bytes()));
@@ -338,16 +337,6 @@ bool ShellPage::TakeFocus(content::WebContents* source, bool reverse) {
   Engine::Get()->FocusPageForTraversal(reverse);
   return true;
 }
-
-#if BUILDFLAG(IS_ANDROID)
-std::unique_ptr<content::ColorChooser> ShellPage::OpenColorChooser(
-    content::WebContents* web_contents,
-    SkColor color,
-    const std::vector<blink::mojom::ColorSuggestionPtr>& suggestions) {
-  return std::make_unique<web_contents_delegate_android::HtmlColorPickerBridge>(
-      web_contents, color, suggestions);
-}
-#endif
 
 content::WebContents* ShellPage::hook_contents() const {
   return contents_.get();

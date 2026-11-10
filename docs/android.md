@@ -14,8 +14,8 @@ All Chromium paths below are in the 155.0.8059.41 tree (`chromium/src`).
 - **The two binaries become three libraries.** Android has no `main` of ours. Content goes in one library that
   every process loads. Go goes in another that only the main window loads, so renderers, the GPU process and the
   app zygote never start Go. Checked on the emulator, in `/proc/<pid>/maps`.
-- **The shell on `main` runs on it.** Tabs, favicons, the content hooks, the settings panel with the frame colour,
-  and the window manager's one layout, on `main` at 0.2.13. A touch screen gets bigger targets and no hover, and a
+- **The shell on `main` runs on it.** Tabs, favicons, the content hooks, the settings page with the frame colour
+  and the theme, and the window manager's one layout, on `main` at 0.2.15. A touch screen gets bigger targets and no hover, and a
   phone shows its tabs as favicons under the toolbar with the full list as a drawer.
 - **System WebView was tried first and dropped.** It ran the same managers and shell in a 2.5 MB APK, but it can't
   gate every request, and the shell shares a renderer with the page. What it showed is in
@@ -312,21 +312,24 @@ uninstall before it can update.
 
 ## The shell on a phone
 
-The branch sits on `main` at 0.2.13. Everything the Mac app's shell does goes through the same managers and the same
+This is `main` at 0.2.15. Everything the Mac app's shell does goes through the same managers and the same
 adapter here, with `Window` as the one Android file (`engine/android/window_android.cc`).
 
 | On `main` | On Android |
 |---|---|
 | Tabs: create, show, close, favicons, a page opening a tab | The same managers. Each tab has its own `ContentView`; `ShowTab` swaps which page layer the compositor draws. The shell shows them differently: see below |
 | Content's hooks, carried to Go by the generated classes | The same classes. Eight hooks content only declares off Android (five for window controls from the web, three others) are left out by the same platform condition content uses: `tools/gen_hooks.py` copies it into `hooks_gen.h` and `hooks_gen.cc` |
-| Settings: tab layout, frame colour, version, updates | The same panel, without the tab layout. The custom colour opens Android's own colour picker, because Blink on Android has none inside the page; the shell's delegate answers `OpenColorChooser` with the one Chromium's embedders share (`components/embedder_support/android/delegate`) |
+| Settings at `chrome://settings/`, its own page over the window | The same page in its own `WebContents`, laid over the whole window: `Window::SetOverlayContents` puts its layer last in the compositor's tree and its `ContentView` above the shell's, where it takes every touch. General only, without the tab layout, and no Keyboard section, since a phone has no shortcuts. The custom colour opens Android's own colour picker, because Blink on Android has none inside the page; the settings page's delegate answers `OpenColorChooser` with the one Chromium's embedders share (`components/embedder_support/android/delegate`). The phone's back key closes it, as its close button does |
+| The theme: System, Light or Dark | The pages follow it as on the Mac. The window's own parts, the title bar on a Mac, are the navigation bar here: white, or the dark theme's near-black, and as the system is, the phone's dark mode decides. The status bar stays the frame colour |
+| Menus and keyboard shortcuts (`core/commands`) | Desktop only. A phone has no menu bar, so `set_menu` and `app_command` do nothing, and the shell's buttons run their commands as on the Mac. A phone's keyboard was not tried |
+| Crash logs | Go's `crash.log` and the child process observer's `crashes.log` in the profile, as on the Mac, and the shell's notice after a crash |
 | The frame colour | Paints the root layer, the window's background and the status bar, and changes live with the shell |
 | The window manager's one layout | `SetWindowLayout` places every tab's view and gives `BrowserWindow.java` the regions; the first region holding a finger decides |
 | `WindowState` | The window's size in CSS pixels, no buttons, square corners, and `full_screen` true |
 | Updates | The same manager and the same `amarit.Client`, every minute, on the `android/arm64` asset. The APK is downloaded into the profile, size and sha256 checked by amarit, and the bubble and the settings panel offer to install it: see [Updates on a phone](#updates-on-a-phone) |
 
-**Tabs on a phone.** A sidebar would take half a phone's width, so on a touch screen (`phone` in `shell/src/state.js`)
-the tabs are favicons in a row of their own under the toolbar (`TabIcons.vue`), the shown one marked as in the sidebar;
+**Tabs on a phone.** A sidebar would take half a phone's width, so on a touch screen (`shell/src/phone.js`)
+the tabs are favicons in a row of their own under the toolbar (`apps/shell/TabIcons.vue`), the shown one marked as in the sidebar;
 a tap shows that tab, and a tab with no favicon yet shows its title's first letter. The sidebar button opens the
 sidebar's own list as a drawer over the toolbar and the page: choosing a tab or New Tab closes it, a tap outside closes
 it, and a tab's close button leaves it open. Every tab's close button shows, since there's no hover. The tab layout
@@ -340,7 +343,7 @@ changes is what happens to the download (`Config.Install`, set in `core/cmd/lib/
 
 - The APK is staged as it was downloaded, in `profile/updates/stage`. There is no bundle to unpack or version to
   read from it, and no writable-location check.
-- The bubble says "Install to update", the settings panel says the release is ready to install, and its button
+- The bubble says "Install to update", the settings page says the release is ready to install, and its button
   becomes Install update. Either one hands the APK to Android's package installer: Go calls the engine's
   `install_update`, and `BrowserWindow.installPackage` opens it with `ACTION_VIEW` through a `FileProvider` that may
   read that one folder (`res/xml/updates.xml`). The app declares `REQUEST_INSTALL_PACKAGES`.
@@ -364,22 +367,14 @@ What doesn't apply on a phone, and what the app does instead:
   draw over the page, so `frame_width` isn't used.
 - **The window title.** A phone doesn't show one.
 - **DevTools and the driver.** The remote debugging endpoint and its window commands, and `driver.mm`, stay on the Mac.
-- **Keyboard shortcuts.** Go reserves Command combinations, plus Control+Tab; a phone's keyboard was not tried.
+- **Menus and keyboard shortcuts.** Desktop only: see the table above.
 
 Open:
 
-- **The toolbar's middle doesn't paint while settings is open.** On Android only, in either layout: back, forward,
-  reload and the address field stay laid out and hit-testable, but Blink doesn't draw them until the panel closes.
-  The shell's own screenshot (DevTools' `Page.captureScreenshot`) shows the same, and the compositor holds no extra
-  layers, so it's in Blink's painting, not our window. Lowering the panel's `z-index`, or raising the header's above
-  it, makes it paint; the cause wasn't found, so neither is applied. Desktop Chromium, on the mock engine at phone width
-  with touch, paints it; the Mac app wasn't checked.
 - **The colour before Go starts.** The window shows the default frame colour from `styles.xml` until Go's first
   layout, so a phone set to another colour sees the default for about a second at a cold start.
 
 `tools/drive_android.py` taps fixed points of the shell from before tabs, so it needs new coordinates before it
 checks this shell. This round was checked by hand on the Android 14 emulator: the app starts, a typed address loads
-`example.com`, New Tab opens a second tab that loads Wikipedia with its favicon, tapping the first tab shows its page
-again, settings opens in both layouts, a preset frame colour changes the frame, the shell and the status bar at
-once and survives a restart, the custom colour opens the picker and applies what it sets, and the layout switches
-to tabs on top.
+`example.com`, New Tab in the drawer opens a second tab that loads Wikipedia with its favicon, the strip switches
+between them, and settings opens over the window and closes with the back key.

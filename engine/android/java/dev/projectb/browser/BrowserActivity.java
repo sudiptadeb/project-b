@@ -1,6 +1,7 @@
 package dev.projectb.browser;
 
 import android.app.Activity;
+import android.content.res.Configuration;
 import android.os.Bundle;
 
 import org.chromium.base.CommandLine;
@@ -65,6 +66,13 @@ public final class BrowserActivity extends Activity {
     protected void onStop() {
         super.onStop();
         window.setActivityVisible(false);
+    }
+
+    // The activity handles uiMode itself, so a theme that follows the system follows it here.
+    @Override
+    public void onConfigurationChanged(Configuration config) {
+        super.onConfigurationChanged(config);
+        window.applyTheme();
     }
 
     @Override

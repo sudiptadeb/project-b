@@ -15,6 +15,7 @@ JNIEXPORT jlong JNICALL Java_dev_projectb_browser_GoCore_table(JNIEnv* env, jcla
       .hook = PBHook,
       .force_gc = PBForceGC,
       .recover_nil_deref = PBRecoverNilDeref,
+      .crash = PBCrash,
       .go_stats = PBGoStats,
   };
   return (jlong)(intptr_t)&go;

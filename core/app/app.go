@@ -3,6 +3,7 @@
 package app
 
 import (
+	"projectb/crash"
 	"projectb/engine"
 	"projectb/history"
 	"projectb/policy"
@@ -23,6 +24,7 @@ type Config struct {
 
 // App holds the managers and is the engine's listener: each function only forwards.
 type App struct {
+	Crash   *crash.Manager
 	Tabs    *tabs.Manager
 	History *history.Manager
 	Suggest *suggest.Manager
@@ -37,6 +39,7 @@ type App struct {
 // to the engine as its listener.
 func Start(e engine.Engine, cfg Config) *App {
 	a := &App{}
+	a.Crash = crash.New(cfg.ProfileDir)
 	a.Policy = policy.New(cfg.BlockedHosts)
 	a.History = history.New(cfg.ProfileDir, e.Post)
 	a.Suggest = suggest.New(a.History)

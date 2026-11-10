@@ -213,6 +213,74 @@ func (m *Manager) Reload() {
 	}
 }
 
+// ReloadBypassingCache reloads the active tab without the cache.
+func (m *Manager) ReloadBypassingCache() {
+	if t := m.tabs[m.active]; t != nil && t.URL != "" {
+		m.eng.ReloadBypassingCache(m.active)
+	}
+}
+
+// Stop stops the active tab loading.
+func (m *Manager) Stop() {
+	if t := m.tabs[m.active]; t != nil && t.Loading {
+		m.eng.Stop(m.active)
+	}
+}
+
+// Duplicate opens a copy of the active tab, history and all, as the last tab, and shows it.
+func (m *Manager) Duplicate() {
+	t := m.tabs[m.active]
+	if t == nil {
+		return
+	}
+	m.HandleTabOpened(m.active, m.eng.DuplicateTab(m.active), t.URL, true)
+}
+
+// Open opens a URL in a new last tab and shows it.
+func (m *Manager) Open(u string) {
+	id := m.eng.CreateTab()
+	m.HandleTabOpened(m.active, id, u, true)
+	m.eng.LoadURL(id, u)
+}
+
+// zoomFactors are the steps zooming in and out moves through, as browsers have them.
+var zoomFactors = []float64{0.25, 1.0 / 3, 0.5, 2.0 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5}
+
+// ZoomIn and ZoomOut move the active tab's page zoom one step; ZoomReset puts it back to
+// actual size.
+func (m *Manager) ZoomIn()    { m.zoomStep(1) }
+func (m *Manager) ZoomOut()   { m.zoomStep(-1) }
+func (m *Manager) ZoomReset() { m.zoomTo(1) }
+
+func (m *Manager) zoomStep(dir int) {
+	if m.tabs[m.active] == nil {
+		return
+	}
+	now := m.eng.ZoomOf(m.active)
+	const near = 0.001
+	if dir > 0 {
+		for _, f := range zoomFactors {
+			if f > now+near {
+				m.zoomTo(f)
+				return
+			}
+		}
+		return
+	}
+	for i := len(zoomFactors) - 1; i >= 0; i-- {
+		if zoomFactors[i] < now-near {
+			m.zoomTo(zoomFactors[i])
+			return
+		}
+	}
+}
+
+func (m *Manager) zoomTo(f float64) {
+	if m.tabs[m.active] != nil {
+		m.eng.Zoom(m.active, f)
+	}
+}
+
 // HandleTabOpened records a tab a page opened, and shows it if the page asked for the
 // foreground.
 func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground bool) {

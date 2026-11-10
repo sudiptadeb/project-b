@@ -10,14 +10,19 @@
 #include "base/task/single_thread_task_runner.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/reload_type.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
+#include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
+#include "third_party/blink/public/common/page/page_zoom.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "url/gurl.h"
@@ -66,6 +71,61 @@ void CallGoForward(int64_t tab) {
 void CallReload(int64_t tab) {
   CheckMainThread();
   g_engine->Reload(tab);
+}
+
+void CallReloadBypassingCache(int64_t tab) {
+  CheckMainThread();
+  g_engine->ReloadBypassingCache(tab);
+}
+
+void CallStop(int64_t tab) {
+  CheckMainThread();
+  g_engine->Stop(tab);
+}
+
+void CallSetZoom(int64_t tab, double factor) {
+  CheckMainThread();
+  g_engine->SetZoom(tab, factor);
+}
+
+double CallGetZoom(int64_t tab) {
+  CheckMainThread();
+  return g_engine->GetZoom(tab);
+}
+
+int64_t CallDuplicateTab(int64_t tab) {
+  CheckMainThread();
+  return g_engine->DuplicateTab(tab);
+}
+
+void CallEdit(int32_t command) {
+  CheckMainThread();
+  g_engine->Edit(command);
+}
+
+void CallOpenSettings() {
+  CheckMainThread();
+  g_engine->OpenSettings();
+}
+
+void CallCloseSettings() {
+  CheckMainThread();
+  g_engine->CloseSettings();
+}
+
+void CallSendToSettings(const char* json, size_t length) {
+  CheckMainThread();
+  g_engine->SendToSettings(json, length);
+}
+
+void CallSetMenu(const char* json, size_t length) {
+  CheckMainThread();
+  SetMainMenu(std::string(json, length));
+}
+
+void CallAppCommand(int32_t command) {
+  CheckMainThread();
+  RunAppCommand(command);
 }
 
 void CallRequestWindow(int32_t request) {
@@ -170,11 +230,22 @@ const PBEngineCalls* Engine::Calls() {
       .go_back = CallGoBack,
       .go_forward = CallGoForward,
       .reload = CallReload,
+      .reload_bypassing_cache = CallReloadBypassingCache,
+      .stop = CallStop,
+      .set_zoom = CallSetZoom,
+      .get_zoom = CallGetZoom,
+      .duplicate_tab = CallDuplicateTab,
+      .edit = CallEdit,
       .request_window = CallRequestWindow,
       .set_window_layout = CallSetWindowLayout,
       .focus_page = CallFocusPage,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,
+      .open_settings = CallOpenSettings,
+      .close_settings = CallCloseSettings,
+      .send_to_settings = CallSendToSettings,
+      .set_menu = CallSetMenu,
+      .app_command = CallAppCommand,
       .set_hook_subscribed = CallSetHookSubscribed,
       .post_wakeup = CallPostWakeup,
   };
@@ -285,19 +356,143 @@ void Engine::Reload(int64_t tab) {
   }
 }
 
+content::WebContents* Engine::Contents(int64_t tab) const {
+  auto it = tabs_.find(tab);
+  return it == tabs_.end() ? nullptr : it->second->contents();
+}
+
+void Engine::ReloadBypassingCache(int64_t tab) {
+  if (content::WebContents* contents = Contents(tab)) {
+    contents->GetController().Reload(content::ReloadType::BYPASSING_CACHE,
+                                     /*check_for_repost=*/false);
+  }
+}
+
+void Engine::Stop(int64_t tab) {
+  if (content::WebContents* contents = Contents(tab)) {
+    contents->Stop();
+  }
+}
+
+void Engine::SetZoom(int64_t tab, double factor) {
+  if (content::WebContents* contents = Contents(tab)) {
+    content::HostZoomMap::SetZoomLevel(contents,
+                                       blink::ZoomFactorToZoomLevel(factor));
+  }
+}
+
+double Engine::GetZoom(int64_t tab) {
+  content::WebContents* contents = Contents(tab);
+  return contents ? blink::ZoomLevelToZoomFactor(
+                        content::HostZoomMap::GetZoomLevel(contents))
+                  : 1;
+}
+
+// A clone has its history but no page until it is told to load.
+int64_t Engine::DuplicateTab(int64_t tab) {
+  content::WebContents* contents = Contents(tab);
+  if (!contents) {
+    return 0;
+  }
+  PageTab* copy = Add(contents->Clone());
+  copy->contents()->GetController().LoadIfNecessary();
+  return copy->id();
+}
+
+content::WebContents* Engine::FocusedContents() const {
+  for (content::WebContents* contents :
+       {settings_ ? settings_->contents() : nullptr, shell_->contents()}) {
+    if (contents && contents->GetRenderWidgetHostView() &&
+        contents->GetRenderWidgetHostView()->HasFocus()) {
+      return contents;
+    }
+  }
+  PageTab* tab = active_tab();
+  return tab ? tab->contents() : nullptr;
+}
+
+void Engine::Edit(int32_t command) {
+  content::WebContents* contents = FocusedContents();
+  if (!contents) {
+    return;
+  }
+  switch (command) {
+    case PB_EDIT_UNDO:
+      contents->Undo();
+      break;
+    case PB_EDIT_REDO:
+      contents->Redo();
+      break;
+    case PB_EDIT_CUT:
+      contents->Cut();
+      break;
+    case PB_EDIT_COPY:
+      contents->Copy();
+      break;
+    case PB_EDIT_PASTE:
+      contents->Paste();
+      break;
+    case PB_EDIT_PASTE_AND_MATCH_STYLE:
+      contents->PasteAndMatchStyle();
+      break;
+    case PB_EDIT_DELETE:
+      contents->Delete();
+      break;
+    case PB_EDIT_SELECT_ALL:
+      contents->SelectAll();
+      break;
+  }
+}
+
+void Engine::OpenSettings() {
+  if (settings_) {
+    return;
+  }
+  settings_ = std::make_unique<SettingsPage>(browser_context_);
+  window_->SetOverlayView(settings_->contents()->GetNativeView());
+  settings_->Load();
+  settings_->contents()->Focus();
+}
+
+// Like CloseTab, the request can come from the page's own key event, so the page dies
+// on a later task.
+void Engine::CloseSettings() {
+  if (!settings_) {
+    return;
+  }
+  window_->RemoveOverlayView(settings_->contents()->GetNativeView());
+  content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
+                                                 std::move(settings_));
+  FocusPage();
+}
+
+void Engine::SendToSettings(const char* json, size_t length) {
+  if (settings_) {
+    settings_->Send(std::string(json, length));
+  }
+}
+
 // Same reason as CloseTab: the request can arrive inside a view's own event.
 void Engine::CloseWindow() {
   content::GetUIThreadTaskRunner({})->PostTask(
       FROM_HERE, base::BindOnce(&Window::Close, base::Unretained(window_)));
 }
 
+// While the settings page is open it keeps the keyboard: a focus request from the shell
+// or Go, such as one still on its way from before it opened, waits until it closes.
 void Engine::FocusPage() {
+  if (settings_) {
+    return;
+  }
   if (PageTab* tab = active_tab()) {
     tab->contents()->Focus();
   }
 }
 
 void Engine::FocusShell() {
+  if (settings_) {
+    return;
+  }
   shell_->contents()->Focus();
 }
 

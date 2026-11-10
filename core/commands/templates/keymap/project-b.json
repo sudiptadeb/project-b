@@ -1,0 +1,849 @@
+{
+  "template": "project-b",
+  "actions": {
+    "app.hide": {
+      "mac": [
+        {
+          "keys": "Cmd+H",
+          "reserve": "page"
+        }
+      ]
+    },
+    "app.hideOthers": {
+      "mac": [
+        {
+          "keys": "Option+Cmd+H",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.new": {
+      "mac": [
+        {
+          "keys": "Cmd+T",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+T",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+T",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "address.focus": {
+      "mac": [
+        {
+          "keys": "Cmd+L",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+L",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+D",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+L",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+D",
+          "reserve": "page"
+        }
+      ]
+    },
+    "window.close": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+W",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+W",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Alt+F4",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+W",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Alt+F4",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "tab.close": {
+      "mac": [
+        {
+          "keys": "Cmd+W",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+W",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+F4",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+W",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+F4",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "edit.undo": {
+      "mac": [
+        {
+          "keys": "Cmd+Z",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Z",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Z",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.redo": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+Z",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Y",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+Shift+Z",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Y",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+Shift+Z",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.cut": {
+      "mac": [
+        {
+          "keys": "Cmd+X",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+X",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+X",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.copy": {
+      "mac": [
+        {
+          "keys": "Cmd+C",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+C",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+C",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.paste": {
+      "mac": [
+        {
+          "keys": "Cmd+V",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+V",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+V",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.pasteAndMatchStyle": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+V",
+          "reserve": "page"
+        },
+        {
+          "keys": "Option+Shift+Cmd+V",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+V",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+V",
+          "reserve": "page"
+        }
+      ]
+    },
+    "edit.delete": {},
+    "edit.selectAll": {
+      "mac": [
+        {
+          "keys": "Cmd+A",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+A",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+A",
+          "reserve": "page"
+        }
+      ]
+    },
+    "view.tabsSide": {},
+    "view.tabsTop": {},
+    "nav.stop": {
+      "mac": [
+        {
+          "keys": "Cmd+.",
+          "reserve": "page"
+        }
+      ]
+    },
+    "nav.reload": {
+      "mac": [
+        {
+          "keys": "Cmd+R",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+R",
+          "reserve": "page"
+        },
+        {
+          "keys": "F5",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+R",
+          "reserve": "page"
+        },
+        {
+          "keys": "F5",
+          "reserve": "page"
+        }
+      ]
+    },
+    "nav.reloadHard": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+R",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+R",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+F5",
+          "reserve": "page"
+        },
+        {
+          "keys": "Shift+F5",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+R",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+F5",
+          "reserve": "page"
+        },
+        {
+          "keys": "Shift+F5",
+          "reserve": "page"
+        }
+      ]
+    },
+    "view.fullScreen": {
+      "mac": [
+        {
+          "keys": "Ctrl+Cmd+F",
+          "reserve": "always"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "F11",
+          "reserve": "always"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "F11",
+          "reserve": "always"
+        }
+      ]
+    },
+    "view.zoomReset": {
+      "mac": [
+        {
+          "keys": "Cmd+0",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+0",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+0",
+          "reserve": "page"
+        }
+      ]
+    },
+    "view.zoomIn": {
+      "mac": [
+        {
+          "keys": "Cmd+=",
+          "reserve": "page"
+        },
+        {
+          "keys": "Shift+Cmd+=",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+=",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+Shift+=",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+=",
+          "reserve": "page"
+        },
+        {
+          "keys": "Ctrl+Shift+=",
+          "reserve": "page"
+        }
+      ]
+    },
+    "view.zoomOut": {
+      "mac": [
+        {
+          "keys": "Cmd+-",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+-",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+-",
+          "reserve": "page"
+        }
+      ]
+    },
+    "dev.viewSource": {
+      "mac": [
+        {
+          "keys": "Option+Cmd+U",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+U",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+U",
+          "reserve": "page"
+        }
+      ]
+    },
+    "focus.nextPane": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Option+Cmd+Down",
+          "reserve": "page"
+        }
+      ]
+    },
+    "focus.previousPane": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Option+Cmd+Up",
+          "reserve": "page"
+        }
+      ]
+    },
+    "nav.back": {
+      "mac": [
+        {
+          "keys": "Cmd+[",
+          "reserve": "page"
+        },
+        {
+          "keys": "Cmd+Left",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Alt+Left",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Alt+Left",
+          "reserve": "page"
+        }
+      ]
+    },
+    "nav.forward": {
+      "mac": [
+        {
+          "keys": "Cmd+]",
+          "reserve": "page"
+        },
+        {
+          "keys": "Cmd+Right",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Alt+Right",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Alt+Right",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.next": {
+      "mac": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Shift+Cmd+]",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Option+Cmd+Right",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageDown",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageDown",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageDown",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "tab.previous": {
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Shift+Cmd+[",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Option+Cmd+Left",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageUp",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageUp",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+Tab",
+          "reserve": "windowed"
+        },
+        {
+          "keys": "Ctrl+PageUp",
+          "reserve": "windowed"
+        }
+      ]
+    },
+    "tab.duplicate": {},
+    "tab.select1": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+1",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+1",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+1",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+1",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select2": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+2",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+2",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+2",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+2",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select3": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+3",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+3",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+3",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+3",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select4": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+4",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+4",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+4",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+4",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select5": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+5",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+5",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+5",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+5",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select6": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+6",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+6",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+6",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+6",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select7": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+7",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+7",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+7",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+7",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.select8": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+8",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+8",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+8",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+8",
+          "reserve": "page"
+        }
+      ]
+    },
+    "tab.selectLast": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+9",
+          "reserve": "page"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+9",
+          "reserve": "page"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+9",
+          "reserve": "page"
+        },
+        {
+          "keys": "Alt+9",
+          "reserve": "page"
+        }
+      ]
+    },
+    "window.minimize": {
+      "mac": [
+        {
+          "keys": "Cmd+M",
+          "reserve": "page"
+        }
+      ]
+    },
+    "window.zoom": {},
+    "window.bringAllToFront": {},
+    "app.about": {},
+    "app.checkUpdate": {},
+    "app.showAll": {}
+  }
+}

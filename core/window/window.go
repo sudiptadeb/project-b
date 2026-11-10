@@ -100,6 +100,9 @@ func (m *Manager) HandleWindowChanged(s engine.WindowState) {
 	}
 }
 
+// FullScreen says whether the window is in full screen.
+func (m *Manager) FullScreen() bool { return m.state.FullScreen }
+
 // Request asks the window to close, minimise, zoom, or go in or out of full screen.
 // The engine reports what came of it.
 func (m *Manager) Request(r engine.WindowRequest) { m.eng.RequestWindow(r) }

@@ -1,0 +1,60 @@
+{
+  "actions": {
+    "app.quit": {
+      "mac": [
+        {
+          "keys": "Cmd+Q",
+          "reserve": "always"
+        }
+      ]
+    },
+    "app.settings": {
+      "mac": [
+        {
+          "keys": "Cmd+,",
+          "reserve": "always"
+        }
+      ]
+    },
+    "focus.nextPane": {
+      "mac": [
+        {
+          "keys": "F6",
+          "reserve": "always"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "F6",
+          "reserve": "always"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "F6",
+          "reserve": "always"
+        }
+      ]
+    },
+    "focus.previousPane": {
+      "mac": [
+        {
+          "keys": "Shift+F6",
+          "reserve": "always"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Shift+F6",
+          "reserve": "always"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Shift+F6",
+          "reserve": "always"
+        }
+      ]
+    }
+  }
+}

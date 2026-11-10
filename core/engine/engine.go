@@ -23,19 +23,82 @@ func (r Rect) Contains(x, y float64) bool {
 	return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H
 }
 
-// Shortcut is a key combination the engine keeps from pages and hands to the app.
-// Which keys those are is decided in Go (core/content/wire.go for the real engine).
-type Shortcut int
+// Mods are the modifier keys held with a key. The values cross to the engine as they are.
+type Mods int
 
 const (
-	ShortcutFocusAddressBar Shortcut = iota + 1
-	ShortcutNewTab
-	ShortcutCloseTab
-	ShortcutNextTab
-	ShortcutPreviousTab
-	// ShortcutTab1 and the eight after it pick a tab by position; the ninth picks the
-	// last tab, as every browser does.
-	ShortcutTab1
+	ModCtrl Mods = 1 << iota
+	ModAlt       // Option on a Mac.
+	ModShift
+	ModCmd // The Command key on a Mac, the Windows key elsewhere.
+)
+
+// Key is one key press: its Windows virtual-key code, which every engine reports on
+// every platform, and the modifiers held with it.
+type Key struct {
+	Code int  `json:"code"`
+	Mods Mods `json:"mods"`
+}
+
+// KeyPhase is when the engine asks about a key.
+type KeyPhase int
+
+const (
+	// KeyBeforePage: the key is about to go to a page. Saying yes keeps it from the page.
+	KeyBeforePage KeyPhase = iota + 1
+	// KeyUnhandled: the page had the key and didn't use it.
+	KeyUnhandled
+)
+
+// Surface is which of our pages had the keyboard when a key was pressed.
+type Surface int
+
+const (
+	SurfacePage Surface = iota + 1
+	SurfaceShell
+	SurfaceSettings
+)
+
+// MenuItem is one entry of the native menu bar. A submenu has Items; a separator has
+// none of the rest.
+type MenuItem struct {
+	Title     string     `json:"title,omitempty"`
+	Action    string     `json:"action,omitempty"` // What choosing it runs, by id.
+	Key       *Key       `json:"key,omitempty"`    // The key it shows; nil for none.
+	Enabled   bool       `json:"enabled,omitempty"`
+	Checked   bool       `json:"checked,omitempty"`
+	Separator bool       `json:"separator,omitempty"`
+	Role      string     `json:"role,omitempty"` // For a submenu the OS fills: "services".
+	Items     []MenuItem `json:"items,omitempty"`
+}
+
+// Menu is the whole menu bar. Role says which menu the OS knows as which: "app",
+// "window" and "help".
+type Menu []MenuItem
+
+// EditCommand is a text-editing command for whichever page has the keyboard.
+type EditCommand int
+
+const (
+	EditUndo EditCommand = iota + 1
+	EditRedo
+	EditCut
+	EditCopy
+	EditPaste
+	EditPasteAndMatchStyle
+	EditDelete
+	EditSelectAll
+)
+
+// AppCommand is something only the OS can do for the app.
+type AppCommand int
+
+const (
+	AppAbout AppCommand = iota + 1
+	AppHide
+	AppHideOthers
+	AppShowAll
+	AppBringAllToFront
 )
 
 // Engine is what the app can ask a browser engine to do.
@@ -56,6 +119,17 @@ type Engine interface {
 	GoBack(tab TabID)
 	GoForward(tab TabID)
 	Reload(tab TabID)
+	// ReloadBypassingCache reloads without the cache; Stop stops loading.
+	ReloadBypassingCache(tab TabID)
+	Stop(tab TabID)
+	// Zoom sets the tab's page zoom as a factor, 1 for actual size; the engine keeps it
+	// for the page's host, as browsers do. ZoomOf says what it is now.
+	Zoom(tab TabID, factor float64)
+	ZoomOf(tab TabID) float64
+	// DuplicateTab makes a hidden copy of the tab, its history included.
+	DuplicateTab(tab TabID) TabID
+	// Edit runs a text-editing command in whichever page has the keyboard.
+	Edit(c EditCommand)
 
 	// RequestWindow asks the native window to close, which ends the app, minimise,
 	// zoom, or go in or out of full screen. What follows arrives as WindowChanged.
@@ -71,6 +145,17 @@ type Engine interface {
 
 	// SendToShell delivers one message to the shell page.
 	SendToShell(msg []byte)
+
+	// OpenSettings puts the settings page over the whole window, in a page of its own,
+	// and gives it the keyboard; CloseSettings takes it away. SendToSettings delivers one
+	// message to it while it is open.
+	OpenSettings()
+	CloseSettings()
+	SendToSettings(msg []byte)
+
+	// SetMenu replaces the native menu bar, where the platform has one.
+	SetMenu(m Menu)
+	AppCommand(c AppCommand)
 
 	// Post runs fn on the main thread, later.
 	Post(fn func())
@@ -107,8 +192,17 @@ type Listener interface {
 	CloseRequested(tab TabID)
 	ActivateRequested(tab TabID)
 
-	// Shortcut fires for a key combination the engine reserves, wherever focus was.
-	Shortcut(s Shortcut)
+	// Key asks about one key press in any of our pages, at either phase. Returning true
+	// means the app used it.
+	Key(k Key, phase KeyPhase, in Surface) bool
+	// MenuChosen says the user chose a menu item, by its action id.
+	MenuChosen(action string)
+	// OSBindings carries the keys the OS lets people give our menu items, by item
+	// title, as macOS App Shortcuts does. It fires after start and whenever they change.
+	OSBindings(byTitle map[string]Key)
+
+	// SettingsMessage is one message from the settings page.
+	SettingsMessage(msg []byte)
 
 	// WindowChanged says what the native window is now. It fires after start, on
 	// resize and on entering or leaving full screen.

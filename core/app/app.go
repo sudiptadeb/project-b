@@ -3,11 +3,13 @@
 package app
 
 import (
+	"projectb/commands"
 	"projectb/crash"
 	"projectb/engine"
 	"projectb/history"
 	"projectb/policy"
 	"projectb/prefs"
+	"projectb/settings"
 	"projectb/shell"
 	"projectb/suggest"
 	"projectb/tabs"
@@ -24,15 +26,21 @@ type Config struct {
 
 // App holds the managers and is the engine's listener: each function only forwards.
 type App struct {
-	Crash   *crash.Manager
-	Tabs    *tabs.Manager
-	History *history.Manager
-	Suggest *suggest.Manager
-	Policy  *policy.Manager
-	Window  *window.Manager
-	Prefs   *prefs.Manager
-	Update  *update.Manager
-	Shell   *shell.Manager
+	Crash    *crash.Manager
+	Tabs     *tabs.Manager
+	History  *history.Manager
+	Suggest  *suggest.Manager
+	Policy   *policy.Manager
+	Window   *window.Manager
+	Prefs    *prefs.Manager
+	Update   *update.Manager
+	Shell    *shell.Manager
+	Commands *commands.Manager
+	Settings *settings.Manager
+
+	actions []*commands.Action
+	// keyIn is which page had the keyboard at the last key press.
+	keyIn engine.Surface
 }
 
 // Start builds everything, on the main thread. The caller then gives the returned App
@@ -49,7 +57,10 @@ func Start(e engine.Engine, cfg Config) *App {
 	closeWindow := func() { a.Window.Request(engine.WindowClose) }
 	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
-	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash)
+	a.Commands = commands.New(e, cfg.ProfileDir, a.Window.FullScreen)
+	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
+	a.Settings = settings.New(e, a.Window, a.Prefs, a.Update, a.Commands)
+	a.registerActions(e, closeWindow)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
@@ -58,12 +69,25 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnListChanged(a.Shell.TabsChanged)
 	a.Tabs.OnEmpty(closeWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
+	a.Window.OnControlsChanged(a.Settings.WindowControlsChanged)
 	a.Window.OnColorChanged(a.Shell.WindowColorChanged)
+	a.Window.OnColorChanged(a.Settings.WindowColorChanged)
 	a.Prefs.OnFrameColorChanged(a.Window.SetColor)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
+	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
 	a.Prefs.OnAutoUpdateChanged(a.Update.SetAuto)
-	a.Prefs.OnAutoUpdateChanged(a.Shell.AutoUpdateChanged)
+	a.Prefs.OnAutoUpdateChanged(a.Settings.AutoUpdateChanged)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
+	a.Update.OnChanged(a.Settings.UpdateChanged)
+	a.Commands.OnChanged(a.Settings.KeyboardChanged)
+	a.Commands.OnChanged(a.Shell.KeysChanged)
+	// What the menu shows enabled or checked follows the active tab, the layout and full
+	// screen.
+	a.Tabs.OnChanged(func(tabs.Tab) { a.Commands.RefreshMenu() })
+	a.Tabs.OnListChanged(a.Commands.RefreshMenu)
+	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
+	a.Window.OnControlsChanged(func(engine.Rect, float64) { a.Commands.RefreshMenu() })
+	a.Commands.Load()
 
 	a.History.Load(nil)
 	a.Tabs.Create()
@@ -119,25 +143,17 @@ func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 
 func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
 
-// Shortcut maps each reserved key combination to the one function that does it.
-func (a *App) Shortcut(s engine.Shortcut) {
-	switch {
-	case s == engine.ShortcutFocusAddressBar:
-		a.Shell.FocusAddressBar()
-	case s == engine.ShortcutNewTab:
-		a.Tabs.Create()
-	case s == engine.ShortcutCloseTab:
-		a.Tabs.CloseActive()
-	case s == engine.ShortcutNextTab:
-		a.Tabs.ActivateNext(false)
-	case s == engine.ShortcutPreviousTab:
-		a.Tabs.ActivateNext(true)
-	case s == engine.ShortcutTab1+8:
-		a.Tabs.ActivateLast()
-	case s >= engine.ShortcutTab1:
-		a.Tabs.ActivateAt(int(s - engine.ShortcutTab1))
-	}
+// Key hands a key press to the commands manager, which decides what it runs.
+func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
+	a.keyIn = in
+	return a.Commands.Key(k, phase)
 }
+
+func (a *App) MenuChosen(action string) { a.Commands.Run(action) }
+
+func (a *App) OSBindings(byTitle map[string]engine.Key) { a.Commands.OSBindings(byTitle) }
+
+func (a *App) SettingsMessage(msg []byte) { a.Settings.Handle(msg) }
 
 func (a *App) WindowChanged(s engine.WindowState) { a.Window.HandleWindowChanged(s) }
 

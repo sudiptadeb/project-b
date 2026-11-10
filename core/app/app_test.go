@@ -249,7 +249,7 @@ func TestShellWindowRequestsReachTheEngine(t *testing.T) {
 	}
 }
 
-func TestTabsThroughTheShellAndShortcuts(t *testing.T) {
+func TestTabsThroughTheShellAndKeys(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
 	r.visit("https://a.test/")
@@ -273,19 +273,19 @@ func TestTabsThroughTheShellAndShortcuts(t *testing.T) {
 	}
 	r.waitForTab(func(tab map[string]any) bool { return tab["url"] == "https://c.test/" && tab["loading"] == false })
 
-	r.e.Fire("shortcut", "tab1")
+	r.e.Fire("key", "tab1")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == float64(1) })
-	r.e.Fire("shortcut", "nextTab")
+	r.e.Fire("key", "nextTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == second })
-	r.e.Fire("shortcut", "closeTab")
+	r.e.Fire("key", "closeTab")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
 	if m["active"] == second {
 		t.Fatalf("closed tab still active: %v", m)
 	}
 
 	// Closing the rest closes the window.
-	r.e.Fire("shortcut", "closeTab")
-	r.e.Fire("shortcut", "closeTab")
+	r.e.Fire("key", "closeTab")
+	r.e.Fire("key", "closeTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 0 })
 	deadline := time.Now().Add(time.Second)
 	for !r.e.Closed() {
@@ -337,31 +337,71 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 
 var _ engine.Listener = (*app.App)(nil)
 
-// The settings panel is the shell's: the snapshot carries what it shows, the shell sets
-// the prefs, and Go says when they change.
-func TestTheShellReadsAndSetsTheSettings(t *testing.T) {
+// openSettings opens the settings page from the shell's gear and reads its snapshot.
+func (r *rig) openSettings() (<-chan []byte, map[string]any) {
+	r.t.Helper()
+	got, stop := r.e.Settings.Subscribe()
+	r.t.Cleanup(stop)
+	r.shell(`{"t":"run","text":"app.settings"}`)
+	deadline := time.Now().Add(5 * time.Second)
+	for !r.e.SettingsOpen() {
+		if time.Now().After(deadline) {
+			r.t.Fatal("settings never opened")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	r.settings(`{"t":"ready"}`)
+	return got, r.waitOn(got, func(m map[string]any) bool { return m["t"] == "snapshot" })
+}
+
+func (r *rig) settings(cmd string) { r.e.Post(func() { r.a.SettingsMessage([]byte(cmd)) }) }
+
+func (r *rig) waitOn(ch <-chan []byte, match func(map[string]any) bool) map[string]any {
+	r.t.Helper()
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case b := <-ch:
+			var m map[string]any
+			if err := json.Unmarshal(b, &m); err != nil {
+				r.t.Fatalf("bad message %s: %v", b, err)
+			}
+			if match(m) {
+				return m
+			}
+		case <-deadline:
+			r.t.Fatal("timed out waiting for a settings message")
+		}
+	}
+}
+
+// Settings is a page of its own: the snapshot carries what it shows, it sets the prefs,
+// and Go says when they change.
+func TestTheSettingsPageReadsAndSetsTheSettings(t *testing.T) {
 	dir := t.TempDir()
 	r := start(t, dir)
 	defer r.stop()
-	r.shell(`{"t":"ready"}`)
-	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if snap["autoUpdate"] != true || snap["running"] != "" {
+	got, snap := r.openSettings()
+	if snap["autoUpdate"] != true || snap["running"] != "" || snap["keyboard"] == nil {
 		t.Fatalf("snapshot = %v", snap)
 	}
-	r.shell(`{"t":"setAutoUpdate","on":false}`)
-	r.waitFor(func(m map[string]any) bool { return m["t"] == "autoUpdate" && m["autoUpdate"] == false })
+	r.settings(`{"t":"setAutoUpdate","on":false}`)
+	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "autoUpdate" && m["autoUpdate"] == false })
 	b, _ := os.ReadFile(filepath.Join(dir, "prefs.json"))
 	if !strings.Contains(string(b), `"autoUpdate":false`) {
 		t.Fatalf("prefs.json = %s", b)
 	}
+	r.settings(`{"t":"close"}`)
+	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "closed" })
 }
 
-// The frame colour is a pref: setting it from the shell repaints the window and tells the
-// shell, together, and it survives a restart.
+// The frame colour is a pref: setting it from the settings page repaints the window and
+// tells the shell, together, and it survives a restart.
 func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	dir := t.TempDir()
 	r := start(t, dir)
-	r.shell(`{"t":"setFrameColor","text":"#3470d0"}`)
+	r.openSettings()
+	r.settings(`{"t":"setFrameColor","text":"#3470d0"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#3470d0" })
 	if r.e.Layout().FrameColor != "#3470d0" {
 		t.Fatalf("window = %v", r.e.Layout().FrameColor)
@@ -374,5 +414,67 @@ func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
 	if m["windowColor"] != "#3470d0" || r.e.Layout().FrameColor != "#3470d0" || r.e.ShownColor() != "#3470d0" {
 		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.Layout().FrameColor, r.e.ShownColor())
+	}
+}
+
+// A key added in the settings page runs its action, and the keymap now belongs to the
+// user. Closing a tab while settings is open closes settings.
+func TestAKeyAddedInSettingsRunsItsAction(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	got, _ := r.openSettings()
+	r.settings(`{"t":"addKey","id":"tab.new","text":"Cmd+Shift+Y","reserve":"always"}`)
+	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "keyboard" })
+	b, _ := os.ReadFile(filepath.Join(dir, "keymap.json"))
+	if !strings.Contains(string(b), `"Shift+Cmd+Y"`) || strings.Contains(string(b), `"follows"`) {
+		t.Fatalf("keymap.json = %s", b)
+	}
+
+	r.e.Fire("key", "closeTab")
+	deadline := time.Now().Add(5 * time.Second)
+	for r.e.SettingsOpen() {
+		if time.Now().After(deadline) {
+			t.Fatal("Cmd+W didn't close settings")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	r.e.Post(func() {
+		r.a.Key(engine.Key{Code: 'Y', Mods: engine.ModCmd | engine.ModShift}, engine.KeyBeforePage, engine.SurfacePage)
+	})
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
+}
+
+// The menu comes from the tree: Edit has Redo, View has Full Screen with its macOS key,
+// and the hidden Select Tab submenu isn't there.
+func TestTheMenuComesFromTheTree(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var menu engine.Menu
+	done := make(chan struct{})
+	r.e.Post(func() { menu = r.e.Menu(); close(done) })
+	<-done
+	find := func(items []engine.MenuItem, title string) *engine.MenuItem {
+		for i := range items {
+			if items[i].Title == title {
+				return &items[i]
+			}
+		}
+		return nil
+	}
+	edit, view, tab := find(menu, "Edit"), find(menu, "View"), find(menu, "Tab")
+	if edit == nil || view == nil || tab == nil {
+		t.Fatalf("menu = %+v", menu)
+	}
+	if find(edit.Items, "Redo") == nil {
+		t.Fatal("no Redo")
+	}
+	full := find(view.Items, "Full Screen")
+	if full == nil || full.Key == nil || *full.Key != (engine.Key{Code: 'F', Mods: engine.ModCtrl | engine.ModCmd}) {
+		t.Fatalf("Full Screen = %+v", full)
+	}
+	if find(tab.Items, "Select Tab") != nil {
+		t.Fatal("the hidden Select Tab submenu is in the menu")
 	}
 }

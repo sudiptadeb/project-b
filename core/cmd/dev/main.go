@@ -83,6 +83,19 @@ func main() {
 		}
 		e.Post(func() { a.ShellMessage(msg) })
 	})
+	// The settings page, served as the real app serves it, with its own channel.
+	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, filepath.Join(*shellDir, "settings.html"))
+	})
+	mux.HandleFunc("GET /settings/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Settings) })
+	mux.HandleFunc("POST /settings/send", func(w http.ResponseWriter, r *http.Request) {
+		msg, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		e.Post(func() { a.SettingsMessage(msg) })
+	})
 	mux.HandleFunc("GET /mock/page", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := mockPage.ReadFile("mock_page.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -102,7 +115,7 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": l.Page, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": l.Page, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(), "menu": e.Menu(), "edits": e.Edits()}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)

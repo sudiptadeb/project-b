@@ -1,5 +1,6 @@
 <script setup>
 import { send } from './bridge.js';
+import { shown } from './keys.js';
 import { state, tabLabel } from './state.js';
 </script>
 
@@ -11,7 +12,7 @@ import { state, tabLabel } from './state.js';
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
         </span>
         <span class="title">New Tab</span>
-        <span class="hint" aria-hidden="true">⌘T</span>
+        <span v-if="state.keys['tab.new']" class="hint" aria-hidden="true">{{ shown(state.keys['tab.new'], state.platform) }}</span>
       </button>
       <div class="tabs" role="tablist" aria-label="Open tabs">
         <div

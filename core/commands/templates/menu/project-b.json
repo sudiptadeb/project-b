@@ -1,0 +1,255 @@
+{
+  "template": "project-b",
+  "menus": [
+    {
+      "title": "Project B",
+      "role": "app",
+      "locked": true,
+      "items": [
+        {
+          "action": "app.about"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "app.settings",
+          "locked": true
+        },
+        {
+          "action": "app.checkUpdate"
+        },
+        {
+          "separator": true
+        },
+        {
+          "title": "Services",
+          "role": "services",
+          "only": "mac",
+          "items": []
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "app.hide",
+          "only": "mac"
+        },
+        {
+          "action": "app.hideOthers",
+          "only": "mac"
+        },
+        {
+          "action": "app.showAll",
+          "only": "mac"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "app.quit",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "title": "File",
+      "items": [
+        {
+          "action": "tab.new"
+        },
+        {
+          "action": "address.focus"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "window.close"
+        },
+        {
+          "action": "tab.close"
+        }
+      ]
+    },
+    {
+      "title": "Edit",
+      "locked": true,
+      "items": [
+        {
+          "action": "edit.undo"
+        },
+        {
+          "action": "edit.redo"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "edit.cut"
+        },
+        {
+          "action": "edit.copy"
+        },
+        {
+          "action": "edit.paste"
+        },
+        {
+          "action": "edit.pasteAndMatchStyle"
+        },
+        {
+          "action": "edit.delete"
+        },
+        {
+          "action": "edit.selectAll"
+        }
+      ]
+    },
+    {
+      "title": "View",
+      "items": [
+        {
+          "action": "view.tabsSide"
+        },
+        {
+          "action": "view.tabsTop"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "nav.stop"
+        },
+        {
+          "action": "nav.reload"
+        },
+        {
+          "action": "nav.reloadHard"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "view.fullScreen"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "view.zoomReset"
+        },
+        {
+          "action": "view.zoomIn"
+        },
+        {
+          "action": "view.zoomOut"
+        },
+        {
+          "separator": true
+        },
+        {
+          "title": "Developer",
+          "items": [
+            {
+              "action": "dev.viewSource"
+            }
+          ]
+        },
+        {
+          "title": "Keyboard",
+          "items": [
+            {
+              "action": "focus.nextPane"
+            },
+            {
+              "action": "focus.previousPane"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "History",
+      "items": [
+        {
+          "action": "nav.back"
+        },
+        {
+          "action": "nav.forward"
+        }
+      ]
+    },
+    {
+      "title": "Tab",
+      "items": [
+        {
+          "action": "tab.next"
+        },
+        {
+          "action": "tab.previous"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "tab.duplicate"
+        },
+        {
+          "separator": true
+        },
+        {
+          "title": "Select Tab",
+          "items": [
+            {
+              "action": "tab.select1"
+            },
+            {
+              "action": "tab.select2"
+            },
+            {
+              "action": "tab.select3"
+            },
+            {
+              "action": "tab.select4"
+            },
+            {
+              "action": "tab.select5"
+            },
+            {
+              "action": "tab.select6"
+            },
+            {
+              "action": "tab.select7"
+            },
+            {
+              "action": "tab.select8"
+            },
+            {
+              "action": "tab.selectLast"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Window",
+      "role": "window",
+      "locked": true,
+      "items": [
+        {
+          "action": "window.minimize"
+        },
+        {
+          "action": "window.zoom"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "window.bringAllToFront",
+          "only": "mac"
+        }
+      ]
+    }
+  ]
+}

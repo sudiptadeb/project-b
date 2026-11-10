@@ -157,9 +157,11 @@ content::WebContents* PageTab::AddNewContents(
   return tab->contents();
 }
 
+// Go gets the key first; one it doesn't use goes to the menu bar.
 bool PageTab::HandleKeyboardEvent(content::WebContents* source,
                                   const input::NativeWebKeyboardEvent& event) {
-  return Engine::Get()->window()->HandleUnhandledKey(event);
+  return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
+         Engine::Get()->window()->HandleUnhandledKey(event);
 }
 
 bool PageTab::TakeFocus(content::WebContents* source, bool reverse) {

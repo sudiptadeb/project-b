@@ -1,7 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue';
 import CrashNotice from './CrashNotice.vue';
-import Settings from './Settings.vue';
 import UpdateStatus from './UpdateStatus.vue';
 import { setPageElement } from './regions.js';
 import { state } from './state.js';
@@ -17,13 +16,12 @@ onMounted(() => setPageElement(el.value));
     </div>
     <CrashNotice />
     <UpdateStatus />
-    <Settings v-if="state.settings" />
   </div>
 </template>
 
 <style scoped>
 /* The page is a plain rectangle: a hole in the shell with nothing painted on it. The
-   crash notice, the update bubble and the settings panel are placed against this box, so
+   crash notice and the update bubble are placed against this box, so
    each sits in the page's corner in either layout. */
 .main {
   position: relative;

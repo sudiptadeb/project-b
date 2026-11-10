@@ -67,6 +67,11 @@ class Window {
   void ShowPageView(gfx::NativeView view);
   void RemovePageView(gfx::NativeView view);
 
+  // The overlay covers the whole window, over the shell, and takes every press while it
+  // is there. The settings page is one.
+  void SetOverlayView(gfx::NativeView view);
+  void RemoveOverlayView(gfx::NativeView view);
+
   void SetLayout(Layout layout);
 
   // Reports the window's state now and whenever it changes.

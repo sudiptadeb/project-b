@@ -7,7 +7,7 @@ view checks the same hitTest: before accepting the event. AppKit's own dispatch 
 exercised. Run it from the repo root:
 
     python3 tools/drive_first_app.py
-    python3 tools/drive_first_app.py settings   # only the settings panel's checks
+    python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -236,127 +236,105 @@ def bundle_version():
 
 
 def settings_checks():
-    """The settings panel the shell draws over the window: how it opens and closes, that its
-    clicks stay in the shell, that its layout and colour reach the real window, and that
-    chrome://settings/ is gone."""
+    """Menus, keys and the settings page in the real app: the menu bar Go builds, keys
+    through Go, and the settings page, a page of its own over the whole window."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
     app.wait("!!document.querySelector('input')", 30)
     time.sleep(0.5)
-    panel = "!!document.querySelector('[role=dialog]')"
-    panels = "document.querySelectorAll('[role=dialog]').length"
-    frame_var = "getComputedStyle(document.documentElement).getPropertyValue('--frame').trim()"
-    checked = lambda value: f"document.querySelector('input[value={value}]').checked"
 
-    # chrome://settings/ is no page of ours any more: typed, it loads nothing with a bridge.
+    def find(items, title):
+        return next((i for i in items if isinstance(i, dict) and i["title"] == title), None)
+
+    menu = json.loads(app.cmd("menu"))
+    view, edit, tab = find(menu, "View"), find(menu, "Edit"), find(menu, "Tab")
+    full = find(view["items"], "Full Screen") if view else None
+    check("the menu bar is Go's tree: Edit, View, Tab", bool(view and edit and tab), [m["title"] for m in menu if isinstance(m, dict)])
+    check("View has Full Screen on Ctrl+Cmd+F", bool(full) and full["key"] == "^@f", full)
+    check("Edit has Redo", bool(edit) and find(edit["items"], "Redo") is not None)
+    check("the hidden Select Tab submenu isn't drawn", bool(tab) and find(tab["items"], "Select Tab") is None)
+    check("AppKit added no Full Screen item of its own", sum(1 for m in menu for i in m.get("items", []) if isinstance(i, dict) and "Full Screen" in i["title"]) == 1)
+
+    # Copy and paste go through Go to the page that has the keyboard.
     focus_bar(app)
-    app.cmd("type", "chrome://settings/")
-    app.wait(f"{VALUE}==='chrome://settings/'")
-    app.cmd("key", "enter")
-    time.sleep(2)
-    page = app.js("[location.href, typeof (window.chrome && chrome.send), !!document.querySelector('.version')]", page=True)
-    tab = app.js("document.querySelector('[role=tab][aria-selected=true]').textContent.trim()")
-    check("chrome://settings/ no longer exists: no page of ours, no bridge", page[1] == "undefined" and not page[2], (page, tab))
-
-    # A page that counts its clicks, under where the panel opens.
-    visit(app, PAGES + "clicks")
-    app.wait("document.title==='0'", 10, page=True)
-
-    # The gear opens the panel, once, and the panel is shell.
-    click(app, "[aria-label=Settings]")
+    app.cmd("type", "copied text")
+    app.wait(f"{VALUE}==='copied text'")
+    app.cmd("key", "cmd+a")
+    app.cmd("key", "cmd+c")
+    app.js(f"{INPUT}.value=''")
+    app.cmd("key", "cmd+v")
     try:
-        app.wait(panel, 10)
-        check("the gear opens the settings panel", app.js(panels) == 1)
+        app.wait(f"{VALUE}==='copied text'", 5)
+        check("Cmd+A, Cmd+C and Cmd+V work in the address bar", True)
     except TimeoutError as e:
-        check("the gear opens the settings panel", False, e)
+        check("Cmd+A, Cmd+C and Cmd+V work in the address bar", False, e)
+    app.cmd("key", "escape")
+
+    # Cmd+, opens the settings page over the whole window.
+    settings = lambda expr: json.loads(app.cmd("evalsettings", expr))
+    app.cmd("key", "cmd+,")
+    try:
+        deadline = time.time() + 10
+        while True:
+            r = app.cmd("evalsettings", "!!document.querySelector('h1')")
+            if r == "true":
+                break
+            if time.time() > deadline:
+                raise TimeoutError(r)
+            time.sleep(0.1)
+        check("Cmd+, opens the settings page", True)
+    except TimeoutError as e:
+        check("Cmd+, opens the settings page", False, e)
         app.close()
         return
-    time.sleep(0.3)
-    x, y = center(app, "[role=dialog] h1")
-    check("the panel is a shell region in the real window", app.cmd("hit", x, y) == "shell", app.cmd("hit", x, y))
-    app.cmd("click", x, y)
     time.sleep(0.5)
-    check("a click inside it doesn't reach the page", app.js("document.title", page=True) == "0", app.js("document.title", page=True))
-    px, py, pw, ph = json.loads(app.cmd("bounds"))["reported"]
-    app.cmd("click", px + 40, py + ph - 40)
-    try:
-        app.wait("document.title==='1'", 5, page=True)
-        check("while a click beside it does", True)
-    except TimeoutError as e:
-        check("while a click beside it does", False, e)
-    check("and the panel stays open", app.js(panels) == 1)
+    check("it covers the window: the middle and the top row are the settings page's", app.cmd("hit", 600, 300) == "settings" and app.cmd("hit", 300, BAR_Y) == "settings", (app.cmd("hit", 600, 300), app.cmd("hit", 300, BAR_Y)))
+    check("it shows the general settings", settings("!!document.querySelector('.version')"))
+    print(app.cmd("capture", os.path.join(OUT, "settings-general.png")), flush=True)
 
-    app.wait(checked("vertical"), 5)
-    expected = bundle_version() or "Development build"
-    shown = app.js("document.querySelector('.version').textContent")
-    check("it shows the layout and the running version", shown == expected, (shown, expected))
-    print(app.cmd("capture", os.path.join(OUT, "settings-vertical.png")), flush=True)
-
-    # A real click on its radio moves the real shell, and the panel stays, under the gear.
-    click(app, "input[value=horizontal]")
-    try:
-        app.wait("!!document.querySelector('.strip')", 10)
-        check("choosing Horizontal in the panel switches the real shell", app.js(panels) == 1)
-    except TimeoutError as e:
-        check("choosing Horizontal in the panel switches the real shell", False, e)
-    time.sleep(0.4)
-    x, y = center(app, "[role=dialog] h1")
-    check("with the tabs on top the panel is still shell", app.cmd("hit", x, y) == "shell", app.cmd("hit", x, y))
-    print(app.cmd("capture", os.path.join(OUT, "settings-horizontal.png")), flush=True)
-    click(app, "input[value=vertical]")
-    app.wait("!!document.querySelector('nav')", 10)
-
-    # Check for updates asks the update manager, which says what it found. A development
-    # build has no version and says it doesn't update; a release that is the newest says
-    # it is up to date.
-    click(app, ".text-button")
-    status = "document.querySelector('.status').textContent"
-    want = "a development build doesn't update" if bundle_version() is None else "Up to date"
-    try:
-        app.wait(f"{status}==={json.dumps(want)}", 30)
-        check(f"Check for updates says: {want}", True)
-    except TimeoutError as e:
-        check(f"Check for updates says: {want}", False, e)
-
-    # A preset recolours the window and the shell together.
-    check("the frame starts dusty teal, in the window and the shell", app.cmd("color") == "#4f9e9e" and app.js(frame_var) == "#4f9e9e", (app.cmd("color"), app.js(frame_var)))
-    for name, color in (("Blue", "#3470d0"), ("Amber", "#faa804"), ("Slate", "#384562")):
-        click(app, f"[role=radio][aria-label={name}]")
-        try:
-            app.wait(f"{frame_var}==={json.dumps(color)}", 5)
-            check(f"{name} recolours the window and the shell", app.cmd("color") == color and json.loads(app.cmd("frame"))["color"] == color, (app.cmd("color"), app.cmd("frame")))
-        except TimeoutError as e:
-            check(f"{name} recolours the window and the shell", False, e)
-        time.sleep(0.3)
-        print(app.cmd("capture", os.path.join(OUT, f"settings-{name.lower()}.png")), flush=True)
-    click(app, "[role=radio][aria-label='Dusty teal']")
-    app.wait(f"{frame_var}==='#4f9e9e'", 5)
-
-    # Escape, the close button and the gear each close it. A new panel's region reaches
-    # the window a frame or two after it shows, so the driver waits before clicking it.
-    app.cmd("key", "escape")
-    try:
-        app.wait(f"{panels}===0", 5)
-        check("Escape closes it", True)
-    except TimeoutError as e:
-        check("Escape closes it", False, e)
-    click(app, "[aria-label=Settings]")
-    app.wait(panel, 5)
+    # A key recorded on the settings page reaches Go, and runs its action.
+    settings("[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Keyboard').click()")
     time.sleep(0.3)
-    click(app, "[aria-label='Close settings']")
+    settings("document.querySelector('[aria-label=\"Add a key for New Tab\"]').click()")
+    time.sleep(0.3)
+    app.cmd("key", "cmd+shift+k")
+    keymap = os.path.join(profile, "keymap.json")
+    deadline = time.time() + 5
+    while time.time() < deadline and not (os.path.exists(keymap) and "Shift+Cmd+K" in open(keymap).read()):
+        time.sleep(0.1)
+    check("a key pressed while recording is added to keymap.json", os.path.exists(keymap) and "Shift+Cmd+K" in open(keymap).read(),
+          (os.listdir(profile), app.cmd("evalsettings", "[document.activeElement.className, document.querySelector('[aria-label=File]').textContent.slice(0,80)]")))
+    print(app.cmd("capture", os.path.join(OUT, "settings-keyboard.png")), flush=True)
+
+    # Cmd+W closes the settings page, not the tab under it.
+    rows = app.js(ROWS)
+    app.cmd("key", "cmd+w")
+    time.sleep(0.5)
+    check("Cmd+W closes the settings page, not the tab", app.cmd("evalsettings", "1").startswith("ERR") and app.js(ROWS) == rows)
+    app.cmd("key", "cmd+shift+k")
     try:
-        app.wait(f"{panels}===0", 5)
-        check("the close button closes it", True)
+        app.wait(f"{ROWS}==={rows + 1}", 5)
+        check("the new key opens a tab", True)
     except TimeoutError as e:
-        check("the close button closes it", False, e)
-    click(app, "[aria-label=Settings]")
-    app.wait(panel, 5)
-    time.sleep(0.3)
-    x, y = center(app, "[role=dialog] h1")
-    click(app, "[aria-label=Settings]")
-    app.wait(f"{panels}===0", 5)
-    time.sleep(0.3)
-    check("the gear closes it too, and its region goes", app.cmd("hit", x, y) == "page", app.cmd("hit", x, y))
+        check("the new key opens a tab", False, e)
+
+    app.cmd("key", "ctrl+cmd+f")
+    deadline = time.time() + 5
+    while time.time() < deadline and '"fullScreen":true' not in app.cmd("state"):
+        time.sleep(0.1)
+    check("Ctrl+Cmd+F enters full screen", '"fullScreen":true' in app.cmd("state"), app.cmd("state"))
+    app.close()
+
+    # After a restart the keymap is still the user's.
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    rows = app.js(ROWS)
+    app.cmd("key", "cmd+shift+k")
+    try:
+        app.wait(f"{ROWS}==={rows + 1}", 5)
+        check("the added key survives a restart", True)
+    except TimeoutError as e:
+        check("the added key survives a restart", False, e)
     app.close()
 
 

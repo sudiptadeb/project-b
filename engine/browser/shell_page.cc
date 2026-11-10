@@ -26,6 +26,7 @@
 #include "content/public/common/bindings_policy.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/window.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -37,49 +38,67 @@ namespace {
 
 constexpr char kHost[] = "shell";
 
-// Forwards chrome.send('shell', [json]) to Go.
+// Forwards chrome.send(name, [json]) to Go as one event: 'shell' from the shell,
+// 'settings' from the settings page.
 class ShellMessageHandler : public content::WebUIMessageHandler {
  public:
+  ShellMessageHandler(const char* name, PBEvent event)
+      : name_(name), event_(event) {}
+
   void RegisterMessages() override {
     web_ui()->RegisterMessageCallback(
-        "shell", base::BindRepeating(&ShellMessageHandler::OnMessage,
-                                     base::Unretained(this)));
+        name_, base::BindRepeating(&ShellMessageHandler::OnMessage,
+                                   base::Unretained(this)));
   }
 
  private:
   void OnMessage(const base::ListValue& args) {
     if (args.size() != 1 || !args[0].is_string()) {
-      LOG(WARNING) << "dropped a malformed message from the shell";
+      LOG(WARNING) << "dropped a malformed message from " << name_;
       return;
     }
     hooks::Args hook_args;
     hook_args.Str(args[0].GetString());
-    hooks::Fire(PB_EVENT_SHELL_MESSAGE, hook_args);
+    hooks::Fire(event_, hook_args);
   }
+
+  const char* const name_;
+  const PBEvent event_;
 };
 
-// The bridge to Go belongs to the shell's own WebContents. The factory sees only the URL,
-// so content makes a controller for chrome://shell/ wherever it loads; anywhere else the
-// controller takes away the page's bindings, so it has no chrome.send, and drops
-// whatever arrives anyway.
+// The bridge to Go belongs to the shell's own WebContents and the settings page's. The
+// factory sees only the URL, so content makes a controller for chrome://shell/ wherever
+// it loads; anywhere else the controller takes away the page's bindings, so it has no
+// chrome.send, and drops whatever arrives anyway.
 class ShellController : public content::WebUIController {
  public:
   explicit ShellController(content::WebUI* web_ui)
       : content::WebUIController(web_ui),
-        is_shell_(web_ui->GetWebContents() ==
-                  Engine::Get()->shell()->contents()) {
-    if (!is_shell_) {
+        is_ours_(IsOurs(web_ui->GetWebContents())) {
+    if (!is_ours_) {
       LOG(WARNING) << "chrome://shell/ outside the shell: no bindings";
       web_ui->SetBindings(content::BindingsPolicySet());
       return;
     }
-    web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>());
+    if (web_ui->GetWebContents() == Engine::Get()->shell()->contents()) {
+      web_ui->AddMessageHandler(
+          std::make_unique<ShellMessageHandler>("shell", PB_EVENT_SHELL_MESSAGE));
+    } else {
+      web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>(
+          "settings", PB_EVENT_SETTINGS_MESSAGE));
+    }
+  }
+
+  static bool IsOurs(content::WebContents* contents) {
+    Engine* engine = Engine::Get();
+    return contents == engine->shell()->contents() ||
+           (engine->settings() && contents == engine->settings()->contents());
   }
 
   bool OverrideHandleWebUIMessage(const GURL& source_url,
                                   const std::string& message,
                                   const base::ListValue& args) override {
-    if (is_shell_) {
+    if (is_ours_) {
       return false;
     }
     LOG(WARNING) << "dropped \"" << message
@@ -90,7 +109,7 @@ class ShellController : public content::WebUIController {
   WEB_UI_CONTROLLER_TYPE_DECL();
 
  private:
-  const bool is_shell_;
+  const bool is_ours_;
 };
 
 WEB_UI_CONTROLLER_TYPE_IMPL(ShellController)
@@ -185,11 +204,14 @@ class ShellDataSource : public content::URLDataSource {
   // Only these files exist, so a path can't reach outside the folder.
   static std::string Name(const GURL& url) {
     std::string path(url.path());
-    if (path == "/shell.js") {
-      return "shell.js";
+    for (const char* name :
+         {"shell.js", "shell.css", "settings.js", "settings.css"}) {
+      if (path == std::string("/") + name) {
+        return name;
+      }
     }
-    if (path == "/shell.css") {
-      return "shell.css";
+    if (path == "/settings") {
+      return "settings.html";
     }
     return "index.html";
   }
@@ -259,10 +281,12 @@ void ShellPage::PrimaryMainFrameRenderProcessGone(
   contents_->GetController().Reload(content::ReloadType::NORMAL, false);
 }
 
+// Go gets the key first; one it doesn't use goes to the menu bar.
 bool ShellPage::HandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
-  return Engine::Get()->window()->HandleUnhandledKey(event);
+  return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
+         Engine::Get()->window()->HandleUnhandledKey(event);
 }
 
 bool ShellPage::TakeFocus(content::WebContents* source, bool reverse) {

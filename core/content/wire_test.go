@@ -83,7 +83,13 @@ func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground bo
 }
 func (r *recorder) CloseRequested(tab engine.TabID)    { r.note(fmt.Sprintf("close %d", tab)) }
 func (r *recorder) ActivateRequested(tab engine.TabID) { r.note(fmt.Sprintf("activate %d", tab)) }
-func (r *recorder) Shortcut(s engine.Shortcut)         { r.note("shortcut") }
+func (r *recorder) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
+	r.note(fmt.Sprintf("key %d %d %d %d", k.Code, k.Mods, phase, in))
+	return k.Mods&engine.ModCmd != 0
+}
+func (r *recorder) MenuChosen(action string)                 { r.note("menu " + action) }
+func (r *recorder) OSBindings(byTitle map[string]engine.Key) { r.note(fmt.Sprint("os ", byTitle)) }
+func (r *recorder) SettingsMessage(msg []byte)               { r.note("settings " + string(msg)) }
 func (r *recorder) WindowChanged(s engine.WindowState) {
 	r.note(fmt.Sprintf("window %gx%g r=%g full=%v", s.W, s.H, s.CornerRadius, s.FullScreen))
 }
@@ -165,23 +171,29 @@ func TestGateAnswersProceedOrBlock(t *testing.T) {
 	}
 }
 
-func TestReservedKeysBecomeShortcuts(t *testing.T) {
+// The recorder takes any Cmd key: the app's answer is the hook's.
+func TestKeysReachTheApp(t *testing.T) {
 	h, r, _ := wired(t)
-	key := func(mods WebInputEventModifiers, code KeyboardCode) []Value {
-		return pack(WebContents{ID: 1}, WebContents{ID: 1}, NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: mods, WindowsKeyCode: code})
+	key := func(id int64, mods WebInputEventModifiers, code KeyboardCode) []Value {
+		return pack(WebContents{ID: id}, WebContents{ID: id}, NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: mods, WindowsKeyCode: code})
 	}
-	v, ok := h.Dispatch(DelegatePreHandleKeyboardEvent, key(WebInputEventModifiersMetaKey, KeyboardCodeW))
-	if !ok || v.I != int64(KeyboardEventProcessingResultHandled) || len(r.got) != 1 {
-		t.Fatalf("Cmd+W: %v %v %v", v, ok, r.got)
+	v, ok := h.Dispatch(DelegatePreHandleKeyboardEvent, key(1, WebInputEventModifiersMetaKey|WebInputEventModifiersShiftKey, KeyboardCodeW))
+	if !ok || v.I != int64(KeyboardEventProcessingResultHandled) {
+		t.Fatalf("Cmd+Shift+W before the page: %v %v", v, ok)
 	}
-	if _, ok := h.Dispatch(DelegatePreHandleKeyboardEvent, key(0, KeyboardCodeW)); ok {
-		t.Fatal("a plain W was taken from the page")
+	if _, ok := h.Dispatch(DelegatePreHandleKeyboardEvent, key(1, 0, KeyboardCodeW)); ok {
+		t.Fatal("a W the app didn't want was taken from the page")
 	}
-	if s := shortcutFor(NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: WebInputEventModifiersMetaKey, WindowsKeyCode: KeyboardCode9}); s != engine.ShortcutTab1+8 {
-		t.Fatalf("Cmd+9 = %v", s)
+	if v, ok := h.Dispatch(DelegateHandleKeyboardEvent, key(-1, WebInputEventModifiersMetaKey, KeyboardCodeL)); !ok || v.I != 1 {
+		t.Fatalf("Cmd+L after the settings page: %v %v", v, ok)
 	}
-	if s := shortcutFor(NativeWebKeyboardEvent{Type: WebInputEventTypeRawKeyDown, Modifiers: WebInputEventModifiersControlKey | WebInputEventModifiersShiftKey, WindowsKeyCode: KeyboardCodeTab}); s != engine.ShortcutPreviousTab {
-		t.Fatalf("Ctrl+Shift+Tab = %v", s)
+	want := []string{
+		fmt.Sprintf("key %d %d %d %d", KeyboardCodeW, engine.ModCmd|engine.ModShift, engine.KeyBeforePage, engine.SurfacePage),
+		fmt.Sprintf("key %d %d %d %d", KeyboardCodeW, 0, engine.KeyBeforePage, engine.SurfacePage),
+		fmt.Sprintf("key %d %d %d %d", KeyboardCodeL, engine.ModCmd, engine.KeyUnhandled, engine.SurfaceSettings),
+	}
+	if fmt.Sprint(r.got) != fmt.Sprint(want) {
+		t.Fatalf("got %v, want %v", r.got, want)
 	}
 }
 

@@ -1,13 +1,22 @@
 #ifndef PROJECT_B_ENGINE_BROWSER_MAC_APP_H_
 #define PROJECT_B_ENGINE_BROWSER_MAC_APP_H_
 
+#include <cstdint>
+#include <string>
+
 namespace project_b {
 
 // Creates the NSApplication content's message pump needs.
 void InitMacApp();
 
-// Adds the menu that gives us Quit, Cut, Copy, Paste and Select All.
-void InstallMainMenu();
+// Replaces the menu bar with Go's engine.Menu, as JSON. Choosing an item tells Go.
+void SetMainMenu(const std::string& json);
+
+// Runs a PBAppCommand.
+void RunAppCommand(int32_t command);
+
+// Tells Go the keys macOS App Shortcuts gives our menu items, now and on every change.
+void WatchOSKeyBindings();
 
 }  // namespace project_b
 

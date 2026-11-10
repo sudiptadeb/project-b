@@ -14,11 +14,14 @@ func Wire(h *Hooks, l engine.Listener) {
 	h.Events.OnFaviconChanged = l.FaviconChanged
 	h.Events.OnWindowChanged = l.WindowChanged
 	h.Events.OnShellCrashed = l.ShellCrashed
+	h.Events.OnSettingsMessage = l.SettingsMessage
+	h.Events.OnMenuChosen = l.MenuChosen
+	h.Events.OnOSBindings = l.OSBindings
 
 	// The gate: every top-level navigation in a tab asks Go before it starts and on
-	// each redirect. The shell's own navigation (id 0) has no gate.
+	// each redirect. The shell's and the settings page's own navigations (ids 0 and -1) have no gate.
 	gate := func(nav NavigationHandle) (NavigationThrottleThrottleAction, bool) {
-		if !nav.IsInPrimaryMainFrame || nav.TabID == 0 {
+		if !nav.IsInPrimaryMainFrame || nav.TabID <= 0 {
 			return 0, false
 		}
 		if l.NavigationStarting(engine.TabID(nav.TabID), nav.URL) {
@@ -30,7 +33,7 @@ func Wire(h *Hooks, l engine.Listener) {
 	h.Throttle.AnswerWillRedirectRequest(gate)
 
 	h.Observer.OnDidFinishNavigation(func(c WebContents, nav NavigationHandle) {
-		if !nav.IsInPrimaryMainFrame || c.ID == 0 {
+		if !nav.IsInPrimaryMainFrame || c.ID <= 0 {
 			return
 		}
 		tab := engine.TabID(c.ID)
@@ -49,76 +52,93 @@ func Wire(h *Hooks, l engine.Listener) {
 		}
 	})
 	h.Observer.OnDidStartLoading(func(c WebContents) {
-		if c.ID != 0 {
+		if c.ID > 0 {
 			l.LoadingChanged(engine.TabID(c.ID), true)
 		}
 	})
 	h.Observer.OnDidStopLoading(func(c WebContents) {
-		if c.ID != 0 {
+		if c.ID > 0 {
 			l.LoadingChanged(engine.TabID(c.ID), false)
 		}
 	})
 	h.Observer.OnLoadProgressChanged(func(c WebContents, progress float64) {
-		if c.ID != 0 {
+		if c.ID > 0 {
 			l.LoadProgressChanged(engine.TabID(c.ID), progress)
 		}
 	})
 	h.Observer.OnTitleWasSet(func(c WebContents, entry NavigationEntry) {
-		if c.ID != 0 {
+		if c.ID > 0 {
 			l.TitleChanged(engine.TabID(c.ID), c.Title)
 		}
 	})
 	h.Observer.OnPrimaryMainFrameRenderProcessGone(func(c WebContents, status TerminationStatus) {
-		if c.ID != 0 {
+		if c.ID > 0 {
 			l.PageCrashed(engine.TabID(c.ID))
 		}
 	})
 
-	// Content asks the tab's delegate to close or show it. The shell (id 0) is no tab.
+	// Content asks the tab's delegate to close or show it. The shell and the settings page
+	// are no tabs.
 	h.Delegate.OnCloseContents(func(_, source WebContents) {
-		if source.ID != 0 {
+		if source.ID > 0 {
 			l.CloseRequested(engine.TabID(source.ID))
 		}
 	})
 	h.Delegate.OnActivateContents(func(_, contents WebContents) {
-		if contents.ID != 0 {
+		if contents.ID > 0 {
 			l.ActivateRequested(engine.TabID(contents.ID))
 		}
 	})
 
-	// Reserved keys are kept from the page and the shell alike, and handed to the app.
+	// Every key press in any of our pages goes to the app before the page sees it, and
+	// again if the page didn't use it.
 	h.Delegate.AnswerPreHandleKeyboardEvent(func(c, source WebContents, event NativeWebKeyboardEvent) (KeyboardEventProcessingResult, bool) {
-		if s := shortcutFor(event); s != 0 {
-			l.Shortcut(s)
+		if k, ok := keyOf(event); ok && l.Key(k, engine.KeyBeforePage, surfaceOf(source)) {
 			return KeyboardEventProcessingResultHandled, true
 		}
 		return 0, false
 	})
+	h.Delegate.AnswerHandleKeyboardEvent(func(c, source WebContents, event NativeWebKeyboardEvent) (bool, bool) {
+		if k, ok := keyOf(event); ok && l.Key(k, engine.KeyUnhandled, surfaceOf(source)) {
+			return true, true
+		}
+		return false, false
+	})
 }
 
-// shortcutFor is the reserved key combination a key event is, or 0.
-func shortcutFor(e NativeWebKeyboardEvent) engine.Shortcut {
-	if e.Type != WebInputEventTypeRawKeyDown {
-		return 0
+// settingsID is the id the adapter gives the settings page; the shell's is 0 and tabs'
+// are positive.
+const settingsID = -1
+
+func surfaceOf(c WebContents) engine.Surface {
+	switch c.ID {
+	case 0:
+		return engine.SurfaceShell
+	case settingsID:
+		return engine.SurfaceSettings
 	}
-	mods := e.Modifiers & WebInputEventModifiersKeyModifiers
-	key := e.WindowsKeyCode
-	switch {
-	case mods == WebInputEventModifiersMetaKey:
-		switch {
-		case key == KeyboardCodeL:
-			return engine.ShortcutFocusAddressBar
-		case key == KeyboardCodeT:
-			return engine.ShortcutNewTab
-		case key == KeyboardCodeW:
-			return engine.ShortcutCloseTab
-		case key >= KeyboardCode1 && key <= KeyboardCode9:
-			return engine.ShortcutTab1 + engine.Shortcut(key-KeyboardCode1)
+	return engine.SurfacePage
+}
+
+// keyOf is the key a key-down event is. Other events (key up, typed characters) are no
+// key press.
+func keyOf(e NativeWebKeyboardEvent) (engine.Key, bool) {
+	if e.Type != WebInputEventTypeRawKeyDown && e.Type != WebInputEventTypeKeyDown {
+		return engine.Key{}, false
+	}
+	k := engine.Key{Code: int(e.WindowsKeyCode)}
+	for _, m := range []struct {
+		web WebInputEventModifiers
+		mod engine.Mods
+	}{
+		{WebInputEventModifiersControlKey, engine.ModCtrl},
+		{WebInputEventModifiersAltKey, engine.ModAlt},
+		{WebInputEventModifiersShiftKey, engine.ModShift},
+		{WebInputEventModifiersMetaKey, engine.ModCmd},
+	} {
+		if e.Modifiers&m.web != 0 {
+			k.Mods |= m.mod
 		}
-	case key == KeyboardCodeTab && mods == WebInputEventModifiersControlKey:
-		return engine.ShortcutNextTab
-	case key == KeyboardCodeTab && mods == WebInputEventModifiersControlKey|WebInputEventModifiersShiftKey:
-		return engine.ShortcutPreviousTab
 	}
-	return 0
+	return k, true
 }

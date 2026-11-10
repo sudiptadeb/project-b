@@ -52,7 +52,6 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   CHECK(base::CreateDirectory(ChromiumDataDir()));
   browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
   RegisterShellWebUI(browser_context_.get());
-  InstallMainMenu();
 
   window_ = std::make_unique<Window>(base::BindOnce(
       [](base::OnceClosure* quit) {
@@ -70,6 +69,7 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
+  WatchOSKeyBindings();
   // Go has given the window its first layout, frame included, so its first frame on
   // screen is already the frame colour. It still shows before any renderer has drawn.
   window_->Show();

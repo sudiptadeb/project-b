@@ -17,6 +17,17 @@ static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
 static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_forward(tab); }
 static inline void call_reload(const PBEngineCalls* c, int64_t tab) { c->reload(tab); }
+static inline void call_reload_bypassing_cache(const PBEngineCalls* c, int64_t tab) { c->reload_bypassing_cache(tab); }
+static inline void call_stop(const PBEngineCalls* c, int64_t tab) { c->stop(tab); }
+static inline void call_set_zoom(const PBEngineCalls* c, int64_t tab, double factor) { c->set_zoom(tab, factor); }
+static inline double call_get_zoom(const PBEngineCalls* c, int64_t tab) { return c->get_zoom(tab); }
+static inline int64_t call_duplicate_tab(const PBEngineCalls* c, int64_t tab) { return c->duplicate_tab(tab); }
+static inline void call_edit(const PBEngineCalls* c, int32_t command) { c->edit(command); }
+static inline void call_open_settings(const PBEngineCalls* c) { c->open_settings(); }
+static inline void call_close_settings(const PBEngineCalls* c) { c->close_settings(); }
+static inline void call_send_to_settings(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_settings(json, length); }
+static inline void call_set_menu(const PBEngineCalls* c, const char* json, size_t length) { c->set_menu(json, length); }
+static inline void call_app_command(const PBEngineCalls* c, int32_t command) { c->app_command(command); }
 static inline void call_set_window_layout(const PBEngineCalls* c, const PBWindowLayout* layout, const PBRegion* regions, size_t count) { c->set_window_layout(layout, regions, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
@@ -115,6 +126,48 @@ func (e *nativeEngine) GoBack(tab engine.TabID) { C.call_go_back(e.calls, C.int6
 func (e *nativeEngine) GoForward(tab engine.TabID) { C.call_go_forward(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) Reload(tab engine.TabID) { C.call_reload(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) ReloadBypassingCache(tab engine.TabID) {
+	C.call_reload_bypassing_cache(e.calls, C.int64_t(tab))
+}
+
+func (e *nativeEngine) Stop(tab engine.TabID) { C.call_stop(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) Zoom(tab engine.TabID, factor float64) {
+	C.call_set_zoom(e.calls, C.int64_t(tab), C.double(factor))
+}
+
+func (e *nativeEngine) ZoomOf(tab engine.TabID) float64 {
+	return float64(C.call_get_zoom(e.calls, C.int64_t(tab)))
+}
+
+func (e *nativeEngine) DuplicateTab(tab engine.TabID) engine.TabID {
+	return engine.TabID(C.call_duplicate_tab(e.calls, C.int64_t(tab)))
+}
+
+func (e *nativeEngine) Edit(c engine.EditCommand) { C.call_edit(e.calls, C.int32_t(c)) }
+
+func (e *nativeEngine) OpenSettings() { C.call_open_settings(e.calls) }
+
+func (e *nativeEngine) CloseSettings() { C.call_close_settings(e.calls) }
+
+func (e *nativeEngine) SendToSettings(msg []byte) {
+	if len(msg) == 0 {
+		return
+	}
+	C.call_send_to_settings(e.calls, (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
+}
+
+func (e *nativeEngine) SetMenu(m engine.Menu) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		log.Printf("menu: %v", err)
+		return
+	}
+	C.call_set_menu(e.calls, (*C.char)(unsafe.Pointer(&b[0])), C.size_t(len(b)))
+}
+
+func (e *nativeEngine) AppCommand(c engine.AppCommand) { C.call_app_command(e.calls, C.int32_t(c)) }
 
 func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
 	rgb, err := strconv.ParseInt(strings.TrimPrefix(l.FrameColor, "#"), 16, 32)

@@ -20,6 +20,8 @@
 // That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
+// Over everything while it is there, and it takes every press.
+@property(nonatomic, weak) NSView* overlayView;
 // Holds every page view; the shown one is the only one not hidden.
 @property(nonatomic, strong) NSView* pages;
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions;
@@ -30,6 +32,7 @@
 }
 
 @synthesize shellView = _shellView;
+@synthesize overlayView = _overlayView;
 @synthesize pages = _pages;
 
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions {
@@ -51,6 +54,9 @@
   NSPoint p = [self convertPoint:point fromView:self.superview];
   if (!NSPointInRect(p, self.bounds)) {
     return nil;
+  }
+  if (self.overlayView) {
+    return [self.overlayView hitTest:p];
   }
   // Shell rectangles measure y from the top; Cocoa measures it from the bottom.
   const float y = self.bounds.size.height - p.y;
@@ -337,6 +343,22 @@ void Window::ShowPageView(gfx::NativeView view) {
 
 void Window::RemovePageView(gfx::NativeView view) {
   [view.GetNativeNSView() removeFromSuperview];
+}
+
+void Window::SetOverlayView(gfx::NativeView view) {
+  NSView* overlay = view.GetNativeNSView();
+  overlay.frame = impl_->container.bounds;
+  overlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  impl_->container.overlayView = overlay;
+  [impl_->container addSubview:overlay];
+}
+
+void Window::RemoveOverlayView(gfx::NativeView view) {
+  NSView* overlay = view.GetNativeNSView();
+  if (impl_->container.overlayView == overlay) {
+    impl_->container.overlayView = nil;
+  }
+  [overlay removeFromSuperview];
 }
 
 void Window::SetLayout(Layout layout) {

@@ -1,5 +1,6 @@
 <script setup>
 import { send } from './bridge.js';
+import { shown } from './keys.js';
 import { controlSpace as controls, state, tabLabel } from './state.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,
@@ -31,7 +32,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
       </button>
     </div>
-    <button class="new-tab" type="button" aria-label="New Tab" title="New Tab (⌘T)" @click="send({ t: 'newTab' })">
+    <button class="new-tab" type="button" aria-label="New Tab" :title="state.keys['tab.new'] ? `New Tab (${shown(state.keys['tab.new'], state.platform)})` : 'New Tab'" @click="send({ t: 'newTab' })">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
     </button>
     <div v-drag class="rest"></div>

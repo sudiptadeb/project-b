@@ -20,7 +20,6 @@ type command struct {
 	T    string `json:"t"`
 	Text string `json:"text"`
 	ID   int64  `json:"id"`
-	On   bool   `json:"on"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -40,11 +39,15 @@ type Manager struct {
 	prefs   *prefs.Manager
 	update  *update.Manager
 	crash   *crash.Manager
+	run     func(action string)
+	keys    func() map[string]string
+	os      string
 }
 
-// New returns a manager.
-func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c}
+// New returns a manager. run runs an action by id, as a menu item would; keys says the key
+// each action shows, on platform os, for the shell's hints.
+func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager, run func(action string), keys func() map[string]string, os string) *Manager {
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os}
 }
 
 // Handle takes one command from the shell.
@@ -66,10 +69,11 @@ func (m *Manager) Handle(msg []byte) {
 			"controls":     m.window.Controls(),
 			"cornerRadius": m.window.CornerRadius(),
 			"tabLayout":    m.prefs.TabLayout(),
-			"autoUpdate":   m.prefs.AutoUpdate(),
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"crashLog":     m.crash.Last(),
+			"platform":     m.os,
+			"keys":         m.keys(),
 		})
 	case "navigate":
 		m.tabs.Navigate(c.Text)
@@ -87,12 +91,8 @@ func (m *Manager) Handle(msg []byte) {
 		m.tabs.Activate(engine.TabID(c.ID))
 	case "setTabLayout":
 		m.prefs.SetTabLayout(c.Text)
-	case "setAutoUpdate":
-		m.prefs.SetAutoUpdate(c.On)
-	case "setFrameColor":
-		m.prefs.SetFrameColor(c.Text)
-	case "checkUpdate":
-		m.update.CheckNow()
+	case "run":
+		m.run(c.Text)
 	case "relaunch":
 		m.update.Relaunch()
 	case "dismissCrash":
@@ -137,11 +137,6 @@ func (m *Manager) TabLayoutChanged(layout string) {
 	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
-// AutoUpdateChanged tells the shell that automatic updates were turned on or off.
-func (m *Manager) AutoUpdateChanged(on bool) {
-	m.send(map[string]any{"t": "autoUpdate", "autoUpdate": on})
-}
-
 // UpdateChanged tells the shell what the updater is doing: nothing, checking,
 // downloading, ready to relaunch, or failed.
 func (m *Manager) UpdateChanged(s update.State) {
@@ -157,6 +152,11 @@ func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
 // WindowColorChanged tells the shell the frame's new colour, which the window now paints.
 func (m *Manager) WindowColorChanged(color string) {
 	m.send(map[string]any{"t": "windowColor", "windowColor": color})
+}
+
+// KeysChanged tells the shell the keys its hints show, after the keymap changed.
+func (m *Manager) KeysChanged() {
+	m.send(map[string]any{"t": "keys", "keys": m.keys()})
 }
 
 // FocusAddressBar gives the shell focus and asks it to put that focus in the address bar.

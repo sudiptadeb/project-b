@@ -1,6 +1,11 @@
 package content
 
-import "projectb/engine"
+import (
+	"encoding/json"
+	"log"
+
+	"projectb/engine"
+)
 
 // The adapter's own events: things our C++ does that content has no hook for. The
 // numbers and value layouts match PBEvent in engine/abi/pb_abi.h.
@@ -11,6 +16,9 @@ const (
 	eventWindowChanged  Hook = 4
 	eventPing           Hook = 5
 	eventShellCrashed   Hook = 6
+	eventSettingsMsg    Hook = 7
+	eventMenuChosen     Hook = 8
+	eventOSBindings     Hook = 9
 )
 
 var eventNames = map[Hook]string{
@@ -20,15 +28,21 @@ var eventNames = map[Hook]string{
 	eventWindowChanged:  "engine.WindowChanged",
 	eventPing:           "engine.Ping",
 	eventShellCrashed:   "engine.ShellCrashed",
+	eventSettingsMsg:    "engine.SettingsMessage",
+	eventMenuChosen:     "engine.MenuChosen",
+	eventOSBindings:     "engine.OSBindings",
 }
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
 type Events struct {
-	OnShellMessage   func(msg []byte)
-	OnTabOpened      func(opener, tab engine.TabID, url string, foreground bool)
-	OnFaviconChanged func(tab engine.TabID, dataURL string)
-	OnWindowChanged  func(s engine.WindowState)
-	OnShellCrashed   func()
+	OnShellMessage    func(msg []byte)
+	OnTabOpened       func(opener, tab engine.TabID, url string, foreground bool)
+	OnFaviconChanged  func(tab engine.TabID, dataURL string)
+	OnWindowChanged   func(s engine.WindowState)
+	OnShellCrashed    func()
+	OnSettingsMessage func(msg []byte)
+	OnMenuChosen      func(action string)
+	OnOSBindings      func(byTitle map[string]engine.Key)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -58,6 +72,22 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	case eventShellCrashed:
 		if e.OnShellCrashed != nil {
 			e.OnShellCrashed()
+		}
+	case eventSettingsMsg:
+		if e.OnSettingsMessage != nil {
+			e.OnSettingsMessage([]byte(r.str()))
+		}
+	case eventMenuChosen:
+		if e.OnMenuChosen != nil {
+			e.OnMenuChosen(r.str())
+		}
+	case eventOSBindings:
+		// JSON: each title with the key's Windows virtual-key code and our modifiers.
+		var byTitle map[string]engine.Key
+		if err := json.Unmarshal([]byte(r.str()), &byTitle); err != nil {
+			log.Printf("content: bad OS bindings: %v", err)
+		} else if e.OnOSBindings != nil {
+			e.OnOSBindings(byTitle)
 		}
 	}
 	return Value{}, false

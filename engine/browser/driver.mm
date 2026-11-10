@@ -34,6 +34,7 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/page_tab.h"
+#include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -52,6 +53,11 @@
 namespace project_b {
 
 namespace {
+
+// The menu bar as the user sees it: each menu's title and its items' titles, with the
+// key each shows ("^~$@" then the key, as macOS writes them), whether it is enabled and
+// whether it is checked.
+std::string MenuJson(NSMenu* menu);
 
 void Reply(const std::string& id, const std::string& text) {
   printf("PBDRIVER %s %s\n", id.c_str(), text.c_str());
@@ -92,6 +98,11 @@ std::string Classify(NSView* hit) {
   if (tab && [hit isDescendantOf:tab->contents()->GetNativeView().GetNativeNSView()]) {
     return "page";
   }
+  SettingsPage* settings = Engine::Get()->settings();
+  if (settings &&
+      [hit isDescendantOf:settings->contents()->GetNativeView().GetNativeNSView()]) {
+    return "settings";
+  }
   if (hit == TheWindow().contentView) {
     return "container";
   }
@@ -123,7 +134,7 @@ std::string SendMouse(NSEventType type, double x, double y, int clicks) {
                                       pressure:clicks ? 1.0 : 0.0];
   NSView* hit = HitFromFrame(x, y);
   const std::string kind = Classify(hit);
-  if (kind != "shell" && kind != "page") {
+  if (kind != "shell" && kind != "page" && kind != "settings") {
     return kind;
   }
   switch (type) {
@@ -183,7 +194,7 @@ unsigned short CodeForChar(unichar c) {
       {"2", 19}, {"3", 20}, {"4", 21}, {"6", 22}, {"5", 23}, {"9", 25},
       {"7", 26}, {"8", 28}, {"0", 29}, {"o", 31}, {"u", 32}, {"i", 34},
       {"p", 35}, {"l", 37}, {"j", 38}, {"k", 40}, {"n", 45}, {"m", 46},
-      {".", 47}, {"/", 44}, {":", 41}, {"-", 27},
+      {".", 47}, {"/", 44}, {":", 41}, {"-", 27}, {",", 43},
   };
   for (const auto& entry : kCodes) {
     if (entry.chars[0] == c) {
@@ -362,6 +373,8 @@ void Run(const std::string& line) {
           flags |= NSEventModifierFlagControl;
         } else if (mod == "shift") {
           flags |= NSEventModifierFlagShift;
+        } else if (mod == "opt") {
+          flags |= NSEventModifierFlagOption;
         }
       }
       if (key == "tab") {
@@ -389,6 +402,14 @@ void Run(const std::string& line) {
     Eval(id, Engine::Get()->shell()->contents(), rest(2));
   } else if (cmd == "evalpage") {
     Eval(id, Engine::Get()->active_tab()->contents(), rest(2));
+  } else if (cmd == "evalsettings") {
+    if (SettingsPage* settings = Engine::Get()->settings()) {
+      Eval(id, settings->contents(), rest(2));
+    } else {
+      Reply(id, "ERR no settings page");
+    }
+  } else if (cmd == "menu") {
+    Reply(id, MenuJson(NSApp.mainMenu));
   } else if (cmd == "capture") {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {
@@ -567,7 +588,9 @@ void Capture(const std::string& id, const std::string& path) {
     view->CopyFromSurface(gfx::Rect(), gfx::Size(), base::Seconds(5), std::move(done));
   };
 
-  copy(Engine::Get()->shell()->contents(),
+  // The settings page covers the whole window while it is open: it alone is the picture.
+  SettingsPage* settings = Engine::Get()->settings();
+  copy(settings ? settings->contents() : Engine::Get()->shell()->contents(),
        base::BindOnce(
            [](scoped_refptr<CaptureState> state,
               const content::CopyFromSurfaceResult& result) {
@@ -580,6 +603,10 @@ void Capture(const std::string& id, const std::string& path) {
              FinishCapture(state);
            },
            state));
+  if (settings) {
+    state->page_done = true;
+    return;
+  }
   copy(Engine::Get()->active_tab()->contents(),
        base::BindOnce(
            [](scoped_refptr<CaptureState> state,
@@ -619,5 +646,42 @@ void StartDriver(const base::FilePath& fifo) {
   });
   Reply("start", "ready");
 }
+
+namespace {
+
+base::ListValue MenuItems(NSMenu* menu) {
+  base::ListValue items;
+  for (NSMenuItem* item in menu.itemArray) {
+    if (item.separatorItem) {
+      items.Append("-");
+      continue;
+    }
+    std::string key;
+    NSEventModifierFlags m = item.keyEquivalentModifierMask;
+    if (item.keyEquivalent.length) {
+      key = std::string(m & NSEventModifierFlagControl ? "^" : "") +
+            (m & NSEventModifierFlagOption ? "~" : "") +
+            (m & NSEventModifierFlagShift ? "$" : "") +
+            (m & NSEventModifierFlagCommand ? "@" : "") +
+            base::SysNSStringToUTF8(item.keyEquivalent);
+    }
+    base::DictValue d;
+    d.Set("title", base::SysNSStringToUTF8(item.title));
+    d.Set("key", key);
+    d.Set("enabled", static_cast<bool>(item.enabled));
+    d.Set("checked", item.state == NSControlStateValueOn);
+    if (item.submenu) {
+      d.Set("items", MenuItems(item.submenu));
+    }
+    items.Append(std::move(d));
+  }
+  return items;
+}
+
+std::string MenuJson(NSMenu* menu) {
+  return base::WriteJson(MenuItems(menu)).value_or("[]");
+}
+
+}  // namespace
 
 }  // namespace project_b

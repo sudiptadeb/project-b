@@ -159,8 +159,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   // Events from the page side. Shortcuts arrive from the engine, whichever page had focus.
   const shortcut = async (name) => {
-    await mock.getByLabel('Shortcut name').fill(name);
-    await mock.getByRole('button', { name: 'Shortcut' }).click();
+    await mock.getByLabel('Key name').fill(name);
+    await mock.getByRole('button', { name: 'Key', exact: true }).click();
   };
   await shortcut('focusAddressBar');
   await page.waitForFunction(() => document.activeElement === document.querySelector('input'));

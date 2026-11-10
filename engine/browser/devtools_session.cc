@@ -103,7 +103,7 @@ protocol::Response DevToolsSession::GetWindowForTarget(
     return protocol::Response::ServerError("No web contents in the target");
   }
   Window* window = GetWindow(kWindowId);
-  if (!window || hooks::TabOf(web_contents) == 0) {
+  if (!window || hooks::TabOf(web_contents) <= 0) {
     return protocol::Response::ServerError("Browser window not found");
   }
   *out_window_id = kWindowId;

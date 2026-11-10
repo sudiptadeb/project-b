@@ -20,18 +20,17 @@ export const state = reactive({
   // colour and width.
   windowColor: '',
   frameWidth: 0,
-  // Whether the sidebar is open, and whether the settings panel is. The shell's own, so
-  // they stay here.
+  // Whether the sidebar is open. The shell's own, so it stays here.
   sidebar: true,
-  settings: false,
-  // Whether the app checks for updates on its own.
-  autoUpdate: true,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
   // with the release's version and, when it failed, why; and how a check the user asked
   // for went.
   update: { phase: '' },
   // The version running, '' for a development build.
   running: '',
+  // The platform, as the keymap names it, and the key each action shows, by action id.
+  platform: 'mac',
+  keys: {},
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
 });
@@ -87,10 +86,14 @@ export function connect() {
           state.controls = m.controls;
           state.cornerRadius = m.cornerRadius;
           state.tabLayout = m.tabLayout;
-          state.autoUpdate = m.autoUpdate;
           state.update = m.update;
           state.running = m.running;
           state.crashLog = m.crashLog;
+          state.platform = m.platform;
+          state.keys = m.keys;
+          break;
+        case 'keys':
+          state.keys = m.keys;
           break;
         case 'crashLog':
           state.crashLog = m.crashLog;
@@ -109,9 +112,6 @@ export function connect() {
         }
         case 'tabLayout':
           state.tabLayout = m.tabLayout;
-          break;
-        case 'autoUpdate':
-          state.autoUpdate = m.autoUpdate;
           break;
         case 'windowColor':
           state.windowColor = m.windowColor;

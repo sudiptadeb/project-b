@@ -39,7 +39,38 @@ typedef enum PBEvent {
                                         // i: full screen
   PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
   PB_EVENT_SHELL_CRASHED = 6,           // nothing; the shell page's renderer died
+  PB_EVENT_SETTINGS_MESSAGE = 7,        // s: json, from the settings page
+  PB_EVENT_MENU_CHOSEN = 8,             // s: the chosen item's action id
+  PB_EVENT_OS_BINDINGS = 9,             // s: json, {title: {code, mods}}, the keys the
+                                        // OS gives our menu items (macOS App Shortcuts)
 } PBEvent;
+
+// Modifier bits, as Go's engine.Mods has them.
+typedef enum PBMods {
+  PB_MOD_CTRL = 1,
+  PB_MOD_ALT = 2,  // Option on a Mac
+  PB_MOD_SHIFT = 4,
+  PB_MOD_CMD = 8,
+} PBMods;
+
+typedef enum PBEditCommand {
+  PB_EDIT_UNDO = 1,
+  PB_EDIT_REDO = 2,
+  PB_EDIT_CUT = 3,
+  PB_EDIT_COPY = 4,
+  PB_EDIT_PASTE = 5,
+  PB_EDIT_PASTE_AND_MATCH_STYLE = 6,
+  PB_EDIT_DELETE = 7,
+  PB_EDIT_SELECT_ALL = 8,
+} PBEditCommand;
+
+typedef enum PBAppCommand {
+  PB_APP_ABOUT = 1,
+  PB_APP_HIDE = 2,
+  PB_APP_HIDE_OTHERS = 3,
+  PB_APP_SHOW_ALL = 4,
+  PB_APP_BRING_ALL_TO_FRONT = 5,
+} PBAppCommand;
 
 // What a press inside a region does. Matches engine.Area in core/engine/engine.go.
 typedef enum PBArea {
@@ -83,6 +114,15 @@ typedef struct PBEngineCalls {
   void (*go_back)(int64_t tab);
   void (*go_forward)(int64_t tab);
   void (*reload)(int64_t tab);
+  void (*reload_bypassing_cache)(int64_t tab);
+  void (*stop)(int64_t tab);
+  // Page zoom as a factor, 1 for actual size, kept for the page's host.
+  void (*set_zoom)(int64_t tab, double factor);
+  double (*get_zoom)(int64_t tab);
+  // Makes a hidden copy of the tab, history included, and returns its id.
+  int64_t (*duplicate_tab)(int64_t tab);
+  // Runs a PBEditCommand in whichever of our pages has the keyboard.
+  void (*edit)(int32_t command);
   void (*request_window)(int32_t request);  // PBWindowRequest
   // regions are in order: the first that holds a point decides. None holds it: the page.
   void (*set_window_layout)(const PBWindowLayout* layout,
@@ -91,6 +131,13 @@ typedef struct PBEngineCalls {
   void (*focus_page)(void);
   void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);
+  // The settings page, over the whole window in its own page while open.
+  void (*open_settings)(void);
+  void (*close_settings)(void);
+  void (*send_to_settings)(const char* json, size_t length);
+  // Replaces the native menu bar: json is Go's engine.Menu.
+  void (*set_menu)(const char* json, size_t length);
+  void (*app_command)(int32_t command);  // PBAppCommand
   // Lets a content hook cross to Go, or stops it. Unsubscribed hooks never cross.
   void (*set_hook_subscribed)(int32_t hook, int on);
   // Asks the main thread to call run_posted soon.

@@ -1,6 +1,6 @@
 // Package mockengine is a browser engine with no browser in it. Its page is a set of
 // buttons that fire the events real content would: navigation, title, failure, crash,
-// a page opening a tab, a shortcut, full screen.
+// a page opening a tab, a key press, full screen.
 package mockengine
 
 import (
@@ -28,17 +28,18 @@ const (
 	Height = 700.0
 )
 
-// Shortcuts are the names the mock page uses for engine.Shortcut.
-var Shortcuts = map[string]engine.Shortcut{
-	"focusAddressBar": engine.ShortcutFocusAddressBar,
-	"newTab":          engine.ShortcutNewTab,
-	"closeTab":        engine.ShortcutCloseTab,
-	"nextTab":         engine.ShortcutNextTab,
-	"previousTab":     engine.ShortcutPreviousTab,
-	"tab1":            engine.ShortcutTab1,
-	"tab2":            engine.ShortcutTab1 + 1,
-	"tab3":            engine.ShortcutTab1 + 2,
-	"tab9":            engine.ShortcutTab1 + 8,
+// Keys are the names the mock page uses for key presses, as a Mac keyboard has them.
+var Keys = map[string]engine.Key{
+	"focusAddressBar": {Code: 'L', Mods: engine.ModCmd},
+	"newTab":          {Code: 'T', Mods: engine.ModCmd},
+	"closeTab":        {Code: 'W', Mods: engine.ModCmd},
+	"nextTab":         {Code: 0x09, Mods: engine.ModCtrl},
+	"previousTab":     {Code: 0x09, Mods: engine.ModCtrl | engine.ModShift},
+	"tab1":            {Code: '1', Mods: engine.ModCmd},
+	"tab2":            {Code: '2', Mods: engine.ModCmd},
+	"tab3":            {Code: '3', Mods: engine.ModCmd},
+	"tab9":            {Code: '9', Mods: engine.ModCmd},
+	"settings":        {Code: 0xBC, Mods: engine.ModCmd},
 }
 
 // tab is one mock tab's session history and what its page shows.
@@ -48,6 +49,7 @@ type tab struct {
 	navSeq  int
 	state   string // What the mock page shows: empty, loading, loaded, blocked, crashed.
 	current string
+	zoom    float64
 }
 
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
@@ -67,6 +69,11 @@ type Engine struct {
 	closed     bool
 	hidden     []engine.TabID // Tabs told they are hidden since the last ShowTab.
 	shownColor string
+	settings   bool
+	menu       engine.Menu
+	edits      []engine.EditCommand
+
+	Settings Feed // Messages to the settings page.
 
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
@@ -200,6 +207,92 @@ func (e *Engine) ShownColor() string {
 	return e.shownColor
 }
 
+func (e *Engine) ReloadBypassingCache(id engine.TabID) { e.Reload(id) }
+
+func (e *Engine) Stop(id engine.TabID) {
+	if t := e.tabs[id]; t != nil && t.state == "loading" {
+		t.navSeq++
+		t.state = "loaded"
+		e.listener.LoadingChanged(id, false)
+	}
+}
+
+func (e *Engine) Zoom(id engine.TabID, factor float64) {
+	if t := e.tabs[id]; t != nil {
+		t.zoom = factor
+	}
+}
+
+func (e *Engine) ZoomOf(id engine.TabID) float64 {
+	if t := e.tabs[id]; t != nil && t.zoom != 0 {
+		return t.zoom
+	}
+	return 1
+}
+
+// DuplicateTab copies the tab's history into a new hidden tab.
+func (e *Engine) DuplicateTab(id engine.TabID) engine.TabID {
+	n := e.CreateTab()
+	if t := e.tabs[id]; t != nil {
+		c := *t
+		c.history = append([]string(nil), t.history...)
+		e.tabs[n] = &c
+	}
+	return n
+}
+
+func (e *Engine) Edit(c engine.EditCommand) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.edits = append(e.edits, c)
+}
+
+// Edits are the editing commands the app ran, in order.
+func (e *Engine) Edits() []engine.EditCommand {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]engine.EditCommand(nil), e.edits...)
+}
+
+// The mock has no page to put over the window: it records whether the settings page is
+// open, and the dev server serves that page on its own.
+func (e *Engine) OpenSettings() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.settings = true
+}
+
+func (e *Engine) CloseSettings() {
+	e.mu.Lock()
+	e.settings = false
+	e.mu.Unlock()
+	e.Settings.Publish([]byte(`{"t":"closed"}`))
+}
+
+// SettingsOpen says whether the app has the settings page open.
+func (e *Engine) SettingsOpen() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.settings
+}
+
+func (e *Engine) SendToSettings(msg []byte) { e.Settings.Publish(msg) }
+
+func (e *Engine) SetMenu(m engine.Menu) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.menu = m
+}
+
+// Menu is the last menu the app gave the window.
+func (e *Engine) Menu() engine.Menu {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.menu
+}
+
+func (e *Engine) AppCommand(engine.AppCommand) {}
+
 func (e *Engine) FocusPage() {}
 
 func (e *Engine) FocusShell() {}
@@ -253,9 +346,10 @@ func (e *Engine) Fire(kind, value string) {
 			id := e.CreateTab()
 			e.listener.TabOpened(e.shown, id, value, true)
 			e.navigate(id, value)
-		case "shortcut":
-			if s, ok := Shortcuts[value]; ok {
-				e.listener.Shortcut(s)
+		case "key":
+			// A key pressed in the page, which uses none of them.
+			if k, ok := Keys[value]; ok && !e.listener.Key(k, engine.KeyBeforePage, engine.SurfacePage) {
+				e.listener.Key(k, engine.KeyUnhandled, engine.SurfacePage)
 			}
 		case "fullscreen":
 			// The system's own button, which asks no one.

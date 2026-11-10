@@ -9,19 +9,25 @@ import { send, state } from './state.js';
 const kb = computed(() => state.keyboard);
 const platform = computed(() => kb.value.platform);
 
-// Who wins a key. Page first is the default, so the list leaves it blank.
+// Who wins a key. Page first is the default, so the list leaves it unmarked; a key the
+// browser wins gets a tag after the keys.
 const priorities = [
   { value: 'page', label: 'Page first', short: '' },
-  { value: 'windowed', label: 'Browser, except in full screen', short: 'Browser, except full screen' },
+  { value: 'windowed', label: 'Browser, except in full screen', short: 'Browser · not full screen' },
   { value: 'always', label: 'Browser, always', short: 'Browser' },
 ];
 const shortOf = (r) => priorities.find((p) => p.value === r)?.short ?? '';
 
-// The priority column: the one an action's keys share, or Mixed.
-function priorityOf(a) {
-  if (!a.keys.length) return '';
+// The tags a row shows: one after all its keys when they agree, else one after each key
+// the browser wins.
+function shared(a) {
+  if (!a.keys.length) return null;
   const first = a.keys[0].reserve;
-  return a.keys.every((k) => k.reserve === first) ? shortOf(first) : 'Mixed';
+  return a.keys.every((k) => k.reserve === first) ? first : null;
+}
+function tagText(k) {
+  const t = shortOf(k.reserve);
+  return k.locked && t ? 'Locked · ' + t : t;
 }
 
 const templateNames = { 'project-b': 'Project B', chrome: 'Chrome' };
@@ -108,10 +114,7 @@ function onRecordKey(e, action) {
     </section>
 
     <section v-for="g in kb.groups" :key="g.title" :aria-label="g.title">
-      <div class="group-head">
-        <h2>{{ g.title }}</h2>
-        <span class="priority" aria-hidden="true">Priority</span>
-      </div>
+      <h2>{{ g.title }}</h2>
       <div class="card">
         <template v-for="a in g.actions" :key="a.id">
           <button type="button" class="action" :aria-expanded="open === a.id" @click="toggle(a.id)">
@@ -120,11 +123,12 @@ function onRecordKey(e, action) {
               <span v-if="a.hidden" class="tag">Hidden</span>
             </span>
             <span class="keys">
-              <kbd v-for="k in a.keys" :key="k.index + k.keys" :class="{ clash: k.clash }" :title="k.clash ? `Also ${k.clash}'s, which wins it` : ''">
-                {{ shown(k.keys, platform) }}
-              </kbd>
+              <template v-for="k in a.keys" :key="k.index + k.keys">
+                <kbd :class="{ clash: k.clash }" :title="k.clash ? `Also ${k.clash}'s, which wins it` : ''">{{ shown(k.keys, platform) }}</kbd>
+                <span v-if="shared(a) === null && tagText(k)" class="tag" :class="{ locked: k.locked }">{{ tagText(k) }}</span>
+              </template>
+              <span v-if="shared(a) !== null && tagText(a.keys[0])" class="tag" :class="{ locked: a.keys[0].locked }">{{ tagText(a.keys[0]) }}</span>
             </span>
-            <span class="priority">{{ priorityOf(a) }}</span>
           </button>
 
           <div v-if="open === a.id" class="editor" :aria-label="`Edit ${a.title}`">
@@ -185,31 +189,12 @@ function onRecordKey(e, action) {
 </template>
 
 <style scoped>
-/* One grid for every row: the action, its keys, its priority. The group's heading puts
-   the Priority head over that column. */
-.action,
-.group-head {
-  display: grid;
-  grid-template-columns: 220px 1fr 190px;
-  align-items: baseline;
-  column-gap: 16px;
-}
-
+/* One grid for every row: the action, then its keys with any priority tags. */
 .action {
+  display: grid;
+  grid-template-columns: 220px 1fr;
   align-items: center;
-}
-
-.group-head {
-  grid-template-columns: 234px 1fr 190px;
-  padding-right: 14px;
-}
-
-.group-head h2 {
-  grid-column: 1 / 3;
-}
-
-.group-head .priority {
-  font-size: 12px;
+  column-gap: 16px;
 }
 
 .action {
@@ -254,9 +239,20 @@ function onRecordKey(e, action) {
   min-width: 0;
 }
 
-.priority {
+.keys .tag {
+  margin-left: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.keys .tag.locked {
+  background: none;
+  border: 1px solid var(--line);
   color: var(--muted);
-  font-size: 13px;
 }
 
 kbd {

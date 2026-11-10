@@ -289,7 +289,13 @@ The engine serves each app at `chrome://<app>/` from its own folder, and gives t
 to Go only to the WebContents the app belongs in. It has two sections, General (what the shell's panel had: tab
 layout, frame colour, updates) and Keyboard:
 
-- Every action, grouped by menu, with its keys for this platform and a show-in-menu switch.
+- Every action, grouped by menu, as one plain row: its name and its keys. Nothing on the
+  row is a control; clicking it opens the action's editor under it (each key's priority and
+  Remove, Add key, In menu, Reset).
+- **Priority shows only where it differs from Page first** (owner's pick, 2026-11-10, "for
+  now"; he isn't convinced yet): a tag after the keys, "Browser" or "Browser · not full
+  screen", or "Locked · Browser". The other option mocked was a separate "Browser keeps
+  these keys" list at the top, as Vivaldi has.
 - Click an action, press the new keys. Add a second binding, remove one, choose its
   `reserve`.
 - A template picker (a reset), reset one action, reset all.
@@ -387,6 +393,15 @@ building the Mac menu bar from the tree, catching keys at the window and handing
 Go, answering keyboard lock, and watching macOS's remaps. Each "wire" item above is one
 engine call into content (`WebContents::Copy`, `Find`, `Stop`, `SavePage`, `HostZoomMap`
 and so on).
+
+## Theme (2026-11-10)
+
+Settings has a Theme row: System, Light or Dark. Go's prefs keep it (`theme` in
+`prefs.json`). The shell and the settings page take their tones from the frame colour in
+either theme (`shell/src/tones.js`, applied by `shell/src/theme.js`); the frame keeps the
+colour the user picked. The window's own buttons and title bar follow it
+(`NSWindow.appearance`). Web pages keep following the system, since NSApp's appearance,
+which content reads, is left alone.
 
 ## Decided (2026-11-10)
 

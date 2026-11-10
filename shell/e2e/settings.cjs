@@ -142,6 +142,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await page.getByRole('button', { name: 'Keyboard' }).click();
   // The list only shows; clicking an action opens its editor.
   const openRow = (title) => page.locator('button.action').filter({ has: page.locator('.name', { hasText: new RegExp('^\\s*' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$') }) }).click();
+  check('a key the browser wins carries a tag, and a page-first key none', await until(async () => (await page.locator('button.action', { hasText: 'Close Tab' }).textContent()).includes('Browser · not full screen') && !(await page.locator('button.action', { hasText: 'Open Location' }).textContent()).includes('Browser')));
   check('the list has no buttons of its own: no plus, remove or reset', (await page.getByRole('button', { name: /^(Add a key for|Remove |Reset (?!all))/ }).count()) === 0);
   check('the keymap follows its template until an edit', keymapFile() === null);
   await openRow('New Tab');
@@ -153,7 +154,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   }), JSON.stringify(keymapFile()?.actions?.['tab.new']));
   check('the page shows it', await until(async () => (await page.getByRole('region', { name: 'File' }).textContent()).includes('⇧⌘K')));
   await openRow('Quit Project B');
-  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked').count()) === 1);
+  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked', { exact: true }).count()) === 1);
   check('Quit can\'t leave the menu', await page.getByRole('switch', { name: 'Quit Project B in the menu' }).isDisabled());
 
   await openRow('Reload This Page');

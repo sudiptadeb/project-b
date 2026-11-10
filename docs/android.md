@@ -239,6 +239,7 @@ pinned version builds.
 | `tools/android-content-fetch.sh` | Chromium 155 for Android and its Linux build dependencies, once |
 | `tools/android-content-build.sh` | `gn gen` and the build, inside the container |
 | `tools/android-content-package.sh` | Copies the APK out, compresses its libraries, signs it on the Mac |
+| `tools/android-release.sh` | For `tools/release.sh`: copies a checkout's tracked files into the container, builds, signs, and stops the VM |
 
 The rest of the adapter is shared with the Mac: `engine/browser/` and `engine/common/`, with `BUILDFLAG` guards. The
 ones that change behaviour on Android: the pak comes from the APK and goes to each child as an open file, the shell's
@@ -252,6 +253,10 @@ To build, with the shell built first on the Mac (`(cd shell && npm run build)`),
     DOCKER_HOST=unix://$HOME/.colima/pb-android/docker.sock docker start pb
     amarit restart pb-android-build               # tools/android-content-build.sh in the container
     tools/android-content-package.sh              # build/android/project-b-content.apk, signed
+
+The build copies the tree it's given (`REPO`, `/repo` by default) into `/work/tree` in the container, rewriting a
+file only when its content changes, and GN builds that copy. A release builds another checkout than the one the
+container mounts, and ninja goes by file times, so building either one in place could keep a stale output.
 
 The VM and container were made with `colima start -p pb-android --vz-rosetta --arch aarch64 --cpu 24 --memory 96
 --disk 230` and `docker run -d --name pb --platform linux/amd64 -v pb-work:/work -v <this worktree>:/repo ubuntu:24.04

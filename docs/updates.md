@@ -75,6 +75,16 @@ release's `releases.json` so earlier releases stay listed, has `amarit release` 
 one, tags `v<v>` and creates the GitHub release with all of it. The first updater-enabled
 version has to be installed by hand from its DMG, once; from then on the app updates itself.
 
+The same release carries the Android app. `tools/android-release.sh` starts the Linux VM,
+copies the files git tracks in `core`, `engine` and the build script, and the built shell, into
+its container, builds the APK there incrementally, signs it on the Mac, and stops the VM. The
+container mounts the Android worktree, so the release's own files are copied in, and the build
+rewrites a file in the tree it builds only when its content changes, so moving between
+checkouts never leaves ninja trusting an older file. The APK goes into `build/dist` twice:
+`Project-B-<v>.apk` for people, and `Project-B-<v>-android-arm64.zip` for the updater, the name
+`amarit.json`'s one asset pattern gives the `android/arm64` target (an APK is a zip). How a phone
+takes it is in [android.md](android.md#updates-on-a-phone).
+
 ## Checked
 
 - `core/update` tests: a newer release is staged and relaunch swaps the bundle and keeps the
@@ -94,6 +104,6 @@ version has to be installed by hand from its DMG, once; from then on the app upd
 
 - No automatic rollback: the previous release is kept, nothing starts it. A refused download
   never reaches the install, which is the case that matters.
-- Only `stable`, only Apple silicon, no delta downloads, no progress percentage.
+- Only `stable`, only Apple silicon and arm64 Android, no delta downloads, no progress percentage.
 - A manifest signature (amarit's enterprise tier) isn't implemented in amarit; the bundle's
   code signature against the pinned key is the trust here.

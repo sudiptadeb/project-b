@@ -2,7 +2,7 @@
   "project": "project-b",
   "releases": "https://github.com/sudiptadeb/project-b/releases/latest/download/releases.json",
   "release": {
-    "targets": ["darwin/arm64"],
+    "targets": ["darwin/arm64", "android/arm64"],
     "asset": "Project-B-{version}-{os}-{arch}.zip",
     "url": "https://github.com/sudiptadeb/project-b/releases/download/v{version}/{asset}"
   }

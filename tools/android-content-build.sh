@@ -8,7 +8,10 @@ SRC=$WORK/chromium/src
 OUT=${OUT:-out/android}
 TARGETS=${TARGETS:-project_b_apk}
 GO_VERSION=1.26.5
-REPO=/repo   # This worktree, mounted into the container.
+# The tree to build: this worktree, mounted into the container, or a release's, which
+# tools/android-release.sh copies in.
+REPO=${REPO:-/repo}
+TREE=$WORK/tree
 
 export PATH=$WORK/depot_tools:/usr/local/go/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Rosetta deadlocks on its own lock when Go's preemption signal lands while it's translating, so
@@ -18,14 +21,42 @@ export PYTHONUNBUFFERED=1 DEPOT_TOOLS_UPDATE=0
 
 [ -x /usr/local/go/bin/go ] || curl -fsSL "https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz" | tar -C /usr/local -xz
 
-echo "=== $(date '+%F %T') expose the repo to GN, with no upstream edits"
+# GN builds a copy of the tree in which a file is rewritten only when its content changes. Ninja
+# goes by file times, so building another checkout straight from where it is could leave an
+# output newer than a changed source, and the output would be kept.
+echo "=== $(date '+%F %T') copy $REPO to $TREE by content"
+python3 - "$REPO" "$TREE" <<'PY' || { echo "RESULT=failed copy"; exit 1; }
+import filecmp, os, shutil, sys
+src, dst = sys.argv[1:3]
+keep = set()
+for top in ("engine", "core", "shell/dist", "VERSION"):
+    base = os.path.join(src, top)
+    files = [base] if os.path.isfile(base) else [os.path.join(d, f) for d, _, fs in os.walk(base) for f in fs]
+    for path in files:
+        rel = os.path.relpath(path, src)
+        if "__pycache__" in rel:
+            continue
+        keep.add(rel)
+        to = os.path.join(dst, rel)
+        if os.path.isfile(to) and filecmp.cmp(path, to, shallow=False):
+            continue
+        os.makedirs(os.path.dirname(to), exist_ok=True)
+        shutil.copyfile(path, to)
+        shutil.copymode(path, to)
+for d, _, fs in os.walk(dst):
+    for f in fs:
+        if os.path.relpath(os.path.join(d, f), dst) not in keep:
+            os.remove(os.path.join(d, f))
+PY
+
+echo "=== $(date '+%F %T') expose the tree to GN, with no upstream edits"
 mkdir -p "$SRC/project_b"
-ln -sfn "$REPO/engine" "$SRC/project_b/engine"
-ln -sfn "$REPO/core" "$SRC/project_b/core"
-ln -sfn "$REPO/shell" "$SRC/project_b/shell"
+ln -sfn "$TREE/engine" "$SRC/project_b/engine"
+ln -sfn "$TREE/core" "$SRC/project_b/core"
+ln -sfn "$TREE/shell" "$SRC/project_b/shell"
 
 # The APK's versionCode grows with VERSION: 0.2.13 is 2013.
-VERSION=$(tr -d '[:space:]' < "$REPO/VERSION")
+VERSION=$(tr -d '[:space:]' < "$TREE/VERSION")
 IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
 VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))
 

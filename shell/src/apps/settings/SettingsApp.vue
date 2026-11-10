@@ -284,4 +284,20 @@ select {
   outline: none;
   box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
+
+/* Fingers need bigger targets than a mouse does, and a touch screen has no hover. */
+.touch .row {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.touch .text-button {
+  max-width: 100%;
+  min-height: 40px;
+  height: auto;
+}
+
+.touch .text-button:hover:not(:disabled) {
+  background: var(--surface);
+}
 </style>

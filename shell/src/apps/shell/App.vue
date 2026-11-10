@@ -110,4 +110,14 @@ watchEffect(() => {
   outline: none;
   box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
+
+/* Fingers need bigger targets than a mouse does, and a touch screen has no hover. */
+.touch .icon-button {
+  width: 40px;
+  height: 40px;
+}
+
+.touch .icon-button:hover:not(:disabled) {
+  background: none;
+}
 </style>

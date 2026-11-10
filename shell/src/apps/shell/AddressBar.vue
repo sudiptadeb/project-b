@@ -302,4 +302,18 @@ li.active {
   margin: 0 8px;
   background: var(--muted);
 }
+
+/* Fingers need bigger targets than a mouse does. */
+.touch .field {
+  height: 40px;
+}
+
+.touch input {
+  font-size: 15px;
+}
+
+.touch li {
+  height: 44px;
+  font-size: 15px;
+}
 </style>

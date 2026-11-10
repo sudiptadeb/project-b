@@ -133,4 +133,8 @@ function switchLayout() {
 .progress.on {
   opacity: 1;
 }
+
+.touch .bar {
+  height: 52px;
+}
 </style>

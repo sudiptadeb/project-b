@@ -210,4 +210,16 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
   margin: 0;
   accent-color: var(--accent);
 }
+
+/* On a phone the colours take a line of their own, at a finger's size. */
+.touch .swatch {
+  width: 32px;
+  height: 32px;
+}
+
+.touch .swatches {
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 </style>

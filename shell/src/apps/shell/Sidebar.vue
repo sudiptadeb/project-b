@@ -178,4 +178,25 @@ import { state, tabLabel } from './state.js';
   background: var(--press);
   color: var(--text);
 }
+
+/* Fingers need bigger targets than a mouse does, a touch screen has no hover, and a phone
+   has no Command key. */
+.touch .row {
+  height: 44px;
+  padding-right: 4px;
+}
+
+.touch .close {
+  width: 32px;
+  height: 32px;
+}
+
+.touch .row:hover:not(.active),
+.touch .close:hover {
+  background: none;
+}
+
+.touch .hint {
+  display: none;
+}
 </style>

@@ -1,38 +1,40 @@
 #!/usr/bin/env python3
 """Drives the real Android app on an emulator: real touches, real keys, real screenshots.
 
-A small local web server is the oracle for what the page received, and the app's own history
-file for what the managers kept. Results and screenshots go to build/android-drive.
+Where to touch comes from the app itself: Android's accessibility tree, which content
+fills with the shell's controls by their labels, the settings page and the shown page,
+each with its place on the screen. Nothing here is a fixed position, so a change to the
+shell's layout needs no new numbers. A small local web server is the oracle for what the
+page received, and the app's own history file for what the managers kept. Results and
+screenshots go to build/android-drive-content.
 
-    ADB_SERIAL=emulator-5600 python3 tools/drive_android.py
+    amarit start project-b-emu          # the emulator; docs/android.md says how it was made
+    tools/test.sh android               # or: python3 tools/drive_android.py
+
+ADB_SERIAL picks another device than emulator-5600, and PB_APK another APK than
+build/android/project-b-content.apk. The APK is installed over what is there and the
+app's data is cleared.
 """
 import http.server
 import json
 import os
+import re
 import subprocess
+import sys
 import threading
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SDK = os.path.expanduser("~/Library/Android/sdk")
 ADB = [SDK + "/platform-tools/adb", "-s", os.environ.get("ADB_SERIAL", "emulator-5600")]
-APK = ROOT + "/build/android/project-b-content.apk"
+APK = os.environ.get("PB_APK") or ROOT + "/build/android/project-b-content.apk"
 PACKAGE = "dev.projectb.browser"
 ACTIVITY = ".BrowserActivity"
 PROFILE = "app_project_b/profile"
 OUT = os.environ.get("OUT", ROOT + "/build/android-drive-content")
-PORT = 8765
-BASE = "localhost:%d" % PORT
-
-# Pixel 6 screen, 1080x2400 at density 2.625, status bar 53dp tall. All in device pixels.
-FIELD = (680, 190)
-BACK = (57, 190)
-FORWARD = (152, 190)
-RELOAD = (246, 190)
-FIRST_SUGGESTION = (680, 320)
-PAGE_TOP = (540, 300)
-PAGE_MIDDLE = (540, 1300)
+FIELD = "android.widget.EditText"  # The address field is the shell's only text field.
 
 PAGES = {
     "/a": "<title>Page A</title><a href=/b style='display:block;height:200px;font-size:40px'>to b</a>",
@@ -80,8 +82,14 @@ class Server(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def adb(*args, check=False):
-    return subprocess.run(ADB + list(args), capture_output=True, text=True, check=check).stdout
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Server)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+PORT = server.server_port
+BASE = "localhost:%d" % PORT
+
+
+def adb(*args):
+    return subprocess.run(ADB + list(args), capture_output=True, text=True).stdout
 
 
 def shot(name):
@@ -89,25 +97,115 @@ def shot(name):
         subprocess.run(ADB + ["exec-out", "screencap", "-p"], stdout=f)
 
 
-def tap(point, wait=0.8):
+def until(condition, timeout=15):
+    """Waits for condition to give something other than None or False, and returns it. When
+    time runs out it returns None."""
+    deadline = time.time() + timeout
+    while True:
+        value = condition()
+        if value is not None and value is not False:
+            return value
+        if time.time() > deadline:
+            return None
+        time.sleep(0.1)
+
+
+def asked(path, timeout=15):
+    """Waits until the page has asked the local server for a path that starts this way."""
+    return until(lambda: any(s.startswith(path) for s in served), timeout)
+
+
+# What is on the screen, asked from the app. Content gives Android's accessibility tree one
+# WebView per page it shows: the shell, the settings page while it is open, and the shown
+# tab's page. A node's attributes are Android's: class, text, content-desc (an aria-label),
+# focused, selected, and bounds in device pixels.
+PARTS = {
+    "shell": lambda labels: "Reload" in labels,
+    "settings": lambda labels: "Close settings" in labels,
+    "page": lambda labels: "Reload" not in labels and "Close settings" not in labels,
+}
+
+
+def screen_parts():
+    """The parts on screen now, by name. Empty while Android can't read the screen, as during
+    an animation, or before content has built its tree."""
+    out = adb("exec-out", "uiautomator", "dump", "/dev/tty")
+    if "</hierarchy>" not in out:
+        return {}
+    root = ET.fromstring(out[:out.rindex("</hierarchy>") + len("</hierarchy>")])
+    parts = {}
+    for view in root.iter("node"):
+        if view.get("class") == "android.webkit.WebView":
+            labels = {n.get("content-desc") for n in view.iter("node")}
+            parts[next(name for name, test in PARTS.items() if test(labels))] = view
+    return parts
+
+
+def find(part, **want):
+    """The first node in a part of the screen whose attributes are all as wanted, or None.
+    A wanted value is the attribute's text, or a function of it. label is content-desc,
+    kind is class."""
+    names = {"label": "content-desc", "kind": "class"}
+    view = screen_parts().get(part)
+    for node in view.iter("node") if view is not None else ():
+        if all(v(node.get(names.get(k, k))) if callable(v) else node.get(names.get(k, k)) == v for k, v in want.items()):
+            return node
+    return None
+
+
+def see(part, timeout=20, **want):
+    """Waits for such a node to show, and returns it."""
+    node = until(lambda: find(part, **want), timeout)
+    if node is None:
+        raise TimeoutError("never showed in the %s: %s" % (part, want))
+    return node
+
+
+def box(node):
+    """A node's place on the screen: left, top, right, bottom."""
+    return tuple(map(int, re.findall(r"\d+", node.get("bounds"))))
+
+
+def middle(node):
+    left, top, right, bottom = box(node)
+    return (left + right) // 2, (top + bottom) // 2
+
+
+def tap(point):
     adb("shell", "input", "tap", str(point[0]), str(point[1]))
-    time.sleep(wait)
+
+
+def press(label):
+    """Taps one of the shell's controls, found by its label."""
+    tap(middle(see("shell", label=label)))
+
+
+def key(code):
+    adb("shell", "input", "keyevent", str(code))
 
 
 def type_text(text):
     adb("shell", "input", "text", text.replace(" ", "%s"))
-    time.sleep(0.8)
 
 
-def key(code, wait=0.8):
-    adb("shell", "input", "keyevent", str(code))
-    time.sleep(wait)
-
-
-def go(text, wait=2.0):
-    tap(FIELD)
+def type_in_bar(text):
+    """Taps the address field and types, waiting for the field to have the keyboard and
+    then to show what was typed."""
+    tap(middle(see("shell", kind=FIELD)))
+    see("shell", kind=FIELD, focused="true")
     type_text(text)
-    key(66, wait)
+    see("shell", kind=FIELD, text=lambda shown: shown.lower().startswith(text.lower()))
+
+
+def go(text):
+    type_in_bar(text)
+    key(66)
+
+
+def page_top():
+    """A point just inside the top of the shown page, right under the shell's rows."""
+    left, top, right, _ = box(see("page"))
+    return (left + right) // 2, top + 10
 
 
 def launch(block=""):
@@ -115,21 +213,24 @@ def launch(block=""):
     # Android takes the app zygote down a few seconds after a force stop. A start inside that window
     # reused the dying zygote once and hung for good, so wait it out. Killing it ourselves is worse:
     # the system never makes another, and no renderer starts.
-    for _ in range(30):
-        if PACKAGE + "_zygote" not in adb("shell", "ps", "-A", "-o", "NAME"):
-            break
-        time.sleep(0.5)
+    until(lambda: PACKAGE + "_zygote" not in adb("shell", "ps", "-A", "-o", "NAME"))
     args = ["shell", "am", "start", "-W", "-n", PACKAGE + "/" + ACTIVITY]
     if block:
         args += ["--es", "block", block]
     adb(*args)
-    # Content starts in the background, so the window shows before the shell does. The shell is
-    # up once its renderer is.
-    for _ in range(30):
-        if any("sandboxed" in name for _, name in children()):
-            break
-        time.sleep(0.5)
-    time.sleep(2)
+    # Content starts in the background, so the window shows before the shell does.
+    see("shell", timeout=60, label="Reload")
+    # A run that ended in a kill leaves a notice over the top of the page. It is shell, so
+    # it would take the touches meant for the page.
+    notice = find("shell", label="Close")
+    if notice is not None:
+        tap(middle(notice))
+        until(lambda: find("shell", label="Close") is None)
+
+
+def processes():
+    """The device's processes as (pid, name)."""
+    return [tuple(line.split()) for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines() if len(line.split()) == 2]
 
 
 def history_file():
@@ -191,213 +292,291 @@ def check(name, ok, detail=""):
     print("%s  %s  %s" % ("ok  " if ok else "FAIL", name, detail), flush=True)
 
 
-def main():
-    os.makedirs(OUT, exist_ok=True)
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Server)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    adb("root")
-    time.sleep(2)
-    adb("wait-for-device")
-    adb("reverse", "tcp:%d" % PORT, "tcp:%d" % PORT)
-    adb("install", "-r", APK)
-    adb("shell", "pm", "clear", PACKAGE)
+def status(url, word):
+    """Waits for the address field to show url, then says whether the shell marks it with
+    this word: Blocked, Failed or Crashed."""
+    see("shell", kind=FIELD, text=url)
+    return until(lambda: find("shell", text=word) is not None)
 
+
+def alive():
+    return PACKAGE in [name for _, name in processes()]
+
+
+def turn(rotation):
+    """Turns the phone and waits for the page to have the new shape."""
+    adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
+    adb("shell", "settings", "put", "system", "user_rotation", str(rotation))
+
+    def turned():
+        page = find("page")
+        if page is None:
+            return False
+        left, top, right, bottom = box(page)
+        return (right - left > bottom - top) == (rotation == 1)
+
+    return until(turned)
+
+
+def url(path):
+    return "http://%s%s" % (BASE, path)
+
+
+def browsing():
+    """Pages, tabs, settings, touches and the gate, in one sitting."""
     launch(block="blocked.test")
     shot("01-opens-empty")
 
     # Type a URL.
     go(BASE + "/a")
+    check("typing a URL loads it", asked("/a"))
+    check("the visit reached Go's history file", until(lambda: visited(url("/a"))))
     shot("02-page-a")
-    check("typing a URL loads it", "/a" in served)
-    check("the visit reached Go's history file", visited("http://%s/a" % BASE))
 
-    # A tap on the page, below the bar, belongs to the page.
-    tap((540, 300), 2.0)
+    # A tap on the page belongs to the page.
+    tap(middle(see("page", label="to b")))
+    check("a tap on a link in the page reaches the page", asked("/b"))
     shot("03-link-tapped")
-    check("a tap on a link in the page reaches the page", "/b" in served)
 
     # Back, forward, reload through the shell's own buttons.
     served.clear()
-    tap(BACK, 2.0)
-    shot("04-back")
-    check("back returns to the page before", "/a" in served, str(served))
+    press("Back")
+    check("back returns to the page before", asked("/a"), str(served))
     served.clear()
-    tap(FORWARD, 2.0)
-    shot("05-forward")
-    check("forward returns to the page after", "/b" in served, str(served))
+    press("Forward")
+    check("forward returns to the page after", asked("/b"), str(served))
     served.clear()
-    tap(RELOAD, 2.0)
-    shot("06-reload")
-    check("reload asks the server again", "/b" in served, str(served))
-    check("an emoji in a title reaches Go whole", history_title("http://%s/b" % BASE) == "Page B \U0001F642",
-          repr(history_title("http://%s/b" % BASE)))
+    press("Reload")
+    check("reload asks the server again", asked("/b"), str(served))
+    check("an emoji in a title reaches Go whole", until(lambda: history_title(url("/b")) == "Page B \U0001F642"),
+          repr(history_title(url("/b"))))
 
+    # Tabs: New Tab is in the drawer, and the strip under the toolbar has an icon per tab.
+    press("Show sidebar")
+    tap(middle(see("shell", kind="android.widget.Button", text="New Tab")))
+    see("shell", kind=FIELD, text="", focused="true")
     go(BASE + "/c")
+    check("New Tab in the drawer opens a tab, and the strip shows it as the one in front",
+          asked("/c") and until(lambda: find("shell", label="Page C", selected="true")) is not None)
+    shot("06b-two-tabs")
+    tap(middle(see("shell", label="Page B \U0001F642")))
+    check("a tap on a tab's icon in the strip shows that tab", until(lambda: find("shell", kind=FIELD, text=url("/b"))) is not None)
+
+    # Settings is a page of its own over the window.
+    press("Settings")
+    check("the settings button opens settings over the window", until(lambda: find("settings", label="Close settings")) is not None)
+    shot("06c-settings")
+    key(4)
+    check("the phone's back key closes settings", until(lambda: "settings" not in screen_parts()))
+
     # Suggestions come from history, shown over the page.
-    tap(FIELD)
-    type_text("page")
+    go(BASE + "/c")
+    asked("/c")
+    type_in_bar("page")
     shot("07-suggestions")
     served.clear()
-    tap(FIRST_SUGGESTION, 2.0)
+    tap(middle(see("shell", text=lambda shown: shown.startswith("Page A"))))
+    check("a tap on a suggestion loads it", asked("/a"), str(served))
     shot("08-suggestion-tapped")
-    check("a tap on a suggestion loads it", len(served) == 1, str(served))
 
     # The phone's back key follows the same path as the shell's button.
     served.clear()
-    key(4, 2.0)
+    key(4)
+    check("the phone's back key goes back", asked("/c"), str(served))
     shot("09-back-key")
-    check("the phone's back key goes back", len(served) == 1, str(served))
 
     # Touch routing: a tap and a scroll in the page area go to the page, not the shell above it.
     go(BASE + "/tap")
+    asked("/tap")
     served.clear()
-    tap(PAGE_TOP, 1.5)
-    check("a tap just below the bar reaches the page", "/tapped" in served, str(served))
+    tap(page_top())
+    check("a tap just below the shell's rows reaches the page", asked("/tapped"), str(served))
     go(BASE + "/tall")
+    asked("/tall")
     served.clear()
-    adb("shell", "input", "swipe", "540", "1800", "540", "600", "300")
-    time.sleep(1.5)
+    left, top, right, bottom = box(see("page"))
+    across, high = (left + right) // 2, bottom - top
+    adb("shell", "input", "swipe", str(across), str(top + high * 3 // 4), str(across), str(top + high // 4), "300")
+    check("a swipe scrolls the page under the shell", asked("/scrolled"), str(served[:3]))
     shot("10-scrolled")
-    check("a swipe scrolls the page under the shell", any(s.startswith("/scrolled") for s in served), str(served[:3]))
 
     # Typing into a page goes through the keyboard to the page, not the shell.
     go(BASE + "/input")
+    asked("/input")
     served.clear()
-    tap(PAGE_TOP, 1.0)
+    tap(middle(see("page", kind=FIELD)))
+    see("page", kind=FIELD, focused="true")
     type_text("hello")
-    key(66, 2.0)
-    shot("10b-typed-into-page")
+    key(66)
     # Android 16's keyboard capitalises the first letter, as it would for a person.
-    check("the keyboard types into a page", any("q=hello" in s.lower() for s in served), str(served))
+    check("the keyboard types into a page", until(lambda: any("q=hello" in s.lower() for s in served)), str(served))
+    shot("10b-typed-into-page")
 
     # Holding a finger on text starts a selection, and the app lives through it.
     go(BASE + "/words")
-    adb("shell", "input", "swipe", "400", "600", "400", "600", "900")
-    time.sleep(1.5)
+    asked("/words")
+    left, top, _, _ = box(see("page", text=lambda shown: shown.startswith("Some words")))
+    adb("shell", "input", "swipe", str(left + 100), str(top + 30), str(left + 100), str(top + 30), "900")
+    check("selecting text in a page doesn't kill the app", alive())
     shot("10c-text-selected")
-    check("selecting text in a page doesn't kill the app", PACKAGE in adb("shell", "ps", "-A", "-o", "NAME"))
     key(4)
 
     # The phone turns: the page follows, and a tap in the new layout still lands.
     go(BASE + "/tap")
-    adb("shell", "settings", "put", "system", "accelerometer_rotation", "0")
-    adb("shell", "settings", "put", "system", "user_rotation", "1")
-    time.sleep(3)
+    asked("/tap")
+    check("the page follows the phone into landscape", turn(1))
     shot("10d-landscape")
     served.clear()
-    tap((1200, 300), 1.5)
-    check("a tap lands in the page in landscape", "/tapped" in served, str(served))
-    adb("shell", "settings", "put", "system", "user_rotation", "0")
-    time.sleep(3)
+    tap(page_top())
+    check("a tap lands in the page in landscape", asked("/tapped"), str(served))
+    turn(0)
 
-    # A gate says no: for a typed URL and for a redirect.
+    # A gate says no: for a typed URL, for a redirect and for a form's POST.
     go("blocked.test")
+    check("a blocked host is marked Blocked and never joins history",
+          status("https://blocked.test/", "Blocked") and not visited("https://blocked.test/"))
     shot("11-blocked")
-    check("a blocked host never joins history", not visited("https://blocked.test/"))
     go(BASE + "/to-blocked")
+    check("a redirect to a blocked host is stopped", status("http://blocked.test/", "Blocked") and not visited("http://blocked.test/"))
     shot("12-redirect-blocked")
-    check("a redirect to a blocked host is stopped", not visited("http://blocked.test/"))
-
-    # A POST is not offered to shouldOverrideUrlLoading. This one documents the gap.
     go(BASE + "/form")
-    tap(PAGE_TOP, 3.0)
+    asked("/form")
+    tap(page_top())
+    check("a form posted to a blocked host is stopped", status("http://blocked.test/", "Blocked"))
     shot("13-post-to-blocked-host")
 
     # A load that fails stays out of history.
-    go("https://nothing.invalid/", 3.0)
+    go("https://nothing.invalid/")
+    check("a failed load is marked Failed and never joins history",
+          status("https://nothing.invalid/", "Failed") and not visited("https://nothing.invalid/"))
     shot("14-failed")
-    check("a failed load never joins history", not visited("https://nothing.invalid/"))
-    go("https://expired.badssl.com/", 4.0)
-    shot("14b-bad-certificate")
 
-    # History survives the process.
-    adb("shell", "am", "force-stop", PACKAGE)
-    time.sleep(1)
+
+def history_after_a_restart():
     launch()
-    tap(FIELD)
-    type_text("page")
+    type_in_bar("page")
+    check("history still suggests Page A after a restart",
+          until(lambda: find("shell", text=lambda shown: shown.startswith("Page A"))) is not None and visited(url("/a")))
     shot("15-suggestions-after-restart")
-    check("history file still holds Page A after a restart", visited("http://%s/a" % BASE))
-    launch()
 
-    # Where Go is: the app's process, and none of its children. The page needs a renderer first.
+
+def renderers():
+    """The pids of the app's renderers, the shell's first: it starts first."""
+    return sorted(int(pid) for pid, name in children() if "sandboxed" in name)
+
+
+def where_go_runs():
+    """Go is in the app's process and in none of its children. The page needs a renderer first."""
+    launch()
     go(BASE + "/a")
-    main_pid = None
-    for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines():
-        parts = line.split()
-        if len(parts) == 2 and parts[1] == PACKAGE:
-            main_pid = parts[0]
+    asked("/a")
+    main_pid = next(pid for pid, name in processes() if name == PACKAGE)
     kids = children()
     go_size = go_library_mappings(main_pid)
     check("Go's library is mapped in the main process", go_size > 0, "%d executable mapping(s)" % go_size)
-    for line in adb("shell", "ps", "-A", "-o", "PID,NAME").splitlines():
-        parts = line.split()
-        if len(parts) == 2 and parts[1] == PACKAGE + "_zygote":
-            kids.append((parts[0], "app:zygote"))
+    kids += [(pid, "app:zygote") for pid, name in processes() if name == PACKAGE + "_zygote"]
     for pid, name in kids:
         rmaps = adb("shell", "cat", "/proc/%s/maps" % pid)
         check("Go's library is not in " + name.split(":")[1], len(rmaps) > 0 and go_library_mappings(pid) == 0, "pid " + pid)
-    renderers = sorted((int(pid) for pid, name in kids if "sandboxed" in name))
-    check("the shell and the page have separate renderers", len(renderers) >= 2, str(kids))
+    check("the shell and the page have separate renderers", len(renderers()) >= 2, str(kids))
 
-    # The page's renderer dies, which is the last one to start.
-    adb("shell", "kill", "-9", str(renderers[-1]))
-    time.sleep(3)
+
+def the_page_renderer_dies():
+    launch()
+    go(BASE + "/a")
+    asked("/a")
+    adb("shell", "kill", "-9", str(renderers()[-1]))
+    check("a page whose renderer died is marked Crashed, and the app lives", status(url("/a"), "Crashed") and alive())
     shot("16-after-page-renderer-kill")
-    check("the app survives a renderer crash", PACKAGE in adb("shell", "ps", "-A", "-o", "NAME"))
     served.clear()
-    tap(RELOAD, 3.0)
+    press("Reload")
+    check("reload recovers after a crash", asked("/a"), str(served))
     shot("17-reloaded-after-crash")
-    check("reload recovers after a crash", "/a" in served, str(served))
 
-    # The shell's renderer dies alone: it comes back from a snapshot, and the page stays.
-    adb("shell", "kill", "-9", str(renderers[0]))
-    time.sleep(4)
+
+def the_shell_renderer_dies():
+    """It dies alone: the shell comes back, and the page stays."""
+    launch()
+    go(BASE + "/a")
+    asked("/a")
+    before = renderers()
+    adb("shell", "kill", "-9", str(before[0]))
+    again = until(lambda: len(set(renderers()) - set(before)) > 0)
+    check("the shell gets a new renderer, and the app lives", again and alive())
     shot("17b-after-shell-renderer-kill")
+    if not alive():
+        return
     served.clear()
-    tap(RELOAD, 3.0)
-    check("the shell works again after its renderer died", "/a" in served, str(served))
-    # The GPU process dies.
-    for pid, name in children():
-        if "privileged" in name:
-            adb("shell", "kill", "-9", pid)
-    time.sleep(5)
+    press("Reload")
+    check("the shell works again after its renderer died", asked("/a"), str(served))
+
+
+def the_gpu_process_dies():
+    launch()
+    go(BASE + "/a")
+    asked("/a")
+    privileged = lambda: {pid for pid, name in children() if "privileged" in name}
+    before = privileged()
+    for pid in before:
+        adb("shell", "kill", "-9", pid)
+    until(lambda: privileged() - before)
     shot("17c-after-gpu-kill")
     served.clear()
-    tap(RELOAD, 3.0)
+    press("Reload")
+    check("the app works after the GPU process died", asked("/a"), str(served))
     shot("17d-reload-after-gpu-kill")
-    check("the app works after the GPU process died", "/a" in served, str(served))
 
-    # The shell and the page have separate renderers, so a page that spins leaves the shell working.
+
+def a_page_spins():
+    """The shell and the page have separate renderers, so a page that spins leaves the shell working."""
     launch()
     go(BASE + "/busy")
-    tap(PAGE_TOP, 1.0)
-    tap(FIELD, 1.0)
-    type_text("xyz")
-    time.sleep(2)
+    asked("/busy")
+    tap(page_top())
+    try:
+        type_in_bar("xyz")
+        check("the address field takes typing while a page spins", True)
+    except TimeoutError as e:
+        check("the address field takes typing while a page spins", False, e)
     shot("18-page-spinning")
-    adb("shell", "am", "force-stop", PACKAGE)
 
-    # The real web, over the office's 443-only egress.
+
+def the_real_web():
+    """Over the office's 443-only egress."""
     launch()
-    go("example.com", 4.0)
+    go("example.com")
+    check("a real https page joins history", until(lambda: visited("https://example.com/"), 30))
     shot("19-real-web-example")
-    check("a real https page joins history", visited("https://example.com/"))
-    go("en.wikipedia.org", 6.0)
-    shot("20-real-web-wikipedia")
-    adb("shell", "input", "swipe", "540", "1800", "540", "600", "300")
-    time.sleep(1.5)
-    shot("21-real-web-scrolled")
-    tap(FIELD)
-    type_text("wiki")
-    shot("22-real-web-suggestions")
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    adb("root")
+    # adbd restarts as root a moment after saying so, and drops what is sent meanwhile.
+    if not until(lambda: adb("shell", "id", "-u").strip() == "0", 30):
+        sys.exit("no rooted device answers as %s: start the emulator with `amarit start project-b-emu`" % ADB[-1])
+    adb("reverse", "tcp:%d" % PORT, "tcp:%d" % PORT)
+    if "Success" not in adb("install", "-r", APK):
+        sys.exit("can't install %s" % APK)
+    adb("shell", "pm", "clear", PACKAGE)
+
+    # Each part starts the app again, so one that the app doesn't survive costs only itself.
+    for part in (browsing, history_after_a_restart, where_go_runs, the_page_renderer_dies, the_shell_renderer_dies,
+                 the_gpu_process_dies, a_page_spins, the_real_web):
+        try:
+            part()
+        except TimeoutError as e:
+            # Something the next step needed never came on screen.
+            shot("stopped-" + part.__name__)
+            check("%s ran to its end" % part.__name__.replace("_", " "), False, "%s; the app is %s" % (e, "running" if alive() else "gone"))
     adb("shell", "am", "force-stop", PACKAGE)
 
     failed = [r for r in results if not r[1]]
     print("\n%d checks, %d failed" % (len(results), len(failed)))
     with open(OUT + "/results.json", "w") as f:
-        json.dump(results, f, indent=1)
+        json.dump([(name, ok, str(detail)) for name, ok, detail in results], f, indent=1)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -23,6 +23,7 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
@@ -70,6 +71,8 @@ def check(name, ok, detail=""):
 
 
 class App:
+    running = []  # Every app started and not yet closed.
+
     def __init__(self, profile, extra=()):
         self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
         os.mkfifo(self.fifo)
@@ -82,6 +85,7 @@ class App:
             [BIN, f"--profile={profile}", f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1,
         )
+        App.running.append(self)
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_reply("start", 60)
         self.writer = open(self.fifo, "w", buffering=1)
@@ -141,6 +145,7 @@ class App:
     def close(self):
         self.cmd("close")
         self.proc.wait(timeout=30)
+        App.running.remove(self)
 
 
 INPUT = "document.querySelector('input')"
@@ -233,6 +238,22 @@ def bundle_version():
         return None
     m = re.search(r"CFBundleShortVersionString</key>\s*<string>([^<]+)", open(plist).read())
     return m.group(1) if m else None
+
+
+def run_parts(parts):
+    """Runs each part and exits with the result. A part that stops early, because the app
+    exited or a wait ran out, is one failure, and the app it left open is stopped."""
+    for part in parts:
+        try:
+            part()
+        except (RuntimeError, TimeoutError, OSError) as e:
+            traceback.print_exc()
+            check(f"{part.__name__} ran to its end", False, e)
+        for app in App.running[:]:
+            app.proc.kill()
+            App.running.remove(app)
+    print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
+    sys.exit(1 if failures else 0)
 
 
 def settings_checks():
@@ -359,7 +380,8 @@ def settings_checks():
     app.close()
 
 
-def main():
+def browsing_checks():
+    """The window, the address bar, pages, tabs and crashes in the real app."""
     if os.path.exists(OUT):
         shutil.rmtree(OUT)
     os.makedirs(OUT)
@@ -829,7 +851,12 @@ def main():
         check("a crashed page shows", True)
     except TimeoutError as e:
         check("a crashed page shows", False, e)
-    visit(app, URL_A)
+    try:
+        visit(app, URL_A)
+        check("a tab whose page crashed loads a page again", True)
+    except RuntimeError as e:
+        check("a tab whose page crashed loads a page again", False, e)
+        raise
     app.cmd("crashshell")
     time.sleep(0.2)
     deadline = time.time() + 15
@@ -910,15 +937,7 @@ def main():
     check("and can be switched back", app.js("!document.querySelector('.strip')"))
     app.close()
 
-    settings_checks()
-    print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
-    sys.exit(1 if failures else 0)
-
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["settings"]:
-        os.makedirs(OUT, exist_ok=True)
-        settings_checks()
-        print("\nall passed" if failures == 0 else f"\n{failures} FAILED", flush=True)
-        sys.exit(1 if failures else 0)
-    main()
+    os.makedirs(OUT, exist_ok=True)
+    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [browsing_checks, settings_checks])

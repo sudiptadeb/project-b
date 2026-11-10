@@ -4,6 +4,10 @@
 import { computed, reactive } from 'vue';
 import { listen, send } from '@/bridge.js';
 
+import { phone } from '@/phone.js';
+
+export { phone };
+
 const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 
 export const state = reactive({
@@ -22,8 +26,9 @@ export const state = reactive({
   // colour and width.
   windowColor: '',
   frameWidth: 0,
-  // Whether the sidebar is open. The shell's own, so it stays here.
-  sidebar: true,
+  // Whether the sidebar is open. The shell's own, so it stays here. On a phone the
+  // sidebar is the drawer, closed until asked for.
+  sidebar: !phone,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
   // with the release's version and, when it failed, why; and how a check the user asked
   // for went.
@@ -38,6 +43,9 @@ export const state = reactive({
   // macOS's report of that crash, or the folder it keeps its reports in.
   crashReport: '',
 });
+
+// tabsOnTop says the tabs are a strip above the toolbar rather than a sidebar.
+export const tabsOnTop = computed(() => !phone && state.tabLayout === 'horizontal');
 
 // activeTab is the tab whose page is showing.
 export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);

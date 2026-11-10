@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { phone } from '@/phone.js';
 import { useTheme } from '@/theme.js';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
@@ -42,7 +43,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
       </button>
     </header>
     <div class="body">
-      <nav class="nav" aria-label="Settings sections">
+      <!-- A phone has no keyboard shortcuts, so only General applies there. -->
+      <nav v-if="!phone" class="nav" aria-label="Settings sections">
         <button
           v-for="s in sections"
           :key="s.id"
@@ -53,7 +55,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
         >{{ s.label }}</button>
       </nav>
       <main class="content">
-        <General v-if="section === 'general'" />
+        <General v-if="phone || section === 'general'" />
         <Keyboard v-else />
       </main>
     </div>

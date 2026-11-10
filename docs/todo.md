@@ -25,8 +25,8 @@ Take an item off when it lands or is dropped.
 - **Back after the first page in a new tab** returns to `about:blank`.
 - **Slowness, fixed at the cause, never masked:** a stale picture after a resize, and a brief
   flash at launch. The rejected masking attempts are on branch `parked-window`.
-- **Android:** the sidebar's place on a phone, the toolbar that doesn't paint while settings is
-  open, and the colour before Go starts. See [android.md](android.md#the-shell-on-a-phone).
+- **Android:** the toolbar that doesn't paint while settings is open, and the colour before Go
+  starts. See [android.md](android.md#the-shell-on-a-phone).
 
 ## Decided, not started
 

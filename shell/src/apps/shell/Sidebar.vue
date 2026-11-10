@@ -2,12 +2,21 @@
 import { send } from '@/bridge.js';
 import { shown } from '@/keys.js';
 import { state, tabLabel } from './state.js';
+
+// As the phone's drawer, choosing a tab or opening a new one closes it; closing a tab
+// leaves it open for the next.
+const props = defineProps({ drawer: Boolean });
+
+function open(msg) {
+  send(msg);
+  if (props.drawer) state.sidebar = false;
+}
 </script>
 
 <template>
-  <nav v-shell class="sidebar" :class="{ closed: !state.sidebar }" aria-label="Tabs">
+  <nav v-shell class="sidebar" :class="{ closed: !state.sidebar, drawer }" aria-label="Tabs">
     <div class="inner">
-      <button class="row new-tab" type="button" @click="send({ t: 'newTab' })">
+      <button class="row new-tab" type="button" @click="open({ t: 'newTab' })">
         <span class="icon">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
         </span>
@@ -23,8 +32,8 @@ import { state, tabLabel } from './state.js';
           role="tab"
           tabindex="0"
           :aria-selected="tab.id === state.active"
-          @click="send({ t: 'activateTab', id: tab.id })"
-          @keydown.enter="send({ t: 'activateTab', id: tab.id })"
+          @click="open({ t: 'activateTab', id: tab.id })"
+          @keydown.enter="open({ t: 'activateTab', id: tab.id })"
           @auxclick.middle="send({ t: 'closeTab', id: tab.id })"
         >
           <span class="icon">
@@ -54,6 +63,20 @@ import { state, tabLabel } from './state.js';
 
 .sidebar.closed {
   width: 0;
+}
+
+/* The drawer lies over the toolbar and the page, full height, with the settings panel's
+   shadow. */
+.sidebar.drawer {
+  height: 100%;
+  width: 280px;
+  max-width: 85%;
+  border-right: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+}
+
+.sidebar.drawer .inner {
+  width: 100%;
 }
 
 .inner {
@@ -179,8 +202,8 @@ import { state, tabLabel } from './state.js';
   color: var(--text);
 }
 
-/* Fingers need bigger targets than a mouse does, a touch screen has no hover, and a phone
-   has no Command key. */
+/* Fingers need bigger targets than a mouse does, a touch screen has no hover to show a
+   close button with, and a phone has no Command key. */
 .touch .row {
   height: 44px;
   padding-right: 4px;
@@ -189,6 +212,7 @@ import { state, tabLabel } from './state.js';
 .touch .close {
   width: 32px;
   height: 32px;
+  visibility: visible;
 }
 
 .touch .row:hover:not(.active),

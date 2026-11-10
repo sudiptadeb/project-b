@@ -14,9 +14,9 @@ All Chromium paths below are in the 155.0.8059.41 tree (`chromium/src`).
 - **The two binaries become three libraries.** Android has no `main` of ours. Content goes in one library that
   every process loads. Go goes in another that only the main window loads, so renderers, the GPU process and the
   app zygote never start Go. Checked on the emulator, in `/proc/<pid>/maps`.
-- **The shell on `main` runs on it as it is.** Tabs in the sidebar or on top, favicons, the content hooks, the
-  settings panel with the frame colour, and the window manager's one layout, on `main` at 0.2.13. A touch screen gets
-  bigger targets and no hover; nothing else in the shell knows it's on a phone.
+- **The shell on `main` runs on it.** Tabs, favicons, the content hooks, the settings panel with the frame colour,
+  and the window manager's one layout, on `main` at 0.2.13. A touch screen gets bigger targets and no hover, and a
+  phone shows its tabs as favicons under the toolbar with the full list as a drawer.
 - **System WebView was tried first and dropped.** It ran the same managers and shell in a 2.5 MB APK, but it can't
   gate every request, and the shell shares a renderer with the page. What it showed is in
   [the alternatives](#6-the-alternatives-behind-the-same-engine-interface).
@@ -311,13 +311,20 @@ adapter here, with `Window` as the one Android file (`engine/android/window_andr
 
 | On `main` | On Android |
 |---|---|
-| Tabs: create, show, close, favicons, a page opening a tab | The same. Each tab has its own `ContentView`; `ShowTab` swaps which page layer the compositor draws |
+| Tabs: create, show, close, favicons, a page opening a tab | The same managers. Each tab has its own `ContentView`; `ShowTab` swaps which page layer the compositor draws. The shell shows them differently: see below |
 | Content's hooks, carried to Go by the generated classes | The same classes. Eight hooks content only declares off Android (five for window controls from the web, three others) are left out by the same platform condition content uses: `tools/gen_hooks.py` copies it into `hooks_gen.h` and `hooks_gen.cc` |
-| Settings: tab layout, frame colour, version, updates | The same panel. The custom colour opens Android's own colour picker, because Blink on Android has none inside the page; the shell's delegate answers `OpenColorChooser` with the one Chromium's embedders share (`components/embedder_support/android/delegate`) |
+| Settings: tab layout, frame colour, version, updates | The same panel, without the tab layout. The custom colour opens Android's own colour picker, because Blink on Android has none inside the page; the shell's delegate answers `OpenColorChooser` with the one Chromium's embedders share (`components/embedder_support/android/delegate`) |
 | The frame colour | Paints the root layer, the window's background and the status bar, and changes live with the shell |
 | The window manager's one layout | `SetWindowLayout` places every tab's view and gives `BrowserWindow.java` the regions; the first region holding a finger decides |
 | `WindowState` | The window's size in CSS pixels, no buttons, square corners, and `full_screen` true |
 | Updates | As in a development build: "a development build doesn't update". Updating an APK isn't built |
+
+**Tabs on a phone.** A sidebar would take half a phone's width, so on a touch screen (`phone` in `shell/src/state.js`)
+the tabs are favicons in a row of their own under the toolbar (`TabIcons.vue`), the shown one marked as in the sidebar;
+a tap shows that tab, and a tab with no favicon yet shows its title's first letter. The sidebar button opens the
+sidebar's own list as a drawer over the toolbar and the page: choosing a tab or New Tab closes it, a tap outside closes
+it, and a tab's close button leaves it open. Every tab's close button shows, since there's no hover. The tab layout
+setting and the toolbar's layout button aren't shown, because neither layout applies. Desktop is unchanged.
 
 What doesn't apply on a phone, and what the app does instead:
 
@@ -334,8 +341,6 @@ What doesn't apply on a phone, and what the app does instead:
 
 Open:
 
-- **The sidebar on a phone.** Tabs on the side is still the default, and its 220px sidebar takes half a phone's
-  width, so a page gets about 180 CSS pixels and settings opens that narrow. Tabs on top fits a phone well.
 - **The toolbar's middle doesn't paint while settings is open.** On Android only, in either layout: back, forward,
   reload and the address field stay laid out and hit-testable, but Blink doesn't draw them until the panel closes.
   The shell's own screenshot (DevTools' `Page.captureScreenshot`) shows the same, and the compositor holds no extra

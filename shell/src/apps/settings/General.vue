@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { phone } from '@/phone.js';
 import { send, state } from './state.js';
 
 // General settings: what Go owns, shown, and the user's changes sent back. It changes only
@@ -66,7 +67,7 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
             {{ t.label }}
           </label>
         </div>
-        <div class="row" role="radiogroup" aria-labelledby="tab-layout">
+        <div v-if="!phone" class="row" role="radiogroup" aria-labelledby="tab-layout">
           <span id="tab-layout" class="label">Tab layout</span>
           <label v-for="l in layouts" :key="l.value" class="choice">
             <input

@@ -3,12 +3,12 @@ import { computed } from 'vue';
 import AddressBar from './AddressBar.vue';
 import NavButtons from './NavButtons.vue';
 import { send } from '@/bridge.js';
-import { activeTab, controlSpace as controls, state } from './state.js';
+import { activeTab, controlSpace as controls, phone, state, tabsOnTop } from './state.js';
 
 // With the tabs on the side this row is the title bar: it holds the space for the native
 // window controls, and its empty parts drag the window. With the tabs on top the strip
 // above is the title bar and this row is an ordinary toolbar.
-const titleBar = computed(() => state.tabLayout !== 'horizontal');
+const titleBar = computed(() => !tabsOnTop.value);
 
 function switchLayout() {
   send({ t: 'setTabLayout', text: titleBar.value ? 'horizontal' : 'vertical' });
@@ -40,6 +40,7 @@ function switchLayout() {
     <NavButtons />
     <AddressBar />
     <button
+      v-if="!phone"
       class="icon-button layout"
       type="button"
       :aria-label="titleBar ? 'Tabs on top' : 'Tabs on the side'"
@@ -115,9 +116,14 @@ function switchLayout() {
   margin-left: 12px;
 }
 
-/* The same 4px apart as the back, forward and reload buttons. */
+/* The same 4px apart as the back, forward and reload buttons. On a phone there is no
+   layout button, so the gear takes its gap from the address bar. */
 .settings {
   margin-left: 4px;
+}
+
+.touch .settings {
+  margin-left: 12px;
 }
 
 .progress {

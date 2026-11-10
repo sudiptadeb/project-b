@@ -1,6 +1,7 @@
 # One window manager
 
-A design note, 2026-11-10, with the owner's decisions at the end.
+A design note, 2026-11-10, with the owner's decisions at the end. Built for macOS the
+same day; Windows and Linux are described here only.
 
 Every desktop asks one question about a mouse press in our window: does it move the
 window, go to the shell, or go to the page? Each platform asks it differently. macOS asks
@@ -122,18 +123,27 @@ walks the list, so none of them knows the rule.
   one `layout` case, which hands the report to the window manager. The shell manager
   stops calling the engine for the window. It still sends the shell its snapshot and the
   `controls` message, with what the window manager tells it.
-- **`core/app/app.go`:** line 49 goes. `window.New` takes the engine and sends the first
-  layout itself, so the frame colour and width still reach the window before it shows.
-  The listener's `WindowChanged` forwards to the window manager.
+- **`core/app/app.go`:** `window.New` takes the engine and sends the first layout
+  itself, so the frame colour and width still reach the window before it shows. The
+  listener's `WindowChanged` forwards to the window manager, and so does `ShellCrashed`:
+  the manager drops what the dead shell claimed, so the page takes every press until the
+  reloaded shell reports again. The engine used to clear the shell's regions itself, out
+  of Go's sight.
 - **`core/window/window.go`:** keeps the last shell report and the last window state,
   builds a `WindowLayout` from both whenever either changes, and sends it only when it
   differs from the last one sent.
 - **The shell:** `regions.js` sends one `layout` message instead of three. It knows
   nothing about platforms. Following your decision, only the empty spaces in the top row
-  keep `v-drag`; the left, right and bottom edge strips in `App.vue` lose it. The
+  keep `v-drag`; the left, right and bottom edge strips in `App.vue` lose it, and so do
+  the sidebar's empty part and, with the tabs on top, the bands beside the toolbar. The
   settings overlay is shell, so its rectangles are shell areas like any other.
-- **The native engine:** one C entry, `set_window_layout`, replaces the four in
-  `engine/abi/pb_abi.h`; the controls hook carries the full `WindowState`.
+- **The native engine:** one C entry, `set_window_layout(layout, regions, count)`,
+  replaces the four in `engine/abi/pb_abi.h`: a `PBWindowLayout` with the view size,
+  the page rectangle and the frame, and beside it the `PBRegion` list (x, y, w, h and a
+  `PBArea`). `request_window` replaces
+  `close_window`. `PB_EVENT_WINDOW_CHANGED` carries the full `WindowState`, and
+  `PB_EVENT_SHELL_CRASHED` says the shell's renderer died. The window applies the frame
+  only when it changed, and places the page only when the view size still matches.
 - **The mock engine:** keeps the last `WindowLayout`. Its `Hit` becomes `At` on that
   layout, so the mock and the tests use the same rule the real engines mirror. Its
   full-screen button reports a `WindowState`.

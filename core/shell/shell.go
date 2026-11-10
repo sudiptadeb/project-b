@@ -16,14 +16,18 @@ import (
 
 // command is what the shell sends us.
 type command struct {
-	T     string        `json:"t"`
-	Text  string        `json:"text"`
-	ID    int64         `json:"id"`
-	Rect  engine.Rect   `json:"rect"`
-	Rects []engine.Rect `json:"rects"`
-	ViewW float64       `json:"viewW"`
-	ViewH float64       `json:"viewH"`
-	On    bool          `json:"on"`
+	T    string `json:"t"`
+	Text string `json:"text"`
+	ID   int64  `json:"id"`
+	On   bool   `json:"on"`
+}
+
+// requests are the names the shell uses for engine.WindowRequest.
+var requests = map[string]engine.WindowRequest{
+	"close":      engine.WindowClose,
+	"minimise":   engine.WindowMinimise,
+	"zoom":       engine.WindowZoom,
+	"fullScreen": engine.WindowFullScreen,
 }
 
 // Manager connects the shell page to the managers.
@@ -90,12 +94,19 @@ func (m *Manager) Handle(msg []byte) {
 		m.update.Relaunch()
 	case "suggest":
 		m.send(map[string]any{"t": "suggestions", "id": c.ID, "items": m.suggest.Query(c.Text)})
-	case "regions":
-		m.eng.SetShellRegions(c.Rects)
-	case "dragRegions":
-		m.eng.SetDragRegions(c.Rects)
-	case "pageBounds":
-		m.eng.SetPageBounds(c.Rect, c.ViewW, c.ViewH)
+	case "layout":
+		var l window.ShellLayout
+		if err := json.Unmarshal(msg, &l); err != nil {
+			log.Printf("shell: bad layout: %v", err)
+			return
+		}
+		m.window.HandleShellLayout(l)
+	case "window":
+		if r, ok := requests[c.Text]; ok {
+			m.window.Request(r)
+		} else {
+			log.Printf("shell: unknown window request %q", c.Text)
+		}
 	case "focusPage":
 		m.eng.FocusPage()
 	case "focusShell":

@@ -396,7 +396,7 @@ def main():
     right_end = app.cmd("hit", 1096, BAR_Y)
     check("the right end of the top row falls through to the frame too", right_end == "frame", right_end)
     below_tabs = app.cmd("hit", 100, 600)
-    check("the empty sidebar falls through to the frame, so it drags the window", below_tabs == "frame", below_tabs)
+    check("the empty sidebar is shell, so it never drags the window", below_tabs == "shell", below_tabs)
     over_buttons = app.cmd("hit", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y)
     check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
     print("hit over window buttons:", over_buttons, flush=True)
@@ -661,6 +661,38 @@ def main():
         check("leaving full screen brings the curve and the controls back", True)
     except TimeoutError as e:
         check("leaving full screen brings the curve and the controls back", False, f"no display? {e}")
+
+    # The same through Go's window manager: the shell asks, the manager tells the engine,
+    # and the engine reports the result. In full screen nothing drags.
+    request = lambda r: app.js(f"(chrome.send('shell',[JSON.stringify({{t:'window',text:'{r}'}})]),1)")
+    state = lambda: json.loads(app.cmd("state"))
+    time.sleep(1)
+    request("fullScreen")
+    try:
+        app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
+        time.sleep(0.5)
+        check("the shell's full screen request goes through the manager into real full screen", state()["fullScreen"], state())
+        right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
+        check("in full screen the empty top row is shell, not drag", right_end == "shell", right_end)
+        time.sleep(1)
+        request("fullScreen")
+        app.wait(f"document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x==={window['buttonsEnd'] + 8}", 20)
+        # macOS may put the window back at another size, so the end of the row is measured.
+        time.sleep(0.5)
+        right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
+        check("and out again, where the empty top row drags", not state()["fullScreen"] and right_end == "frame", (state(), right_end, app.js("[window.innerWidth,window.innerHeight]")))
+    except TimeoutError as e:
+        check("the shell's full screen request goes through the manager into real full screen", False, f"no display? {e}")
+    width = app.js("window.innerWidth")
+    request("zoom")
+    try:
+        app.wait(f"window.innerWidth>{width}", 10)
+        check("the shell's zoom request zooms the window", state()["zoomed"], state())
+        request("zoom")
+        app.wait(f"window.innerWidth==={width}", 10)
+        check("and zooms it back", not state()["zoomed"], state())
+    except TimeoutError as e:
+        check("the shell's zoom request zooms the window", False, f"no display? {e}")
 
     # Tabs. Tab 1 is on example.com here.
     app.cmd("key", "cmd+t")

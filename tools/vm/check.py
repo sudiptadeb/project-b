@@ -234,7 +234,8 @@ def quit_app():
 
 
 def drags(name, x, y, home, expect="moves the window"):
-    """expect is "moves the window", or "resizes the window" for the edges AppKit keeps for itself."""
+    """expect is "moves the window", "resizes the window" for the edges AppKit keeps for
+    itself, or "leaves the window alone"."""
     win = window()
     if win is None:
         check(f"dragging {name} {expect}", False, "no window: the app is gone")
@@ -245,6 +246,8 @@ def drags(name, x, y, home, expect="moves the window"):
     moved, resized = (now[0] - win[0], now[1] - win[1]), (now[2] - win[2], now[3] - win[3])
     if expect == "moves the window":
         ok = abs(moved[0] - MOVE[0]) <= 3 and abs(moved[1] - MOVE[1]) <= 3 and resized == (0, 0)
+    elif expect == "leaves the window alone":
+        ok = moved == (0, 0) and resized == (0, 0)
     else:
         ok = resized != (0, 0)
     check(f"dragging {name} {expect}", ok, f"moved {moved}, resized {resized}")
@@ -589,15 +592,16 @@ if changed(now, one) >= 0.005:
     vnc.key("cmd+w")
     time.sleep(1)
 
-# Dragging and double-clicking, tabs on the side. The top row is in the title bar; the empty
-# sidebar is below it. The outer 3 points of the left and right edges are AppKit's resize zone.
+# Dragging and double-clicking, tabs on the side. Only the empty spaces in the top row drag;
+# the sidebar never does. The outer 3 points of the left and right edges are AppKit's resize
+# zone.
 gap = L["zoom"][0] + L["zoom"][2] / 2 + 4
 TOP_EDGE = ("the top frame edge", W / 2, 2)
 RESIZE_EDGES = (("the left edge", 1, H / 2), ("the right edge", W - 1, H / 2))
-SIDE_PLACES = (("the gap right of the buttons", gap, 14), ("the end of the top row", W - 6, TOP),
-               ("the empty sidebar", 100, H - 40))
+SIDE_PLACES = (("the gap right of the buttons", gap, 14), ("the end of the top row", W - 6, TOP))
 for place in SIDE_PLACES + (TOP_EDGE,):
     drags(*place, home)
+drags("the empty sidebar", 100, H - 40, home, "leaves the window alone")
 for place in RESIZE_EDGES:
     drags(*place, home, "resizes the window")
 selects_text(home)

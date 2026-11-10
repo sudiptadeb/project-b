@@ -70,19 +70,21 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
-  // Go has given the window its frame, so its first frame on screen is already the
-  // frame colour. It still shows before any renderer has drawn.
+  // Go has given the window its first layout, frame included, so its first frame on
+  // screen is already the frame colour. It still shows before any renderer has drawn.
   window_->Show();
-  window_->ListenForControls(
-      base::BindRepeating([](const gfx::RectF& r, double corner_radius) {
-        hooks::Args args;
-        args.Double(r.x());
-        args.Double(r.y());
-        args.Double(r.width());
-        args.Double(r.height());
-        args.Double(corner_radius);
-        hooks::Fire(PB_EVENT_WINDOW_CONTROLS_CHANGED, args);
-      }));
+  window_->ListenForState(base::BindRepeating([](const Window::State& s) {
+    hooks::Args args;
+    args.Double(s.size.width());
+    args.Double(s.size.height());
+    args.Double(s.controls.x());
+    args.Double(s.controls.y());
+    args.Double(s.controls.width());
+    args.Double(s.controls.height());
+    args.Double(s.corner_radius);
+    args.Bool(s.full_screen);
+    hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
+  }));
   StartRemoteDebugging();
 
   if (command_line->HasSwitch("pb-driver")) {

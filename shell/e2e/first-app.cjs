@@ -224,8 +224,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
-  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 9 && r.hit === 'drag', JSON.stringify(r.drag));
-  check('the empty part of the sidebar drags the window', (await regions('?x=100&y=600')).hit === 'drag');
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 5 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty part of the sidebar is shell and never drags', (await regions('?x=100&y=600')).hit === 'shell');
+  check('the frame\'s left, right and bottom edges never drag', (await regions('?x=2&y=300')).hit !== 'drag' && (await regions('?x=1098&y=300')).hit !== 'drag' && (await regions('?x=600&y=698')).hit !== 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   // The frame colour has one owner: Go gave it to the window and to the shell.
   const frame = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
@@ -244,10 +245,12 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
   check('in full screen the corners are square', (await windowRadius()) === '0px', await windowRadius());
+  check('in full screen nothing drags: the empty top row is shell', (await regions('?x=600&y=2')).hit === 'shell' && (await regions()).drag.length === 0, JSON.stringify((await regions()).drag));
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);
   check('and the corners their curve', (await windowRadius()) === '26px', await windowRadius());
+  check('and the empty top row drags again', (await regions('?x=600&y=2')).hit === 'drag');
 
   // Tabs.
   const rows = page.getByRole('tab');
@@ -342,6 +345,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   r = await regions();
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
+  check('the bands beside the toolbar under the strip are shell, not drag', (await regions('?x=2&y=60')).hit === 'shell');
   await page.getByRole('button', { name: 'New Tab', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   check('New Tab works from the strip', (await bar.inputValue()) === '');

@@ -68,45 +68,41 @@ void CallReload(int64_t tab) {
   g_engine->Reload(tab);
 }
 
-void CallCloseWindow() {
+void CallRequestWindow(int32_t request) {
   CheckMainThread();
-  g_engine->CloseWindow();
-}
-
-void CallSetPageBounds(double x,
-                       double y,
-                       double w,
-                       double h,
-                       double view_w,
-                       double view_h) {
-  CheckMainThread();
-  g_engine->window()->SetPageBounds(gfx::RectF(x, y, w, h),
-                                    gfx::SizeF(view_w, view_h));
-}
-
-std::vector<gfx::RectF> ToRects(const double* rects, size_t count) {
-  std::vector<gfx::RectF> out;
-  out.reserve(count);
-  for (size_t i = 0; i < count; i++) {
-    const double* r = UNSAFE_BUFFERS(rects + i * 4);
-    UNSAFE_BUFFERS(out.emplace_back(r[0], r[1], r[2], r[3]));
+  switch (request) {
+    case PB_WINDOW_CLOSE:
+      g_engine->CloseWindow();
+      break;
+    case PB_WINDOW_MINIMISE:
+      g_engine->window()->Minimize();
+      break;
+    case PB_WINDOW_ZOOM:
+      g_engine->window()->Zoom();
+      break;
+    case PB_WINDOW_FULL_SCREEN:
+      g_engine->window()->ToggleFullScreen();
+      break;
   }
-  return out;
 }
 
-void CallSetShellRegions(const double* rects, size_t count) {
+void CallSetWindowLayout(const PBWindowLayout* l,
+                         const PBRegion* regions,
+                         size_t region_count) {
   CheckMainThread();
-  g_engine->window()->SetShellRegions(ToRects(rects, count));
-}
-
-void CallSetWindowFrame(int32_t rgb, double width) {
-  CheckMainThread();
-  g_engine->window()->SetFrame(static_cast<uint32_t>(rgb), width);
-}
-
-void CallSetDragRegions(const double* rects, size_t count) {
-  CheckMainThread();
-  g_engine->window()->SetDragRegions(ToRects(rects, count));
+  Window::Layout layout = {
+      .viewport = gfx::SizeF(l->view_w, l->view_h),
+      .page = gfx::RectF(l->page_x, l->page_y, l->page_w, l->page_h),
+      .frame_rgb = static_cast<uint32_t>(l->frame_rgb),
+      .frame_width = l->frame_width,
+  };
+  layout.regions.reserve(region_count);
+  for (size_t i = 0; i < region_count; i++) {
+    const PBRegion& r = UNSAFE_BUFFERS(regions[i]);
+    layout.regions.push_back({gfx::RectF(r.x, r.y, r.w, r.h),
+                              static_cast<Window::Area>(r.area)});
+  }
+  g_engine->window()->SetLayout(std::move(layout));
 }
 
 void CallFocusPage() {
@@ -174,11 +170,8 @@ const PBEngineCalls* Engine::Calls() {
       .go_back = CallGoBack,
       .go_forward = CallGoForward,
       .reload = CallReload,
-      .close_window = CallCloseWindow,
-      .set_page_bounds = CallSetPageBounds,
-      .set_shell_regions = CallSetShellRegions,
-      .set_drag_regions = CallSetDragRegions,
-      .set_window_frame = CallSetWindowFrame,
+      .request_window = CallRequestWindow,
+      .set_window_layout = CallSetWindowLayout,
       .focus_page = CallFocusPage,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,

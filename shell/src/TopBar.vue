@@ -17,10 +17,12 @@ function switchLayout() {
 
 <template>
   <header v-shell class="top" :class="{ toolbar: !titleBar }">
-    <!-- The frame's bands around the bar are empty shell, so they drag the window. -->
+    <!-- As the title bar, the frame's bands around the bar are empty spaces in the top row,
+         so they drag the window. Under the tab strip they are just shell. -->
     <div v-if="titleBar" v-drag class="band top"></div>
     <div class="row">
-    <div v-drag class="band side"></div>
+    <div v-if="titleBar" v-drag class="band side"></div>
+    <div v-else class="band side"></div>
     <div class="bar">
     <template v-if="titleBar">
       <div v-drag class="space" :style="{ width: controls.left }"></div>
@@ -57,7 +59,8 @@ function switchLayout() {
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
     </div>
-    <div v-drag class="band side"></div>
+    <div v-if="titleBar" v-drag class="band side"></div>
+    <div v-else class="band side"></div>
     </div>
   </header>
 </template>

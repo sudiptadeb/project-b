@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -198,18 +199,53 @@ func TestStaleNavigationDoesNotCommit(t *testing.T) {
 func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
-	r.shell(`{"t":"regions","rects":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}]}`)
-	r.shell(`{"t":"dragRegions","rects":[{"x":300,"y":0,"w":500,"h":32}]}`)
+	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"page":{"x":0,"y":48,"w":800,"h":552},"viewW":800,"viewH":600}`)
 	r.shell(`{"t":"ready"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
 
+	l := r.e.Layout()
+	if l.Page != (engine.Rect{X: 0, Y: 48, W: 800, H: 552}) || l.FrameColor == "" {
+		t.Fatalf("layout %+v", l)
+	}
 	for _, c := range []struct {
 		x, y float64
-		want string
-	}{{10, 10, "shell"}, {120, 100, "shell"}, {10, 100, "page"}, {600, 300, "page"}, {400, 10, "drag"}, {400, 40, "shell"}} {
-		if got := r.e.Hit(c.x, c.y); got != c.want {
-			t.Errorf("Hit(%v,%v) = %v, want %v", c.x, c.y, got, c.want)
+		want engine.Area
+	}{{10, 10, engine.AreaShell}, {120, 100, engine.AreaShell}, {10, 100, engine.AreaPage}, {600, 300, engine.AreaPage}, {400, 10, engine.AreaDrag}, {400, 40, engine.AreaShell}} {
+		if got := l.At(c.x, c.y); got != c.want {
+			t.Errorf("At(%v,%v) = %v, want %v", c.x, c.y, got, c.want)
 		}
+	}
+}
+
+func TestShellWindowRequestsReachTheEngine(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"page":{"x":0,"y":48,"w":800,"h":552},"viewW":800,"viewH":600}`)
+	r.shell(`{"t":"window","text":"fullScreen"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" && m["cornerRadius"] == float64(0) })
+	if got := r.e.Layout().At(400, 10); got != engine.AreaShell {
+		t.Fatalf("in full screen the empty top row is %v", got)
+	}
+	r.shell(`{"t":"window","text":"fullScreen"}`)
+	r.waitFor(func(m map[string]any) bool {
+		return m["t"] == "controls" && m["cornerRadius"] == mockengine.CornerRadius
+	})
+	if got := r.e.Layout().At(400, 10); got != engine.AreaDrag {
+		t.Fatalf("back from full screen the empty top row is %v", got)
+	}
+	r.shell(`{"t":"window","text":"zoom"}`)
+	r.shell(`{"t":"window","text":"minimise"}`)
+	r.shell(`{"t":"window","text":"close"}`)
+	deadline := time.Now().Add(time.Second)
+	for !r.e.Closed() {
+		if time.Now().After(deadline) {
+			t.Fatal("window never closed")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	want := []engine.WindowRequest{engine.WindowFullScreen, engine.WindowFullScreen, engine.WindowZoom, engine.WindowMinimise, engine.WindowClose}
+	if got := r.e.Requests(); !slices.Equal(got, want) {
+		t.Fatalf("requests %v", got)
 	}
 }
 
@@ -288,8 +324,8 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if m["cornerRadius"] != mockengine.CornerRadius {
 		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
 	}
-	if m["windowColor"] != "#4f9e9e" || r.e.WindowColor() != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.FrameWidth() != 4 {
-		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.WindowColor(), r.e.FrameWidth())
+	if m["windowColor"] != "#4f9e9e" || r.e.Layout().FrameColor != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.Layout().FrameWidth != 4 {
+		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.Layout().FrameColor, r.e.Layout().FrameWidth)
 	}
 
 	r.e.Fire("fullscreen", "")
@@ -327,8 +363,8 @@ func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	r := start(t, dir)
 	r.shell(`{"t":"setFrameColor","text":"#3470d0"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#3470d0" })
-	if r.e.WindowColor() != "#3470d0" {
-		t.Fatalf("window = %v", r.e.WindowColor())
+	if r.e.Layout().FrameColor != "#3470d0" {
+		t.Fatalf("window = %v", r.e.Layout().FrameColor)
 	}
 	r.stop()
 
@@ -336,7 +372,7 @@ func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	defer r.stop()
 	r.shell(`{"t":"ready"}`)
 	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if m["windowColor"] != "#3470d0" || r.e.WindowColor() != "#3470d0" || r.e.ShownColor() != "#3470d0" {
-		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.WindowColor(), r.e.ShownColor())
+	if m["windowColor"] != "#3470d0" || r.e.Layout().FrameColor != "#3470d0" || r.e.ShownColor() != "#3470d0" {
+		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.Layout().FrameColor, r.e.ShownColor())
 	}
 }

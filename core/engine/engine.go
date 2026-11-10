@@ -57,23 +57,13 @@ type Engine interface {
 	GoForward(tab TabID)
 	Reload(tab TabID)
 
-	// CloseWindow closes the window, which ends the app.
-	CloseWindow()
+	// RequestWindow asks the native window to close, which ends the app, minimise,
+	// zoom, or go in or out of full screen. What follows arrives as WindowChanged.
+	RequestWindow(r WindowRequest)
 
-	// SetPageBounds places the shown tab's view behind the shell. viewW and viewH are
-	// the window size the shell measured against, so an engine can ignore a report
-	// made for a size the window no longer has.
-	SetPageBounds(r Rect, viewW, viewH float64)
-	// SetShellRegions replaces the rectangles the shell owns. Mouse events inside
-	// them go to the shell; everything else goes to the page.
-	SetShellRegions(rects []Rect)
-	// SetDragRegions replaces the rectangles where a mouse down moves the window
-	// instead: the empty parts of the shell. They win over shell regions.
-	SetDragRegions(rects []Rect)
-	// SetWindowFrame is the frame the window itself paints: its colour, "#rrggbb",
-	// under the page and the shell, so any gap the shell leaves shows it and not white,
-	// and the width of the band it draws around its edge over both.
-	SetWindowFrame(hex string, width float64)
+	// SetWindowLayout is everything about how the window behaves, from the window
+	// manager, whenever any of it changes.
+	SetWindowLayout(l WindowLayout)
 	// FocusPage gives keyboard focus to the shown tab's page; FocusShell gives it to
 	// the shell page, which then places it inside itself.
 	FocusPage()
@@ -120,10 +110,64 @@ type Listener interface {
 	// Shortcut fires for a key combination the engine reserves, wherever focus was.
 	Shortcut(s Shortcut)
 
-	// WindowControlsChanged says where the native window controls (close, minimise,
-	// zoom) sit, so the shell can leave that space, and the radius the OS rounds the
-	// window's corners with, so the shell can follow the curve. It fires after start,
-	// on resize and on entering or leaving full screen. An empty Rect means there are
-	// none to leave space for; a radius of 0 means square corners.
-	WindowControlsChanged(r Rect, cornerRadius float64)
+	// WindowChanged says what the native window is now. It fires after start, on
+	// resize and on entering or leaving full screen.
+	WindowChanged(s WindowState)
+
+	// ShellCrashed says the shell page's renderer died. The engine reloads it, and the
+	// new shell reports its layout again.
+	ShellCrashed()
 }
+
+// Area is what a press at a point does.
+type Area int
+
+const (
+	AreaPage  Area = iota // No region holds the point: it goes to the shown page.
+	AreaShell             // It goes to the shell.
+	AreaDrag              // It moves the window.
+)
+
+// Region is one rectangle and what a press inside it does.
+type Region struct {
+	Rect Rect
+	Area Area
+}
+
+// WindowLayout is everything the engine needs to make the window behave.
+type WindowLayout struct {
+	ViewW, ViewH float64  // The window size the shell measured; an engine places the page only when it still has that size.
+	Page         Rect     // Where the shown tab's page goes.
+	Regions      []Region // In order. The first that holds a point decides.
+	FrameColor   string   // "#rrggbb", painted under the shell and the page.
+	FrameWidth   float64  // The band drawn around the window's edge, over both.
+}
+
+// At is the one hit test: what a press at x, y does.
+func (l WindowLayout) At(x, y float64) Area {
+	for _, r := range l.Regions {
+		if r.Rect.Contains(x, y) {
+			return r.Area
+		}
+	}
+	return AreaPage
+}
+
+// WindowState is what the engine reports about its native window.
+type WindowState struct {
+	W, H         float64 // The content area, CSS pixels.
+	Controls     Rect    // The native window buttons; empty when there are none.
+	CornerRadius float64 // 0 when the corners are square.
+	FullScreen   bool
+}
+
+// WindowRequest is what the user asked the window to do. Each is what pressing that
+// window button does, so zoom and full screen go in or out.
+type WindowRequest int
+
+const (
+	WindowClose WindowRequest = iota + 1
+	WindowMinimise
+	WindowZoom
+	WindowFullScreen
+)

@@ -35,7 +35,7 @@ import { state, tabLabel } from './state.js';
           </button>
         </div>
       </div>
-      <div v-drag class="rest"></div>
+      <div class="rest"></div>
     </div>
   </nav>
 </template>

@@ -12,7 +12,8 @@ func Wire(h *Hooks, l engine.Listener) {
 	h.Events.OnShellMessage = l.ShellMessage
 	h.Events.OnTabOpened = l.TabOpened
 	h.Events.OnFaviconChanged = l.FaviconChanged
-	h.Events.OnWindowControlsChanged = l.WindowControlsChanged
+	h.Events.OnWindowChanged = l.WindowChanged
+	h.Events.OnShellCrashed = l.ShellCrashed
 
 	// The gate: every top-level navigation in a tab asks Go before it starts and on
 	// each redirect. The shell's own navigation (id 0) has no gate.

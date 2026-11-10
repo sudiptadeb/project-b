@@ -5,6 +5,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 ## Docs
 
 - [first-app.md](first-app.md): pieces, the window, measurements, packaging.
+- [window-manager.md](window-manager.md): one Go owner for how the window behaves, built for macOS, and how Windows and Linux map to it.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.

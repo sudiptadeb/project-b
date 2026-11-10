@@ -43,7 +43,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Window = window.New(e, a.Prefs.FrameColor())
-	a.Update = update.New(cfg.Update, e.Post, e.CloseWindow)
+	closeWindow := func() { a.Window.Request(engine.WindowClose) }
+	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update)
 
@@ -52,7 +53,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnTitleChanged(func(t tabs.Tab) { a.History.UpdateTitle(t.URL, t.Title) })
 	a.Tabs.OnChanged(a.Shell.TabChanged)
 	a.Tabs.OnListChanged(a.Shell.TabsChanged)
-	a.Tabs.OnEmpty(e.CloseWindow)
+	a.Tabs.OnEmpty(closeWindow)
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 	a.Window.OnColorChanged(a.Shell.WindowColorChanged)
 	a.Prefs.OnFrameColorChanged(a.Window.SetColor)
@@ -135,6 +136,6 @@ func (a *App) Shortcut(s engine.Shortcut) {
 	}
 }
 
-func (a *App) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
-	a.Window.HandleControlsChanged(r, cornerRadius)
-}
+func (a *App) WindowChanged(s engine.WindowState) { a.Window.HandleWindowChanged(s) }
+
+func (a *App) ShellCrashed() { a.Window.HandleShellCrashed() }

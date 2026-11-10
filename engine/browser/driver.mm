@@ -374,6 +374,14 @@ void Run(const std::string& line) {
   } else if (cmd == "resize") {
     [TheWindow() setContentSize:NSMakeSize(number(2), number(3))];
     Reply(id, "ok");
+  } else if (cmd == "state") {
+    // What the native window is now, as AppKit says.
+    NSWindow* window = TheWindow();
+    Reply(id, base::StringPrintf(
+                  "{\"fullScreen\":%s,\"zoomed\":%s,\"miniaturized\":%s}",
+                  (window.styleMask & NSWindowStyleMaskFullScreen) ? "true" : "false",
+                  window.zoomed ? "true" : "false",
+                  window.miniaturized ? "true" : "false"));
   } else if (cmd == "fullscreen") {
     [TheWindow() toggleFullScreen:nil];
     Reply(id, "ok");
@@ -408,7 +416,7 @@ void Run(const std::string& line) {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {
     gfx::RectF b = Engine::Get()->window()->page_bounds();
-    // The shown page's frame in the window's content view, where SetPageBounds put it.
+    // The shown page's frame in the window's content view, where the layout put it.
     NSView* page_view =
         Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
     NSRect f = [page_view.superview convertRect:page_view.frame

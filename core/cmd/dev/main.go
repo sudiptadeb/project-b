@@ -18,6 +18,7 @@ import (
 	"syscall"
 
 	"projectb/app"
+	"projectb/engine"
 	"projectb/mockengine"
 	"projectb/update"
 )
@@ -92,12 +93,20 @@ func main() {
 		e.Fire(r.FormValue("kind"), r.FormValue("value"))
 	})
 	mux.HandleFunc("GET /mock/regions", func(w http.ResponseWriter, r *http.Request) {
-		regions, drag, bounds := e.Regions()
-		out := map[string]any{"regions": regions, "drag": drag, "bounds": bounds, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": e.WindowColor(), "shownColor": e.ShownColor(), "frameWidth": e.FrameWidth()}
+		l := e.Layout()
+		shell, drag := []engine.Rect{}, []engine.Rect{}
+		for _, g := range l.Regions {
+			if g.Area == engine.AreaDrag {
+				drag = append(drag, g.Rect)
+			} else {
+				shell = append(shell, g.Rect)
+			}
+		}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": l.Page, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)
-			out["hit"] = e.Hit(x, y)
+			out["hit"] = [...]string{engine.AreaPage: "page", engine.AreaShell: "shell", engine.AreaDrag: "drag"}[l.At(x, y)]
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(out)

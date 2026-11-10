@@ -34,12 +34,12 @@ watchEffect(() => {
     <TabStrip v-if="horizontal" />
     <TopBar />
     <div class="body">
-      <div v-drag class="edge left"></div>
+      <div class="edge left"></div>
       <Sidebar v-if="!horizontal" />
       <PageView />
-      <div v-drag class="edge right"></div>
+      <div class="edge right"></div>
     </div>
-    <div v-drag class="edge bottom"></div>
+    <div class="edge bottom"></div>
   </div>
 </template>
 

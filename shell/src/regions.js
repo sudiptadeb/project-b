@@ -1,9 +1,10 @@
-// Tells the main process which rectangles are shell, which empty shell drags the
-// window, and where the page goes.
+// Tells the window manager, in one layout message, which rectangles are shell, which
+// empty shell drags the window, and where the page goes. The manager decides what each
+// point does; this only measures.
 //
-// A component marks itself with v-shell, and empty shell that should move the window
-// with v-drag. One batcher measures once per frame, and only when something may have
-// changed, and sends only what differs. ResizeObserver misses moves, so a running
+// A component marks itself with v-shell, and an empty space in the top row that should
+// move the window with v-drag. One batcher measures once per frame, and only when
+// something may have changed, and sends only when the layout differs. ResizeObserver misses moves, so a running
 // animation or transition keeps it measuring until it ends.
 
 import { send } from './bridge.js';
@@ -15,9 +16,7 @@ const draggable = new Set();
 let pageEl = null;
 let scheduled = false;
 let animations = 0;
-let lastRegions = '';
-let lastDrag = '';
-let lastBounds = '';
+let last = '';
 
 function rectOf(el) {
   const r = el.getBoundingClientRect();
@@ -34,27 +33,18 @@ function schedule() {
 function measure() {
   scheduled = false;
 
-  const rects = [...marked].map(rectOf).filter((r) => r.w > 0 && r.h > 0);
-  const regions = JSON.stringify(rects);
-  if (regions !== lastRegions) {
-    lastRegions = regions;
-    send({ t: 'regions', rects });
-  }
-
-  const dragRects = [...draggable].map(rectOf).filter((r) => r.w > 0 && r.h > 0);
-  const drag = JSON.stringify(dragRects);
-  if (drag !== lastDrag) {
-    lastDrag = drag;
-    send({ t: 'dragRegions', rects: dragRects });
-  }
-
-  if (pageEl) {
-    const rect = rectOf(pageEl);
-    const bounds = JSON.stringify([rect, window.innerWidth, window.innerHeight]);
-    if (bounds !== lastBounds) {
-      lastBounds = bounds;
-      send({ t: 'pageBounds', rect, viewW: window.innerWidth, viewH: window.innerHeight });
-    }
+  const layout = {
+    t: 'layout',
+    shell: [...marked].map(rectOf).filter((r) => r.w > 0 && r.h > 0),
+    drag: [...draggable].map(rectOf).filter((r) => r.w > 0 && r.h > 0),
+    page: rectOf(pageEl),
+    viewW: window.innerWidth,
+    viewH: window.innerHeight,
+  };
+  const json = JSON.stringify(layout);
+  if (json !== last) {
+    last = json;
+    send(layout);
   }
 
   if (animations > 0) {
@@ -93,7 +83,7 @@ function directive(set, outline) {
 // v-shell: this element belongs to the shell, wherever it sits in the page.
 export const vShell = directive(marked, '2px solid rgba(220, 38, 38, 0.8)');
 
-// v-drag: this empty shell element moves the window. Nothing inside it gets clicks.
+// v-drag: this empty space in the top row moves the window. Nothing inside it gets clicks.
 export const vDrag = directive(draggable, '2px dashed rgba(38, 99, 220, 0.8)');
 
 // setPageElement says where the page goes. It isn't shell, so it isn't marked.

@@ -12,15 +12,12 @@ package main
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_show_tab(const PBEngineCalls* c, int64_t tab) { c->show_tab(tab); }
-static inline void call_close_window(const PBEngineCalls* c) { c->close_window(); }
+static inline void call_request_window(const PBEngineCalls* c, int32_t request) { c->request_window(request); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
 static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_forward(tab); }
 static inline void call_reload(const PBEngineCalls* c, int64_t tab) { c->reload(tab); }
-static inline void call_set_page_bounds(const PBEngineCalls* c, double x, double y, double w, double h, double vw, double vh) { c->set_page_bounds(x, y, w, h, vw, vh); }
-static inline void call_set_shell_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_shell_regions(rects, count); }
-static inline void call_set_drag_regions(const PBEngineCalls* c, const double* rects, size_t count) { c->set_drag_regions(rects, count); }
-static inline void call_set_window_frame(const PBEngineCalls* c, int32_t rgb, double width) { c->set_window_frame(rgb, width); }
+static inline void call_set_window_layout(const PBEngineCalls* c, const PBWindowLayout* layout, const PBRegion* regions, size_t count) { c->set_window_layout(layout, regions, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
 static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
 static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
@@ -103,7 +100,9 @@ func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.
 
 func (e *nativeEngine) ShowTab(tab engine.TabID) { C.call_show_tab(e.calls, C.int64_t(tab)) }
 
-func (e *nativeEngine) CloseWindow() { C.call_close_window(e.calls) }
+func (e *nativeEngine) RequestWindow(r engine.WindowRequest) {
+	C.call_request_window(e.calls, C.int32_t(r))
+}
 
 func (e *nativeEngine) LoadURL(tab engine.TabID, url string) {
 	c := C.CString(url)
@@ -117,37 +116,26 @@ func (e *nativeEngine) GoForward(tab engine.TabID) { C.call_go_forward(e.calls, 
 
 func (e *nativeEngine) Reload(tab engine.TabID) { C.call_reload(e.calls, C.int64_t(tab)) }
 
-func (e *nativeEngine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
-	C.call_set_page_bounds(e.calls, C.double(r.X), C.double(r.Y), C.double(r.W), C.double(r.H), C.double(viewW), C.double(viewH))
-}
-
-func (e *nativeEngine) SetShellRegions(rects []engine.Rect) {
-	flat := flatten(rects)
-	C.call_set_shell_regions(e.calls, &flat[0], C.size_t(len(rects)))
-}
-
-func (e *nativeEngine) SetWindowFrame(hex string, width float64) {
-	rgb, err := strconv.ParseInt(strings.TrimPrefix(hex, "#"), 16, 32)
+func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
+	rgb, err := strconv.ParseInt(strings.TrimPrefix(l.FrameColor, "#"), 16, 32)
 	if err != nil {
-		log.Printf("window colour %q is not #rrggbb", hex)
+		log.Printf("window colour %q is not #rrggbb", l.FrameColor)
 		return
 	}
-	C.call_set_window_frame(e.calls, C.int32_t(rgb), C.double(width))
-}
-
-func (e *nativeEngine) SetDragRegions(rects []engine.Rect) {
-	flat := flatten(rects)
-	C.call_set_drag_regions(e.calls, &flat[0], C.size_t(len(rects)))
-}
-
-// flatten lays rectangles out as x, y, w, h, with a spare value so there is always an
-// address to take.
-func flatten(rects []engine.Rect) []C.double {
-	flat := make([]C.double, 0, len(rects)*4+1)
-	for _, r := range rects {
-		flat = append(flat, C.double(r.X), C.double(r.Y), C.double(r.W), C.double(r.H))
+	regions := make([]C.PBRegion, len(l.Regions))
+	for i, g := range l.Regions {
+		regions[i] = C.PBRegion{x: C.double(g.Rect.X), y: C.double(g.Rect.Y), w: C.double(g.Rect.W), h: C.double(g.Rect.H), area: C.int32_t(g.Area)}
 	}
-	return append(flat, 0)
+	var first *C.PBRegion
+	if len(regions) > 0 {
+		first = &regions[0]
+	}
+	layout := C.PBWindowLayout{
+		view_w: C.double(l.ViewW), view_h: C.double(l.ViewH),
+		page_x: C.double(l.Page.X), page_y: C.double(l.Page.Y), page_w: C.double(l.Page.W), page_h: C.double(l.Page.H),
+		frame_rgb: C.int32_t(rgb), frame_width: C.double(l.FrameWidth),
+	}
+	C.call_set_window_layout(e.calls, &layout, first, C.size_t(len(regions)))
 }
 
 func (e *nativeEngine) FocusPage() { C.call_focus_page(e.calls) }

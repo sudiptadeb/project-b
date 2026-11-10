@@ -13,13 +13,11 @@ type fakeEngine struct {
 	next   engine.TabID
 	shown  engine.TabID
 	closed []engine.TabID
-	window bool
 }
 
 func (f *fakeEngine) CreateTab() engine.TabID      { f.next++; return f.next }
 func (f *fakeEngine) CloseTab(id engine.TabID)     { f.closed = append(f.closed, id) }
 func (f *fakeEngine) ShowTab(id engine.TabID)      { f.shown = id }
-func (f *fakeEngine) CloseWindow()                 { f.window = true }
 func (f *fakeEngine) LoadURL(engine.TabID, string) {}
 
 func ids(tabs []Tab) []engine.TabID {
@@ -74,16 +72,15 @@ func TestCreateCloseAndActivate(t *testing.T) {
 	}
 }
 
-func TestClosingTheLastTabClosesTheWindow(t *testing.T) {
+func TestClosingTheLastTabEmptiesTheList(t *testing.T) {
 	e := &fakeEngine{}
 	m := New(e)
 	empty := false
 	m.OnEmpty(func() { empty = true })
-	m.OnEmpty(e.CloseWindow)
 	m.Create()
 	m.CloseActive()
-	if !empty || !e.window || len(m.All()) != 0 || m.ActiveID() != 0 {
-		t.Fatalf("empty %v window %v all %v active %v", empty, e.window, m.All(), m.ActiveID())
+	if !empty || len(m.All()) != 0 || m.ActiveID() != 0 {
+		t.Fatalf("empty %v all %v active %v", empty, m.All(), m.ActiveID())
 	}
 }
 

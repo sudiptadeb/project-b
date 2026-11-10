@@ -11,45 +11,39 @@
 #include "components/input/native_web_keyboard_event.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
 
-// Answers the OS hit test. Content's own views ask this same question, so a view that
-// loses the answer ignores the event (see shouldIgnoreMouseEvent: in
-// content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm).
+// Answers the OS hit test by walking the layout's regions. Content's own views ask this
+// same question, so a view that loses the answer ignores the event (see
+// shouldIgnoreMouseEvent: in content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm).
 //
-// In a drag region the answer is nil, so the event falls through to the window's own
+// In a drag area the answer is nil, so the event falls through to the window's own
 // frame, which moves the window and, inside the title bar, zooms on a double-click.
 // That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
 // Holds every page view; the shown one is the only one not hidden.
 @property(nonatomic, strong) NSView* pages;
-- (void)setRegions:(std::vector<gfx::RectF>)regions;
-- (void)setDragRegions:(std::vector<gfx::RectF>)regions;
+- (void)setRegions:(std::vector<project_b::Window::Region>)regions;
 @end
 
 @implementation PBContainerView {
-  std::vector<gfx::RectF> _regions;
-  std::vector<gfx::RectF> _dragRegions;
+  std::vector<project_b::Window::Region> _regions;
 }
 
 @synthesize shellView = _shellView;
 @synthesize pages = _pages;
 
-- (void)setRegions:(std::vector<gfx::RectF>)regions {
+- (void)setRegions:(std::vector<project_b::Window::Region>)regions {
   _regions = std::move(regions);
 }
 
 // AppKit asks this, privately, which part of the title bar the window server must leave
 // to the app. A transparent view leaves none, so the server moved the window from any
 // drag that started in the title bar strip, the address field included. The container
-// leaves all of itself: every press there goes through hitTest:, and only a drag region
+// leaves all of itself: every press there goes through hitTest:, and only a drag area
 // falls through to the frame, which moves the window. Chrome's content view answers the
 // same (bridged_content_view.mm).
 - (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
   return self.bounds;
-}
-
-- (void)setDragRegions:(std::vector<gfx::RectF>)regions {
-  _dragRegions = std::move(regions);
 }
 
 - (NSView*)hitTest:(NSPoint)point {
@@ -60,15 +54,17 @@
   }
   // Shell rectangles measure y from the top; Cocoa measures it from the bottom.
   const float y = self.bounds.size.height - p.y;
-  for (const gfx::RectF& r : _dragRegions) {
-    if (r.Contains(p.x, y)) {
+  for (const project_b::Window::Region& r : _regions) {
+    if (!r.rect.Contains(p.x, y)) {
+      continue;
+    }
+    if (r.area == project_b::Window::Area::kDrag) {
       return nil;
     }
-  }
-  for (const gfx::RectF& r : _regions) {
-    if (r.Contains(p.x, y)) {
+    if (r.area == project_b::Window::Area::kShell) {
       return [self.shellView hitTest:p];
     }
+    break;
   }
   // hitTest: skips hidden views, so this finds the shown page or nothing.
   NSView* page = [self.pages hitTest:p];
@@ -95,7 +91,7 @@
   return _forceKeyForDriver || [super isMainWindow];
 }
 
-// AppKit zooms on a double-click in the title bar by itself. A drag region below the
+// AppKit zooms on a double-click in the title bar by itself. A drag area below the
 // title bar gets the same, following the user's "double-click a window's title bar to"
 // setting, as Chrome does (native_widget_mac_nswindow.mm).
 - (void)sendEvent:(NSEvent*)event {
@@ -118,7 +114,7 @@
 @end
 
 @interface PBWindowDelegate : NSObject <NSWindowDelegate>
-@property(nonatomic) base::RepeatingClosure onControlsMayHaveMoved;
+@property(nonatomic) base::RepeatingClosure onStateMayHaveChanged;
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose;
 @end
 
@@ -126,7 +122,7 @@
   base::OnceClosure _onClose;
 }
 
-@synthesize onControlsMayHaveMoved = _onControlsMayHaveMoved;
+@synthesize onStateMayHaveChanged = _onStateMayHaveChanged;
 
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose {
   if ((self = [super init])) {
@@ -140,8 +136,8 @@
 }
 
 - (void)windowDidResize:(NSNotification*)notification {
-  if (_onControlsMayHaveMoved) {
-    _onControlsMayHaveMoved.Run();
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
   }
 }
 
@@ -153,8 +149,8 @@
 }
 
 - (void)windowDidEnterFullScreen:(NSNotification*)notification {
-  if (_onControlsMayHaveMoved) {
-    _onControlsMayHaveMoved.Run();
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
   }
 }
 
@@ -163,9 +159,9 @@
 // goes out now and once more then.
 - (void)windowDidExitFullScreen:(NSNotification*)notification {
   [notification.object toolbar].visible = YES;
-  if (_onControlsMayHaveMoved) {
-    _onControlsMayHaveMoved.Run();
-    base::RepeatingClosure again = _onControlsMayHaveMoved;
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
+    base::RepeatingClosure again = _onStateMayHaveChanged;
     dispatch_async(dispatch_get_main_queue(), ^{
       again.Run();
     });
@@ -183,9 +179,11 @@ struct Window::Impl {
   gfx::RectF page_bounds;
   size_t ignored_stale_bounds = 0;
   uint32_t shown_rgb = 0;
-  base::RepeatingCallback<void(const gfx::RectF&, double)> on_controls;
-  gfx::RectF last_controls;
-  double last_radius = -1;
+  // The frame last painted; none yet.
+  int64_t frame_rgb = -1;
+  double frame_width = -1;
+  base::RepeatingCallback<void(const State&)> on_state;
+  State last_state;
 
   // The close and zoom buttons bound the controls. In full screen macOS hides them.
   gfx::RectF Controls() const {
@@ -233,17 +231,23 @@ struct Window::Impl {
     return radius;
   }
 
-  void ReportControls() {
-    const gfx::RectF controls = Controls();
-    const double radius = CornerRadius();
-    if (controls == last_controls && radius == last_radius) {
+  void ReportState() {
+    const State state = {
+        .size = gfx::SizeF(container.bounds.size.width,
+                           container.bounds.size.height),
+        .controls = Controls(),
+        .corner_radius = CornerRadius(),
+        .full_screen = (window.styleMask & NSWindowStyleMaskFullScreen) != 0,
+    };
+    if (state.size == last_state.size && state.controls == last_state.controls &&
+        state.corner_radius == last_state.corner_radius &&
+        state.full_screen == last_state.full_screen) {
       return;
     }
-    last_controls = controls;
-    last_radius = radius;
+    last_state = state;
     // The frame band the container draws follows the window's curve.
-    container.layer.cornerRadius = radius;
-    on_controls.Run(controls, radius);
+    container.layer.cornerRadius = state.corner_radius;
+    on_state.Run(state);
   }
 };
 
@@ -335,50 +339,55 @@ void Window::RemovePageView(gfx::NativeView view) {
   [view.GetNativeNSView() removeFromSuperview];
 }
 
-void Window::SetPageBounds(const gfx::RectF& bounds,
-                           const gfx::SizeF& viewport) {
+void Window::SetLayout(Layout layout) {
+  [impl_->container setRegions:std::move(layout.regions)];
+
+  if (layout.frame_rgb != impl_->frame_rgb ||
+      layout.frame_width != impl_->frame_width) {
+    impl_->frame_rgb = layout.frame_rgb;
+    impl_->frame_width = layout.frame_width;
+    const uint32_t rgb = layout.frame_rgb;
+    NSColor* color = [NSColor colorWithSRGBRed:((rgb >> 16) & 0xff) / 255.0
+                                         green:((rgb >> 8) & 0xff) / 255.0
+                                          blue:(rgb & 0xff) / 255.0
+                                         alpha:1];
+    impl_->window.backgroundColor = color;
+    // A layer's border is drawn above its sublayers, so this band sits over the page
+    // and the shell alike; its corners take the window's radius in ReportState.
+    impl_->container.layer.backgroundColor = color.CGColor;
+    impl_->container.layer.borderColor = color.CGColor;
+    impl_->container.layer.borderWidth = layout.frame_width;
+  }
+
   const NSSize size = impl_->container.bounds.size;
-  if (std::round(viewport.width()) != std::round(size.width) ||
-      std::round(viewport.height()) != std::round(size.height)) {
+  if (std::round(layout.viewport.width()) != std::round(size.width) ||
+      std::round(layout.viewport.height()) != std::round(size.height)) {
     impl_->ignored_stale_bounds++;
     return;
   }
-  impl_->page_bounds = bounds;
+  const gfx::RectF& page = layout.page;
+  impl_->page_bounds = page;
   impl_->container.pages.frame =
-      NSMakeRect(std::round(bounds.x()),
-                 std::round(size.height - bounds.y() - bounds.height()),
-                 std::round(bounds.width()), std::round(bounds.height()));
+      NSMakeRect(std::round(page.x()),
+                 std::round(size.height - page.y() - page.height()),
+                 std::round(page.width()), std::round(page.height()));
 }
 
-void Window::SetShellRegions(std::vector<gfx::RectF> regions) {
-  [impl_->container setRegions:std::move(regions)];
+void Window::ListenForState(
+    base::RepeatingCallback<void(const State&)> on_change) {
+  impl_->on_state = std::move(on_change);
+  impl_->last_state = {.corner_radius = -1};  // So the first report always goes.
+  impl_->delegate.onStateMayHaveChanged = base::BindRepeating(
+      [](Impl* impl) { impl->ReportState(); }, impl_.get());
+  impl_->ReportState();
 }
 
-void Window::SetFrame(uint32_t rgb, double width) {
-  NSColor* color = [NSColor colorWithSRGBRed:((rgb >> 16) & 0xff) / 255.0
-                                       green:((rgb >> 8) & 0xff) / 255.0
-                                        blue:(rgb & 0xff) / 255.0
-                                       alpha:1];
-  impl_->window.backgroundColor = color;
-  // A layer's border is drawn above its sublayers, so this band sits over the page and
-  // the shell alike; its corners take the window's radius in ReportControls.
-  impl_->container.layer.backgroundColor = color.CGColor;
-  impl_->container.layer.borderColor = color.CGColor;
-  impl_->container.layer.borderWidth = width;
+void Window::Zoom() {
+  [impl_->window performZoom:nil];
 }
 
-void Window::SetDragRegions(std::vector<gfx::RectF> regions) {
-  [impl_->container setDragRegions:std::move(regions)];
-}
-
-void Window::ListenForControls(
-    base::RepeatingCallback<void(const gfx::RectF&, double)> on_change) {
-  impl_->on_controls = std::move(on_change);
-  impl_->last_controls = gfx::RectF(-1, -1, 0, 0);  // So the first report always goes.
-  impl_->last_radius = -1;
-  impl_->delegate.onControlsMayHaveMoved = base::BindRepeating(
-      [](Impl* impl) { impl->ReportControls(); }, impl_.get());
-  impl_->ReportControls();
+void Window::ToggleFullScreen() {
+  [impl_->window toggleFullScreen:nil];
 }
 
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {

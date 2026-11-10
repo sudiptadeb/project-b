@@ -51,13 +51,22 @@ content hook is a Go change only; see [content-hooks.md](content-hooks.md).
 
 Stacked views: every tab's page view at the bottom, inside one holder, with only the
 active one not hidden; a full-window transparent shell on top. Shell components mark
-themselves with `v-shell` and report their rectangles, empty shell that should move the
-window marks itself with `v-drag`, and `<PageView>` reports where the page goes.
-`PBContainerView hitTest:` asks two questions: is this point in a drag rectangle (answer
-nil, so AppKit's frame drags the window and, inside the title bar, zooms on a
-double-click), else is it in a shell rectangle? Content's own views ask the same
-`hitTest:` before accepting a mouse event, so nothing routes events by hand. That is
-how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
+themselves with `v-shell`, the empty spaces in the top row that move the window mark
+themselves with `v-drag`, and `<PageView>` says where the page goes; the shell sends
+all of it as one `layout` message. Go's window manager (`core/window`) owns the window:
+it takes that report and the engine's `WindowState` (size, buttons, corner radius, full
+screen), decides what each point does, and gives the engine one `WindowLayout` through
+`SetWindowLayout`: drag areas first, then shell areas, the page rectangle, and the
+frame. In full screen it sends no drag areas. Close, minimise, zoom and full screen
+requests go through it too. The design: [window-manager.md](window-manager.md).
+
+`PBContainerView hitTest:` walks the layout's regions in order: a drag area answers nil,
+so AppKit's frame drags the window and, inside the title bar, zooms on a double-click; a
+shell area answers the shell's view; anything else the page. Content's own views ask
+the same `hitTest:` before accepting a mouse event, so nothing routes events by hand.
+That is how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
+The sidebar and the frame's left, right and bottom edges never drag; the resize edges
+are AppKit's.
 
 The page holder keeps its margins through autoresizing, so it follows a window resize
 in the same frame. A page position measured for an older window size is ignored,
@@ -66,8 +75,8 @@ because a fresher one follows.
 The shell's top row is 44px, centred on the window buttons of a unified toolbar, and
 the window uses `NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so
 the shell draws under the native window buttons. The engine reports where those buttons are
-(`WindowControlsChanged`: after start, on resize, on entering or leaving full screen,
-empty when there are none) and the shell leaves exactly that space on whichever side
+(`WindowChanged`: after start, on resize, on entering or leaving full screen, empty
+when there are none) and the shell leaves exactly that space on whichever side
 they are. Hit-testing from the window's frame view, as AppKit does, shows the title bar
 does not swallow clicks over the shell: a point on a control returns the shell, a point
 on the empty strip returns the frame, a point on a window button returns the button.
@@ -77,7 +86,7 @@ none, so a drag across the address field moved the window. The content view clai
 whole title bar from it (`_opaqueRectForWindowMoveWhenInTitlebar`, as Chrome's does), so
 every press there goes through the hit test.
 
-The window goes on screen once Go has given it the frame colour and width, so even its
+The window goes on screen once Go has given it its first layout, frame included, so even its
 first frame has them. Until the shell's first frame, content paints the shell's view
 white over all of it, as it does any view it has no frame for yet. A new tab loads
 `about:blank`, so every tab has a page view that paints in content's default colour from
@@ -106,7 +115,7 @@ the panel sends the user's changes, and Go says when they change.
 The frame colour is a pref, `frameColor`, by default a dusty teal, `#4f9e9e`. The panel
 offers it and the frames of the Ulaa design's modes (Personal's teal, Work's blue, Kids'
 amber, Open Season's red, Incognito's slate), and a colour input for any other. The
-window manager paints the window's frame with it through `SetWindowFrame` and tells the
+window manager paints the window's frame with it through the next `SetWindowLayout` and tells the
 shell, so both change together, and `shell/src/tones.js` derives the shell's other tones
 from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
 fills the colour itself, faint.

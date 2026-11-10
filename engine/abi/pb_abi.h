@@ -34,9 +34,44 @@ typedef enum PBEvent {
   PB_EVENT_SHELL_MESSAGE = 1,           // s: json
   PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
-  PB_EVENT_WINDOW_CONTROLS_CHANGED = 4, // d: x, d: y, d: w, d: h, d: window corner radius
+  PB_EVENT_WINDOW_CHANGED = 4,          // d: w, d: h, the content area; d: x, d: y, d: w,
+                                        // d: h, the window buttons; d: corner radius;
+                                        // i: full screen
   PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
+  PB_EVENT_SHELL_CRASHED = 6,           // nothing; the shell page's renderer died
 } PBEvent;
+
+// What a press inside a region does. Matches engine.Area in core/engine/engine.go.
+typedef enum PBArea {
+  PB_AREA_PAGE = 0,   // it goes to the shown page
+  PB_AREA_SHELL = 1,  // it goes to the shell
+  PB_AREA_DRAG = 2,   // it moves the window
+} PBArea;
+
+typedef struct PBRegion {
+  double x, y, w, h;
+  int32_t area;  // PBArea
+} PBRegion;
+
+// Everything about how the window behaves, from Go's window manager, with its regions
+// passed beside it. Rectangles are in shell coordinates, y measured down from the top.
+typedef struct PBWindowLayout {
+  // The window size the shell measured; the page is placed only while it still fits.
+  double view_w, view_h;
+  double page_x, page_y, page_w, page_h;
+  // The frame: the colour the window paints under the page and the shell, 0xRRGGBB,
+  // and the width of the band it draws around its edge, in points.
+  int32_t frame_rgb;
+  double frame_width;
+} PBWindowLayout;
+
+// Matches engine.WindowRequest. Each does what pressing that window button does.
+typedef enum PBWindowRequest {
+  PB_WINDOW_CLOSE = 1,
+  PB_WINDOW_MINIMISE = 2,
+  PB_WINDOW_ZOOM = 3,
+  PB_WINDOW_FULL_SCREEN = 4,
+} PBWindowRequest;
 
 // What Go can ask the adapter to do. Handed over once, at start.
 typedef struct PBEngineCalls {
@@ -48,21 +83,11 @@ typedef struct PBEngineCalls {
   void (*go_back)(int64_t tab);
   void (*go_forward)(int64_t tab);
   void (*reload)(int64_t tab);
-  void (*close_window)(void);
-  // view_w and view_h are the window size the shell measured against.
-  void (*set_page_bounds)(double x,
-                          double y,
-                          double w,
-                          double h,
-                          double view_w,
-                          double view_h);
-  // rects is x, y, w, h repeated count times.
-  void (*set_shell_regions)(const double* rects, size_t count);
-  // Same layout. A mouse down here drags the window.
-  void (*set_drag_regions)(const double* rects, size_t count);
-  // The frame: the colour the window itself paints under the page and the shell,
-  // 0xRRGGBB, and the width of the band the window draws around its edge, in points.
-  void (*set_window_frame)(int32_t rgb, double width);
+  void (*request_window)(int32_t request);  // PBWindowRequest
+  // regions are in order: the first that holds a point decides. None holds it: the page.
+  void (*set_window_layout)(const PBWindowLayout* layout,
+                            const PBRegion* regions,
+                            size_t region_count);
   void (*focus_page)(void);
   void (*focus_shell)(void);
   void (*send_to_shell)(const char* json, size_t length);

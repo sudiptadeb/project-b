@@ -251,11 +251,11 @@ void ShellPage::DidFirstVisuallyNonEmptyPaint() {
   }
 }
 
-// A dead shell claims nothing, so the page keeps working until the new shell asks
-// for a fresh snapshot.
+// Go's window manager takes back what a dead shell claimed, so the page keeps working
+// until the new shell reports its layout again.
 void ShellPage::PrimaryMainFrameRenderProcessGone(
     base::TerminationStatus status) {
-  Engine::Get()->window()->SetShellRegions({});
+  hooks::Fire(PB_EVENT_SHELL_CRASHED, hooks::Args());
   contents_->GetController().Reload(content::ReloadType::NORMAL, false);
 }
 

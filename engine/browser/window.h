@@ -18,44 +18,63 @@ struct NativeWebKeyboardEvent;
 namespace project_b {
 
 // The native window: the pages' views at the bottom, one shown at a time, the shell's
-// view on top covering everything. One question decides who gets a mouse event: is
-// this point in a rectangle the shell claimed?
+// view on top covering everything. Go's window manager describes how it behaves in one
+// Layout; the window only follows it, and reports its State back.
 class Window {
  public:
+  // What a press inside a region does. Matches PBArea.
+  enum class Area { kPage = 0, kShell = 1, kDrag = 2 };
+  struct Region {
+    gfx::RectF rect;
+    Area area;
+  };
+  struct Layout {
+    // The size the shell measured against. A page position measured for an older
+    // window size is ignored, and a fresher one follows because the resize made the
+    // shell measure again.
+    gfx::SizeF viewport;
+    gfx::RectF page;  // Where the page goes, in shell coordinates.
+    // In order: the first region that holds a point decides. None holds it: the page.
+    std::vector<Region> regions;
+    // The colour the window paints wherever nothing else does, before the shell's
+    // first paint and wherever it lags a live resize, 0xRRGGBB, and the width in
+    // points of the band it draws over everything around its edge, rounded with its
+    // own corner radius, so the page's square corners never show at the curve.
+    uint32_t frame_rgb;
+    double frame_width;
+  };
+  struct State {
+    gfx::SizeF size;  // The content area.
+    gfx::RectF controls;  // The window buttons, in shell coordinates; empty in full screen.
+    double corner_radius;  // 0 in full screen.
+    bool full_screen;
+  };
+
   explicit Window(base::OnceClosure on_close);
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
   ~Window();
 
-  // Puts the window on screen. Call it once SetFrame has been called.
+  // Puts the window on screen. Call it once SetLayout has been called.
   void Show();
   void Close();
   void SetTitle(const std::u16string& title);
   void SetShellView(gfx::NativeView view);
 
-  // Page views all sit where SetPageBounds says. AddPageView adds one hidden;
+  // Page views all sit where the layout's page says. AddPageView adds one hidden;
   // ShowPageView shows it and hides the others.
   void AddPageView(gfx::NativeView view);
   void ShowPageView(gfx::NativeView view);
   void RemovePageView(gfx::NativeView view);
 
-  // Where the page goes, in shell coordinates. viewport is the size the shell measured
-  // against: a report made for an older window size is ignored, and a fresher one
-  // follows because the resize made the shell measure again.
-  void SetPageBounds(const gfx::RectF& bounds, const gfx::SizeF& viewport);
-  void SetShellRegions(std::vector<gfx::RectF> regions);
-  void SetDragRegions(std::vector<gfx::RectF> regions);
-  // The frame, 0xRRGGBB and a width in points: the colour the window paints wherever
-  // nothing else does, before the shell's first paint and wherever it lags a live
-  // resize, and the band the window draws over everything around its edge, rounded
-  // with its own corner radius, so the page's square corners never show at the curve.
-  void SetFrame(uint32_t rgb, double width);
+  void SetLayout(Layout layout);
 
-  // Reports where the native window controls are, in shell coordinates, and the
-  // window's own corner radius, now and whenever either changes. In full screen the
-  // controls are empty and the radius is 0.
-  void ListenForControls(
-      base::RepeatingCallback<void(const gfx::RectF&, double corner_radius)> on_change);
+  // Reports the window's state now and whenever it changes.
+  void ListenForState(base::RepeatingCallback<void(const State&)> on_change);
+
+  // What the window buttons do: zoom and full screen go in or out.
+  void Zoom();
+  void ToggleFullScreen();
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 

@@ -22,6 +22,12 @@ var Controls = engine.Rect{X: 19, Y: 19, W: 60, H: 14}
 // CornerRadius is what macOS 26 rounds that window's corners with. Full screen has none.
 const CornerRadius = 26.0
 
+// Width and Height are the mock window's content size, the real window's first size.
+const (
+	Width  = 1100.0
+	Height = 700.0
+)
+
 // Shortcuts are the names the mock page uses for engine.Shortcut.
 var Shortcuts = map[string]engine.Shortcut{
 	"focusAddressBar": engine.ShortcutFocusAddressBar,
@@ -47,20 +53,17 @@ type tab struct {
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
 // as it does with real content.
 type Engine struct {
-	windowColor string
-	frameWidth  float64
-	queue       chan func()
-	listener    engine.Listener
-	nextTab     engine.TabID
-	tabs        map[engine.TabID]*tab
-	shown       engine.TabID
-	full        bool // Full screen, so there are no window controls.
+	queue    chan func()
+	listener engine.Listener
+	nextTab  engine.TabID
+	tabs     map[engine.TabID]*tab
+	shown    engine.TabID
+	full     bool // Full screen, so there are no window controls.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu         sync.Mutex
-	regions    []engine.Rect
-	drag       []engine.Rect
-	bounds     engine.Rect
+	layout     engine.WindowLayout
+	requests   []engine.WindowRequest
 	closed     bool
 	hidden     []engine.TabID // Tabs told they are hidden since the last ShowTab.
 	shownColor string
@@ -81,23 +84,24 @@ func (e *Engine) Run() {
 	}
 }
 
-// SetListener sets who hears the engine's events, and reports the window controls to
-// it, as the real engine does right after it starts. That is also when the real engine
-// puts its window on screen, so the colour the window has now is its first frame's.
+// SetListener sets who hears the engine's events, and reports the window to it, as the
+// real engine does right after it starts. That is also when the real engine puts its
+// window on screen, so the colour the window has now is its first frame's.
 func (e *Engine) SetListener(l engine.Listener) {
 	e.mu.Lock()
-	e.shownColor = e.windowColor
+	e.shownColor = e.layout.FrameColor
 	e.mu.Unlock()
 	e.listener = l
-	e.reportControls()
+	e.reportWindow()
 }
 
-func (e *Engine) reportControls() {
-	if e.full {
-		e.listener.WindowControlsChanged(engine.Rect{}, 0)
-	} else {
-		e.listener.WindowControlsChanged(Controls, CornerRadius)
+func (e *Engine) reportWindow() {
+	s := engine.WindowState{W: Width, H: Height, FullScreen: e.full}
+	if !e.full {
+		s.Controls = Controls
+		s.CornerRadius = CornerRadius
 	}
+	e.listener.WindowChanged(s)
 }
 
 func (e *Engine) Name() string { return "mock" }
@@ -153,44 +157,40 @@ func (e *Engine) Reload(id engine.TabID) {
 	}
 }
 
-func (e *Engine) CloseWindow() {
+// RequestWindow closes the window, goes in or out of full screen, and records every
+// request. A mock window has nothing to minimise or zoom.
+func (e *Engine) RequestWindow(r engine.WindowRequest) {
 	e.mu.Lock()
-	e.closed = true
+	e.requests = append(e.requests, r)
+	e.closed = e.closed || r == engine.WindowClose
 	e.mu.Unlock()
-	e.publishPage(0, "closed", "")
+	switch r {
+	case engine.WindowClose:
+		e.publishPage(0, "closed", "")
+	case engine.WindowFullScreen:
+		e.full = !e.full
+		e.reportWindow()
+	}
 }
 
-func (e *Engine) SetPageBounds(r engine.Rect, viewW, viewH float64) {
+func (e *Engine) SetWindowLayout(l engine.WindowLayout) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.bounds = r
+	e.layout = l
 }
 
-func (e *Engine) SetShellRegions(rects []engine.Rect) {
+// Layout is the last layout the app gave the window.
+func (e *Engine) Layout() engine.WindowLayout {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.regions = rects
+	return e.layout
 }
 
-func (e *Engine) SetWindowFrame(hex string, width float64) {
+// Requests are the window requests the app made, in order.
+func (e *Engine) Requests() []engine.WindowRequest {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.windowColor = hex
-	e.frameWidth = width
-}
-
-// FrameWidth is the band the app last asked the window to draw around its edge.
-func (e *Engine) FrameWidth() float64 {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.frameWidth
-}
-
-// WindowColor is the colour the app last asked the window to paint.
-func (e *Engine) WindowColor() string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.windowColor
+	return append([]engine.WindowRequest(nil), e.requests...)
 }
 
 // ShownColor is the colour the window painted when it went on screen.
@@ -200,12 +200,6 @@ func (e *Engine) ShownColor() string {
 	return e.shownColor
 }
 
-func (e *Engine) SetDragRegions(rects []engine.Rect) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.drag = rects
-}
-
 func (e *Engine) FocusPage() {}
 
 func (e *Engine) FocusShell() {}
@@ -213,31 +207,6 @@ func (e *Engine) FocusShell() {}
 func (e *Engine) SendToShell(msg []byte) { e.Shell.Publish(msg) }
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
-
-// Regions returns the shell's rectangles, the drag rectangles and the page's bounds.
-func (e *Engine) Regions() (shell, drag []engine.Rect, bounds engine.Rect) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return append([]engine.Rect(nil), e.regions...), append([]engine.Rect(nil), e.drag...), e.bounds
-}
-
-// Hit answers what the real engine's hit test answers for a point: "drag", "shell" or
-// "page".
-func (e *Engine) Hit(x, y float64) string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	for _, r := range e.drag {
-		if r.Contains(x, y) {
-			return "drag"
-		}
-	}
-	for _, r := range e.regions {
-		if r.Contains(x, y) {
-			return "shell"
-		}
-	}
-	return "page"
-}
 
 // Closed reports whether the app closed its window.
 func (e *Engine) Closed() bool {
@@ -289,8 +258,9 @@ func (e *Engine) Fire(kind, value string) {
 				e.listener.Shortcut(s)
 			}
 		case "fullscreen":
+			// The system's own button, which asks no one.
 			e.full = !e.full
-			e.reportControls()
+			e.reportWindow()
 		}
 	})
 }

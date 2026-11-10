@@ -1528,6 +1528,7 @@ bool WebContentsDelegateHooks::CanOverscrollContent() {
   return content::WebContentsDelegate::CanOverscrollContent();
 }
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 bool WebContentsDelegateHooks::CanUseWindowingControls(content::RenderFrameHost* requesting_frame) {
   if (hooks::Subscribed(hooks::kWebContentsDelegate_CanUseWindowingControls)) {
     hooks::Args args;
@@ -1540,6 +1541,7 @@ bool WebContentsDelegateHooks::CanUseWindowingControls(content::RenderFrameHost*
   }
   return content::WebContentsDelegate::CanUseWindowingControls(requesting_frame);
 }
+#endif
 
 void WebContentsDelegateHooks::CancelKeyboardLockRequest(content::WebContents* web_contents) {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_CancelKeyboardLockRequest)) {
@@ -2000,6 +2002,7 @@ void WebContentsDelegateHooks::LostPointerLock() {
   content::WebContentsDelegate::LostPointerLock();
 }
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 void WebContentsDelegateHooks::MaximizeFromWebAPI() {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_MaximizeFromWebAPI)) {
     return content::WebContentsDelegate::MaximizeFromWebAPI();
@@ -2009,7 +2012,9 @@ void WebContentsDelegateHooks::MaximizeFromWebAPI() {
   hooks::Fire(hooks::kWebContentsDelegate_MaximizeFromWebAPI, args);
   content::WebContentsDelegate::MaximizeFromWebAPI();
 }
+#endif
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 void WebContentsDelegateHooks::MinimizeFromWebAPI() {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_MinimizeFromWebAPI)) {
     return content::WebContentsDelegate::MinimizeFromWebAPI();
@@ -2019,6 +2024,7 @@ void WebContentsDelegateHooks::MinimizeFromWebAPI() {
   hooks::Fire(hooks::kWebContentsDelegate_MinimizeFromWebAPI, args);
   content::WebContentsDelegate::MinimizeFromWebAPI();
 }
+#endif
 
 void WebContentsDelegateHooks::NavigationStateChanged(content::WebContents* source, content::InvalidateTypes changed_flags) {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_NavigationStateChanged)) {
@@ -2206,6 +2212,7 @@ void WebContentsDelegateHooks::ResizeDueToAutoResize(content::WebContents* web_c
   content::WebContentsDelegate::ResizeDueToAutoResize(web_contents, new_size);
 }
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 void WebContentsDelegateHooks::RestoreFromWebAPI() {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_RestoreFromWebAPI)) {
     return content::WebContentsDelegate::RestoreFromWebAPI();
@@ -2215,6 +2222,7 @@ void WebContentsDelegateHooks::RestoreFromWebAPI() {
   hooks::Fire(hooks::kWebContentsDelegate_RestoreFromWebAPI, args);
   content::WebContentsDelegate::RestoreFromWebAPI();
 }
+#endif
 
 bool WebContentsDelegateHooks::SaveFrame(const GURL& url, const content::Referrer& referrer, content::RenderFrameHost* rfh) {
   if (hooks::Subscribed(hooks::kWebContentsDelegate_SaveFrame)) {
@@ -2253,6 +2261,7 @@ void WebContentsDelegateHooks::SetFocusToLocationBar() {
   content::WebContentsDelegate::SetFocusToLocationBar();
 }
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 void WebContentsDelegateHooks::SetResizableFromWebAPI(bool resizable) {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_SetResizableFromWebAPI)) {
     return content::WebContentsDelegate::SetResizableFromWebAPI(resizable);
@@ -2263,6 +2272,7 @@ void WebContentsDelegateHooks::SetResizableFromWebAPI(bool resizable) {
   hooks::Fire(hooks::kWebContentsDelegate_SetResizableFromWebAPI, args);
   content::WebContentsDelegate::SetResizableFromWebAPI(resizable);
 }
+#endif
 
 void WebContentsDelegateHooks::SetTopControlsGestureScrollInProgress(bool in_progress) {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_SetTopControlsGestureScrollInProgress)) {
@@ -2443,6 +2453,7 @@ bool WebContentsDelegateHooks::ShouldSuppressDialogs(content::WebContents* sourc
   return content::WebContentsDelegate::ShouldSuppressDialogs(source);
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 bool WebContentsDelegateHooks::ShouldUseInstancedSystemMediaControls() const {
   if (hooks::Subscribed(hooks::kWebContentsDelegate_ShouldUseInstancedSystemMediaControls)) {
     hooks::Args args;
@@ -2454,6 +2465,7 @@ bool WebContentsDelegateHooks::ShouldUseInstancedSystemMediaControls() const {
   }
   return content::WebContentsDelegate::ShouldUseInstancedSystemMediaControls();
 }
+#endif
 
 void WebContentsDelegateHooks::ShowRepostFormWarningDialog(content::WebContents* source) {
   if (!hooks::Subscribed(hooks::kWebContentsDelegate_ShowRepostFormWarningDialog)) {
@@ -3299,6 +3311,7 @@ bool ContentBrowserClientHooks::IsHandledURL(const GURL& url) {
   return content::ContentBrowserClient::IsHandledURL(url);
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 bool ContentBrowserClientHooks::IsInitialWebUIURL(const GURL& url) {
   if (hooks::Subscribed(hooks::kContentBrowserClient_IsInitialWebUIURL)) {
     hooks::Args args;
@@ -3310,6 +3323,7 @@ bool ContentBrowserClientHooks::IsInitialWebUIURL(const GURL& url) {
   }
   return content::ContentBrowserClient::IsInitialWebUIURL(url);
 }
+#endif
 
 bool ContentBrowserClientHooks::IsInternalScheme(const GURL& url) {
   if (hooks::Subscribed(hooks::kContentBrowserClient_IsInternalScheme)) {
@@ -3949,6 +3963,7 @@ bool ContentBrowserClientHooks::ShouldDisableSiteIsolation(content::SiteIsolatio
   return content::ContentBrowserClient::ShouldDisableSiteIsolation(site_isolation_mode);
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 bool ContentBrowserClientHooks::ShouldDisallowCredentialRequest(content::WebContents* web_contents) {
   if (hooks::Subscribed(hooks::kContentBrowserClient_ShouldDisallowCredentialRequest)) {
     hooks::Args args;
@@ -3960,6 +3975,7 @@ bool ContentBrowserClientHooks::ShouldDisallowCredentialRequest(content::WebCont
   }
   return content::ContentBrowserClient::ShouldDisallowCredentialRequest(web_contents);
 }
+#endif
 
 bool ContentBrowserClientHooks::ShouldEmbeddedFramesTryToReuseExistingProcess(content::RenderFrameHost* outermost_main_frame) {
   if (hooks::Subscribed(hooks::kContentBrowserClient_ShouldEmbeddedFramesTryToReuseExistingProcess)) {

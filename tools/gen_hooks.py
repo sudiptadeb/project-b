@@ -562,6 +562,7 @@ class Method:
         start = node["range"]["begin"].get("offset", node["loc"].get("offset"))
         self.line = header_lines.offset_to_line(start)
         self.comment = header_lines.comment_above(self.line)
+        self.guard = header_lines.guard(self.line)
         self.signature = sig
 
     def key(self):
@@ -585,6 +586,33 @@ class HeaderLines:
             else:
                 hi = mid - 1
         return lo + 1
+
+    def guard(self, line):
+        """The preprocessor condition the header declares this line under, "" for none, so
+        a hook that only some platforms have is only overridden there. The header's own
+        include guard doesn't count."""
+        stack = []  # One list of conditions per open #if: the branches before, negated, and this one.
+        for text in self.lines[:line - 1]:
+            m = re.match(r"\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b\s*(.*?)\s*(//.*)?$", text)
+            if not m:
+                continue
+            word, cond = m.group(1), m.group(2)
+            if word == "ifdef":
+                cond = f"defined({cond})"
+            elif word == "ifndef":
+                cond = "" if cond.endswith("_H_") else f"!defined({cond})"
+            if word in ("if", "ifdef", "ifndef"):
+                stack.append([cond] if cond else [])
+            elif word == "elif":
+                prev = stack[-1]
+                stack[-1] = [f"!({c})" for c in prev[-1:]] + prev[:-1] + [cond]
+            elif word == "else":
+                prev = stack[-1]
+                stack[-1] = [f"!({c})" for c in prev[-1:]] + prev[:-1]
+            elif word == "endif":
+                stack.pop()
+        conds = [c for branch in stack for c in branch]
+        return " && ".join(f"({c})" if "||" in c and len(conds) > 1 else c for c in conds)
 
     def comment_above(self, line):
         out = []
@@ -893,12 +921,18 @@ def write_cpp(classes, hooks, used_copiers, enums, records, version, table_hash)
         for m in carried:
             ret = m.ret_written if m.ret is None or not hasattr(m.ret, "as_result") else m.ret.as_result
             ret = qualify(ret, "")
+            if m.guard:
+                h.append(f"#if {m.guard}")
             h.append(f"  {ret} {m.name}({cpp_param_list(m)}){' const' if m.is_const else ''} override;")
+            if m.guard:
+                h.append("#endif")
         h += ["};", ""]
 
         for m in carried:
             ret = m.ret_written if m.ret is None or not hasattr(m.ret, "as_result") else m.ret.as_result
             ret = qualify(ret, "")
+            if m.guard:
+                cc.append(f"#if {m.guard}")
             cc.append(f"{ret} {name}::{m.name}({cpp_param_list(m)}){' const' if m.is_const else ''} {{")
             default = f"{qualified}::{m.name}({cpp_args_list(m)})"
             if m.ret is None:
@@ -928,7 +962,7 @@ def write_cpp(classes, hooks, used_copiers, enums, records, version, table_hash)
                 cc.append(f"{indent}}}")
                 cc.append("  }")
                 cc.append(f"  return {default};")
-            cc += ["}", ""]
+            cc += ["}", "#endif", ""] if m.guard else ["}", ""]
 
     h += ["}  // namespace project_b", "", "#endif  // PROJECT_B_ENGINE_BROWSER_HOOKS_GEN_H_", ""]
     cc += ["const char* NavigationThrottleHooks::GetNameForLogging() {", '  return "project_b::NavigationThrottleHooks";', "}", "", "}  // namespace project_b", ""]

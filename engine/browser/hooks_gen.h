@@ -538,7 +538,9 @@ class WebContentsDelegateHooks : public content::WebContentsDelegate {
   int AllowedPrerenderingCount(content::WebContents& web_contents) override;
   bool CanEnterFullscreenModeForTab(content::RenderFrameHost* requesting_frame) override;
   bool CanOverscrollContent() override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   bool CanUseWindowingControls(content::RenderFrameHost* requesting_frame) override;
+#endif
   void CancelKeyboardLockRequest(content::WebContents* web_contents) override;
   bool CheckMediaAccessPermission(content::RenderFrameHost* render_frame_host, const url::Origin& security_origin, blink::mojom::MediaStreamType type) override;
   void CloseContents(content::WebContents* source) override;
@@ -576,8 +578,12 @@ class WebContentsDelegateHooks : public content::WebContentsDelegate {
   bool IsWaitingForPointerLockPrompt(content::WebContents* web_contents) override;
   void LoadingStateChanged(content::WebContents* source, bool should_show_loading_ui) override;
   void LostPointerLock() override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   void MaximizeFromWebAPI() override;
+#endif
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   void MinimizeFromWebAPI() override;
+#endif
   void NavigationStateChanged(content::WebContents* source, content::InvalidateTypes changed_flags) override;
   void OnDidBlockNavigation(content::WebContents* web_contents, const GURL& blocked_url, const GURL& initiator_url, const url::Origin& initiator_origin, blink::mojom::NavigationBlockedReason reason) override;
   bool OnGoToEntryOffset(int offset) override;
@@ -593,11 +599,15 @@ class WebContentsDelegateHooks : public content::WebContentsDelegate {
   void RequestKeyboardLock(content::WebContents* web_contents, bool esc_key_locked) override;
   void RequestPointerLock(content::WebContents* web_contents, bool user_gesture, bool last_unlocked_by_target) override;
   void ResizeDueToAutoResize(content::WebContents* web_contents, const gfx::Size& new_size) override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   void RestoreFromWebAPI() override;
+#endif
   bool SaveFrame(const GURL& url, const content::Referrer& referrer, content::RenderFrameHost* rfh) override;
   void SetContentsBounds(content::WebContents* source, const gfx::Rect& bounds) override;
   void SetFocusToLocationBar() override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   void SetResizableFromWebAPI(bool resizable) override;
+#endif
   void SetTopControlsGestureScrollInProgress(bool in_progress) override;
   void SetTopControlsShownRatio(content::WebContents* web_contents, float ratio) override;
   bool ShouldAllowLazyLoad() override;
@@ -612,7 +622,9 @@ class WebContentsDelegateHooks : public content::WebContentsDelegate {
   bool ShouldResumeRequestsForCreatedWindow() override;
   bool ShouldShowStaleContentOnEviction(content::WebContents* source) override;
   bool ShouldSuppressDialogs(content::WebContents* source) override;
+#if !BUILDFLAG(IS_ANDROID)
   bool ShouldUseInstancedSystemMediaControls() const override;
+#endif
   void ShowRepostFormWarningDialog(content::WebContents* source) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
   void UnregisterProtocolHandler(content::RenderFrameHost* requesting_frame, const std::string& protocol, const GURL& url, bool user_gesture) override;
@@ -689,7 +701,9 @@ class ContentBrowserClientHooks : public content::ContentBrowserClient {
   bool IsFullCookieAccessAllowed(content::BrowserContext* browser_context, content::WebContents* web_contents, const GURL& url, const blink::StorageKey& storage_key, net::CookieSettingOverrides overrides) override;
   bool IsFullscreenAllowedForUnfocusedWebContents(content::WebContents* unfocused_web_contents) override;
   bool IsHandledURL(const GURL& url) override;
+#if !BUILDFLAG(IS_ANDROID)
   bool IsInitialWebUIURL(const GURL& url) override;
+#endif
   bool IsInternalScheme(const GURL& url) override;
   bool IsJitDisabledForSite(content::BrowserContext* browser_context, const GURL& site_url) override;
   bool IsMultiCaptureAllowed(content::RenderFrameHost* render_frame_host) override;
@@ -745,7 +759,9 @@ class ContentBrowserClientHooks : public content::ContentBrowserClient {
   bool ShouldDisableOriginAgentClusterDefault(content::BrowserContext* browser_context) override;
   bool ShouldDisableOriginIsolation() override;
   bool ShouldDisableSiteIsolation(content::SiteIsolationMode site_isolation_mode) override;
+#if !BUILDFLAG(IS_ANDROID)
   bool ShouldDisallowCredentialRequest(content::WebContents* web_contents) override;
+#endif
   bool ShouldEmbeddedFramesTryToReuseExistingProcess(content::RenderFrameHost* outermost_main_frame) override;
   bool ShouldEnableBtm(content::BrowserContext* browser_context) override;
   bool ShouldEnableStrictSiteIsolation() override;

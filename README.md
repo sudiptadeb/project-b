@@ -44,7 +44,11 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
 ## Test it
 
 Test tools go in `.tools/` inside the repo, which git ignores. `npm install` in step 2
-already brought Playwright. ChromeDriver, pinned to the Chromium we build:
+already brought Playwright; it needs its browser once:
+
+    (cd shell && npx playwright install chromium)
+
+ChromeDriver, pinned to the Chromium we build:
 
     mkdir -p .tools/chromedriver && cd .tools/chromedriver
     curl -LO https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.41/mac-arm64/chromedriver-mac-arm64.zip
@@ -72,7 +76,8 @@ agent or ssh session with no display:
 Then allow `.tools/desk/deskctl` once in System Settings, Privacy & Security, under both
 Screen & System Audio Recording and Accessibility, and keep someone logged in with the
 screen unlocked. `.tools/desk/desk status` says what's missing. Without it the check skips
-itself. `DESK` points the tests at another copy.
+itself. `DESK` and `CHROMEDRIVER` point the tests at other copies; a machine that already
+has these tools elsewhere can also link `.tools/desk` and `.tools/chromedriver` to them.
 
 Real clicks, drags and full screen at scale run in a macOS VM:
 [docs/vm-testing.md](docs/vm-testing.md).

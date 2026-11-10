@@ -13,7 +13,8 @@ The machine
 
 Steps, in order, each with how to know it worked
 1. Clone the repo anywhere; every script finds the repo from where it sits.
-2. npm install in shell/. That also brings Playwright for the mock tests.
+2. npm install in shell/. That also brings Playwright for the mock tests; then, in shell/,
+   npx playwright install chromium for its browser.
 3. tools/fetch-chromium.sh. Long download. Done when it prints RESULT=ok and
    chromium/src is checked out at tag 155.0.8059.41.
 4. tools/build.sh. Done when it prints RESULT=ok and chromium/src/out/pb/project_b exists.
@@ -39,6 +40,8 @@ Known traps
   left project_b processes behind, stop only those you started.
 - check_first_paint.py prints "skipped" when deskctl isn't allowed or nobody is logged in
   with the screen unlocked. That is not a failure.
+- A machine that already has ChromeDriver 155.0.8059.41 or deskctl elsewhere: link
+  .tools/chromedriver or .tools/desk to that folder, or set CHROMEDRIVER / DESK.
 - deskctl's permissions are tied to its path and its signing key (.tools/desk/signing.pem).
   Rebuild with install.sh, which keeps both; deleting the key means allowing it again.
 - Real clicks, drags and full screen at scale need the macOS VM in tools/vm

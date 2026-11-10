@@ -8,6 +8,7 @@ inside that session.
 .tools/desk/desk status                     # logged in? locked? which permissions?
 .tools/desk/desk windows                    # app, x, y, width, height, title
 .tools/desk/desk shot out.png "Project B"   # one app's window, nothing else
+.tools/desk/desk shot out.png 4242          # the window of one process, when an app is open more than once
 .tools/desk/desk shot out.png               # the whole display
 .tools/desk/desk raise "Project B"          # bring an app to the front
 .tools/desk/desk click 100 200

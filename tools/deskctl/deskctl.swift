@@ -3,7 +3,7 @@
 //
 //   deskctl status
 //   deskctl windows
-//   deskctl shot <file.png> [app]
+//   deskctl shot <file.png> [app | pid]
 //   deskctl raise <app>
 //   deskctl move <x> <y>
 //   deskctl click <x> <y>
@@ -57,7 +57,8 @@ func windows() {
 }
 
 // The whole display, or with `app` only that app's largest window, with whatever
-// else is on the desktop left out even if it overlaps.
+// else is on the desktop left out even if it overlaps. A number for `app` is a process
+// id, which picks one of several copies of an app that are open.
 func shot(_ path: String, app: String?) {
     let done = DispatchSemaphore(value: 0)
     Task {
@@ -67,8 +68,10 @@ func shot(_ path: String, app: String?) {
             config.showsCursor = app == nil
             let filter: SCContentFilter
             if let app {
+                let pid = pid_t(app)
                 let matches = content.windows.filter {
-                    $0.owningApplication?.applicationName == app && $0.isOnScreen && $0.windowLayer == 0
+                    (pid == nil ? $0.owningApplication?.applicationName == app : $0.owningApplication?.processID == pid)
+                        && $0.isOnScreen && $0.windowLayer == 0
                 }
                 guard let window = matches.max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
                 else { fail("no window on screen for \(app)") }
@@ -206,7 +209,7 @@ case "status":
 case "windows":
     windows()
 case "shot":
-    guard args.count == 2 || args.count == 3 else { fail("shot <file.png> [app]") }
+    guard args.count == 2 || args.count == 3 else { fail("shot <file.png> [app | pid]") }
     shot(args[1], app: args.count == 3 ? args[2] : nil)
 case "raise":
     needAccessibility()
@@ -233,5 +236,5 @@ case "type":
     guard args.count == 2 else { fail("type <text>") }
     type(args[1])
 default:
-    fail("status | windows | shot <file> [app] | raise <app> | move x y | click x y | drag x1 y1 x2 y2 | scroll x y dy [steps] [holdMs] | key code [mods] | type text")
+    fail("status | windows | shot <file> [app | pid] | raise <app> | move x y | click x y | drag x1 y1 x2 y2 | scroll x y dy [steps] [holdMs] | key code [mods] | type text")
 }

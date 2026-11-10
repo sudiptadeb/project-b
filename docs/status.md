@@ -52,8 +52,6 @@ logged in to the Mac's desktop once after each boot.
 - `android`: a WebView APK and `docs/android.md`, with real content being built. Predates tabs
   and hooks, so it needs updating before merging.
 
-## Open decisions
+## Open decisions and to do
 
-- URL policy on every request: a proxy in the browser process, or rules in a renderer throttle.
-- A Go nil dereference: recover or crash loudly.
-- From the review: move focus decisions into Go.
+See [todo.md](todo.md).

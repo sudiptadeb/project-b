@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.expanduser("~/Official/workspace/ulaa/project-b")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "chromium/src/out/pb")
 CLANG = "../../third_party/llvm-build/Release+Asserts/bin/clang++"
 

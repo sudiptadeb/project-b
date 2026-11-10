@@ -4,7 +4,7 @@
 # optimisation, no symbols. It takes hours and can't be rebuilt quickly.
 set -uo pipefail
 
-ROOT=$HOME/Official/workspace/ulaa/project-b
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/chromium/src
 OUT=${OUT:-out/pb}
 RELEASE=${RELEASE:-0}

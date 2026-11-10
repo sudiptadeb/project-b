@@ -9,7 +9,7 @@
 # Needs gh (logged in) and amarit (go install github.com/sudiptadeb/amarit/cmd/amarit@latest).
 set -euo pipefail
 
-ROOT=$HOME/Official/workspace/ulaa/project-b
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 REPO=sudiptadeb/project-b
 VERSION=$(tr -d '[:space:]' < "$ROOT/VERSION")
 TAG=v$VERSION

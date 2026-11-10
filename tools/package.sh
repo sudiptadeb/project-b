@@ -3,7 +3,7 @@
 # OUT=out/rel tools/package.sh packs the release build instead.
 set -euo pipefail
 
-ROOT=$HOME/Official/workspace/ulaa/project-b
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${OUT:-out/pb}
 FROM=$ROOT/chromium/src/$OUT
 STAGE=$ROOT/build/package

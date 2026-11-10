@@ -129,6 +129,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await shell.getByRole('button', { name: 'Tabs on the side' }).click();
   check('a change from the toolbar reaches the settings page', await until(async () => await radio('Vertical').isChecked()));
 
+  // The update manager checks by itself two seconds after it starts. Let that one land
+  // first, so the count below is only the button's.
+  await until(() => manifests > 0);
   const counted = manifests;
   await page.getByRole('radio', { name: 'Blue' }).click();
   check('a frame colour recolours the window and the shell, and is saved', await until(async () => (await root('--frame')) === '#3470d0' && (await regions()).windowColor === '#3470d0' && prefsFile().frameColor === '#3470d0'));

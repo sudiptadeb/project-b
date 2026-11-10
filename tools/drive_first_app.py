@@ -4,7 +4,8 @@
 The driver asks the window's own hitTest:, sets first responder and hands the event to
 the view, because [window sendEvent:] delivers nothing without a GUI session. Content's
 view checks the same hitTest: before accepting the event. AppKit's own dispatch isn't
-exercised. Run it from the repo root:
+exercised, and neither is full screen, which needs a real screen
+(tools/check_full_screen.py). This needs no display. Run it from the repo root:
 
     python3 tools/drive_first_app.py
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
@@ -360,11 +361,6 @@ def settings_checks():
           len({last, one_back, two_back}) == 3 and back == last, (last, one_back, two_back, back))
     app.cmd("mods", 0)
 
-    app.cmd("key", "ctrl+cmd+f")
-    deadline = time.time() + 5
-    while time.time() < deadline and '"fullScreen":true' not in app.cmd("state"):
-        time.sleep(0.1)
-    check("Ctrl+Cmd+F enters full screen", '"fullScreen":true' in app.cmd("state"), app.cmd("state"))
     app.close()
 
     # After a restart the keymap is still the user's.
@@ -664,46 +660,17 @@ def browsing_checks():
     check("the shell document neither scrolls nor bounces", root == ["hidden", "none", 0], root)
 
     # The engine reads the window's corner radius from macOS and the shell's frame
-    # follows it, one frame width inside. Real full screen, which needs a display, has
-    # square corners and no controls; the radius comes back with the window.
+    # follows it, one frame width inside.
     radius = lambda: float(app.js("getComputedStyle(document.documentElement).getPropertyValue('--window-radius')").replace("px", ""))
     native = lambda: json.loads(app.cmd("frame"))  # The border the window itself draws.
     windowed = radius()
     print("window corner radius", windowed, "native frame", native(), flush=True)
     check("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": "#4f9e9e"}, (windowed, native()))
-    app.cmd("fullscreen")
-    try:
-        app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
-        check("real full screen reports square corners and no controls", native()["radius"] == 0 and app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == 12, (native(), radius()))
-        time.sleep(1)  # A toggle sent while macOS is still in its transition is dropped.
-        app.cmd("fullscreen")
-        app.wait(f"getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='{windowed:g}px'", 20)
-        app.wait(f"document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x==={window['buttonsEnd'] + 8}", 10)
-        check("leaving full screen brings the curve and the controls back", True)
-    except TimeoutError as e:
-        check("leaving full screen brings the curve and the controls back", False, f"no display? {e}")
 
-    # The same through Go's window manager: the shell asks, the manager tells the engine,
-    # and the engine reports the result. In full screen nothing drags.
+    # The shell asks Go's window manager, the manager tells the engine, and the engine
+    # reports the result. Full screen is checked on a real screen: tools/check_full_screen.py.
     request = lambda r: app.js(f"(chrome.send('shell',[JSON.stringify({{t:'window',text:'{r}'}})]),1)")
     state = lambda: json.loads(app.cmd("state"))
-    time.sleep(1)
-    request("fullScreen")
-    try:
-        app.wait("getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim()==='0px'", 10)
-        time.sleep(0.5)
-        check("the shell's full screen request goes through the manager into real full screen", state()["fullScreen"], state())
-        right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
-        check("in full screen the empty top row is shell, not drag", right_end == "shell", right_end)
-        time.sleep(1)
-        request("fullScreen")
-        app.wait(f"document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x==={window['buttonsEnd'] + 8}", 20)
-        # macOS may put the window back at another size, so the end of the row is measured.
-        time.sleep(0.5)
-        right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
-        check("and out again, where the empty top row drags", not state()["fullScreen"] and right_end == "frame", (state(), right_end, app.js("[window.innerWidth,window.innerHeight]")))
-    except TimeoutError as e:
-        check("the shell's full screen request goes through the manager into real full screen", False, f"no display? {e}")
     width = app.js("window.innerWidth")
     request("zoom")
     try:

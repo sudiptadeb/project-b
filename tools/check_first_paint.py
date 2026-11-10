@@ -5,13 +5,17 @@ ChromeDriver navigates within a second of the app starting. The shell's view, la
 over the page, used to stay white there until the shell next painted, so a static page
 stayed hidden though it had rendered. This loads a static page in a solid colour that
 way and checks a capture of the real window, taken with desk, for that colour. The
-app's own captures read the page's surface and would pass anyway. Run it from the repo
-root on a Mac with someone logged in at the console:
+app's own captures read the page's surface and would pass anyway.
 
-    python3 tools/check_first_paint.py
+NEEDS A PERSON LOGGED IN at this Mac's screen, and desk allowed to record it
+(tools/deskctl/README.md). The app has to start inside the desktop session for its
+window to be on the screen, so start it through on_screen.py:
 
-PB_BIN picks another binary, CHROMEDRIVER another ChromeDriver. The capture goes to
-build/first-paint/.
+    tools/test.sh screen                                     # with the other real-screen checks
+    tools/on_screen.py python3 tools/check_first_paint.py    # alone
+
+PB_BIN picks another binary, CHROMEDRIVER another ChromeDriver, DESK another desk. The
+capture goes to build/first-paint/.
 """
 
 import http.server
@@ -50,19 +54,32 @@ class Fixture(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def window_name():
-    # desk names a window by its app: the bundle's name for a packaged app.
-    parts = BIN.split(os.sep)
-    bundles = [p for p in parts if p.endswith(".app")]
-    return bundles[-1][:-len(".app")] if bundles else os.path.basename(BIN)
+def app_started_by(pid):
+    """The app ChromeDriver started: its one child process. A person's own copy of the
+    app may be open on the same screen, so the capture is of this process's window."""
+    ps = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
+    return next(int(line.split()[0]) for line in ps.splitlines() if int(line.split()[1]) == pid)
+
+
+def page_colour_share(shot, app):
+    """How much of the app's window, captured now, is the page's colour."""
+    if os.path.exists(shot):
+        os.remove(shot)
+    taken = subprocess.run([DESK, "shot", shot, str(app)], capture_output=True, text=True)
+    if not os.path.exists(shot):
+        return 0, taken.stderr.strip()
+    image = Image.open(shot).convert("RGB")
+    total = image.width * image.height
+    return sum(n for n, c in image.getcolors(total) if all(abs(a - b) <= 3 for a, b in zip(c, COLOUR))) / total, ""
 
 
 def main():
     status = subprocess.run([DESK, "status"], capture_output=True, text=True).stdout if os.path.exists(DESK) else ""
-    if "on console: 1" not in status or "screen locked: no" not in status:
-        print("skipped: needs desk and an unlocked console session to capture the real window")
-        print(status.strip())
-        return 0
+    if "on console: 1" not in status or "screen locked: no" not in status or "screen recording: true" not in status:
+        print("NEEDS A PERSON AT THE SCREEN: desk has to capture the real window, which takes someone logged in, "
+              f"the screen unlocked, and Screen Recording allowed for deskctl (tools/deskctl/README.md). {DESK} status says:")
+        print(status.strip() or "nothing: it isn't installed")
+        return 2
 
     if os.path.exists(OUT):
         shutil.rmtree(OUT)
@@ -88,20 +105,21 @@ def main():
             print("FAIL session ->", r)
             return 1
         base = f"{wd}/session/{r['value']['sessionId']}"
+        app = app_started_by(cd.pid)
         http_json("POST", base + "/url", {"url": f"http://127.0.0.1:{server.server_port}/"})
-        time.sleep(2)
 
+        # The page has loaded. Its colour reaches the window with the next frame; a page
+        # that stays hidden never gets there. The page area is well over half the window,
+        # and a white page area has none of the colour.
         shot = os.path.join(OUT, "window.png")
-        subprocess.run([DESK, "shot", shot, window_name()], capture_output=True)
-        if not os.path.exists(shot):
-            print(f"FAIL no capture of the {window_name()} window")
-            return 1
-        image = Image.open(shot).convert("RGB")
-        total = image.width * image.height
-        share = sum(n for n, c in image.getcolors(total) if all(abs(a - b) <= 3 for a, b in zip(c, COLOUR))) / total
-        # The page area is well over half the window; a white page area has none of it.
+        deadline = time.time() + 10
+        while True:
+            share, error = page_colour_share(shot, app)
+            if share > 0.4 or time.time() > deadline:
+                break
         ok = share > 0.4
-        print(("ok   " if ok else "FAIL ") + f"the first page shows in the window: {share:.0%} of it is the page's colour ({shot})")
+        print(("ok   " if ok else "FAIL ") + f"the first page shows in the window: {share:.0%} of it is the page's colour ({shot})"
+              + (f" -> {error}" if error else ""))
         return 0 if ok else 1
     finally:
         if base:

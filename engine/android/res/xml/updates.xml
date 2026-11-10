@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one folder the package installer may read: where Go's updater stages a downloaded APK,
+     in the profile (core/cmd/lib/update_android.go). The profile is in Chromium's data folder,
+     app_project_b beside files/, which FileProvider has no tag for. -->
+<paths>
+    <files-path name="updates" path="../app_project_b/profile/updates/stage/" />
+</paths>

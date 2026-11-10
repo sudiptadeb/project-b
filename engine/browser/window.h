@@ -73,6 +73,9 @@ class Window {
   void AddPageContents(content::WebContents* contents);
   void ShowPageContents(content::WebContents* contents);
   void RemovePageContents(content::WebContents* contents);
+
+  // Opens Android's package installer for the APK at path, where the user confirms.
+  void InstallPackage(const std::string& path);
 #else
   void SetShellView(gfx::NativeView view);
 

@@ -39,7 +39,7 @@ const status = computed(() => {
   const s = state.update;
   if (s.check === 'checking') return 'Checking…';
   if (s.phase === 'downloading') return `Downloading ${s.version}…`;
-  if (s.phase === 'ready') return `${s.version} is ready to relaunch`;
+  if (s.phase === 'ready') return `${s.version} is ready to ${phone ? 'install' : 'relaunch'}`;
   if (s.phase === 'failed') return `Update${s.version ? ' to ' + s.version : ''} failed: ${s.error}`;
   if (s.check === 'current') return 'Up to date';
   if (s.check === 'failed') return s.checkError;
@@ -117,7 +117,10 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
             Version <span class="version">{{ state.running || 'Development build' }}</span>
             <span class="status" role="status">{{ status }}</span>
           </span>
-          <button type="button" class="text-button" :disabled="busy" @click="send({ t: 'checkUpdate' })">Check for updates</button>
+          <!-- On a phone the panel is where a ready release is installed from: Android's
+               installer takes it from here. -->
+          <button v-if="phone && state.update.phase === 'ready'" type="button" class="text-button" @click="send({ t: 'relaunch' })">Install update</button>
+          <button v-else type="button" class="text-button" :disabled="busy" @click="send({ t: 'checkUpdate' })">Check for updates</button>
         </div>
         <label class="row">
           <span class="label">Automatic updates</span>

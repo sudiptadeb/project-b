@@ -53,46 +53,15 @@ import (
 	"projectb/app"
 	"projectb/content"
 	"projectb/engine"
-	"projectb/update"
 )
 
-// Where releases are published and how to recognise one of ours. The project and the URL
-// are the ones in amarit.json at the repo root, which tools/release.sh publishes with; the
-// key is the certificate tools/package.sh signs with (its SHA-1, as in the trust profile).
+// Where releases are published. The project and the URL are the ones in amarit.json at the
+// repo root, which tools/release.sh publishes with. updateConfig, beside this file for each
+// platform, describes this build to the updater.
 const (
 	releaseProject  = "project-b"
 	releaseManifest = "https://github.com/sudiptadeb/project-b/releases/latest/download/releases.json"
-	signingLeafSHA1 = "59b20dfe02ee393a05173eec84daa8c662c845be"
 )
-
-// updateConfig describes this build to the updater. A binary running from a build directory
-// rather than an installed bundle has no version, and never updates.
-func updateConfig(profileDir string) update.Config {
-	exe, err := os.Executable()
-	if err != nil {
-		return update.Config{}
-	}
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
-	bundle := update.BundleOf(exe)
-	if bundle == "" {
-		return update.Config{}
-	}
-	version, err := update.Version(bundle)
-	if err != nil {
-		log.Printf("update: %v; updates are off", err)
-		return update.Config{}
-	}
-	return update.Config{
-		Project:  releaseProject,
-		Version:  version,
-		Releases: releaseManifest,
-		StateDir: filepath.Join(profileDir, "updates"),
-		App:      bundle,
-		Verify:   update.SignedBy(signingLeafSHA1),
-	}
-}
 
 // nativeEngine is the real engine: every method calls the C++ adapter.
 type nativeEngine struct {

@@ -4,7 +4,8 @@
 //
 // amarit does the manifest and the verified download. The bundle is ours: the app is a
 // signed folder of two binaries, a library and resources, not one file amarit could rename,
-// so the unpacking, the signature check, the swap and the relaunch live here.
+// so the unpacking, the signature check, the swap and the relaunch live here. On Android the
+// download is the APK, and the system's package installer does the rest (Config.Install).
 package update
 
 import (
@@ -67,6 +68,11 @@ type Config struct {
 	// Verify checks an unpacked bundle before it is staged: the signature, for the real app.
 	// Nil checks only that the bundle says it is the version the manifest promised.
 	Verify func(app string) error
+	// Install, when set, takes the place of the bundle: the download is staged as it is,
+	// and Relaunch hands it to Install. On Android that opens the system's package
+	// installer, which refuses an APK signed with another key and asks the user. App and
+	// Verify are unused.
+	Install func(file string)
 }
 
 // Manager owns the update state. Every method runs on the main thread; the check loop
@@ -216,9 +222,11 @@ func (m *Manager) CheckNow() {
 func (m *Manager) check(ctx context.Context) (current bool, err error) {
 	m.checking.Lock()
 	defer m.checking.Unlock()
-	if err := writable(filepath.Dir(m.cfg.App)); err != nil {
-		m.set(State{Phase: Failed, Error: err.Error()})
-		return false, nil
+	if m.cfg.Install == nil {
+		if err := writable(filepath.Dir(m.cfg.App)); err != nil {
+			m.set(State{Phase: Failed, Error: err.Error()})
+			return false, nil
+		}
 	}
 	d, err := m.client.Check(ctx)
 	if err != nil {
@@ -258,7 +266,7 @@ func (m *Manager) check(ctx context.Context) (current bool, err error) {
 // fetch downloads the release and unpacks it into the stage directory, and checks that the
 // bundle inside says it is that version and passes Verify. A download that fails is tried
 // again next check; a bundle that fails its checks is refused for good, so a bad release is
-// downloaded once, not every minute.
+// downloaded once, not every minute. With Install set, the download itself is staged.
 func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error) {
 	stage, downloads := m.stageDir(), m.downloadDir()
 	os.RemoveAll(stage)
@@ -270,6 +278,13 @@ func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error)
 	archive, err := m.client.Download(ctx, d, downloads)
 	if err != nil {
 		return "", err
+	}
+	if m.cfg.Install != nil {
+		staged := filepath.Join(stage, filepath.Base(archive))
+		if err := os.MkdirAll(stage, 0o700); err != nil {
+			return "", err
+		}
+		return staged, os.Rename(archive, staged)
 	}
 	app, err := unpack(archive, stage)
 	if err == nil {
@@ -301,12 +316,19 @@ func (m *Manager) checkBundle(app, version string) error {
 
 // Relaunch puts the staged bundle where the running one is, keeps the running one as the
 // previous release, and ends the app; a helper left behind starts the new one once this
-// process has gone. Nothing happens unless a release is ready.
+// process has gone. With Install set, it hands the staged download to Install and the app
+// carries on; the release stays staged, so a user who cancels can ask again. Nothing happens
+// unless a release is ready.
 func (m *Manager) Relaunch() {
 	m.mu.Lock()
 	staged := m.staged
 	m.mu.Unlock()
 	if staged == "" {
+		return
+	}
+	if m.cfg.Install != nil {
+		log.Printf("update: handing %s to the installer", staged)
+		m.cfg.Install(staged)
 		return
 	}
 	_, executable, err := bundleInfo(staged)

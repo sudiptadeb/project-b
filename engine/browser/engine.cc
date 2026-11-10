@@ -187,6 +187,13 @@ void CallSetHookSubscribed(int32_t hook, int on) {
   hooks::SetSubscribed(hook, on != 0);
 }
 
+#if BUILDFLAG(IS_ANDROID)
+void CallInstallUpdate(const char* path) {
+  CheckMainThread();
+  g_engine->window()->InstallPackage(path);
+}
+#endif
+
 // The one call that any thread may make.
 void CallPostWakeup() {
   content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
@@ -250,6 +257,9 @@ const PBEngineCalls* Engine::Calls() {
       .app_command = CallAppCommand,
       .set_hook_subscribed = CallSetHookSubscribed,
       .post_wakeup = CallPostWakeup,
+#if BUILDFLAG(IS_ANDROID)
+      .install_update = CallInstallUpdate,
+#endif
   };
   return &calls;
 }

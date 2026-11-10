@@ -2,6 +2,7 @@ package dev.projectb.browser;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.view.MotionEvent;
@@ -11,6 +12,9 @@ import android.view.ViewGroup;
 import android.view.View;
 import android.widget.FrameLayout;
 
+import androidx.core.content.FileProvider;
+
+import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -264,6 +268,24 @@ final class BrowserWindow extends FrameLayout {
     @CalledByNative
     private void close() {
         activity.finish();
+    }
+
+    /**
+     * Hands a downloaded update to Android's package installer, which asks the user and refuses an
+     * APK signed with another key. res/xml/updates.xml names the one folder it may read.
+     */
+    @CalledByNative
+    private void installPackage(String path) {
+        Intent install =
+                new Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(
+                                FileProvider.getUriForFile(
+                                        activity,
+                                        activity.getPackageName() + ".updates",
+                                        new File(path)),
+                                "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        activity.startActivity(install);
     }
 
     private int px(double css) {

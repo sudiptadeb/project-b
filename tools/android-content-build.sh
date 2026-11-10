@@ -24,6 +24,11 @@ ln -sfn "$REPO/engine" "$SRC/project_b/engine"
 ln -sfn "$REPO/core" "$SRC/project_b/core"
 ln -sfn "$REPO/shell" "$SRC/project_b/shell"
 
+# The APK's versionCode grows with VERSION: 0.2.13 is 2013.
+VERSION=$(tr -d '[:space:]' < "$REPO/VERSION")
+IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+VERSION_CODE=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))
+
 cd "$SRC" || exit 1
 mkdir -p "$OUT"
 cat > "$OUT/args.gn" <<ARGS
@@ -40,6 +45,8 @@ use_remoteexec = false
 use_siso = true
 android_static_analysis = "off"
 root_extra_deps = [ "//project_b/engine/android:project_b_apk" ]
+project_b_version = "$VERSION"
+project_b_version_code = $VERSION_CODE
 ARGS
 
 echo "=== $(date '+%F %T') gn gen"

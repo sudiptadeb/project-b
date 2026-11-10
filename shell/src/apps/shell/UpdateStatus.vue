@@ -1,9 +1,10 @@
 <script setup>
 import { send } from '@/bridge.js';
-import { state } from './state.js';
+import { phone, state } from './state.js';
 
 // The update manager's state, shown the way a browser shows a link's address: a small
-// bubble in the page's bottom-left corner, there only while something is happening.
+// bubble in the page's bottom-left corner, there only while something is happening. On a
+// phone a ready release goes to Android's package installer rather than a relaunch.
 function relaunch() {
   send({ t: 'relaunch' });
 }
@@ -13,7 +14,7 @@ function relaunch() {
   <div v-if="state.update.phase" v-shell class="update" :class="state.update.phase">
     <span v-if="state.update.phase === 'downloading'" role="status">Downloading Project B {{ state.update.version }}…</span>
     <button v-else-if="state.update.phase === 'ready'" type="button" @click="relaunch">
-      Project B {{ state.update.version }} is ready. <b>Relaunch to update</b>
+      Project B {{ state.update.version }} is ready. <b>{{ phone ? 'Install' : 'Relaunch' }} to update</b>
     </button>
     <span v-else role="status" :title="state.update.error">Update{{ state.update.version ? ' to ' + state.update.version : '' }} failed: {{ state.update.error }}</span>
   </div>

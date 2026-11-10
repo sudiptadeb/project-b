@@ -148,6 +148,9 @@ typedef struct PBEngineCalls {
   void (*set_hook_subscribed)(int32_t hook, int on);
   // Asks the main thread to call run_posted soon.
   void (*post_wakeup)(void);
+  // Android only: opens the system's package installer for the APK at path, where the user
+  // confirms. The Mac swaps its own bundle, and leaves this null.
+  void (*install_update)(const char* path);
 } PBEngineCalls;
 
 // What the adapter can tell the Go core. The main binary fills it in from Go's exports

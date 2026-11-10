@@ -8,6 +8,11 @@ import("//tools/grit/repack.gni")
 
 declare_args() {
   project_b_go = "/usr/local/go/bin/go"
+
+  # The release this APK is, from VERSION, and the versionCode Android compares, which must
+  # grow with it. tools/android-content-build.sh sets both.
+  project_b_version = ""
+  project_b_version_code = 1
 }
 
 manifest = "$target_gen_dir/AndroidManifest.xml"
@@ -153,6 +158,7 @@ action("go_core") {
     rebase_path("//third_party/llvm-build/Release+Asserts/bin/clang", root_build_dir),
     rebase_path("//third_party/android_toolchain/ndk", root_build_dir),
     "$default_min_sdk_version",
+    project_b_version,
   ]
 }
 
@@ -178,6 +184,7 @@ android_resources("resources") {
   sources = [
     "res/drawable/icon.xml",
     "res/values/styles.xml",
+    "res/xml/updates.xml",
   ]
 }
 
@@ -194,6 +201,7 @@ android_library("java") {
     "//media/capture/video/android:capture_java",
     "//net/android:net_java",
     "//third_party/androidx:androidx_annotation_annotation_java",
+    "//third_party/androidx:androidx_core_core_java",
     "//third_party/jni_zero:jni_zero_java",
     "//ui/android:ui_java",
   ]
@@ -208,6 +216,8 @@ android_library("java") {
 
 android_apk("project_b_apk") {
   apk_name = "ProjectB"
+  version_name = project_b_version
+  version_code = "$project_b_version_code"
   android_manifest = manifest
   android_manifest_dep = ":manifest"
   # Android 15 and later force edge to edge from 35 up, and the shell doesn't handle insets yet.

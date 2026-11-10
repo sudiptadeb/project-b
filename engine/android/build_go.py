@@ -8,7 +8,7 @@ import sys
 
 
 def main():
-    go, out, depfile, clang, ndk, min_sdk = sys.argv[1:7]
+    go, out, depfile, clang, ndk, min_sdk, version = sys.argv[1:8]
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     build_dir = os.getcwd()
     link = os.path.relpath(os.path.join(build_dir, "../../project_b"), build_dir)
@@ -31,7 +31,8 @@ def main():
     # that links this one finds it at runtime: without it, it would record the build-time path.
     subprocess.check_call(
         [go, "build", "-buildmode=c-shared", "-trimpath",
-         "-ldflags", "-s -w -extldflags '-fuse-ld=lld --unwindlib=none -Wl,-z,max-page-size=16384 -Wl,-soname,libcore.so'",
+         "-ldflags", "-s -w -X main.version=" + version +
+         " -extldflags '-fuse-ld=lld --unwindlib=none -Wl,-z,max-page-size=16384 -Wl,-soname,libcore.so'",
          "-o", os.path.join(build_dir, out), "./cmd/lib"],
         cwd=os.path.join(repo, "core"), env=env)
 

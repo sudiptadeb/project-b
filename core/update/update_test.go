@@ -371,3 +371,28 @@ func TestAutomaticChecksTurnOffAndOnAtOnce(t *testing.T) {
 		t.Fatalf("on again, the timer made %d requests in all", n)
 	}
 }
+
+func TestInstallTakesTheDownloadAsItIs(t *testing.T) {
+	apk := []byte("an APK, as far as the updater cares")
+	rs := release(t, "0.2.0", apk, apk)
+	var installed []string
+	cfg := Config{Project: "project-b", Version: "0.1.0", Releases: rs.url, StateDir: filepath.Join(t.TempDir(), "updates"),
+		Install: func(file string) { installed = append(installed, file) }}
+	quit := false
+	m := New(cfg, func(f func()) { f() }, func() { quit = true })
+	m.check(context.Background())
+	if s := m.State(); s.Phase != Ready || s.Version != "0.2.0" {
+		t.Fatalf("state %+v", s)
+	}
+	m.Relaunch()
+	m.Relaunch()
+	if len(installed) != 2 || installed[0] != installed[1] || !strings.HasPrefix(installed[0], m.stageDir()) {
+		t.Fatalf("installed %v", installed)
+	}
+	if b, err := os.ReadFile(installed[0]); err != nil || string(b) != string(apk) {
+		t.Fatalf("staged %q %v", b, err)
+	}
+	if quit {
+		t.Fatal("the app quit; the installer replaces it")
+	}
+}

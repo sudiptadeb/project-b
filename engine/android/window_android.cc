@@ -257,6 +257,12 @@ void Window::ListenForState(
   g_browser_window->ListenForState(std::move(on_change));
 }
 
+void Window::InstallPackage(const std::string& path) {
+  JNIEnv* env = AttachCurrentThread();
+  Java_BrowserWindow_installPackage(env, g_browser_window->java(),
+                                    base::android::ConvertUTF8ToJavaString(env, path));
+}
+
 void Window::Minimize() {
   Java_BrowserWindow_minimize(AttachCurrentThread(), g_browser_window->java());
 }

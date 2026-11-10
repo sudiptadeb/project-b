@@ -258,7 +258,8 @@ The VM and container were made with `colima start -p pb-android --vz-rosetta --a
 sleep infinity`; the checkout lives in the `pb-work` volume.
 
 Minimum Android 10 (API 29), arm64 only. Libraries are compressed in the APK to halve the download, so Android
-unpacks them at install, which costs about 200 MB of phone storage. Version `Developer Build`, version code 1.
+unpacks them at install, which costs about 200 MB of phone storage. The version is `VERSION`'s, for the APK's
+`versionName` and for Go's updater, and the `versionCode` grows with it: 0.2.13 is 2013.
 
 ### What was tested
 
@@ -317,7 +318,7 @@ adapter here, with `Window` as the one Android file (`engine/android/window_andr
 | The frame colour | Paints the root layer, the window's background and the status bar, and changes live with the shell |
 | The window manager's one layout | `SetWindowLayout` places every tab's view and gives `BrowserWindow.java` the regions; the first region holding a finger decides |
 | `WindowState` | The window's size in CSS pixels, no buttons, square corners, and `full_screen` true |
-| Updates | As in a development build: "a development build doesn't update". Updating an APK isn't built |
+| Updates | The same manager and the same `amarit.Client`, every minute, on the `android/arm64` asset. The APK is downloaded into the profile, size and sha256 checked by amarit, and the bubble and the settings panel offer to install it: see [Updates on a phone](#updates-on-a-phone) |
 
 **Tabs on a phone.** A sidebar would take half a phone's width, so on a touch screen (`phone` in `shell/src/state.js`)
 the tabs are favicons in a row of their own under the toolbar (`TabIcons.vue`), the shown one marked as in the sidebar;
@@ -325,6 +326,27 @@ a tap shows that tab, and a tab with no favicon yet shows its title's first lett
 sidebar's own list as a drawer over the toolbar and the page: choosing a tab or New Tab closes it, a tap outside closes
 it, and a tab's close button leaves it open. Every tab's close button shows, since there's no hover. The tab layout
 setting and the toolbar's layout button aren't shown, because neither layout applies. Desktop is unchanged.
+
+### Updates on a phone
+
+`core/update` does on the phone what it does on the Mac, up to the download: the same check every minute, the
+same switch, the same Check for updates, against the same `releases.json`, for the `android/arm64` asset. What
+changes is what happens to the download (`Config.Install`, set in `core/cmd/lib/update_android.go`):
+
+- The APK is staged as it was downloaded, in `profile/updates/stage`. There is no bundle to unpack or version to
+  read from it, and no writable-location check.
+- The bubble says "Install to update", the settings panel says the release is ready to install, and its button
+  becomes Install update. Either one hands the APK to Android's package installer: Go calls the engine's
+  `install_update`, and `BrowserWindow.installPackage` opens it with `ACTION_VIEW` through a `FileProvider` that may
+  read that one folder (`res/xml/updates.xml`). The app declares `REQUEST_INSTALL_PACKAGES`.
+- Android does the rest. The first time, it asks the user to let Project B install apps; then it shows its own
+  install dialog, refuses an APK signed with another key, and replaces the app once the user agrees. Nothing is
+  installed silently. A user who cancels can tap again: the release stays staged until the next start.
+- Trust is the signature: the phone only accepts an update signed with the key the installed app has.
+
+The real app always checks the published manifest. It was checked once on the emulator against a local manifest
+through a launch extra that has since been removed: 0.2.13 found 0.2.14, offered it, and Android's installer
+replaced it.
 
 What doesn't apply on a phone, and what the app does instead:
 

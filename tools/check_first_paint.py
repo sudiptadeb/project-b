@@ -26,9 +26,9 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
-CHROMEDRIVER = os.environ.get("CHROMEDRIVER") or os.path.expanduser(
-    "~/PW_TOOLS/chromedriver/chromedriver-mac-arm64/chromedriver")
-DESK = os.path.expanduser("~/PW_TOOLS/desk/desk")
+CHROMEDRIVER = os.environ.get("CHROMEDRIVER") or os.path.join(
+    ROOT, ".tools/chromedriver/chromedriver-mac-arm64/chromedriver")
+DESK = os.environ.get("DESK") or os.path.join(ROOT, ".tools/desk/desk")
 OUT = os.path.join(ROOT, "build/first-paint")
 
 COLOUR = (31, 122, 77)

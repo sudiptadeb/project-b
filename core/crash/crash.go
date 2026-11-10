@@ -5,6 +5,8 @@
 // at the next start means the last run crashed, from Go or not: it is renamed after the
 // time it was last written, so no crash overwrites another, and the shell is told where
 // it is and where macOS put its own report of that process.
+//
+// A child process that crashes is one line in crashes.log, which is kept.
 package crash
 
 import (
@@ -16,19 +18,22 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"time"
+
+	"projectb/engine"
 )
 
 // Manager knows whether the last run crashed.
 type Manager struct {
-	current string
-	last    string
-	report  string
+	current  string
+	children string
+	last     string
+	report   string
 }
 
 // New starts this run's crash.log in dir, after keeping the last run's, if there is one,
 // as crash-<time>.log. reports is the folder macOS writes its crash reports to.
 func New(dir, reports string) *Manager {
-	m := &Manager{current: filepath.Join(dir, "crash.log")}
+	m := &Manager{current: filepath.Join(dir, "crash.log"), children: filepath.Join(dir, "crashes.log")}
 	if info, err := os.Stat(m.current); err == nil {
 		last := filepath.Join(dir, "crash-"+info.ModTime().Format("2006-01-02-150405")+".log")
 		if err := os.Rename(m.current, last); err != nil {
@@ -101,6 +106,23 @@ func reportPID(name string) int {
 // Stop says this run ends cleanly: there is no crash to report next time.
 func (m *Manager) Stop() {
 	if err := os.Remove(m.current); err != nil {
+		log.Printf("crash: %v", err)
+	}
+}
+
+// ProcessCrashed adds a line about a child process that crashed to crashes.log.
+func (m *Manager) ProcessCrashed(p engine.ProcessCrash) {
+	f, err := os.OpenFile(m.children, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	if err != nil {
+		log.Printf("crash: %v", err)
+		return
+	}
+	defer f.Close()
+	line := fmt.Sprintf("%s %s %s, exit code %d, pid %d", time.Now().Format(time.DateTime), p.Type, p.Status, p.ExitCode, p.PID)
+	if p.URL != "" {
+		line += ", " + p.URL
+	}
+	if _, err := fmt.Fprintln(f, line); err != nil {
 		log.Printf("crash: %v", err)
 	}
 }

@@ -44,6 +44,8 @@ typedef enum PBEvent {
   PB_EVENT_OS_BINDINGS = 9,             // s: json, {title: {code, mods}}, the keys the
                                         // OS gives our menu items (macOS App Shortcuts)
   PB_EVENT_MODS_CHANGED = 10,           // i: the modifiers held now, PBMods
+  PB_EVENT_PROCESS_CRASHED = 11,        // s: process type, i: base::TerminationStatus,
+                                        // i: exit code, i: pid, s: a renderer's page or ""
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.

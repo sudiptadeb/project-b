@@ -11,6 +11,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/browser_context.h"
+#include "project_b/engine/browser/child_processes.h"
 #include "project_b/engine/browser/devtools.h"
 #include "project_b/engine/browser/driver.h"
 #include "project_b/engine/browser/engine.h"
@@ -70,6 +71,7 @@ int BrowserMainParts::PreMainMessageLoopRun() {
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
   WatchOSKeyBindings();
+  child_processes_ = std::make_unique<ChildProcesses>();
   // Go has given the window its first layout, frame included, so its first frame on
   // screen is already the frame colour. It still shows before any renderer has drawn.
   window_->Show();
@@ -100,6 +102,7 @@ void BrowserMainParts::WillRunMainMessageLoop(
 
 void BrowserMainParts::PostMainMessageLoopRun() {
   StopRemoteDebugging();
+  child_processes_.reset();
   Go().stop();
   engine_.reset();
   shell_.reset();

@@ -213,6 +213,9 @@ type Listener interface {
 	// ShellCrashed says the shell page's renderer died. The engine reloads it, and the
 	// new shell reports its layout again.
 	ShellCrashed()
+
+	// ProcessCrashed says a child process crashed.
+	ProcessCrashed(p ProcessCrash)
 }
 
 // Area is what a press at a point does.
@@ -257,6 +260,16 @@ func (l WindowLayout) At(x, y float64) Area {
 		}
 	}
 	return AreaPage
+}
+
+// ProcessCrash is a child process that died when it shouldn't have: a renderer, the GPU
+// process or a utility process. The engine starts another when one is needed.
+type ProcessCrash struct {
+	Type     string // The kind of process, as the engine names it.
+	Status   string // How it ended: crashed, killed, out of memory, and so on.
+	ExitCode int
+	PID      int
+	URL      string // The page a renderer showed, or "".
 }
 
 // WindowState is what the engine reports about its native window.

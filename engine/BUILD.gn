@@ -88,6 +88,8 @@ source_set("browser") {
     "browser/browser_context.h",
     "browser/browser_main_parts.h",
     "browser/browser_main_parts.mm",
+    "browser/child_processes.cc",
+    "browser/child_processes.h",
     "browser/content_browser_client.cc",
     "browser/content_browser_client.h",
     "browser/devtools.cc",

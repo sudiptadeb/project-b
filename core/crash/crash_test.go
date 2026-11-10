@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"projectb/engine"
 )
 
 // crashIn is set when the test binary runs as the program that crashes.
@@ -100,5 +102,21 @@ func TestARunThatDidNotStopIsACrashWithMacOSReport(t *testing.T) {
 	}
 	if m.Report() != ours {
 		t.Fatalf("report = %q, want %q", m.Report(), ours)
+	}
+}
+
+func TestAChildProcessCrashIsALineAndNoNotice(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir, "")
+	m.ProcessCrashed(engine.ProcessCrash{Type: "renderer", Status: "crashed", ExitCode: 11, PID: 42, URL: "https://p.test/"})
+	m.ProcessCrashed(engine.ProcessCrash{Type: "GPU", Status: "crashed", ExitCode: 11, PID: 43})
+	m.Stop()
+	if New(dir, "").Last() != "" {
+		t.Fatal("a child's crash brings up the notice")
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "crashes.log"))
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) != 2 || !strings.HasSuffix(lines[0], " renderer crashed, exit code 11, pid 42, https://p.test/") || !strings.HasSuffix(lines[1], " GPU crashed, exit code 11, pid 43") {
+		t.Fatalf("crashes.log = %q", b)
 	}
 }

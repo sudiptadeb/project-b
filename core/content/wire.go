@@ -18,6 +18,7 @@ func Wire(h *Hooks, l engine.Listener) {
 	h.Events.OnMenuChosen = l.MenuChosen
 	h.Events.OnOSBindings = l.OSBindings
 	h.Events.OnModsChanged = l.ModsChanged
+	h.Events.OnProcessCrashed = l.ProcessCrashed
 
 	// The gate: every top-level navigation in a tab asks Go before it starts and on
 	// each redirect. The shell's and the settings page's own navigations (ids 0 and -1) have no gate.

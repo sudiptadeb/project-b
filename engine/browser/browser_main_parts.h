@@ -11,6 +11,7 @@
 namespace project_b {
 
 class BrowserContext;
+class ChildProcesses;
 class Engine;
 class ShellPage;
 class Window;
@@ -38,6 +39,7 @@ class BrowserMainParts : public content::BrowserMainParts {
   std::unique_ptr<Window> window_;
   std::unique_ptr<ShellPage> shell_;
   std::unique_ptr<Engine> engine_;
+  std::unique_ptr<ChildProcesses> child_processes_;
   base::OnceClosure quit_;
 };
 

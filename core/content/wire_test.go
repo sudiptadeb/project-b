@@ -95,6 +95,9 @@ func (r *recorder) WindowChanged(s engine.WindowState) {
 	r.note(fmt.Sprintf("window %gx%g r=%g full=%v", s.W, s.H, s.CornerRadius, s.FullScreen))
 }
 func (r *recorder) ShellCrashed() { r.note("shell crashed") }
+func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
+	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))
+}
 
 func wired(t *testing.T) (*Hooks, *recorder, map[Hook]bool) {
 	t.Helper()
@@ -225,7 +228,8 @@ func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h.Dispatch(eventTabOpened, []Value{{I: 1}, {I: 2}, {S: "https://p.test/"}, {I: 1}})
 	h.Dispatch(eventWindowChanged, []Value{{D: 1100}, {D: 700}, {D: 1}, {D: 2}, {D: 3}, {D: 4}, {D: 20}, {I: 1}})
 	h.Dispatch(eventShellCrashed, nil)
-	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 1100x700 r=20 full=true", "shell crashed"}) {
+	h.Dispatch(eventProcessCrashed, []Value{{S: "renderer"}, {I: int64(TerminationStatusProcessCrashed)}, {I: 11}, {I: 42}, {S: "https://p.test/"}})
+	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 1100x700 r=20 full=true", "shell crashed", "renderer crashed 11 42 https://p.test/"}) {
 		t.Fatalf("got %v", r.got)
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {

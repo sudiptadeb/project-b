@@ -20,6 +20,7 @@ const (
 	eventMenuChosen     Hook = 8
 	eventOSBindings     Hook = 9
 	eventModsChanged    Hook = 10
+	eventProcessCrashed Hook = 11
 )
 
 var eventNames = map[Hook]string{
@@ -33,6 +34,18 @@ var eventNames = map[Hook]string{
 	eventMenuChosen:     "engine.MenuChosen",
 	eventOSBindings:     "engine.OSBindings",
 	eventModsChanged:    "engine.ModsChanged",
+	eventProcessCrashed: "engine.ProcessCrashed",
+}
+
+// terminationNames are how a child process ended, as engine.ProcessCrash says it. The
+// engine reports only these.
+var terminationNames = map[TerminationStatus]string{
+	TerminationStatusAbnormalTermination: "exited abnormally",
+	TerminationStatusProcessWasKilled:    "was killed",
+	TerminationStatusProcessCrashed:      "crashed",
+	TerminationStatusLaunchFailed:        "failed to launch",
+	TerminationStatusOom:                 "ran out of memory",
+	TerminationStatusEvictedForMemory:    "was evicted for memory",
 }
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
@@ -46,6 +59,7 @@ type Events struct {
 	OnMenuChosen      func(action string)
 	OnOSBindings      func(byTitle map[string]engine.Key)
 	OnModsChanged     func(m engine.Mods)
+	OnProcessCrashed  func(p engine.ProcessCrash)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -95,6 +109,16 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 			log.Printf("content: bad OS bindings: %v", err)
 		} else if e.OnOSBindings != nil {
 			e.OnOSBindings(byTitle)
+		}
+	case eventProcessCrashed:
+		if e.OnProcessCrashed != nil {
+			e.OnProcessCrashed(engine.ProcessCrash{
+				Type:     r.str(),
+				Status:   terminationNames[TerminationStatus(r.int())],
+				ExitCode: int(r.int()),
+				PID:      int(r.int()),
+				URL:      r.str(),
+			})
 		}
 	}
 	return Value{}, false

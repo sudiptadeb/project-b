@@ -182,8 +182,10 @@ action's keys and whether it is hidden.
   so it merges: an action that is new in the template is added with its default keys,
   unless one of its keys is already bound in the file. Those keys are left off and the
   action goes in the notice.
-- **An owned menu file** never changes by itself. Items the template has and the file
-  doesn't go in the notice.
+- **An owned menu file** merges only its locked parts. A locked menu that is new in the
+  template is added at the template's place; a locked item that is new, or missing after
+  a hand edit, is added to its locked menu at the template's place. Everything else the
+  template has and the file doesn't goes in the notice.
 - **The notice** shows at startup and stays in settings, listing what is missing or
   clashed, with "add" for each, "add all" and "reset".
 - Nothing else in an owned file changes. A default key that changed in the template doesn't
@@ -209,10 +211,14 @@ to change.
 - **The tree marks locked menus and items** with `"locked": true` in the tree template.
   A locked menu can't be removed or renamed: the app menu, Edit (macOS adds its own items
   there, and copy and paste on Mac only work through it), Window (macOS adds the window
-  list) and Help. A locked item can't be hidden or deleted: Quit and Settings. When the
-  menu editor comes, locked items can be moved but never deleted.
-- **If a hand edit drops a locked item or menu** from `menu.json`, Go puts it back where
-  the template has it.
+  list) and Help. A locked item can't be hidden or deleted: Quit and Settings, both in the
+  app menu.
+- **A locked item lives only inside a locked menu,** all the way up. A new locked item
+  goes into an existing locked menu, or into a new locked menu made for it. When the menu
+  editor comes, a locked item can be moved, but only between locked menus. Users may put
+  their own items inside a locked menu.
+- **So locked parts always have a known place,** even in an owned tree, and updates can
+  merge them (below).
 
 ### A bad file
 

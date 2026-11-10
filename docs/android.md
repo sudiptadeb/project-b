@@ -17,9 +17,9 @@ All Chromium paths below are in the 155.0.8059.41 tree (`chromium/src`).
 - **The shell on `main` runs on it as it is.** Tabs in the sidebar or on top, favicons, the content hooks, the
   settings panel with the frame colour, and the window manager's one layout, on `main` at 0.2.13. A touch screen gets
   bigger targets and no hover; nothing else in the shell knows it's on a phone.
-- **System WebView works as a stopgap, and only that.** Built first, it runs the same managers and shell in a 2.5 MB
-  APK, but it can't gate every request, and the shell shares a renderer with the page. It was left on the engine
-  interface from before tabs, so it doesn't build now: see [The WebView build](#the-webview-build).
+- **System WebView was tried first and dropped.** It ran the same managers and shell in a 2.5 MB APK, but it can't
+  gate every request, and the shell shares a renderer with the page. What it showed is in
+  [the alternatives](#6-the-alternatives-behind-the-same-engine-interface).
 
 ## 1. Can a content-based app be built for Android?
 
@@ -128,36 +128,32 @@ How it's laid out (`engine/android/BUILD.gn`):
 the table's address to the content library as a `long`, and `SetGo` takes it from there, the same table `app/main.cc`
 fills on the Mac. Neither content library depends on the Go ones (`llvm-readelf -d`).
 
-**Checked on the emulator, for both builds:** `/proc/<pid>/maps` shows `libcore.so` mapped in the main process,
+**Checked on the emulator:** `/proc/<pid>/maps` shows `libcore.so` mapped in the main process,
 and in none of the two renderers, the GPU process or the app zygote.
 
 Things that are different on Android:
 
-- Every Go engine call lands on Android's main thread. On content that's content's UI thread, as on the Mac, and
-  `post_wakeup` posts to it as before. On WebView it's JNI, and `post_wakeup` comes from a goroutine's thread that
-  the VM doesn't know, so it attaches for that one call.
-- On WebView, JNI's string functions use modified UTF-8, which breaks emoji in page titles, so
-  `engine/webview/jni.c` passes real UTF-8 bytes in both directions. A test covers this.
+- Every Go engine call lands on Android's main thread, which is content's UI thread, as on the Mac, and
+  `post_wakeup` posts to it as before.
 - `onDestroy` ends the process. Go's state can't outlive the views it describes, and a new window in the same
   process would otherwise find managers describing a page that no longer exists.
 - Go's own output goes nowhere on Android, because stderr is `/dev/null`. `log.Printf` isn't visible in `logcat`.
 
 ## 5. Does the transparent shell over the page work on Android?
 
-**On WebView: yes, tested.** Two `WebView`s in a `FrameLayout`: the page below, the shell above with a transparent
-background. Touches need nothing new. Android offers a finger down to views from the top, and the one that
-accepts it keeps the whole gesture, so `ShellView.dispatchTouchEvent` refuses when the point is outside the
-shell's rectangles and the page gets it. That's the same question as the Mac's `hitTest:`.
+**Yes, tested.** Touches need nothing new. Android offers a finger down to views from the top, and the one that
+accepts it keeps the whole gesture, so the shell's view refuses when the point is outside the shell's rectangles and
+the page gets it. That's the same question as the Mac's `hitTest:`.
 
 Two details:
 
 - `setMotionEventSplittingEnabled(false)` on the parent, or a second finger landing on the bar during a pinch would
   go to the shell.
 - `navigator.maxTouchPoints` marks a phone, not `pointer: coarse`. Chromium calls any device with a stylus a fine
-  pointer in WebView 113 (`ui/android/java/.../TouchDevice.java`), and the emulator's touch screen says it has
-  one, as an S Pen phone would.
+  pointer (`ui/android/java/.../TouchDevice.java`), and the emulator's touch screen says it has one, as an S Pen
+  phone would.
 
-**On content: yes, tested, with one compositor for both instead of two views.** `ContentViewRenderView` owns one
+**With one compositor for both, not two views.** `ContentViewRenderView` owns one
 `SurfaceView` and shows one `WebContents`, and two stacked `SurfaceView`s won't blend: Android draws each as its own
 hardware layer. So the window (`engine/android/window_android.cc`, `BrowserWindow.java`) is:
 
@@ -215,10 +211,8 @@ Other things content gives us that WebView can't: the same native code as the de
 gets written once; client certificates and device trust below the WebView API; session and cookie control; the
 extension system if we ever want it; and no `; wv` in the user agent. Google's sign-in refuses embedded WebViews.
 
-**Recommendation: our own content on Android, on the same interface as the Mac.** It's built and it works. WebView
-stays useful as a fast way to try the shell and the managers on a phone, with no Linux host and a 10-second build,
-and it costs little to keep while the interface is small. It shouldn't carry anything enterprise, because the holes
-above are in the platform and we can't close them. GeckoView would close most of them, but puts a second engine
+**Recommendation: our own content on Android, on the same interface as the Mac.** It's built and it works. WebView was
+built first, as a stopgap, and dropped: the holes above are in the platform and we can't close them. GeckoView would close most of them, but puts a second engine
 under every site we support.
 
 ## 7. How the existing Ulaa browser does it
@@ -269,8 +263,7 @@ unpacks them at install, which costs about 200 MB of phone storage. Version `Dev
 ### What was tested
 
 Before tabs, `tools/drive_android.py`, on an Android 14 emulator and an Android 16 emulator with 16 KB memory pages,
-both headless, 29 checks, all passing on both. For this shell, see [The shell on a phone](#the-shell-on-a-phone). Results and screenshots land in `build/android-drive-content` and
-`build/android-drive-webview`.
+both headless, 29 checks, all passing on both. For this shell, see [The shell on a phone](#the-shell-on-a-phone). Results and screenshots land in `build/android-drive-content`.
 
 - Typing a URL, a tap on a link, back, forward, reload, the phone's back key.
 - Suggestions from history, over the page, with the keyboard up. A tap on one loads it.
@@ -284,7 +277,7 @@ both headless, 29 checks, all passing on both. For this shell, see [The shell on
   and works. The GPU process killed: the app keeps working.
 - Real sites over the office network: `example.com`, Wikipedia.
 
-Measured on the Android 16 emulator, both builds showing `example.com`, one run each:
+Measured on the Android 16 emulator, before tabs, both builds showing `example.com`, one run each:
 
 | | Content | WebView |
 |---|---|---|
@@ -305,41 +298,11 @@ One driver trap: Android takes the app zygote down a few seconds after a force s
 reused the dying zygote once and hung until it was killed, after which no renderer would start. The driver waits for
 it to go. A user won't force-stop and relaunch inside a few seconds, but it's worth knowing.
 
-## The WebView build
-
-Built first, to have something on a phone the same day. Labelled `Project B WebView` on the phone, and
-`webview` is what the shell's `engine` says.
-
-**It doesn't build since this branch moved onto `main`.** `engine/webview/jni.c` fills `PBEngineCalls` and
-`PBGoCalls` as they were before tabs, and `Engine.java` has one page. Bringing it up to date means a map of tab to
-`WebView`, the layout call, and turning WebView's callbacks into the numbered content hooks Go now subscribes to
-(navigation, title, loading, favicon), which WebView only partly has. Everything below is what it showed before that.
-
-| Folder or file | What it is |
-|---|---|
-| `engine/webview/jni.c` | Go's table on one side, JNI on the other |
-| `engine/webview/java/.../Engine.java` | The engine calls: two views and their clients |
-| `engine/webview/java/.../ShellView.java` | The shell: transparent, hit test, serves itself from the APK's assets |
-| `engine/webview/java/.../BrowserActivity.java` | The window |
-| `tools/android-webview-build.sh` | Go, JNI, Java and the signed APK, with the SDK's own tools. About 10 s |
-| `tools/android-signing-setup.sh` | Makes the one stable key, once |
-
-No Gradle and no AndroidX: `aapt2`, `javac`, `d8`, `zipalign` and `apksigner`, flat. It needs the NDK at
-`~/Library/Android/sdk/ndk/29.0.14206865`. Minimum Android 8 (API 26), arm64 only.
-
-Tested, before tabs, with the same driver and the same list as above, on WebView 113 (Android 14) and 133 (Android 16), 24 checks
-all passing (the content-only crash checks don't apply). Its own results, all from WebView:
-
-- A page in a loop freezes the address bar, because they share a renderer.
-- A top-level POST skips the gate.
-- A bad certificate is refused. WebView refuses by default but tells nobody, so the adapter reports it.
-- `target=_blank` and `window.open` open in the same view, and Google sign-in refuses embedded WebViews.
-
 ## Signing
 
-Both APKs are signed with `~/PW_TOOLS/project-b-signing/android.keystore`, password in `~/PW_TOOLS/lab-secrets.env` as
-`PROJECT_B_ANDROID_KEYSTORE_PASSWORD`. Losing the key forces every phone to uninstall before it can update. The two
-apps have different package names, so both install side by side.
+The APK is signed with `~/PW_TOOLS/project-b-signing/android.keystore`, made once by `tools/android-signing-setup.sh`,
+password in `~/PW_TOOLS/lab-secrets.env` as `PROJECT_B_ANDROID_KEYSTORE_PASSWORD`. Losing the key forces every phone to
+uninstall before it can update.
 
 ## The shell on a phone
 

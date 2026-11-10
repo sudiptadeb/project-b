@@ -26,8 +26,7 @@ Take an item off when it lands or is dropped.
 - **Slowness, fixed at the cause, never masked:** a stale picture after a resize, and a brief
   flash at launch. The rejected masking attempts are on branch `parked-window`.
 - **Android:** the sidebar's place on a phone, the toolbar that doesn't paint while settings is
-  open, the colour before Go starts, and whether to bring the WebView build up to date or drop
-  it. See [android.md](android.md#the-shell-on-a-phone).
+  open, and the colour before Go starts. See [android.md](android.md#the-shell-on-a-phone).
 
 ## Decided, not started
 

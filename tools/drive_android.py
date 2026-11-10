@@ -4,8 +4,7 @@
 A small local web server is the oracle for what the page received, and the app's own history
 file for what the managers kept. Results and screenshots go to build/android-drive.
 
-    ADB_SERIAL=emulator-5600 python3 tools/drive_android.py            # the WebView build
-    ENGINE=content python3 tools/drive_android.py                      # the content build
+    ADB_SERIAL=emulator-5600 python3 tools/drive_android.py
 """
 import http.server
 import json
@@ -18,12 +17,11 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SDK = os.path.expanduser("~/Library/Android/sdk")
 ADB = [SDK + "/platform-tools/adb", "-s", os.environ.get("ADB_SERIAL", "emulator-5600")]
-ENGINE = os.environ.get("ENGINE", "webview")
-APK = ROOT + "/build/android/project-b-%s.apk" % ENGINE
-PACKAGE = {"webview": "dev.projectb.webview", "content": "dev.projectb.browser"}[ENGINE]
+APK = ROOT + "/build/android/project-b-content.apk"
+PACKAGE = "dev.projectb.browser"
 ACTIVITY = ".BrowserActivity"
-PROFILE = {"webview": "files/profile", "content": "app_project_b/profile"}[ENGINE]
-OUT = os.environ.get("OUT", ROOT + "/build/android-drive-" + ENGINE)
+PROFILE = "app_project_b/profile"
+OUT = os.environ.get("OUT", ROOT + "/build/android-drive-content")
 PORT = 8765
 BASE = "localhost:%d" % PORT
 
@@ -340,10 +338,7 @@ def main():
         rmaps = adb("shell", "cat", "/proc/%s/maps" % pid)
         check("Go's library is not in " + name.split(":")[1], len(rmaps) > 0 and go_library_mappings(pid) == 0, "pid " + pid)
     renderers = sorted((int(pid) for pid, name in kids if "sandboxed" in name))
-    if ENGINE == "webview":
-        check("exactly one renderer holds shell and page", len(renderers) == 1, str(kids))
-    else:
-        check("the shell and the page have separate renderers", len(renderers) >= 2, str(kids))
+    check("the shell and the page have separate renderers", len(renderers) >= 2, str(kids))
 
     # The page's renderer dies, which is the last one to start.
     adb("shell", "kill", "-9", str(renderers[-1]))
@@ -355,27 +350,25 @@ def main():
     shot("17-reloaded-after-crash")
     check("reload recovers after a crash", "/a" in served, str(served))
 
-    if ENGINE == "content":
-        # The shell's renderer dies alone: it comes back from a snapshot, and the page stays.
-        adb("shell", "kill", "-9", str(renderers[0]))
-        time.sleep(4)
-        shot("17b-after-shell-renderer-kill")
-        served.clear()
-        tap(RELOAD, 3.0)
-        check("the shell works again after its renderer died", "/a" in served, str(served))
-        # The GPU process dies.
-        for pid, name in children():
-            if "privileged" in name:
-                adb("shell", "kill", "-9", pid)
-        time.sleep(5)
-        shot("17c-after-gpu-kill")
-        served.clear()
-        tap(RELOAD, 3.0)
-        shot("17d-reload-after-gpu-kill")
-        check("the app works after the GPU process died", "/a" in served, str(served))
+    # The shell's renderer dies alone: it comes back from a snapshot, and the page stays.
+    adb("shell", "kill", "-9", str(renderers[0]))
+    time.sleep(4)
+    shot("17b-after-shell-renderer-kill")
+    served.clear()
+    tap(RELOAD, 3.0)
+    check("the shell works again after its renderer died", "/a" in served, str(served))
+    # The GPU process dies.
+    for pid, name in children():
+        if "privileged" in name:
+            adb("shell", "kill", "-9", pid)
+    time.sleep(5)
+    shot("17c-after-gpu-kill")
+    served.clear()
+    tap(RELOAD, 3.0)
+    shot("17d-reload-after-gpu-kill")
+    check("the app works after the GPU process died", "/a" in served, str(served))
 
-    # On WebView one renderer holds both views, so a page that spins freezes the shell too. On
-    # content they're separate, so the shell keeps working.
+    # The shell and the page have separate renderers, so a page that spins leaves the shell working.
     launch()
     go(BASE + "/busy")
     tap(PAGE_TOP, 1.0)

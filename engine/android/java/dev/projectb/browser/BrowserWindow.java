@@ -142,9 +142,8 @@ final class BrowserWindow extends FrameLayout {
     }
 
     /**
-     * Holds the shell's view. The same question the Mac window's hitTest: asks, and the WebView
-     * build's ShellView: Android offers a finger down to the views from the top, and refusing here
-     * hands it to the page below.
+     * Holds the shell's view. The same question the Mac window's hitTest: asks: Android offers a
+     * finger down to the views from the top, and refusing here hands it to the page below.
      */
     private final class ShellHolder extends FrameLayout {
         ShellHolder(Context context) {

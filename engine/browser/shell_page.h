@@ -15,7 +15,8 @@ class WebContents;
 
 namespace project_b {
 
-// Makes chrome://shell/ loadable, served from the shell folder beside the binary.
+// Makes our pages loadable, chrome://shell/ and chrome://settings/, each served from its
+// own folder under shell/ beside the binary.
 void RegisterShellWebUI(content::BrowserContext* browser_context);
 
 // The shell: one transparent page covering the window. It talks to the Go core with

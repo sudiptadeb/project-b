@@ -7,7 +7,7 @@
 // something may have changed, and sends only when the layout differs. ResizeObserver misses moves, so a running
 // animation or transition keeps it measuring until it ends.
 
-import { send } from './bridge.js';
+import { send } from '@/bridge.js';
 
 const debug = new URLSearchParams(location.search).get('debug') === 'regions';
 

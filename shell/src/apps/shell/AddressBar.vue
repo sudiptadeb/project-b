@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { send } from './bridge.js';
+import { send } from '@/bridge.js';
 import { activeTab, setHandlers, state } from './state.js';
 
 const input = ref(null);

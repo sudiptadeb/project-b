@@ -1,5 +1,5 @@
 <script setup>
-import { send } from './bridge.js';
+import { send } from '@/bridge.js';
 import { state } from './state.js';
 
 // The update manager's state, shown the way a browser shows a link's address: a small

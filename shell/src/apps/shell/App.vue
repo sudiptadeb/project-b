@@ -5,7 +5,7 @@ import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
 import { state } from './state.js';
-import { tones } from './tones.js';
+import { tones } from '@/tones.js';
 
 // Both layouts show the same tabs from the same state; only where they sit differs.
 const horizontal = computed(() => state.tabLayout === 'horizontal');

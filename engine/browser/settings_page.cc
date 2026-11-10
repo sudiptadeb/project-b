@@ -27,7 +27,7 @@ SettingsPage::~SettingsPage() {
 void SettingsPage::Load() {
   contents_->GetController().LoadURLWithParams(
       content::NavigationController::LoadURLParams(
-          GURL("chrome://shell/settings")));
+          GURL("chrome://settings/")));
 }
 
 void SettingsPage::Send(const std::string& json) {

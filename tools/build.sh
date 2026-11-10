@@ -55,7 +55,8 @@ RC=$?
 echo "=== $(date '+%F %T') build rc=$RC in $(( $(date +%s) - START ))s"
 [ "$RC" -eq 0 ] || { echo "RESULT=failed build"; exit 1; }
 
-mkdir -p "$OUT/shell"
-cp -f "$ROOT/shell/dist/"* "$OUT/shell/"
+# One folder per page: shell/shell/, shell/settings/.
+rm -rf "$OUT/shell"
+cp -R "$ROOT/shell/dist" "$OUT/shell"
 ls -la "$OUT/project_b" "$OUT/project_b_helper" "$OUT/libproject_b_content.dylib" 2>/dev/null
 echo "RESULT=ok $(date '+%F %T')"

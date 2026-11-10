@@ -16,7 +16,7 @@ namespace project_b {
 // Hooks give the settings page this id; the shell's is 0 and tabs' are positive.
 inline constexpr int64_t kSettingsPageId = -1;
 
-// The settings page: chrome://shell/settings in a page of its own, over the whole
+// The settings page: chrome://settings/, an app of its own in a WebContents of its own, over the whole
 // window while it is open, so the shell never carries it. It talks to Go as the shell
 // does, under its own message name.
 class SettingsPage : public WebContentsDelegateHooks {

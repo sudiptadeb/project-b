@@ -2,7 +2,7 @@
 // they send, and the page starts from a snapshot.
 
 import { reactive } from 'vue';
-import { bridge } from '../bridge.js';
+import { bridge } from '@/bridge.js';
 
 const channel = bridge('settings');
 export const send = channel.send;

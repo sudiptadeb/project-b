@@ -36,7 +36,38 @@ namespace project_b {
 
 namespace {
 
-constexpr char kHost[] = "shell";
+// Our pages, each an app of its own (shell/src/apps/<app>) at chrome://<app>/, served from
+// shell/<app>/ beside the binary. Each has the one WebContents it belongs in, and its
+// messages cross to Go as one event.
+struct App {
+  const char* host;
+  PBEvent event;
+};
+constexpr App kApps[] = {
+    {"shell", PB_EVENT_SHELL_MESSAGE},
+    {"settings", PB_EVENT_SETTINGS_MESSAGE},
+};
+
+const App* AppFor(const GURL& url) {
+  if (!url.SchemeIs("chrome")) {
+    return nullptr;
+  }
+  for (const App& app : kApps) {
+    if (url.host() == app.host) {
+      return &app;
+    }
+  }
+  return nullptr;
+}
+
+// The WebContents an app belongs in: the shell's, or the settings page's while it is open.
+content::WebContents* HomeOf(const App& app) {
+  Engine* engine = Engine::Get();
+  if (app.event == PB_EVENT_SHELL_MESSAGE) {
+    return engine->shell()->contents();
+  }
+  return engine->settings() ? engine->settings()->contents() : nullptr;
+}
 
 // Forwards chrome.send(name, [json]) to Go as one event: 'shell' from the shell,
 // 'settings' from the settings page.
@@ -66,91 +97,81 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
   const PBEvent event_;
 };
 
-// The bridge to Go belongs to the shell's own WebContents and the settings page's. The
-// factory sees only the URL, so content makes a controller for chrome://shell/ wherever
-// it loads; anywhere else the controller takes away the page's bindings, so it has no
+// The bridge to Go belongs to each app's own WebContents. The factory sees only the URL,
+// so content makes a controller for chrome://shell/ or chrome://settings/ wherever it
+// loads; anywhere else the controller takes away the page's bindings, so it has no
 // chrome.send, and drops whatever arrives anyway.
-class ShellController : public content::WebUIController {
+class AppController : public content::WebUIController {
  public:
-  explicit ShellController(content::WebUI* web_ui)
+  AppController(content::WebUI* web_ui, const App& app)
       : content::WebUIController(web_ui),
-        is_ours_(IsOurs(web_ui->GetWebContents())) {
-    if (!is_ours_) {
-      LOG(WARNING) << "chrome://shell/ outside the shell: no bindings";
+        app_(app),
+        is_home_(web_ui->GetWebContents() == HomeOf(app)) {
+    if (!is_home_) {
+      LOG(WARNING) << "chrome://" << app_.host << "/ outside its page: no bindings";
       web_ui->SetBindings(content::BindingsPolicySet());
       return;
     }
-    if (web_ui->GetWebContents() == Engine::Get()->shell()->contents()) {
-      web_ui->AddMessageHandler(
-          std::make_unique<ShellMessageHandler>("shell", PB_EVENT_SHELL_MESSAGE));
-    } else {
-      web_ui->AddMessageHandler(std::make_unique<ShellMessageHandler>(
-          "settings", PB_EVENT_SETTINGS_MESSAGE));
-    }
-  }
-
-  static bool IsOurs(content::WebContents* contents) {
-    Engine* engine = Engine::Get();
-    return contents == engine->shell()->contents() ||
-           (engine->settings() && contents == engine->settings()->contents());
+    web_ui->AddMessageHandler(
+        std::make_unique<ShellMessageHandler>(app_.host, app_.event));
   }
 
   bool OverrideHandleWebUIMessage(const GURL& source_url,
                                   const std::string& message,
                                   const base::ListValue& args) override {
-    if (is_ours_) {
+    if (is_home_) {
       return false;
     }
-    LOG(WARNING) << "dropped \"" << message
-                 << "\" from chrome://shell/ outside the shell";
+    LOG(WARNING) << "dropped \"" << message << "\" from chrome://" << app_.host
+                 << "/ outside its page";
     return true;
   }
 
   WEB_UI_CONTROLLER_TYPE_DECL();
 
  private:
-  const bool is_ours_;
+  const App app_;
+  const bool is_home_;
 };
 
-WEB_UI_CONTROLLER_TYPE_IMPL(ShellController)
+WEB_UI_CONTROLLER_TYPE_IMPL(AppController)
 
-class ShellControllerFactory : public content::WebUIControllerFactory {
+class AppControllerFactory : public content::WebUIControllerFactory {
  public:
   std::unique_ptr<content::WebUIController> CreateWebUIControllerForURL(
       content::WebUI* web_ui,
       const GURL& url) override {
-    return IsShell(url) ? std::make_unique<ShellController>(web_ui) : nullptr;
+    const App* app = AppFor(url);
+    return app ? std::make_unique<AppController>(web_ui, *app) : nullptr;
   }
 
   content::WebUI::TypeID GetWebUIType(content::BrowserContext* browser_context,
                                       const GURL& url) override {
-    return IsShell(url) ? reinterpret_cast<content::WebUI::TypeID>(0x1)
-                        : content::WebUI::kNoWebUI;
+    const App* app = AppFor(url);
+    return app ? reinterpret_cast<content::WebUI::TypeID>(app)
+               : content::WebUI::kNoWebUI;
   }
 
   bool UseWebUIForURL(content::BrowserContext* browser_context,
                       const GURL& url) override {
-    return IsShell(url);
-  }
-
- private:
-  static bool IsShell(const GURL& url) {
-    return url.SchemeIs("chrome") && url.host() == kHost;
+    return AppFor(url) != nullptr;
   }
 };
 
-// Serves the built shell from disk. No remote content ever reaches this page.
-class ShellDataSource : public content::URLDataSource {
+// Serves one app's built files from disk. No remote content ever reaches its page.
+class AppDataSource : public content::URLDataSource {
  public:
-  std::string GetSource() override { return kHost; }
+  explicit AppDataSource(const char* host) : host_(host) {}
+
+  std::string GetSource() override { return host_; }
 
   void StartDataRequest(const GURL& url,
                         const content::WebContents::Getter& wc_getter,
                         GotDataCallback callback) override {
     base::FilePath dir;
     CHECK(base::PathService::Get(base::DIR_ASSETS, &dir));
-    std::string name = Name(url);
-    base::FilePath file = dir.Append("shell").AppendASCII(name);
+    base::FilePath file =
+        dir.Append("shell").AppendASCII(host_).AppendASCII(Name(url));
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
         base::BindOnce(
@@ -201,29 +222,30 @@ class ShellDataSource : public content::URLDataSource {
   }
 
  private:
-  // Only these files exist, so a path can't reach outside the folder.
-  static std::string Name(const GURL& url) {
+  // Only these files exist, so a path can't reach outside the folder: index.html, and the
+  // app's one script and one stylesheet.
+  std::string Name(const GURL& url) const {
     std::string path(url.path());
-    for (const char* name :
-         {"shell.js", "shell.css", "settings.js", "settings.css"}) {
-      if (path == std::string("/") + name) {
-        return name;
+    for (const char* ext : {".js", ".css"}) {
+      if (path == "/" + host_ + ext) {
+        return host_ + ext;
       }
-    }
-    if (path == "/settings") {
-      return "settings.html";
     }
     return "index.html";
   }
+
+  const std::string host_;
 };
 
 }  // namespace
 
 void RegisterShellWebUI(content::BrowserContext* browser_context) {
-  static base::NoDestructor<ShellControllerFactory> factory;
+  static base::NoDestructor<AppControllerFactory> factory;
   content::WebUIControllerFactory::RegisterFactory(factory.get());
-  content::URLDataSource::Add(browser_context,
-                              std::make_unique<ShellDataSource>());
+  for (const App& app : kApps) {
+    content::URLDataSource::Add(browser_context,
+                                std::make_unique<AppDataSource>(app.host));
+  }
 }
 
 ShellPage::ShellPage(content::BrowserContext* browser_context)

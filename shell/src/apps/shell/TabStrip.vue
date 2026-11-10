@@ -1,6 +1,6 @@
 <script setup>
-import { send } from './bridge.js';
-import { shown } from './keys.js';
+import { send } from '@/bridge.js';
+import { shown } from '@/keys.js';
 import { controlSpace as controls, state, tabLabel } from './state.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,

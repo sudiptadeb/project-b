@@ -40,6 +40,7 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
 
     (cd shell && npm run build)
     (cd core && go run ./cmd/dev -shell ../shell/dist)    # then open http://127.0.0.1:8765
+                                                          # settings: http://127.0.0.1:8765/settings/
 
 ## Test it
 

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue';
-import { tones } from '../tones.js';
+import { tones } from '@/tones.js';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
 import { send, state } from './state.js';

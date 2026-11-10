@@ -28,7 +28,7 @@ var mockPage embed.FS
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
-	shellDir := flag.String("shell", "../shell/dist", "built shell")
+	shellDir := flag.String("shell", "../shell/dist", "the built pages, one folder each")
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
 	block := flag.String("block", "", "comma-separated blocked hosts")
@@ -73,7 +73,7 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(*shellDir)))
+	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(*shellDir, "shell"))))
 	mux.HandleFunc("GET /shell/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Shell) })
 	mux.HandleFunc("POST /shell/send", func(w http.ResponseWriter, r *http.Request) {
 		msg, err := io.ReadAll(r.Body)
@@ -83,10 +83,8 @@ func main() {
 		}
 		e.Post(func() { a.ShellMessage(msg) })
 	})
-	// The settings page, served as the real app serves it, with its own channel.
-	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filepath.Join(*shellDir, "settings.html"))
-	})
+	// The settings page, an app of its own as in the real app, with its own channel.
+	mux.Handle("GET /settings/", http.StripPrefix("/settings/", http.FileServer(http.Dir(filepath.Join(*shellDir, "settings")))))
 	mux.HandleFunc("GET /settings/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Settings) })
 	mux.HandleFunc("POST /settings/send", func(w http.ResponseWriter, r *http.Request) {
 		msg, err := io.ReadAll(r.Body)

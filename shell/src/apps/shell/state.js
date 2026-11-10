@@ -2,7 +2,7 @@
 // by what they send, and a new shell starts from a snapshot.
 
 import { computed, reactive } from 'vue';
-import { listen, send } from './bridge.js';
+import { listen, send } from '@/bridge.js';
 
 const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 

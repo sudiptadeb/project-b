@@ -1,6 +1,6 @@
 <script setup>
-import { send } from './bridge.js';
-import { shown } from './keys.js';
+import { send } from '@/bridge.js';
+import { shown } from '@/keys.js';
 import { state, tabLabel } from './state.js';
 </script>
 

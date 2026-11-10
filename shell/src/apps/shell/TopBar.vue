@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import AddressBar from './AddressBar.vue';
 import NavButtons from './NavButtons.vue';
-import { send } from './bridge.js';
+import { send } from '@/bridge.js';
 import { activeTab, controlSpace as controls, state } from './state.js';
 
 // With the tabs on the side this row is the title bar: it holds the space for the native

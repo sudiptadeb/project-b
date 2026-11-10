@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && vite build --mode settings"
+    "build": "rm -rf dist && for app in $(ls src/apps); do VITE_APP=$app vite build || exit 1; done"
   },
   "dependencies": {
     "vue": "^3.5.0"

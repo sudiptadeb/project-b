@@ -103,7 +103,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   const open = async () => {
     const p = await browser.newPage({ viewport: { width: 1100, height: 700 } });
     watch(p);
-    await p.goto(base + '/settings');
+    await p.goto(base + '/settings/');
     await p.getByRole('heading', { name: 'Settings' }).waitFor();
     return p;
   };

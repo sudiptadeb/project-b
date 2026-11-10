@@ -1,5 +1,5 @@
 <script setup>
-import { send } from './bridge.js';
+import { send } from '@/bridge.js';
 import { activeTab } from './state.js';
 
 function act(t) {

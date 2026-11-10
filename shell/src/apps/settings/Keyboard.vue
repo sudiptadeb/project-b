@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue';
-import { comboOf, shown } from '../keys.js';
+import { comboOf, shown } from '@/keys.js';
 import { send, state } from './state.js';
 
 // Every action by menu, with its keys on this platform. Changes go to Go, and the list

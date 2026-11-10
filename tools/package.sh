@@ -22,7 +22,7 @@ mkdir -p "$MACOS" "$RESOURCES/shell" "$LIBRARIES" "$FRAMEWORKS"
 cp "$FROM/project_b" "$FROM/project_b_helper" "$MACOS/"
 cp "$FROM/libproject_b_content.dylib" "$FRAMEWORKS/"
 cp "$FROM/project_b.pak" "$FROM/icudtl.dat" "$FROM/snapshot_blob.bin" "$FROM"/v8_context_snapshot.*.bin "$RESOURCES/"
-cp "$FROM"/shell/* "$RESOURCES/shell/"
+cp -R "$FROM"/shell/* "$RESOURCES/shell/"
 cp "$FROM/libEGL.dylib" "$FROM/libGLESv2.dylib" "$FROM/libvk_swiftshader.dylib" "$FROM/libvulkan.dylib" \
    "$FROM/vk_swiftshader_icd.json" "$LIBRARIES/"
 

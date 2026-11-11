@@ -75,6 +75,9 @@ type Engine struct {
 	menu       engine.Menu
 	edits      []engine.EditCommand
 
+	// The fake extension runtime, in a build with extensions.
+	extensions extensionRuntime
+
 	Settings Feed // Messages to the settings page.
 
 	Shell Feed // Messages to the shell page.

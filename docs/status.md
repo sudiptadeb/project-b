@@ -4,6 +4,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 
 ## Docs
 
+- [design-system.md](design-system.md): how our UI looks: colours, type, sizes and the shared controls. Read it before drawing anything.
 - [first-app.md](first-app.md): pieces, the window, measurements, packaging.
 - [window-manager.md](window-manager.md): one Go owner for how the window behaves, built for macOS, and how Windows and Linux map to it.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.

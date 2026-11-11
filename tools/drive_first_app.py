@@ -9,6 +9,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
 
     python3 tools/drive_first_app.py
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
+    python3 tools/drive_first_app.py timeline   # only the timeline
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -25,6 +26,9 @@ import tempfile
 import threading
 import time
 import traceback
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import timeline  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
@@ -263,6 +267,98 @@ def version_checks():
     r = subprocess.run([BIN, "--version"], capture_output=True, text=True, timeout=10)
     want = bundle_version() or "development build"
     check("--version prints the version and exits", r.returncode == 0 and re.fullmatch(rf"Project B {re.escape(want)}, Chromium [0-9.]+\n", r.stdout) is not None, (r.returncode, r.stdout))
+
+
+# The start-up milestones, in the order they must come. The shell's first paint and the
+# first tab's commit race the rest, so they are checked apart.
+STARTUP = ["process.start", "main.entered", "content.ready", "window.created", "shell.created",
+           "shell.navigation_start", "go.starting", "go.started", "window.shown", "shell.committed",
+           "shell.script", "shell.mounted", "shell.ready", "shell.snapshot"]
+
+
+def timeline_checks():
+    """The app's own timeline (docs/logging.md): the start-up milestones from C++, Go and
+    the shell's JavaScript on one clock, each interaction as a span, and the same lines in
+    timeline.log."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    log = os.path.join(OUT, "app.log")
+    log_start = os.path.getsize(log) if os.path.exists(log) else 0
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+
+    def read():
+        return json.loads(app.cmd("timeline", 0))["result"]["entries"]
+
+    def wait_for(test, timeout=20):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if test(read()):
+                return True
+            time.sleep(0.1)
+        return False
+
+    wait_for(lambda es: {"shell.on_screen", "tab.committed"} <= set(timeline.marks(es)))
+    m = timeline.marks(read())
+    ms = lambda name: m[name] / 1e6
+    missing = [n for n in STARTUP + ["shell.first_paint", "shell.on_screen", "tab.committed"] if n not in m]
+    check("every start-up milestone is on the timeline", not missing, missing)
+    if missing:
+        app.close()
+        return
+    check("process start is time zero", m["process.start"] == 0)
+    steps = [(a, b, ms(b) - ms(a)) for a, b in zip(STARTUP, STARTUP[1:])]
+    check("the milestones come in order, C++, Go and JavaScript alike", all(step >= 0 for _, _, step in steps), [s for s in steps if s[2] < 0])
+    # Generous: without a screen AppKit alone can take seconds before main.
+    check("no step takes over 15 s and the shell's state arrives within 30 s", all(step < 15000 for _, _, step in steps) and ms("shell.snapshot") < 30000, steps)
+    check("the shell paints after its script runs, and that frame reaches the screen after it is painted",
+          ms("shell.script") <= ms("shell.first_paint") <= ms("shell.on_screen") < ms("shell.first_paint") + 5000,
+          (ms("shell.script"), ms("shell.first_paint"), ms("shell.on_screen")))
+    check("the first tab commits after Go starts it", ms("go.starting") <= ms("tab.committed") < ms("go.starting") + 15000, (ms("go.starting"), ms("tab.committed")))
+
+    def span_after(action, name):
+        """Does the action and returns the span it makes, or None."""
+        before = len([s for s in timeline.spans(read()) if s["name"] == name])
+        action()
+        wait_for(lambda es: len([s for s in timeline.spans(es) if s["name"] == name]) > before, 10)
+        found = [s for s in timeline.spans(read()) if s["name"] == name]
+        return found[-1] if len(found) > before else None
+
+    def in_order(span, stages):
+        return span is not None and all(s in span["stages"] for s in stages) and \
+            [span["stages"][s] for s in stages] == sorted(span["stages"][s] for s in stages) and 0 < span["dur"] < 10e9
+
+    opened = span_after(lambda: click(app, "button.settings"), "settings.open")
+    check("opening settings is a span from the click to its first frame on screen, through Go, the engine and the page",
+          in_order(opened, ["settings.open.go", "settings.open.created", "settings.open.shown", "settings.navigation_start",
+                            "settings.committed", "settings.script", "settings.mounted", "settings.snapshot",
+                            "settings.first_paint", "settings.on_screen"]), opened)
+    app.cmd("key", "cmd+w")
+    time.sleep(0.5)
+    new = span_after(lambda: click(app, ".new-tab"), "tab.new")
+    check("a new tab is a span that ends when the shell has drawn it", in_order(new, ["tab.new.go", "tab.new.done"]), new)
+    closed = span_after(lambda: app.cmd("key", "cmd+w"), "tab.close")
+    check("closing a tab from the keyboard is a span too, begun in Go", in_order(closed, ["tab.close.go", "tab.close.done"]), closed)
+    moved = span_after(lambda: click(app, "button[aria-label^='Tabs on']"), "tabs.layout")
+    check("moving the tabs is a span that covers the page moving", in_order(moved, ["tabs.layout.go", "tabs.layout.done", "tabs.layout.page_moved"]), moved)
+
+    # A LOG in the engine's C++ is an entry.
+    app.cmd("strayshell")
+    logged = lambda es, src, kind: [e for e in es if e["src"] == src and e["kind"] == kind]
+    wait_for(lambda es: logged(es, "engine", "warn"), 5)
+    entries = read()
+    check("LOG(WARNING) in the engine is a warn entry", any("outside its page" in e.get("text", "") for e in logged(entries, "engine", "warn")), logged(entries, "engine", "warn"))
+    check("no entry carries a URL", not [e for e in entries if "://" in e.get("text", "") + e.get("name", "") and "chrome://" not in e.get("text", "")])
+
+    app.close()
+    with open(os.path.join(profile, "timeline.log")) as f:
+        written = timeline.parse(f)
+    in_file = timeline.marks(written)
+    check("timeline.log in the profile has the same marks at the same times", all(in_file.get(n) == m[n] for n in STARTUP), [(n, in_file.get(n), m[n]) for n in STARTUP if in_file.get(n) != m[n]])
+    with open(log) as f:
+        f.seek(log_start)
+        printed = timeline.marks(timeline.parse(f))
+    check("and so does what the app printed", all(printed.get(n) == m[n] for n in STARTUP))
+    check("and the spans", {"settings.open", "tab.new", "tab.close", "tabs.layout"} <= {s["name"] for s in timeline.spans(written)})
 
 
 def settings_checks():
@@ -908,4 +1004,4 @@ def browsing_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [version_checks, browsing_checks, settings_checks])
+    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [timeline_checks] if sys.argv[1:] == ["timeline"] else [version_checks, timeline_checks, browsing_checks, settings_checks])

@@ -9,7 +9,7 @@ below them. The address bar's suggestion box, fed by real history, extends over 
 
 | Folder | What it is | Needs Chromium |
 |---|---|---|
-| `core/` | Go managers (tabs, history, suggest, policy, window, prefs, update, shell) and the engine contract | No |
+| `core/` | Go managers (tabs, history, suggest, policy, window, prefs, update, shell), the timeline that all logging goes through, and the engine contract | No |
 | `core/mockengine`, `core/cmd/dev` | Mock engine and dev server | No |
 | `shell/` | Vue 3 shell | No |
 | `core/cmd/lib` | The cgo layer: the Go core as a c-archive | Links into the main binary |
@@ -121,6 +121,13 @@ shell, so both change together, and `shell/src/tones.js` derives the shell's oth
 from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
 fills the colour itself, faint.
 
+## Logs and timing
+
+The app keeps one timeline of what it did and when: start-up as marks, each interaction as
+a span, and every line of log, from C++, Go and the pages on one clock. It prints it,
+writes it to `timeline.log` in the profile and keeps it in memory for
+`ProjectB.getTimeline`. Every feature logs through it: [logging.md](logging.md).
+
 ## Crashes
 
 While the app runs, `crash.log` in the profile (`~/.project-b/default/` unless
@@ -202,7 +209,7 @@ driver, not read back from the window.
 | Content symbols in main / helper | 0 / 0 |
 | cgo call, C++ to Go | 34 to 54 ns (bare); a `hook` crossing with no values is 120 ns |
 | Forced full GC blocking the main thread | median 181 us, max 743 us, 20 runs |
-| First paint, process start to shell paint | 1.05 to 1.5 s at best; up to 10.6 s from the OS issue below |
+| First paint, process start to shell paint | 1.05 to 1.5 s at best; up to 10.6 s from the OS issue below. Measured since from the timeline: `tools/measure.py` |
 | Key press to next frames, inside the shell | median 8.6 to 12.1 ms, max about 33 ms, 26 keys |
 | Threads / RSS, main | 27 to 31 / 140 to 149 MB |
 | Threads / RSS, GPU | 14 to 19 / 97 to 106 MB |
@@ -302,7 +309,8 @@ for Chrome for Testing.
     RELEASE=1 OUT=out/rel tools/build.sh   # official-style build, takes hours
     tools/package.sh                       # build/project-b.dmg; OUT=out/rel for the release
     python3 tools/drive_first_app.py       # real app, results in build/real (7 screenshots); PB_BIN picks another binary
-    python3 tools/measure_first_app.py     # the numbers above
+    python3 tools/measure_first_app.py     # memory, boundary cost and overlay cost above
+    python3 tools/measure.py               # start-up and responsiveness, from the app's timeline (logging.md)
     (cd core && go test ./...)             # managers, no C++
     node shell/e2e/first-app.cjs           # shell on the mock engine, in a browser
     (cd core && go run ./cmd/dev)          # try it on the mock: http://127.0.0.1:8765

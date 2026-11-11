@@ -6,6 +6,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 
 - [design-system.md](design-system.md): how our UI looks: colours, type, sizes and the shared controls. Read it before drawing anything.
 - [first-app.md](first-app.md): pieces, the window, measurements, packaging.
+- [logging.md](logging.md): **follow it in every feature.** The one timeline for logs and timing: how to log in Go, C++ and JS, names, levels, what never goes in, and how start-up and each interaction are measured.
 - [window-manager.md](window-manager.md): one Go owner for how the window behaves, built for macOS, and how Windows and Linux map to it.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
@@ -26,6 +27,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
     tools/test.sh screen                       # full screen, the clipboard, first paint; NEEDS A PERSON logged in at the screen
     tools/test.sh vm                           # real clicks in the macOS VM; needs a desktop login once per boot
     tools/test.sh android                      # the Android app on the emulator (amarit start project-b-emu)
+    python3 tools/measure.py --compare         # start-up and responsiveness from the app's timeline, against the baseline
 
 `PB_BIN` picks another Mac binary and `PB_APK` another APK. The README's "Test it" says what
 each group needs.

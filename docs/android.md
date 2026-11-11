@@ -137,7 +137,8 @@ Things that are different on Android:
   `post_wakeup` posts to it as before.
 - `onDestroy` ends the process. Go's state can't outlive the views it describes, and a new window in the same
   process would otherwise find managers describing a page that no longer exists.
-- Go's own output goes nowhere on Android, because stderr is `/dev/null`. `log.Printf` isn't visible in `logcat`.
+- Stderr is `/dev/null` on Android, so the timeline, which is all the app logs ([logging.md](logging.md)), prints
+  to the system's log instead: `adb logcat -s ProjectB`. Its file is `timeline.log` in the profile, as on the Mac.
 
 ## 5. Does the transparent shell over the page work on Android?
 

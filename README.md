@@ -7,7 +7,8 @@ silicon Macs, and arm64 Android phones built on the same Mac.
 Releases with a DMG and self-update: https://github.com/sudiptadeb/project-b/releases.
 Where the project stands: [docs/status.md](docs/status.md). How it is built:
 [docs/first-app.md](docs/first-app.md). Android: [docs/android.md](docs/android.md). How our UI
-looks, for anyone drawing any of it: [docs/design-system.md](docs/design-system.md).
+looks, for anyone drawing any of it: [docs/design-system.md](docs/design-system.md). How every
+feature logs and times itself: [docs/logging.md](docs/logging.md).
 
 ## Get it working
 

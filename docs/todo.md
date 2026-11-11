@@ -1,6 +1,6 @@
 # To do
 
-What is decided but not built, and what is waiting for a discussion. Last updated 2026-11-11.
+What is decided but not built, and what is waiting for a discussion. Last updated 2026-11-12.
 Take an item off when it lands or is dropped.
 
 ## For discussion with the owner first
@@ -23,6 +23,24 @@ Take an item off when it lands or is dropped.
 - **Content's own `chrome://` pages** (such as `chrome://gpu`) pass the gate but don't load,
   because the resource pack lacks their files.
 - **Back after the first page in a new tab** returns to `about:blank`.
+- **What the first timelines show** ([logging.md](logging.md), baselines in `tools/baseline/`, medians of 10
+  starts of the development build, 2026-11-12). Nothing is changed yet; each is for a decision.
+  - *Settings is laid over the window before it has drawn anything.* From the click: over the window at 3 ms
+    on the Mac and 7 ms on the Android emulator; its first paint at 71 ms and 117 ms; its first frame on screen
+    at 132 ms and 163 ms. On Android the window's first frame with the empty overlay is on screen at 45 ms, so
+    the phone shows a blank page for about 120 ms: the flash. The Mac covers the window for as long.
+  - *A first frame takes long to reach the screen after it is painted:* 64 ms on the Mac for the shell at
+    start-up and 62 ms for settings, about four frames; 118 ms and 45 ms on the emulator.
+  - *Mac start-up is 296 ms to the shell on screen.* The larger steps: 27 ms before `main`, 41 ms to content
+    ready, 39 ms to the window, 53 ms from the window shown to the first tab's commit, and the 64 ms above.
+  - *Input on this Mac is not late:* a real click reaches the window 1 to 2 ms after the OS made it and the
+    shell 1 ms later. One real Cmd+T took 22 ms from the window to Go, against 0.5 ms through the driver;
+    one sample, worth a look. The macOS VM's lag (clicks landing 1 to 3 s late) hasn't been read this way
+    yet: `tools/timeline.py` on the VM's `timeline.log` will say which side it is on.
+  - *Android start-up is 989 ms on the emulator:* 276 ms from Go started to the shell's commit, and 202 ms
+    from the shell's first state to its first paint.
+  - *Go sends to the shell before its script listens:* each start logs "__shellReceive is not defined" a few
+    times on stderr. The snapshot that follows `ready` makes up for it.
 - **Slowness, fixed at the cause, never masked:** a stale picture after a resize, and a brief
   flash at launch. The rejected masking attempts are on branch `parked-window`.
 - **Android:** the colour before Go starts. See [android.md](android.md#the-shell-on-a-phone).

@@ -660,9 +660,13 @@ def slot(win):
 
 
 def page_timeline(action, seconds):
-    """Runs action and records the page's bounds for that long. Returns them and the window after."""
-    start = time.time()
+    """Runs action and records the page's bounds for that long, timed from when action
+    returns. Returns them and the window after.
+
+    A resize from outside goes through tart exec and System Events, which take 0.25 to 0.8 s
+    to answer, and answer once the window has its new size, so the clock starts then."""
     action()
+    start = time.time()
     boxes = []
     while time.time() - start < seconds:
         vnc.wait_frame(0.2)

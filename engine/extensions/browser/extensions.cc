@@ -421,7 +421,15 @@ void Extensions::AskToInstall(
     const std::string& icon,
     extensions::ExtensionInstallPromptClient::DoneCallback done) {
   const int64_t prompt = next_prompt_++;
-  prompts_[prompt] = std::move(done);
+  prompts_[prompt] = base::BindOnce(
+      [](extensions::ExtensionInstallPromptClient::DoneCallback done,
+         bool accept) {
+        using Client = extensions::ExtensionInstallPromptClient;
+        std::move(done).Run(Client::DoneCallbackPayload(
+            accept ? Client::Result::ACCEPTED
+                   : Client::Result::USER_CANCELED));
+      },
+      std::move(done));
 
   base::DictValue details;
   details.Set("id", extension->id());
@@ -464,9 +472,21 @@ void Extensions::AnswerInstallPrompt(int64_t prompt, bool accept) {
   }
   auto done = std::move(it->second);
   prompts_.erase(it);
-  using Client = extensions::ExtensionInstallPromptClient;
-  std::move(done).Run(Client::DoneCallbackPayload(
-      accept ? Client::Result::ACCEPTED : Client::Result::USER_CANCELED));
+  std::move(done).Run(accept);
+}
+
+// The same prompt, marked as a removal, with the icon the toolbar already shows.
+void Extensions::AskToRemove(const extensions::Extension* extension,
+                             base::OnceCallback<void(bool)> done) {
+  const int64_t prompt = next_prompt_++;
+  prompts_[prompt] = std::move(done);
+
+  base::DictValue details;
+  details.Set("id", extension->id());
+  details.Set("name", extension->name());
+  details.Set("version", extension->VersionString());
+  details.Set("remove", true);
+  OnPromptIconRead(prompt, std::move(details), Icons{icons_[extension->id()].icon, {}});
 }
 
 void Extensions::Uninstall(const std::string& id) {

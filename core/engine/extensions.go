@@ -32,7 +32,8 @@ type ExtensionCommand struct {
 	Description string `json:"description"`
 }
 
-// InstallPrompt is the engine asking whether to install a package it has unpacked.
+// InstallPrompt is the engine asking whether to install a package it has unpacked, or,
+// with Remove, whether to remove an extension a store's page asked to remove.
 type InstallPrompt struct {
 	ID          int64    `json:"-"`
 	Extension   string   `json:"id"`
@@ -40,6 +41,7 @@ type InstallPrompt struct {
 	Version     string   `json:"version"`
 	Icon        string   `json:"icon"`
 	Permissions []string `json:"permissions"` // Names and host patterns, as the manifest has them.
+	Remove      bool     `json:"remove"`
 }
 
 // InstallResult is how an install or a load ended. A person who declines the prompt gets

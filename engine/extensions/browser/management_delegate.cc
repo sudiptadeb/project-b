@@ -3,8 +3,6 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/location.h"
-#include "base/task/single_thread_task_runner.h"
 #include "content/public/browser/browser_context.h"
 #include "extensions/browser/api/management/management_api.h"
 #include "extensions/browser/disable_reason.h"
@@ -12,6 +10,7 @@
 #include "extensions/browser/uninstall_reason.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
+#include "project_b/engine/extensions/browser/extensions.h"
 #include "url/gurl.h"
 
 namespace project_b {
@@ -64,23 +63,24 @@ void ManagementDelegate::DisableExtension(
 }
 
 // A store page's Remove button. Chrome asks "Remove?" in a dialog of its own first; we
-// have no such dialog yet, so it removes, as Remove in the extension manager does.
-// docs/extensions.md lists this.
+// ask through Go, as for an install, and remove only on a yes.
 std::unique_ptr<extensions::UninstallDialogDelegate>
 ManagementDelegate::UninstallFunctionDelegate(
     extensions::ManagementUninstallFunctionBase* function,
     const extensions::Extension* target_extension,
     bool show_programmatic_uninstall_ui) const {
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE,
+  Extensions::Get()->AskToRemove(
+      target_extension,
       base::BindOnce(
           [](scoped_refptr<extensions::ManagementUninstallFunctionBase> function,
-             extensions::ExtensionId id) {
+             extensions::ExtensionId id, bool accept) {
             std::u16string error;
-            extensions::ExtensionRegistrar::Get(function->browser_context())
-                ->UninstallExtension(
-                    id, extensions::UNINSTALL_REASON_MANAGEMENT_API, &error);
-            function->OnExtensionUninstallDialogClosed(true, error);
+            if (accept) {
+              extensions::ExtensionRegistrar::Get(function->browser_context())
+                  ->UninstallExtension(
+                      id, extensions::UNINSTALL_REASON_MANAGEMENT_API, &error);
+            }
+            function->OnExtensionUninstallDialogClosed(accept, error);
           },
           base::WrapRefCounted(function), target_extension->id()));
   return nullptr;

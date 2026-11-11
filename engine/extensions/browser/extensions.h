@@ -108,6 +108,10 @@ class Extensions : public extensions::ExtensionRegistryObserver,
       const extensions::Extension* extension,
       const std::string& icon,
       extensions::ExtensionInstallPromptClient::DoneCallback done);
+  // A store page's Remove button asks the same way: Go shows "Remove?" and done runs
+  // with the answer.
+  void AskToRemove(const extensions::Extension* extension,
+                   base::OnceCallback<void(bool)> done);
   // A prompt for an install that begins somewhere other than Install: a store's page.
   std::unique_ptr<extensions::ExtensionInstallPromptClient>
   CreateInstallPrompt();
@@ -190,9 +194,8 @@ class Extensions : public extensions::ExtensionRegistryObserver,
   std::unique_ptr<extensions::InstallVerifier> install_verifier_;
   std::unique_ptr<extensions::SharedModuleService> shared_modules_;
   std::map<std::string, Icons> icons_;
-  // The install prompts Go hasn't answered yet.
-  std::map<int64_t, extensions::ExtensionInstallPromptClient::DoneCallback>
-      prompts_;
+  // The prompts Go hasn't answered yet.
+  std::map<int64_t, base::OnceCallback<void(bool)>> prompts_;
   int64_t next_prompt_ = 1;
   std::unique_ptr<ExtensionPopup> popup_;
   base::FilePath driver_choice_;

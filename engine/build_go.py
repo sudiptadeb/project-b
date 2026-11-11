@@ -8,6 +8,7 @@ import sys
 
 def main():
     go, out, depfile, deployment_target = sys.argv[1:5]
+    tags = ",".join(sys.argv[5:])
     repo = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     build_dir = os.getcwd()
     # Inside the source tree the repo is reached through src/project_b.
@@ -26,7 +27,7 @@ def main():
         "PATH": os.path.dirname(go) + ":/usr/bin:/bin",
     })
     subprocess.check_call(
-        [go, "build", "-buildmode=c-archive", "-trimpath", "-o",
+        [go, "build", "-buildmode=c-archive", "-trimpath", "-tags", tags, "-o",
          os.path.join(build_dir, out), "./cmd/lib"],
         cwd=os.path.join(repo, "core"), env=env)
 

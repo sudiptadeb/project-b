@@ -2,6 +2,7 @@
 # that load it. See docs/first-app.md.
 
 import("//build/config/mac/mac_sdk.gni")
+import("//project_b/engine/extensions.gni")
 import("//third_party/inspector_protocol/inspector_protocol.gni")
 import("//tools/grit/repack.gni")
 
@@ -23,6 +24,9 @@ action("go_core") {
     rebase_path(depfile, root_build_dir),
     mac_deployment_target,
   ]
+  if (project_b_extensions) {
+    args += [ "extensions" ]
+  }
 }
 
 source_set("go_core_lib") {

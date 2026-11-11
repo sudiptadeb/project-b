@@ -7,6 +7,8 @@ import vue from '@vitejs/plugin-vue';
 // what apps share in src/ (imported as @/). `VITE_APP=<app> vite build` builds one app into
 // dist/<app>/ as index.html, <app>.js and <app>.css; `npm run build` builds every app.
 // `npm run dev` serves them all, with hot reload, against core/cmd/dev on :8765.
+// EXTENSIONS=1 builds or serves them with the extensions UI: @extensions is src/extensions
+// then, and src/extensions-off, which has nothing in it, otherwise.
 const dev = 'http://127.0.0.1:8765';
 const apps = resolve(__dirname, 'src/apps');
 
@@ -20,7 +22,12 @@ export default defineConfig(({ command }) => {
     // A build's root is its app's folder, so its index.html lands at dist/<app>/index.html.
     root: resolve(apps, app || ''),
     base: './',
-    resolve: { alias: { '@': resolve(__dirname, 'src') } },
+    resolve: {
+      alias: {
+        '@extensions': resolve(__dirname, process.env.EXTENSIONS === '1' ? 'src/extensions' : 'src/extensions-off'),
+        '@': resolve(__dirname, 'src'),
+      },
+    },
     build: {
       target: 'esnext',
       assetsInlineLimit: 0,

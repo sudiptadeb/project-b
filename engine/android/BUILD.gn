@@ -3,6 +3,7 @@
 
 import("//build/config/android/config.gni")
 import("//build/config/android/rules.gni")
+import("//project_b/engine/extensions.gni")
 import("//third_party/jni_zero/jni_zero.gni")
 import("//tools/grit/repack.gni")
 
@@ -14,6 +15,8 @@ declare_args() {
   project_b_version = ""
   project_b_version_code = 1
 }
+
+assert(!project_b_extensions, "Extensions are built for the Mac only")
 
 manifest = "$target_gen_dir/AndroidManifest.xml"
 library_name = "project_b_content"

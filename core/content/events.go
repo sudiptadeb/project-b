@@ -3,9 +3,9 @@ package content
 import (
 	"encoding/json"
 	"errors"
-	"log"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // The adapter's own events: things our C++ does that content has no hook for. The
@@ -113,7 +113,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		// JSON: each title with the key's Windows virtual-key code and our modifiers.
 		var byTitle map[string]engine.Key
 		if err := json.Unmarshal([]byte(r.str()), &byTitle); err != nil {
-			log.Printf("content: bad OS bindings: %v", err)
+			timeline.Warnf("content: bad OS bindings: %v", err)
 		} else if e.OnOSBindings != nil {
 			e.OnOSBindings(byTitle)
 		}

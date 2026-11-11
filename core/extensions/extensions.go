@@ -7,12 +7,12 @@ package extensions
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // saved is what this package keeps in the profile, in extensions.json.
@@ -71,7 +71,7 @@ func New(eng engine.Extensions, dir string, activeTab func() engine.TabID) *Mana
 	}
 	if b, err := os.ReadFile(m.path); err == nil {
 		if err := json.Unmarshal(b, &m.saved); err != nil {
-			log.Printf("extensions: %s: %v", m.path, err)
+			timeline.Errorf("extensions: %s: %v", m.path, err)
 		}
 	}
 	m.list = eng.Extensions()
@@ -93,7 +93,7 @@ func (m *Manager) changed() {
 func (m *Manager) save() {
 	b, _ := json.Marshal(m.saved)
 	if err := os.WriteFile(m.path, append(b, '\n'), 0o600); err != nil {
-		log.Printf("extensions: %v", err)
+		timeline.Errorf("extensions: %v", err)
 	}
 }
 

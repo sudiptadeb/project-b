@@ -22,11 +22,11 @@ import "C"
 
 import (
 	"encoding/json"
-	"log"
 	"unsafe"
 
 	"projectb/content"
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // The real engine's extension calls: each goes to the C++ adapter.
@@ -83,7 +83,7 @@ func (e *nativeEngine) Extensions() []engine.Extension {
 	defer C.free(unsafe.Pointer(c))
 	var list []engine.Extension
 	if err := json.Unmarshal([]byte(C.GoString(c)), &list); err != nil {
-		log.Printf("extensions: bad list from the engine: %v", err)
+		timeline.Warnf("extensions: bad list from the engine: %v", err)
 	}
 	return list
 }

@@ -5,9 +5,9 @@ package prefs
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
+	"projectb/timeline"
 	"regexp"
 )
 
@@ -158,16 +158,16 @@ func (m *Manager) SetTheme(theme string) {
 func (m *Manager) save() {
 	b, _ := json.Marshal(m.prefs)
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o700); err != nil {
-		log.Printf("prefs: %v", err)
+		timeline.Errorf("prefs: %v", err)
 		return
 	}
 	// A new file renamed over the old, so no reader and no crash sees half of one.
 	tmp := m.path + ".tmp"
 	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
-		log.Printf("prefs: %v", err)
+		timeline.Errorf("prefs: %v", err)
 		return
 	}
 	if err := os.Rename(tmp, m.path); err != nil {
-		log.Printf("prefs: %v", err)
+		timeline.Errorf("prefs: %v", err)
 	}
 }

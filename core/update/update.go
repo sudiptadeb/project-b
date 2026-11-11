@@ -11,7 +11,6 @@ package update
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"github.com/sudiptadeb/amarit"
 
 	"projectb/relaunch"
+	"projectb/timeline"
 )
 
 // CheckInterval is how often the app looks for a release. One minute while the updater is
@@ -110,7 +110,7 @@ func New(cfg Config, post func(func()), quit func()) *Manager {
 	c, err := amarit.NewClient(filepath.Join(cfg.StateDir, "amarit"), "stable",
 		amarit.Project(cfg.Project), amarit.Version(cfg.Version), amarit.Releases(cfg.Releases))
 	if err != nil {
-		log.Printf("update: %v; updates are off", err)
+		timeline.Errorf("update: %v; updates are off", err)
 		return m
 	}
 	m.client = c
@@ -140,7 +140,7 @@ func (m *Manager) Start() {
 	os.RemoveAll(m.stageDir())
 	os.RemoveAll(m.downloadDir())
 	m.started = true
-	log.Printf("update: %s %s, %s", m.cfg.Project, m.cfg.Version, m.cfg.Releases)
+	timeline.Infof("update: %s %s, %s", m.cfg.Project, m.cfg.Version, m.cfg.Releases)
 	if m.auto {
 		m.startTimer()
 	}
@@ -165,13 +165,13 @@ func (m *Manager) SetAuto(on bool) {
 	if on {
 		m.startTimer()
 	} else {
-		log.Printf("update: automatic checks are off")
+		timeline.Infof("update: automatic checks are off")
 		m.stopTimer()
 	}
 }
 
 func (m *Manager) startTimer() {
-	log.Printf("update: checking every %s", CheckInterval)
+	timeline.Infof("update: checking every %s", CheckInterval)
 	m.timer = make(chan struct{})
 	go m.loop(m.timer)
 }
@@ -233,10 +233,10 @@ func (m *Manager) check(ctx context.Context) (current bool, err error) {
 	}
 	d, err := m.client.Check(ctx)
 	if err != nil {
-		log.Printf("update: check: %v", err)
+		timeline.Errorf("update: check: %v", err)
 		return false, err
 	}
-	log.Printf("update: %s", d.Reason)
+	timeline.Infof("update: %s", d.Reason)
 	m.mu.Lock()
 	s := m.state
 	m.mu.Unlock()
@@ -254,14 +254,14 @@ func (m *Manager) check(ctx context.Context) (current bool, err error) {
 	m.set(State{Phase: Downloading, Version: d.Version, Total: d.Asset.Size})
 	app, err := m.fetch(ctx, d)
 	if err != nil {
-		log.Printf("update: %s: %v", d.Version, err)
+		timeline.Errorf("update: %s: %v", d.Version, err)
 		m.set(State{Phase: Failed, Version: d.Version, Error: err.Error()})
 		return false, nil
 	}
 	m.mu.Lock()
 	m.staged = app
 	m.mu.Unlock()
-	log.Printf("update: %s is staged at %s; ready to relaunch", d.Version, app)
+	timeline.Infof("update: %s is staged at %s; ready to relaunch", d.Version, app)
 	m.set(State{Phase: Ready, Version: d.Version})
 	return false, nil
 }
@@ -304,7 +304,7 @@ func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error)
 	if err != nil {
 		os.RemoveAll(stage)
 		if rerr := m.client.Reject(d.Version); rerr != nil {
-			log.Printf("update: %v", rerr)
+			timeline.Errorf("update: %v", rerr)
 		}
 		return "", fmt.Errorf("%s was refused: %w", d.Version, err)
 	}
@@ -338,7 +338,7 @@ func (m *Manager) Relaunch() {
 		return
 	}
 	if m.cfg.Install != nil {
-		log.Printf("update: handing %s to the installer", staged)
+		timeline.Infof("update: handing %s to the installer", staged)
 		m.cfg.Install(staged)
 		return
 	}
@@ -364,7 +364,7 @@ func (m *Manager) Relaunch() {
 	m.mu.Lock()
 	m.staged = ""
 	m.mu.Unlock()
-	log.Printf("update: %s is in place, previous release kept at %s; relaunching", m.cfg.App, previous)
+	timeline.Infof("update: %s is in place, previous release kept at %s; relaunching", m.cfg.App, previous)
 	relaunch.After(filepath.Join(m.cfg.App, "Contents", "MacOS", executable), nil)
 	m.quit()
 }

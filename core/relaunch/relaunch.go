@@ -3,9 +3,9 @@
 package relaunch
 
 import (
-	"log"
 	"os"
 	"os/exec"
+	"projectb/timeline"
 	"strconv"
 	"syscall"
 )
@@ -17,7 +17,7 @@ func After(executable string, args []string) {
 	cmd := exec.Command("/bin/sh", append([]string{"-c", script, "relaunch", strconv.Itoa(os.Getpid()), executable}, args...)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
-		log.Printf("relaunch: %v", err)
+		timeline.Errorf("relaunch: %v", err)
 	}
 }
 
@@ -25,7 +25,7 @@ func After(executable string, args []string) {
 func Self() {
 	exe, err := os.Executable()
 	if err != nil {
-		log.Printf("relaunch: %v", err)
+		timeline.Errorf("relaunch: %v", err)
 		return
 	}
 	After(exe, os.Args[1:])

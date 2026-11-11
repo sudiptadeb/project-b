@@ -54,6 +54,7 @@ import (
 	"projectb/content"
 	"projectb/engine"
 	"projectb/flags"
+	"projectb/timeline"
 )
 
 // Where releases are published. The project and the URL are the ones in amarit.json at the
@@ -132,7 +133,7 @@ func (e *nativeEngine) SendToSettings(msg []byte) {
 func (e *nativeEngine) SetMenu(m engine.Menu) {
 	b, err := json.Marshal(m)
 	if err != nil {
-		log.Printf("menu: %v", err)
+		timeline.Errorf("menu: %v", err)
 		return
 	}
 	C.call_set_menu(e.calls, (*C.char)(unsafe.Pointer(&b[0])), C.size_t(len(b)))
@@ -143,7 +144,7 @@ func (e *nativeEngine) AppCommand(c engine.AppCommand) { C.call_app_command(e.ca
 func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
 	rgb, err := strconv.ParseInt(strings.TrimPrefix(l.FrameColor, "#"), 16, 32)
 	if err != nil {
-		log.Printf("window colour %q is not #rrggbb", l.FrameColor)
+		timeline.Errorf("window colour %q is not #rrggbb", l.FrameColor)
 		return
 	}
 	regions := make([]C.PBRegion, len(l.Regions))

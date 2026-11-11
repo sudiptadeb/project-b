@@ -10,12 +10,12 @@ package commands
 
 import (
 	"encoding/json"
-	"log"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // Action is one thing the user can do.
@@ -209,7 +209,7 @@ func (m *Manager) mergeNew(t Keymap) {
 }
 
 func (m *Manager) problem(s string) {
-	log.Printf("commands: %s", s)
+	timeline.Errorf("commands: %s", s)
 	m.problems = append(m.problems, s)
 }
 
@@ -226,7 +226,7 @@ func (m *Manager) apply() {
 			for _, b := range a.On(m.platform) {
 				k, err := ParseKeys(b.Keys)
 				if err != nil {
-					log.Printf("commands: %s: %v", id, err)
+					timeline.Errorf("commands: %s: %v", id, err)
 					continue
 				}
 				if _, taken := m.index[k]; !taken {
@@ -269,7 +269,7 @@ func (m *Manager) order() []string {
 func (m *Manager) Run(id string) {
 	a, ok := m.actions[id]
 	if !ok {
-		log.Printf("commands: no action %q", id)
+		timeline.Warnf("commands: no action %q", id)
 		return
 	}
 	if a.Enabled != nil && !a.Enabled() {

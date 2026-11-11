@@ -4,9 +4,9 @@ package content
 
 import (
 	"encoding/json"
-	"log"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // The adapter's extension events. The numbers and value layouts match PBExtensionEvent in
@@ -35,7 +35,7 @@ func WireExtensions(h *Hooks, l engine.ExtensionsListener) {
 	on(eventExtensionInstallPrompt, "engine.ExtensionInstallPrompt", func(r *reader) {
 		p := engine.InstallPrompt{ID: r.int()}
 		if err := json.Unmarshal([]byte(r.str()), &p); err != nil {
-			log.Printf("content: bad install prompt: %v", err)
+			timeline.Warnf("content: bad install prompt: %v", err)
 			return
 		}
 		l.ExtensionInstallPrompt(p)

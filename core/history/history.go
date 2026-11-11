@@ -5,9 +5,9 @@ package history
 import (
 	"bufio"
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
+	"projectb/timeline"
 	"sort"
 	"strings"
 	"time"
@@ -166,7 +166,7 @@ func (m *Manager) save(e *Entry) {
 	select {
 	case m.writes <- *e:
 	default:
-		log.Printf("history: write queue full, dropped %s", e.URL)
+		timeline.Warnf("history: write queue full, dropped a visit")
 	}
 }
 
@@ -176,12 +176,12 @@ func (m *Manager) writer() {
 	for e := range m.writes {
 		if w == nil {
 			if err := os.MkdirAll(filepath.Dir(m.path), 0o700); err != nil {
-				log.Printf("history: %v", err)
+				timeline.Errorf("history: %v", err)
 				continue
 			}
 			f, err := os.OpenFile(m.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 			if err != nil {
-				log.Printf("history: %v", err)
+				timeline.Errorf("history: %v", err)
 				continue
 			}
 			w = f
@@ -189,7 +189,7 @@ func (m *Manager) writer() {
 		}
 		line, _ := json.Marshal(e)
 		if _, err := w.Write(append(line, '\n')); err != nil {
-			log.Printf("history: %v", err)
+			timeline.Errorf("history: %v", err)
 		}
 	}
 }

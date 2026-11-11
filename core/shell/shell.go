@@ -4,13 +4,13 @@ package shell
 
 import (
 	"encoding/json"
-	"log"
 
 	"projectb/crash"
 	"projectb/engine"
 	"projectb/prefs"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/timeline"
 	"projectb/update"
 	"projectb/window"
 )
@@ -65,7 +65,7 @@ func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manag
 func (m *Manager) Handle(msg []byte) {
 	var c command
 	if err := json.Unmarshal(msg, &c); err != nil {
-		log.Printf("shell: bad message: %v", err)
+		timeline.Warnf("shell: bad message: %v", err)
 		return
 	}
 	switch c.T {
@@ -120,7 +120,7 @@ func (m *Manager) Handle(msg []byte) {
 	case "layout":
 		var l window.ShellLayout
 		if err := json.Unmarshal(msg, &l); err != nil {
-			log.Printf("shell: bad layout: %v", err)
+			timeline.Warnf("shell: bad layout: %v", err)
 			return
 		}
 		m.window.HandleShellLayout(l)
@@ -128,7 +128,7 @@ func (m *Manager) Handle(msg []byte) {
 		if r, ok := requests[c.Text]; ok {
 			m.window.Request(r)
 		} else {
-			log.Printf("shell: unknown window request %q", c.Text)
+			timeline.Warnf("shell: unknown window request %q", c.Text)
 		}
 	case "focusPage":
 		m.eng.FocusPage()
@@ -140,7 +140,7 @@ func (m *Manager) Handle(msg []byte) {
 				return
 			}
 		}
-		log.Printf("shell: unknown command %q", c.T)
+		timeline.Warnf("shell: unknown command %q", c.T)
 	}
 }
 
@@ -199,7 +199,7 @@ func (m *Manager) Send(v any) { m.send(v) }
 func (m *Manager) send(v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		log.Printf("shell: %v", err)
+		timeline.Errorf("shell: %v", err)
 		return
 	}
 	m.eng.SendToShell(b)

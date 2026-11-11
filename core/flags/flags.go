@@ -10,9 +10,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
+	"projectb/timeline"
 	"regexp"
 	"slices"
 	"strconv"
@@ -179,7 +179,7 @@ func New(dir string) *Manager {
 	var file map[string]string
 	if b, err := os.ReadFile(m.path); err == nil {
 		if err := json.Unmarshal(b, &file); err != nil {
-			log.Printf("flags: %v", err)
+			timeline.Errorf("flags: %v", err)
 		}
 	}
 	for id, v := range file {
@@ -259,15 +259,15 @@ func (m *Manager) View() []FlagView {
 func (m *Manager) save() {
 	b, _ := json.MarshalIndent(m.saved, "", "  ")
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o700); err != nil {
-		log.Printf("flags: %v", err)
+		timeline.Errorf("flags: %v", err)
 		return
 	}
 	tmp := m.path + ".tmp"
 	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
-		log.Printf("flags: %v", err)
+		timeline.Errorf("flags: %v", err)
 		return
 	}
 	if err := os.Rename(tmp, m.path); err != nil {
-		log.Printf("flags: %v", err)
+		timeline.Errorf("flags: %v", err)
 	}
 }

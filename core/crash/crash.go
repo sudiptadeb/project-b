@@ -13,13 +13,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"time"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // Manager knows whether the last run crashed.
@@ -37,28 +37,28 @@ func New(dir, reports string) *Manager {
 	if info, err := os.Stat(m.current); err == nil {
 		last := filepath.Join(dir, "crash-"+info.ModTime().Format("2006-01-02-150405")+".log")
 		if err := os.Rename(m.current, last); err != nil {
-			log.Printf("crash: %v", err)
+			timeline.Errorf("crash: %v", err)
 		} else {
 			m.last = last
 			m.report = osReport(last, info.ModTime(), reports)
 		}
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 		return m
 	}
 	f, err := os.OpenFile(m.current, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 		return m
 	}
 	// The runtime keeps its own copy of the descriptor.
 	defer f.Close()
 	if _, err := fmt.Fprintf(f, "pid %d, started %s\n", os.Getpid(), time.Now().Format(time.DateTime)); err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 	}
 	if err := debug.SetCrashOutput(f, debug.CrashOptions{}); err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 	}
 	return m
 }
@@ -106,7 +106,7 @@ func reportPID(name string) int {
 // Stop says this run ends cleanly: there is no crash to report next time.
 func (m *Manager) Stop() {
 	if err := os.Remove(m.current); err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 	}
 }
 
@@ -114,7 +114,7 @@ func (m *Manager) Stop() {
 func (m *Manager) ProcessCrashed(p engine.ProcessCrash) {
 	f, err := os.OpenFile(m.children, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 		return
 	}
 	defer f.Close()
@@ -123,7 +123,7 @@ func (m *Manager) ProcessCrashed(p engine.ProcessCrash) {
 		line += ", " + p.URL
 	}
 	if _, err := fmt.Fprintln(f, line); err != nil {
-		log.Printf("crash: %v", err)
+		timeline.Errorf("crash: %v", err)
 	}
 }
 

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
+	"projectb/timeline"
 	"projectb/update"
 )
 
@@ -44,7 +44,7 @@ func updateConfig(profileDir string) update.Config {
 	}
 	version, err := update.Version(bundle)
 	if err != nil {
-		log.Printf("update: %v; updates are off", err)
+		timeline.Errorf("update: %v; updates are off", err)
 		return update.Config{}
 	}
 	return update.Config{

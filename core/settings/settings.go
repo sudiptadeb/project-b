@@ -6,12 +6,12 @@ package settings
 
 import (
 	"encoding/json"
-	"log"
 
 	"projectb/commands"
 	"projectb/engine"
 	"projectb/flags"
 	"projectb/prefs"
+	"projectb/timeline"
 	"projectb/update"
 	"projectb/window"
 )
@@ -98,7 +98,7 @@ func (m *Manager) IsOpen() bool { return m.open }
 func (m *Manager) Handle(msg []byte) {
 	var c command
 	if err := json.Unmarshal(msg, &c); err != nil {
-		log.Printf("settings: bad message: %v", err)
+		timeline.Warnf("settings: bad message: %v", err)
 		return
 	}
 	switch c.T {
@@ -138,7 +138,7 @@ func (m *Manager) Handle(msg []byte) {
 		m.commands.UseTemplate(c.Text)
 	case "addKey":
 		if err := m.commands.AddBinding(c.ID, c.Text, c.Reserve); err != nil {
-			log.Printf("settings: %v", err)
+			timeline.Errorf("settings: %v", err)
 		}
 	case "removeKey":
 		m.commands.RemoveBinding(c.ID, c.Index)
@@ -164,7 +164,7 @@ func (m *Manager) Handle(msg []byte) {
 				return
 			}
 		}
-		log.Printf("settings: unknown command %q", c.T)
+		timeline.Warnf("settings: unknown command %q", c.T)
 	}
 }
 
@@ -213,7 +213,7 @@ func (m *Manager) send(v any) {
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
-		log.Printf("settings: %v", err)
+		timeline.Errorf("settings: %v", err)
 		return
 	}
 	m.eng.SendToSettings(b)

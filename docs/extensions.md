@@ -147,6 +147,9 @@ and nothing points at Google. Not `webstorePrivate`, and no policy install of an
 
 A local `.crx` takes the same path from step 2. "Load unpacked" loads a folder, as Chrome's does.
 
+Removing an extension removes what it stored too: everything kept under its origin, its
+`chrome.storage`, and for a packaged one its files.
+
 **The mock store** is `core/cmd/extstore`, a separate small Go program on `127.0.0.1`. It serves
 the folder `tools/fetch-extensions.sh` fills, `.tools/extensions/`, which git ignores:
 
@@ -276,8 +279,6 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 ## Open for the owner
 
-- **Uninstalling leaves the extension's stored data** (`chrome.storage`, IndexedDB) in the
-  profile. Chrome's cleaner for it is in `//chrome`.
 - **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`. So are
   `tabs.sendMessage` and `tabs.connect` from the extension to a tab: Chrome implements both in
   `//chrome`'s renderer code. Messages from a content script to its extension work.
@@ -294,4 +295,8 @@ Every check below was left out on purpose, to be discussed and then built or dro
   tested beyond that. 1Password needs `nativeMessaging` and Grammarly `identity`.
 - **What the first launch after a link costs.** Twice, the first start of a freshly linked
   extensions build printed nothing for a minute, and the next start was normal. Not looked into.
-- **The store's address has no default.** A new profile shows an empty store until it is set.
+- **The store's default address is undecided.** Today there is none, and a new profile shows
+  an empty store until one is set. The owner's word so far: "Store defaults to chrome store for
+  now... we can change it to mock or just visit mock store for testing". What "chrome store"
+  means for a store that is a catalogue and package files, which Google's isn't, is a question
+  still to put to him. Nothing is built for it.

@@ -158,6 +158,13 @@ def open_popup(app):
     return popup_box(app)
 
 
+def pages_seen(app):
+    """Loads a page and returns how many pages the test extension says it has counted."""
+    visit(app, drive_first_app.URL_A)
+    app.wait("!!document.documentElement.dataset.pbTestExtension", 30, page=True)
+    return json.loads(app.js("document.documentElement.dataset.pbTestExtension", page=True))["pages"]
+
+
 def extension_checks():
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
@@ -282,6 +289,18 @@ def extension_checks():
     settings_wait(app, f"!({INSTALLED}).includes({json.dumps(UBOL_NAME)})", 30)
     check("Remove uninstalls it", True)
 
+    # Removing an extension takes what it stored with it: installed again, it has
+    # counted no pages.
+    close_settings(app)
+    before = pages_seen(app)
+    open_extension_settings(app)
+    for left in (1, 0):
+        settings_click(app, f"[aria-label={json.dumps('Remove ' + TEST_NAME)}]")
+        settings_wait(app, f"({INSTALLED}).length==={left}||{left}===0&&({INSTALLED}).length===0", 30)
+    install_from_store(app, TEST_NAME)
+    close_settings(app)
+    after = pages_seen(app)
+    check("removing an extension deletes what it stored", before >= 2 and after == 1, (before, after))
     app.close()
 
 

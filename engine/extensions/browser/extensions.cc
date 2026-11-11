@@ -10,6 +10,7 @@
 #include "base/command_line.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/files/file_util.h"
+#include "base/barrier_closure.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
@@ -27,7 +28,9 @@
 #include "components/prefs/pref_service_factory.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/storage_partition.h"
 #include "extensions/browser/api/runtime/runtime_api.h"
+#include "extensions/browser/api/storage/storage_frontend.h"
 #include "extensions/browser/blocklist.h"
 #include "extensions/browser/browser_context_keyed_service_factories.h"
 #include "extensions/browser/crx_file_info.h"
@@ -38,6 +41,7 @@
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/browser/extension_util.h"
 #include "extensions/browser/forced_extensions/install_stage_tracker.h"
 #include "extensions/browser/install/crx_install_error.h"
 #include "extensions/browser/install_tracker.h"
@@ -596,21 +600,30 @@ void Extensions::PostDeactivateExtension(
 void Extensions::PreUninstallExtension(
     scoped_refptr<const extensions::Extension> extension) {}
 
-// A packaged extension's files are ours to remove: the folder of all its versions. An
-// unpacked one's folder is the user's.
+// What an extension stored goes with it: what its pages and service worker kept under
+// its origin, and its chrome.storage. A packaged extension's files are ours to remove
+// too, the folder of all its versions; an unpacked one's folder is the user's.
 void Extensions::PostUninstallExtension(
     scoped_refptr<const extensions::Extension> extension,
     base::OnceClosure done_callback) {
-  base::OnceClosure done =
-      done_callback ? std::move(done_callback) : base::DoNothing();
-  if (extensions::Manifest::IsUnpackedLocation(extension->location())) {
-    std::move(done).Run();
-    return;
+  const bool packaged =
+      !extensions::Manifest::IsUnpackedLocation(extension->location());
+  base::RepeatingClosure done = base::BarrierClosure(
+      packaged ? 3 : 2,
+      done_callback ? std::move(done_callback) : base::DoNothing());
+  extensions::util::GetStoragePartitionForExtensionId(extension->id(),
+                                                      browser_context_)
+      ->ClearDataForOrigin(
+          ~content::StoragePartition::REMOVE_DATA_MASK_SHADER_CACHE,
+          extension->url(), done);
+  extensions::StorageFrontend::Get(browser_context_)
+      ->DeleteStorageSoon(extension->id(), done);
+  if (packaged) {
+    extensions::GetExtensionFileTaskRunner()->PostTaskAndReply(
+        FROM_HERE,
+        base::GetDeletePathRecursivelyCallback(extension->path().DirName()),
+        done);
   }
-  extensions::GetExtensionFileTaskRunner()->PostTaskAndReply(
-      FROM_HERE,
-      base::GetDeletePathRecursivelyCallback(extension->path().DirName()),
-      std::move(done));
 }
 
 void Extensions::LoadExtensionForReload(

@@ -12,9 +12,11 @@
 #                           paste, and first paint in the real window.
 #                           NEEDS A PERSON LOGGED IN at this Mac's screen, with it unlocked,
 #                           and desk allowed to record the screen.
-#   tools/test.sh vm        Real clicks, drags and keys in the macOS VM.
+#   tools/test.sh vm        Real clicks, drags and keys in the macOS VM, on build/project-b.dmg
+#                           or PB_DMG (a path or URL): tools/vm/run.sh starts the VM, installs
+#                           it, checks and stops the VM again. Known bugs don't fail it.
 #                           NEEDS A PERSON to have logged in at this Mac's desktop once since
-#                           it booted. Then tools/vm/start.sh and tools/vm/install-dmg.sh.
+#                           it booted.
 #   tools/test.sh android   The Android app on the emulator.
 #                           Needs the emulator running and the APK, or PB_APK.
 #
@@ -112,7 +114,7 @@ screen() {
 vm() {
     echo "The vm group NEEDS A PERSON to have logged in at this Mac's desktop once since it booted."
     [ -x "$VM_PYTHON" ] || cannot vm "no $VM_PYTHON, the Python with numpy that the VM's tools use. Run tools/vm/setup.sh once."
-    run "real clicks in the macOS VM" "$VM_PYTHON" tools/vm/check.py
+    run "real clicks in the macOS VM" tools/vm/run.sh "${PB_DMG:-build/project-b.dmg}"
 }
 
 android() {

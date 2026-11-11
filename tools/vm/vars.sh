@@ -1,9 +1,9 @@
 # Shared by the shell scripts in this folder. Nothing here is a secret.
 #
 # PB_VM names the VM, pb-test by default. Each VM has its own amarit unit, Screen Sharing
-# address file and shared folder, so two can run side by side:
+# address file, shared folder and run lock, so two can run side by side:
 #   PB_VM=pb-build tools/vm/setup.sh    # once: a VM of its own from the image
-#   PB_VM=pb-build tools/vm/start.sh
+#   PB_VM=pb-build tools/vm/run.sh <DMG>
 VM_HOME="$HOME/PW_TOOLS/macos-vm"
 TART_VERSION=2.41.1
 TART="$VM_HOME/bin/tart.app/Contents/MacOS/tart"

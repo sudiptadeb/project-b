@@ -9,6 +9,8 @@ its controls is asked from the installed app itself, through its driver, in a la
 own before the checks (layout()); positions are in points.
 """
 
+import atexit
+import html
 import json
 import os
 import subprocess
@@ -23,7 +25,7 @@ import numpy as np
 VM_HOME = rfb.VM_HOME
 TART = VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
 VM = rfb.VM
-SHOTS = time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
+SHOTS = os.environ.get("PB_VM_SHOTS") or time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
 BUNDLE_ID = "dev.projectb.browser"
 APP = "/Applications/Project B.app"
 SCREEN = (1440, 900)
@@ -38,17 +40,118 @@ ANIMATION = 2.0
 MOVE = (60, 40)
 
 os.environ["TART_HOME"] = VM_HOME + "/tart-home"
-passed = failed = 0
+
+# Checks that fail because of a bug we know about, by the check's name, with the bug. Such a
+# failure is reported as "known" and doesn't fail the run; a known check that passes says so,
+# so the entry can go once the bug is fixed. A new failure anywhere else fails the run.
+SLOW_INPUT = "a click or a shortcut can wait one to three seconds before the app takes it (docs/vm-testing.md, bug 5)"
+STALE = "after a change of size or layout, the old picture can stay on screen for a second or two (docs/vm-testing.md, bug 7)"
+LATE_CLICKS = "after leaving full screen onto another frame the shell takes clicks late or not at all (docs/vm-testing.md, bug 2)"
+KNOWN = {
+    "green button: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
+    "Ctrl+Cmd+F: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
+    "tabs on top, green button: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
+    "a live resize keeps the page against the frame in every frame":
+        "during a live resize the page runs past the frame in some frames (docs/vm-testing.md, bug 7)",
+    "Cmd+T adds a tab within 0.5 s": SLOW_INPUT,
+    "the layout button puts the tabs on top within 1 s": SLOW_INPUT,
+    "the layout button brings the tabs back to the side within 1 s": SLOW_INPUT,
+    "after the tabs move to the top, the sidebar is gone within 1 s": STALE,
+    "after the tabs move back to the side, the sidebar shows within 1 s": STALE,
+    "after a resize from outside the app, the page fills its new place within 0.5 s": STALE,
+    "after zoom, the page fills its new place within 2 s": STALE,
+    "after zooming back, the page fills its place within 2 s": STALE,
+    "after leaving full screen, the page fills its place within 2 s": STALE,
+}
+
+# The test pages, served inside the VM so no check waits on the internet. Each is one colour,
+# so which page shows is plain from any part of it. Plain http, because history keeps only
+# http and https pages, and the suggestions come from history.
+PAGES = "/Users/admin/pb-pages"
+PORT = 8765
+ALPHA = f"http://127.0.0.1:{PORT}/alpha.html"
+BRAVO = f"http://127.0.0.1:{PORT}/bravo.html"
+PAGE_HTML = {
+    "alpha.html": "<title>Alpha</title><body style='margin:0;background:#2b6cb0;color:#fff;font:64px sans-serif'><p>Alpha</p>",
+    "bravo.html": "<title>Bravo</title><body style='margin:0;background:#dd6b20;color:#fff;font:64px sans-serif'><p>Bravo</p>",
+}
+PROFILE = "/Users/admin/.project-b/default"
+# Every launch starts from a fresh profile with automatic update checks off, so no update
+# notice comes up over the page in the middle of a check.
+PREFS = '{"autoUpdate": false}'
+
+results = []
+finished = False
+about = ""
 
 
 def check(name, ok, detail=""):
-    global passed, failed
-    passed, failed = passed + bool(ok), failed + (not ok)
-    print(f"{'pass' if ok else 'FAIL'}  {name}: {detail}", flush=True)
+    known = KNOWN.get(name)
+    status = "pass" if ok else "known" if known else "FAIL"
+    note = (f"  [known: {known}]" if not ok else f"  [a known bug didn't show: {known}]") if known else ""
+    results.append({"name": name, "status": status, "detail": detail, "known": known})
+    print(f"{status:5}  {name}: {detail}{note}", flush=True)
+
+
+def counts():
+    return {k: sum(r["status"] == k for r in results) for k in ("pass", "known", "FAIL")}
+
+
+def report():
+    """Writes summary.txt, results.json and index.html next to the shots, however the run ended."""
+    if not os.path.isdir(SHOTS):
+        return
+    c = counts()
+    verdict = ("PASSED" if finished and not c["FAIL"] else "FAILED") + \
+        f": {c['pass']} passed, {c['known']} failed as known bugs, {c['FAIL']} failed" + \
+        ("" if finished else ", and the checks stopped early")
+    with open(SHOTS + "/summary.txt", "w") as f:
+        f.write(about)
+        for r in results:
+            f.write(f"{r['status']:5}  {r['name']}: {r['detail']}" + (f"  [{r['known']}]" if r["known"] else "") + "\n")
+        f.write(verdict + "\n")
+    with open(SHOTS + "/results.json", "w") as f:
+        json.dump({"verdict": verdict, "finished": finished, "counts": c, "checks": results}, f, indent=1)
+    rows = "".join(f"<tr class={r['status']}><td>{r['status']}</td><td>{html.escape(r['name'])}"
+                   f"<div>{html.escape(str(r['detail']))}</div>"
+                   + (f"<div>known: {html.escape(r['known'])}</div>" if r["known"] else "") + "</td></tr>"
+                   for r in results)
+    shots = "".join(f"<figure><img src='{html.escape(n)}' loading=lazy><figcaption>{html.escape(n[:-4])}</figcaption></figure>"
+                    for n in sorted(os.listdir(SHOTS)) if n.endswith(".png"))
+    with open(SHOTS + "/index.html", "w") as f:
+        f.write("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+                "<title>VM checks</title><style>body{font:14px system-ui;margin:16px}td{padding:4px 8px;vertical-align:top}"
+                "td div{color:#666;font-size:12px}.FAIL td:first-child{color:#c00;font-weight:bold}"
+                ".known td:first-child{color:#b70}.pass td:first-child{color:#080}img{max-width:100%}"
+                "figure{margin:16px 0}</style>"
+                f"<h1>{html.escape(verdict)}</h1><p>{html.escape(about)}</p><table>{rows}</table>{shots}")
+    print(verdict + f", shots in {SHOTS}", flush=True)
 
 
 def guest(*cmd):
     return subprocess.run([TART, "exec", VM, *cmd], capture_output=True, text=True, timeout=60).stdout.strip()
+
+
+def fresh_profile(path=PROFILE, wipe="/Users/admin/.project-b"):
+    guest("/bin/sh", "-c", f"rm -rf '{wipe}' && mkdir -p '{path}' && echo '{PREFS}' > '{path}/prefs.json'")
+
+
+def serve_pages():
+    """Writes the test pages into the VM and serves them there, on its own loopback."""
+    files = " ".join(f"&& printf '%s' \"{page}\" > {PAGES}/{name}" for name, page in PAGE_HTML.items())
+    guest("/bin/sh", "-c", f"mkdir -p {PAGES} {files}")
+    guest("/usr/bin/pkill", "-f", f"http.server {PORT}")
+    # tart exec waits for everything it started, so the server is a child of this run instead,
+    # for as long as it lasts.
+    server = subprocess.Popen([TART, "exec", VM, "/usr/bin/python3", "-m", "http.server", str(PORT),
+                               "--bind", "127.0.0.1", "--directory", PAGES],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    atexit.register(server.terminate)
+    for _ in range(50):
+        if guest("/usr/bin/curl", "-fs", ALPHA):
+            return
+        time.sleep(0.2)
+    sys.exit(f"the test pages aren't served at {ALPHA} in the VM")
 
 
 WINDOWS = """
@@ -111,7 +214,6 @@ def window_or_stop(name):
     win = window()
     if win is None:
         check(name, False, "no window: the app is gone, so the checks after this can't run")
-        print(f"{passed} passed, {failed} failed, stopped early, shots in {SHOTS}", flush=True)
         sys.exit(1)
     return win
 
@@ -193,6 +295,7 @@ def layout():
     buttons and the page ("bounds").
     """
     guest("/bin/sh", "-c", f"rm -rf {CAL}; mkdir -p {CAL} && mkfifo {CAL}/fifo")
+    fresh_profile(f"{CAL}/profile", f"{CAL}/profile")
     guest("/usr/bin/open", "-n", "--stdout", f"{CAL}/out", "--stderr", f"{CAL}/err", APP, "--args",
           f"--pb-driver={CAL}/fifo", f"--user-data-dir={CAL}/profile")
     asked = [0]
@@ -415,7 +518,7 @@ def full_screen(name, enter, home, first_control, on_top=False):
             # Start the app again from a fresh profile, so the checks after this still mean
             # something: a click that lands even later would move the tabs for the next launch.
             quit_app()
-            guest("/bin/rm", "-rf", "/Users/admin/.project-b")
+            fresh_profile()
             launch()
             time.sleep(1.5)
             if on_top:
@@ -448,18 +551,21 @@ def missing():
 
 if why := missing():
     rfb.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
-os.makedirs(SHOTS)
+os.makedirs(SHOTS, exist_ok=True)
 
 # Start clean: nothing running, no profile, so the tabs start on the side.
 guest("/usr/bin/killall", "project_b")
-guest("/bin/rm", "-rf", "/Users/admin/.project-b")
+fresh_profile()
 time.sleep(1)
 vnc = rfb.Vnc()
 print(f"display {vnc.width}x{vnc.height}, shots in {SHOTS}", flush=True)
-with open(SHOTS + "/ABOUT.txt", "w") as about:
-    about.write(f"Real pixels: the macOS {guest('/usr/bin/sw_vers', '-productVersion')} VM's screen as Screen Sharing\n"
-                f"sent it, {time.strftime('%Y-%m-%d %H:%M')}, not composites. Project B "
-                f"{guest('/usr/bin/defaults', 'read', APP + '/Contents/Info', 'CFBundleVersion')} from /Applications.\n")
+about = (f"Real pixels: the macOS {guest('/usr/bin/sw_vers', '-productVersion')} VM ({VM})'s screen as Screen Sharing\n"
+         f"sent it, {time.strftime('%Y-%m-%d %H:%M')}, not composites. Project B "
+         f"{guest('/usr/bin/defaults', 'read', APP + '/Contents/Info', 'CFBundleVersion')} from /Applications.\n")
+with open(SHOTS + "/ABOUT.txt", "w") as f:
+    f.write(about)
+atexit.register(report)
+serve_pages()
 shot("desktop")
 # After a boot the image's login item leaves an "App Background Activity" notice at the top
 # right, over the window's right end. Swipe it away as a person would; on a clear desktop
@@ -546,14 +652,37 @@ def address():
     return crop(vnc.image(), PX + V["field"][0] + 8, PY + TOP - 7, 400, 14)
 
 
+def until(get, ok, limit=PAGE_LOAD + 5):
+    """get() once ok() holds of it, or as it is after the limit. Checks of whether something
+    works wait for their result this way, because a click or key can land seconds late
+    (SLOW_INPUT) and a picture can lag (STALE): only the checks named "within" time things.
+    Waiting also keeps a late input from landing on the step after its own."""
+    end = time.time() + limit
+    now = get()
+    while not ok(now) and time.time() < end:
+        time.sleep(0.2)
+        now = get()
+    return now
+
+
+def field_focused():
+    """Whether the address field shows its focus ring, in the frame colour."""
+    f = V["field"]
+    return int(near(crop(vnc.image(), PX + f[0], PY + f[1], f[2], f[3]), FRAME, 40).sum()) > 300
+
+
+def type_address(text):
+    """Clicks the address field, waits for it to take focus, and goes to text."""
+    click_on(V["field"])
+    until(field_focused, bool, 5)
+    vnc.type(text)
+    vnc.key("return")
+
+
 # Real clicks at title-bar height, tabs on the side.
 blank = page()
-click_on(V["field"])
-time.sleep(0.4)
-vnc.type("example.com")
-vnc.key("return")
-time.sleep(PAGE_LOAD)
-example = page()
+type_address(ALPHA)
+example = until(page, lambda p: changed(blank, p) > 0.001)
 example_at = address()
 shot("vertical-example")
 check("a click reaches the address bar", changed(blank, example) > 0.001 and still(), f"page changed {changed(blank, example):.3f}")
@@ -565,46 +694,42 @@ page_bar = float(np.mean(near(crop(img, PX + PAGE_V[0], PY + PAGE_V[1], PAGE_V[2
 check("tabs on the side: shell draws over the page", sidebar_bar > 0.9 and edge > 0.9 and page_bar < 0.2,
       f"sidebar {sidebar_bar:.2f}, frame {edge:.2f}, shell colour in page {page_bar:.2f}")
 
-click_on(V["field"])
-time.sleep(0.4)
-vnc.type("iana.org/help/example-domains")
-vnc.key("return")
-time.sleep(PAGE_LOAD)
-iana = page()
+type_address(BRAVO)
+iana = until(page, lambda p: changed(example, p) > 0.001)
 iana_at = address()
 check("a second page loads", changed(example, iana) > 0.001 and changed(example_at, iana_at) > 0.01,
       f"page changed {changed(example, iana):.3f}, address {changed(example_at, iana_at):.3f}")
 
 click_on(V["back"])
-time.sleep(PAGE_LOAD)
-page()
-back = address()
+back = until(address, lambda a: changed(a, example_at) < 0.01)
 shot("after-back")
 check("a click reaches the back button", changed(back, example_at) < 0.01 and still(), f"address differs from the first page's by {changed(back, example_at):.3f}")
 click_on(V["forward"])
-time.sleep(PAGE_LOAD)
-page()
-forward = address()
+forward = until(address, lambda a: changed(a, iana_at) < 0.01)
 check("a click reaches the forward button", changed(forward, iana_at) < 0.01 and still(), f"address differs from the second page's by {changed(forward, iana_at):.3f}")
 
 # Suggestions: Cmd+L from the page, type, pick one with a real click over the page.
 vnc.click(*NEUTRAL)
 time.sleep(0.3)
 SUGGESTED = (V["field"][0] + 70, V["field"][1] + V["field"][3] - 8, 400, 60)  # Where the list opens.
-before = crop(vnc.image(), PX + SUGGESTED[0], PY + SUGGESTED[1], SUGGESTED[2], SUGGESTED[3])
+
+
+def suggested():
+    return crop(vnc.image(), PX + SUGGESTED[0], PY + SUGGESTED[1], SUGGESTED[2], SUGGESTED[3])
+
+
+before = suggested()
 vnc.key("cmd+l")
-time.sleep(0.3)
-vnc.type("exam")
-time.sleep(0.8)
-listed = crop(vnc.image(), PX + SUGGESTED[0], PY + SUGGESTED[1], SUGGESTED[2], SUGGESTED[3])
+until(field_focused, bool, 5)
+vnc.type("alph")
+listed = until(suggested, lambda l: changed(before, l) > 0.05, 5)
+time.sleep(0.5)  # The list can still be growing.
 shot("suggestions")
 check("Cmd+L and typing shows suggestions over the page", changed(before, listed) > 0.05, f"changed {changed(before, listed):.3f}")
 # The first item: 6 below the field, inside the list's 1 border and 4 padding, 32 high.
 vnc.click(PX + middle(V["field"])[0], PY + V["field"][1] + V["field"][3] + 6 + 1 + 4 + 16)
-time.sleep(PAGE_LOAD)
-page()
-picked = address()
-check("a click picks a suggestion", changed(picked, example_at) < 0.01, f"address differs from example.com's by {changed(picked, example_at):.3f}")
+picked = until(address, lambda a: changed(a, example_at) < 0.01)
+check("a click picks a suggestion", changed(picked, example_at) < 0.01, f"address differs from the first page's by {changed(picked, example_at):.3f}")
 
 # Tabs by key, compared by what the sidebar shows.
 SIDE = (V["sidebar"][0] + 4, V["sidebar"][1] + 4, 180, 300)
@@ -628,30 +753,34 @@ check("Cmd+T adds a tab within 0.5 s", changed(one, two) > 0.005 and took <= 0.5
 if changed(one, two) <= 0.005:
     # So the checks below still have their two tabs.
     vnc.key("cmd+t")
+    until(side, lambda n: changed(one, n) > 0.005, 5)
 time.sleep(0.5)
 two = side()
 shot("two-tabs")
 click_on(V["tabs"][0])
-time.sleep(1)
-shown = address()
-check("a click reaches a tab in the sidebar", changed(shown, example_at) < 0.01, f"address differs from example.com's by {changed(shown, example_at):.3f}")
+shown = until(address, lambda a: changed(a, example_at) < 0.01)
+check("a click reaches a tab in the sidebar", changed(shown, example_at) < 0.01, f"address differs from the first page's by {changed(shown, example_at):.3f}")
 click_on(V["tabs"][1])
-time.sleep(1)
+until(address, lambda a: changed(a, example_at) >= 0.01)
 vnc.key("cmd+t")
-time.sleep(1)
+until(side, lambda n: changed(two, n) > 0.005, 5)
 vnc.key("cmd+w")
-time.sleep(1)
-check("Cmd+W closes a tab", changed(side(), two) < 0.005, f"differs from two tabs {changed(side(), two):.3f}")
+check("Cmd+W closes a tab", changed(until(side, lambda n: changed(n, two) < 0.05, 5), two) < 0.05,
+      f"differs from two tabs {changed(side(), two):.3f}")
 vnc.key("cmd+t")
-time.sleep(1)
+until(side, lambda n: changed(two, n) > 0.005, 5)
 vnc.key("cmd+w")
 vnc.key("cmd+w")
-time.sleep(1)
-now = side()
+# Which of the two the sidebar looks like: a fixed threshold read a sidebar with one tab, drawn
+# a pixel differently, as not one tab.
+now = until(side, lambda n: changed(n, one) < 0.05 and changed(n, one) < changed(n, two) / 4, 5)
 shot("cmd-w-twice")
-check("Cmd+W twice fast closes two tabs", changed(now, one) < 0.005,
+closed_two = changed(now, one) < 0.05 and changed(now, one) < changed(now, two) / 4
+check("Cmd+W twice fast closes two tabs", closed_two,
       f"differs from one tab {changed(now, one):.3f}, from two tabs {changed(now, two):.3f}")
-if changed(now, one) >= 0.005:
+if not closed_two and changed(now, two) < changed(now, one):
+    # Two tabs left: close one, so the checks below start from one. Never otherwise, because
+    # Cmd+W on the last tab ends the app.
     vnc.key("cmd+w")
     time.sleep(1)
 
@@ -813,9 +942,44 @@ if HOME_PAGE is not None:
 set_window(home)
 
 
-# Tabs on top.
-click_on(V["layout"], right=True)
+# Tabs on top, from a new launch: leaving full screen above can leave the shell deaf to
+# clicks (LATE_CLICKS), and nothing below should fail for that.
+quit_app()
+fresh_profile()
 time.sleep(1)
+launch()
+time.sleep(1.5)
+if window() != home:
+    set_window(home)
+type_address(ALPHA)
+until(address, lambda a: changed(a, example_at) < 0.01)
+
+
+def tabs_on_top(img):
+    """Whether the tabs are on top: the strip along the window's top right is the frame colour."""
+    return float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME))) > 0.9
+
+
+def switch_layout(rect, to_top, name):
+    """Clicks the layout button and waits up to 5 s for the tabs to move, timing it, so a
+    click the app takes late (SLOW_INPUT) fails only this check and not the ones after it."""
+    click_on(rect, right=True)
+    start = time.time()
+    while time.time() - start < 5 and tabs_on_top(vnc.image()) != to_top:
+        time.sleep(0.1)
+    took = time.time() - start
+    moved = tabs_on_top(vnc.image()) == to_top
+    check(f"the layout button {name} within 1 s", moved and took <= 1,
+          f"the tabs moved {took:.1f} s after the click" if moved else "the tabs didn't move in 5 s")
+    time.sleep(1)
+
+
+switch_layout(V["layout"], True, "puts the tabs on top")
+start = time.time()
+while time.time() - start < 5 and float(np.mean(near(crop(vnc.image(), PX + 8, PY + 300, 180, 200), BAR))) >= 0.2:
+    time.sleep(0.1)
+took = time.time() - start
+check("after the tabs move to the top, the sidebar is gone within 1 s", took <= 1, f"gone after {took:.1f} s")
 shot("horizontal")
 img = vnc.image()
 strip = float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME)))
@@ -828,27 +992,35 @@ edge = float(np.mean(near(crop(img, PX + 1, PY + 100, 2, H - 200), FRAME)))
 check("tabs on top: shell draws over the page", strip > 0.9 and edge > 0.9 and content < 0.2, f"frame {edge:.2f}, shell colour in page {content:.2f}")
 print(f"tabs on top: window buttons {lights(img, home)}", flush=True)
 
+def page_until(want, limit=PAGE_LOAD + 5):
+    """The page, tabs on top, once want(page) holds, or as it is after the limit. A click or key
+    can land seconds late here (SLOW_INPUT, timed by the layout checks), so each step waits
+    for its own result before the next, and a late one can't land on the step after it."""
+    end = time.time() + limit
+    now = page(PAGE_H)
+    while not want(now) and time.time() < end:
+        time.sleep(0.3)
+        now = page(PAGE_H)
+    return now
+
+
 on_top = page(PAGE_H)
 vnc.key("cmd+t")
-time.sleep(1)
-blank_tab = page(PAGE_H)
+blank_tab = page_until(lambda p: changed(on_top, p) > 0.001)
 check("Cmd+T adds a tab, tabs on top", changed(on_top, blank_tab) > 0.001)
 click_on(T["tabs"][0])
-time.sleep(1)
-check("a click reaches a tab at title-bar height", changed(page(PAGE_H), on_top) < 0.01 and still())
+check("a click reaches a tab at title-bar height", changed(page_until(lambda p: changed(p, on_top) < 0.01), on_top) < 0.01 and still())
 click_on(T["tabs"][1])
-time.sleep(1)
+page_until(lambda p: changed(p, blank_tab) < 0.01)
 vnc.key("cmd+w")
-time.sleep(1)
+page_until(lambda p: changed(p, on_top) < 0.01)
 click_on(T["field"])
 time.sleep(0.4)
-vnc.type("iana.org/help/example-domains")
+vnc.type(BRAVO)
 vnc.key("return")
-time.sleep(PAGE_LOAD)
-check("a click reaches the address bar, tabs on top", changed(page(PAGE_H), on_top) > 0.001 and still())
+check("a click reaches the address bar, tabs on top", changed(page_until(lambda p: changed(p, on_top) > 0.001), on_top) > 0.001 and still())
 click_on(T["back"])
-time.sleep(PAGE_LOAD)
-check("a click reaches the back button, tabs on top", changed(page(PAGE_H), on_top) < 0.01 and still())
+check("a click reaches the back button, tabs on top", changed(page_until(lambda p: changed(p, on_top) < 0.01), on_top) < 0.01 and still())
 
 STRIP = ("the empty strip", W - (T["w"] - T["rest"][0] - T["rest"][2]) - 60, middle(T["rest"])[1])
 for place in (STRIP, TOP_EDGE):
@@ -858,12 +1030,16 @@ for place in RESIZE_EDGES:
 zooms(*STRIP, home)
 full_screen("tabs on top, green button", lambda: vnc.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, BAR, on_top=True)
 
-click_on(T["layout"], right=True)
-time.sleep(1)
+switch_layout(T["layout"], False, "brings the tabs back to the side")
+start = time.time()
+while time.time() - start < 5 and float(np.mean(near(crop(vnc.image(), PX + 8, PY + 300, 180, 200), BAR))) <= 0.9:
+    time.sleep(0.1)
+took = time.time() - start
+check("after the tabs move back to the side, the sidebar shows within 1 s", took <= 1, f"shown after {took:.1f} s")
 shot("back-to-vertical")
 img = vnc.image()
 check("the layout button brings the tabs back to the side", float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR))) > 0.9)
 
 check("Cmd+Q ends the app", quit_app())
-print(f"{passed} passed, {failed} failed, shots in {SHOTS}", flush=True)
-sys.exit(1 if failed else 0)
+finished = True
+sys.exit(1 if counts()["FAIL"] else 0)

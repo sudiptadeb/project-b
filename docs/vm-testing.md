@@ -46,7 +46,9 @@ Project B bugs, worst first:
    pointer over the new page, the first Cmd+T or Cmd+L landed 1.1 to 2.4 s late in most tries, and
    in 0.1 to 0.2 s in the last two full runs. Terminal under the same input was instant. The browser main thread sat
    idle in its event wait the whole time, so the key is queued behind the page's input, not stuck
-   on a busy thread.
+   on a busy thread. Clicks wait the same way: on 2026-11-11, in 0.2.22 and in 0.2.23 alike, a
+   click on the layout button right after the tabs moved, or right after a page loaded, took
+   effect 1.5 to 3 s later or was lost, and keys typed after it were partly lost.
 6. **The empty sidebar doesn't drag the window**, though double-clicking it zooms. Since then
    this is the design: only the empty spaces in the top row drag, and the sidebar is shell, so it
    neither drags nor zooms ([window-manager.md](window-manager.md)). `check.py` expects that.
@@ -126,21 +128,55 @@ Not tried, on purpose: `sudo`, the keychain, or anything that goes around the en
 
 ## Run it
 
+With nobody watching, one command from a DMG to a verdict:
+
     tools/vm/setup.sh                 # once: Tart, Python, the image, the VM
+    tools/vm/run.sh <DMG path or URL> # or tools/test.sh vm, on build/project-b.dmg or PB_DMG
+
+`run.sh` takes the VM's lock, starts the VM if it was stopped, installs the DMG, runs
+`check.py`, copies the app's crash reports from the VM, and stops the VM again if it started
+it. It writes everything to one folder, `~/PW_TOOLS/macos-vm/shots/<time>-<VM>`, which
+`shots/latest-<VM>` points to:
+
+- `summary.txt`: one line per check, `pass`, `known` or `FAIL`, and the verdict last.
+- `results.json`: the same, for a script.
+- `index.html`: the checks and every shot on one page.
+- `run.txt`: all it printed. `project_b-*.ips`: any crash reports.
+
+Exit 0 is a pass: every check passed, or failed only as a known bug. A check that fails
+because of a bug we know about is listed in `KNOWN` at the top of `check.py`, with the bug;
+it's reported as `known` and doesn't fail the run. When it passes, the line says the known bug
+didn't show, so the entry can go once the bug is fixed. Exit 1 is a new failure, or the checks
+stopped early (the app quit or crashed). Exit 2 is that it couldn't run: no DMG, another run
+holds the lock, or the VM didn't start.
+
+Nothing the checks open comes from the internet: `check.py` writes two one-colour pages into
+the VM and serves them there on `127.0.0.1:8765`. Every launch starts from a fresh profile with
+automatic update checks off, so no update notice comes up over a page.
+
+A check of whether something works waits up to several seconds for its result, and fails only
+if it never comes: the app can take a click seconds late (bug 5) and keep an old picture on
+screen for a second or two (bug 7), so a fixed wait failed a different check in most runs. Only
+the checks named "within" time things, and those that bugs 2, 5 and 7 can slow are known. On
+2026-11-11, five runs in a row on 0.2.24, each from a stopped VM, all passed, with three or four
+known failures each.
+
+By hand, a step at a time:
+
     tools/vm/start.sh                 # boots it and waits for the desktop
     tools/vm/install-dmg.sh <path or URL>
-    tools/test.sh vm                  # check.py, under the VM's own Python
+    ~/PW_TOOLS/macos-vm/venv/bin/python tools/vm/check.py
     tools/vm/stop.sh
 
 ### A second VM
 
 `PB_VM` names the VM every script here works on, `pb-test` by default. Each VM has its own
-amarit unit (`macos-vm-<VM>`), Screen Sharing address file (`vnc-url-<VM>`) and shared folder
-(`share-<VM>`), so two run side by side, for example one for the release checks
+amarit unit (`macos-vm-<VM>`), Screen Sharing address file (`vnc-url-<VM>`), shared folder
+(`share-<VM>`) and run lock, so two run side by side, for example one for the release checks
 and one for a feature's:
 
     PB_VM=pb-build tools/vm/setup.sh  # once: a VM of its own, from the image
-    PB_VM=pb-build tools/vm/start.sh
+    PB_VM=pb-build tools/vm/run.sh <DMG>
 
 Each VM is made from the image, not from another VM, so they share nothing. Tart clones the
 image with APFS's copy-on-write, so a new VM takes little disk until it changes. macOS runs at

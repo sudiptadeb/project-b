@@ -13,6 +13,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [menus-shortcuts.md](menus-shortcuts.md): the design for actions, menus and key bindings, not built yet; Chrome's full list is in [chrome-shortcuts.md](chrome-shortcuts.md).
 - [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
 - [android.md](android.md): the same shell and managers on Android's content layer, built in a Linux VM on this Mac.
+- [extensions.md](extensions.md): Chrome extensions, a build-time feature that is off by default: the layers, the mock store, the flag, and the checks left out on purpose.
 
 ## Daily commands
 
@@ -26,6 +27,14 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 
 `PB_BIN` picks another Mac binary and `PB_APK` another APK. The README's "Test it" says what
 each group needs.
+
+## A build with extensions
+
+    tools/fetch-extensions.sh && tools/pack-test-extension.py    # the mock store's folder, once
+    EXTENSIONS=1 OUT=out/ext tools/build.sh                      # its own folder; the first build is a full one
+    EXTENSIONS=1 tools/test.sh mock app                          # the extension checks of both groups
+
+Off by default, and no release is built with it. [extensions.md](extensions.md) has the rest.
 
 ## Shipping a build to try
 

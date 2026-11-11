@@ -26,6 +26,12 @@ Take an item off when it lands or is dropped.
 - **Slowness, fixed at the cause, never masked:** a stale picture after a resize, and a brief
   flash at launch. The rejected masking attempts are on branch `parked-window`.
 - **Android:** the colour before Go starts. See [android.md](android.md#the-shell-on-a-phone).
+- **Extensions: the checks left out, and what is open.** A build with `EXTENSIONS=1` installs
+  and runs Chrome extensions from a mock store. Every check skipped on purpose (hashes,
+  publisher proof, blocklist, policy, content verification, host scrubbing) and every open
+  behaviour is listed in [extensions.md](extensions.md#checks-to-discuss). No release carries
+  the flag until those are decided, and until the URL policy above covers what extensions
+  request.
 
 ## Decided, not started
 

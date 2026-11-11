@@ -132,13 +132,28 @@ Not tried, on purpose: `sudo`, the keychain, or anything that goes around the en
     tools/test.sh vm                  # check.py, under the VM's own Python
     tools/vm/stop.sh
 
+### A second VM
+
+`PB_VM` names the VM every script here works on, `pb-test` by default. Each VM has its own
+amarit unit (`macos-vm-<VM>`), Screen Sharing address file (`vnc-url-<VM>`) and shared folder
+(`share-<VM>`), so two run side by side, for example one for the release checks
+and one for a feature's:
+
+    PB_VM=pb-build tools/vm/setup.sh  # once: a VM of its own, from the image
+    PB_VM=pb-build tools/vm/start.sh
+
+Each VM is made from the image, not from another VM, so they share nothing. Tart clones the
+image with APFS's copy-on-write, so a new VM takes little disk until it changes. macOS runs at
+most two macOS VMs at once. A new VM asks once for tart-guest-agent to control System Events
+(see Calibration).
+
 What the checks need, and what they say when it's missing:
 
 - **The VM's own Python**, `~/PW_TOOLS/macos-vm/venv/bin/python`, which `setup.sh` makes with
   numpy, pillow and cryptography. The system's Python has none of them, and `check.py` and
   `rfb.py` say so under it. `tools/test.sh vm` uses the right one.
 - **The VM running**, by `start.sh`, which needs the desktop login below once per boot.
-- **`~/PW_TOOLS/macos-vm/vnc-url`**, the VM's Screen Sharing address. `start.sh` writes it
+- **`~/PW_TOOLS/macos-vm/vnc-url-<VM>`**, the VM's Screen Sharing address. `start.sh` writes it
   when the desktop is up and `stop.sh` removes it. If the VM runs and the file is gone,
   run `start.sh` again: it leaves a running VM alone and only writes the address.
 - **The app installed in the VM**, by `install-dmg.sh`.
@@ -150,7 +165,7 @@ To drive it by hand, with coordinates in points:
 
     rfb.py shot out.png | click X Y | dbl X Y | move X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
 
-Run those with the VM's Python. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
+Run those with the VM's Python, with `PB_VM` set for a VM other than `pb-test`. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
 runs a command inside the VM with no password and no network.
 
 ## Decisions

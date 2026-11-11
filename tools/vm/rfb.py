@@ -21,7 +21,8 @@ import time
 from urllib.parse import urlparse
 
 VM_HOME = os.path.expanduser("~/PW_TOOLS/macos-vm")
-URL_FILE = VM_HOME + "/vnc-url"
+VM = os.environ.get("PB_VM", "pb-test")  # vars.sh says which VM; start.sh writes its address.
+URL_FILE = f"{VM_HOME}/vnc-url-{VM}"
 
 
 def refuse(message):

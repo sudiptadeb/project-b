@@ -9,6 +9,7 @@ RUNNING="tart run .* $VM\$"
 
 if ! pgrep -f "$RUNNING" > /dev/null; then
     rm -f "$VNC_URL_FILE"
+    mkdir -p "$SHARE"
     # stop.sh keeps the unit: amarit run on a unit removed seconds earlier stops the new
     # process at once.
     if amarit ls | awk -v unit="$UNIT" '$1 == unit {found = 1} END {exit !found}'; then

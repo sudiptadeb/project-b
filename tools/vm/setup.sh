@@ -1,6 +1,9 @@
 #!/bin/bash
 # One time: installs Tart and the VNC client's Python under ~/PW_TOOLS/macos-vm, pulls the
 # macOS image and makes the VM. Needs no sudo. Safe to run again.
+#
+# PB_VM names the VM, pb-test by default. Each VM is made from the image on its own, so none
+# depends on another; Tart clones the image with APFS's copy-on-write.
 set -eu
 . "$(dirname "$0")/vars.sh"
 

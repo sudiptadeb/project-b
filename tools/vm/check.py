@@ -22,7 +22,7 @@ import numpy as np
 
 VM_HOME = rfb.VM_HOME
 TART = VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
-VM = "pb-test"
+VM = rfb.VM
 SHOTS = time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
 BUNDLE_ID = "dev.projectb.browser"
 APP = "/Applications/Project B.app"

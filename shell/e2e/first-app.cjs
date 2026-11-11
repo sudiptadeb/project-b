@@ -21,6 +21,10 @@ execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'co
 
 let server;
 async function startServer(extra = []) {
+  // A server left over from another run would answer in ours' place.
+  if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
+    throw new Error(`port ${port} already has a server: stop it and run again`);
+  }
   server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, '-block=blocked.test', ...extra], { stdio: 'ignore' });
   for (let i = 0; i < 100; i++) {
     try {

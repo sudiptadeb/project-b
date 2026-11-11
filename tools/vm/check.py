@@ -68,6 +68,17 @@ def window():
     return (w["X"], w["Y"], w["Width"], w["Height"])
 
 
+def window_or_stop(name):
+    """The app's window, for a check that needs one. With none, the app has quit or crashed
+    and nothing after this can run: the check fails and the run ends with its count."""
+    win = window()
+    if win is None:
+        check(name, False, "no window: the app is gone, so the checks after this can't run")
+        print(f"{passed} passed, {failed} failed, stopped early, shots in {SHOTS}", flush=True)
+        sys.exit(1)
+    return win
+
+
 def set_window(box):
     """Puts the window back between checks. Done inside the VM: it isn't what's being tested."""
     x, y, w, h = box
@@ -238,10 +249,7 @@ def quit_app():
 def drags(name, x, y, home, expect="moves the window"):
     """expect is "moves the window", "resizes the window" for the edges AppKit keeps for
     itself, or "leaves the window alone"."""
-    win = window()
-    if win is None:
-        check(f"dragging {name} {expect}", False, "no window: the app is gone")
-        return
+    win = window_or_stop(f"dragging {name} {expect}")
     vnc.drag(win[0] + x, win[1] + y, win[0] + x + MOVE[0], win[1] + y + MOVE[1])
     time.sleep(0.6)
     now = window()
@@ -258,10 +266,7 @@ def drags(name, x, y, home, expect="moves the window"):
 
 def zooms(name, x, y, home):
     """Zoom grows both ways. Double-clicking a window edge grows just one, so it doesn't count."""
-    win = window()
-    if win is None:
-        check(f"double-clicking {name} zooms", False, "no window: the app is gone")
-        return
+    win = window_or_stop(f"double-clicking {name} zooms")
     vnc.dbl(win[0] + x, win[1] + y)
     time.sleep(ANIMATION)
     now = window()
@@ -275,7 +280,7 @@ def selects_text(home):
     time.sleep(0.4)
     vnc.type("select these words")
     time.sleep(0.3)
-    win = window()
+    win = window_or_stop("dragging across the address field selects text, not the window")
     text = V["field"][0] + 12  # The input's padding.
     vnc.drag(win[0] + text + 10, win[1] + TOP, win[0] + text + 90, win[1] + TOP)
     time.sleep(0.6)

@@ -27,10 +27,12 @@ SHOTS = time.strftime(VM_HOME + "/shots/%Y%m%d-%H%M%S")
 BUNDLE_ID = "dev.projectb.browser"
 APP = "/Applications/Project B.app"
 SCREEN = (1440, 900)
-FRAME = (15, 170, 170)  # --frame and --accent
-BAR = (226, 242, 242)  # --bar
+# The default frame colour, #4f9e9e (core/prefs/prefs.go), and the light tones the shell
+# makes from it (shell/src/tones.js). A fresh profile has these.
+FRAME = (79, 158, 158)  # --frame and --accent
+BAR = (232, 242, 242)  # --bar, the frame mixed 0.87 toward white
 WHITE = (255, 255, 255)  # --surface
-ICON = (11, 143, 143)  # --icon, the toolbar's buttons
+ICON = (66, 133, 133)  # --icon, the toolbar's buttons: the frame mixed 0.16 toward black
 PAGE_LOAD = 3.0
 ANIMATION = 2.0
 MOVE = (60, 40)

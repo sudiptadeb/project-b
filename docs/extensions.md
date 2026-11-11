@@ -10,11 +10,16 @@ This is the design as built. The research behind it is in
     EXTENSIONS=1 OUT=out/ext tools/build.sh       # a build with extensions, in a folder of its own
     chromium/src/out/ext/project_b
 
-Then press the puzzle piece in the toolbar, Manage extensions, set the store's address to
-`http://127.0.0.1:8766`, and install.
+The store is a website. Started like that, the store is the Chrome Web Store: visit
+`chromewebstore.google.com` and press "Add to Chrome". To make the mock store the store:
 
-What works today, in the real app: the test extension and uBlock Origin Lite install from the
-mock store, with the prompt; uBlock Origin Lite blocks, and shows its count on its button;
+    chromium/src/out/ext/project_b --apps-gallery-url=http://127.0.0.1:8766 \
+        --apps-gallery-download-url=http://127.0.0.1:8766/download/%s
+
+and visit `http://127.0.0.1:8766/`.
+
+What works today, in the real app: uBlock Origin Lite installs from the real Chrome Web Store's
+page, and it and the test extension from the mock store's page, each with the prompt; uBlock Origin Lite blocks, and shows its count on its button;
 content scripts, service workers, messaging and `chrome.storage` run; buttons pin and unpin;
 popups open, size themselves and take clicks; Load unpacked and a local `.crx` install; and all
 of it is there again after a restart.
@@ -94,10 +99,9 @@ profile with no incognito, kiosk, guest or policy side, most answers are one lin
 
 The tab ids `//extensions` sees are the engine's own, which are Go's. There is one window, id 1.
 
-**What `//extensions` insisted on that we don't use.** It would not start, or its installer
+**What `//extensions` insisted on.** It would not start, or its installer
 would not run, without each of these, so each exists with nothing behind it:
 
-- a delegate for the web store's private API (`api_client.cc`). No page can reach that API here;
 - a registry for the schemes an extension handles, which tells macOS nothing;
 - a blocklist with no list, an install tracker and an install stage tracker (`extensions.cc`);
 - a policy client that allows everything, and a hold on the profile that holds nothing
@@ -134,18 +138,45 @@ the extension, so the engine reads it and gives Go the picture as a data: URL. A
 message's sender is in (`sender.tab`) is asked of Go by the engine itself, as `tabs.get` with no
 extension.
 
-## Installing, and the mock store
+## Installing: the store is a website
 
-Installs come from a store the browser knows by one setting, its address. There is no default,
-and nothing points at Google. Not `webstorePrivate`, and no policy install of any kind.
+An extension is installed from a store's own page, as in Chrome. The page calls
+`chrome.webstorePrivate`, an API `//extensions` implements and gives only to the store's origin:
 
-1. The settings page shows the store's catalogue, which Go fetched (`core/extensions/store.go`).
-2. Install: Go downloads the package into the profile and hands the file to the engine.
-3. `CrxInstaller` unpacks it in a sandboxed process and asks. The prompt goes to Go and on to
-   the settings page, which shows the manifest's permission names as written.
-4. On yes, `//extensions` records it and loads it, and tells Go, which tells the shell.
+1. "Add to Chrome" on the page calls `beginInstallWithManifest3` with the extension's id,
+   manifest and icon. `//extensions` asks its embedder to show a prompt. Ours goes to Go, and
+   the shell shows it over the page, with the manifest's permission names as written.
+2. On yes the page calls `completeInstall`. `//extensions`' `WebstoreInstaller` downloads the
+   package and hands it to `CrxInstaller`, which unpacks it in a sandboxed process, records it
+   and loads it. The registry tells Go, which tells the shell.
 
-A local `.crx` takes the same path from step 2. "Load unpacked" loads a folder, as Chrome's does.
+**Which origins are a store.** `chromewebstore.google.com` has the API by `//extensions`' own
+rule. One more origin can be named on the command line with `--apps-gallery-url`, which is
+Chromium's own switch for testing a store (`extensions/common/webstore_override.cc`); we turn
+its check on and copy the switch to renderers. That is how the mock store's page gets the API.
+It names one origin, so there are at most two stores at once: Google's and that one.
+
+**Where packages come from.** `WebstoreInstaller` builds one download address for every
+install: Google's update endpoint, or the template in `--apps-gallery-download-url`. So with the
+mock store's two switches, an install begun on Google's page would also be fetched from the mock
+store. The app as it ships passes neither switch, and everything is Google's.
+
+**The download** goes through content's `DownloadManager`, as in Chrome. It needed nothing from
+us: with no download manager delegate, content saves to the path the installer forces (a
+temporary file under the profile's `Webstore Downloads`), and the installer deletes it. No
+other download behaves differently, and there is still no general download feature.
+
+**What the store's page made us add**, each because the real page calls it or the installer
+dereferences it: `chrome.management` with a delegate of ours (`management_delegate.cc`; the
+page listens for installs and has a Remove button), an image decoder for the icon, the
+browser's version in the download address (Google answers nothing without it), an install
+verifier that is never started, a shared module service, and the prefs of an enterprise
+banner the page asks about.
+
+A local `.crx` (Install package… in the extension manager) goes straight to `CrxInstaller`, which
+asks with the same prompt, shown in the settings page. "Load unpacked" loads a folder, with no
+prompt, as Chrome's does. The extension manager has a link that opens the Chrome Web Store in a
+tab.
 
 Removing an extension removes what it stored too: everything kept under its origin, its
 `chrome.storage`, and for a packaged one its files.
@@ -153,7 +184,12 @@ Removing an extension removes what it stored too: everything kept under its orig
 **The mock store** is `core/cmd/extstore`, a separate small Go program on `127.0.0.1`. It serves
 the folder `tools/fetch-extensions.sh` fills, `.tools/extensions/`, which git ignores:
 
+- `GET /`: the store's page: the catalogue, with an "Add to Project B" button for each, which
+  makes the same two `chrome.webstorePrivate` calls the Chrome Web Store's page makes.
 - `GET /catalogue.json`: one entry per extension: id, name, version, description, size, package, icon.
+- `GET /manifest/<id>`: an extension's manifest, which the page hands the browser.
+- `GET /download/<id>`: its package, as `application/x-chrome-extension`, where the browser
+  fetches it to install.
 - `GET /crx/<id>_<version>.crx`: the package, byte for byte as fetched.
 - `GET /icon/<id>.png`.
 - `GET /update?x=id%3D<id>%26v%3D<version>%26uc`: gupdate XML in the Web Store's shape. Nothing reads it yet.
@@ -212,22 +248,26 @@ flag in one folder rebuilds our own files and links again, under a minute, becau
   popup it finds open, and any other press in the shell asks Go to close it.
 - **Settings, Extensions.** Installed: enable, pin, remove, and details (id, version, source,
   permissions, site access). "Load unpacked" and "Install package…" open the system's panel.
-  Store: the address, and the catalogue with Install. The install prompt is a dialog there.
+  Store: a link that opens the Chrome Web Store in a tab.
+- **The install prompt** is one dialog, shown by the shell over the page for an install a
+  store's page began, and by the settings page for a package picked there.
 
 ## Tests
 
 `EXTENSIONS=1` adds to two of the existing groups.
 
 - `EXTENSIONS=1 tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
-  tests: the store, the prompt, load unpacked, pins, the popup, and the `tabs` and `action` APIs,
-  on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 40 checks: the same
+  tests: the prompt in both pages, a package, load unpacked, pins, the popup, and the `tabs` and
+  `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 38 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
-- `EXTENSIONS=1 tools/test.sh app`: `tools/drive_extensions.py`, 28 checks on the real app built
-  with the flag (`PB_BIN`, or `chromium/src/out/ext/project_b`): it installs the test extension
-  and uBlock Origin Lite from the mock store, sees the content script run and an ad host
-  blocked, pins and unpins, opens the popup and clicks in it, restarts, turns one off and
-  removes it. It needs the network, for the ad host.
+- `EXTENSIONS=1 tools/test.sh app`: `tools/drive_extensions.py`, 36 checks on the real app built
+  with the flag (`PB_BIN`, or `chromium/src/out/ext/project_b`). Started with the mock store as
+  its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
+  sees the content script run and an ad host blocked, pins and unpins, opens the popup and
+  clicks in it, restarts, turns one off and removes it. Then, started as it ships, it opens the
+  Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
+  "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
 - `tools/test.sh app`, without the flag, also runs `tools/check_no_extensions.py`: the library
   has no symbol of namespace `extensions`, and the main binary none of Go's extension packages.
 
@@ -245,12 +285,11 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 **At the store and before install**
 
-- The package's SHA-256 is not checked against anything: not by the fetch script, not by the
-  store, not by Go after the download.
-- The fetch script does not check that what it downloaded is a CRX.
-- Go does not check that the installed id is the one the catalogue named.
-- The store's address is taken as typed: no scheme rule, no allow-list, no TLS requirement.
-- No size limit on a download.
+- A package from the mock store is not checked against anything the store said: no hash, no
+  size. The fetch script that fills the mock store checks neither a hash nor that a file is a CRX.
+- Any origin named with `--apps-gallery-url` is a store, over plain http too.
+- A store page's Remove button removes at once. Chrome asks "Remove?" first.
+- The supervised-user question (a child needing a parent's yes) is always answered no.
 
 **In the installer**
 
@@ -258,7 +297,10 @@ Every check below was left out on purpose, to be discussed and then built or dro
   key. Google's publisher proof, which a Web Store package also carries, is not required.
 - No blocklist: `GetBlocklist` answers nothing, so Chrome's malware list is never consulted.
 - No management policy: nothing can forbid an extension, a permission or a host.
-- No off-store rule: any CRX3 from any file installs.
+- No off-store rule: any CRX3 from any file installs. A package downloaded for a store's page
+  is held to the same plain `CRX3`, not to the publisher proof Chrome demands of its store.
+- The install verifier, which in Chrome checks that an installed extension came from the store,
+  exists and is never started.
 - An update that asks for more permissions installs like any other. Chrome disables such an
   update until the user agrees.
 
@@ -295,8 +337,6 @@ Every check below was left out on purpose, to be discussed and then built or dro
   tested beyond that. 1Password needs `nativeMessaging` and Grammarly `identity`.
 - **What the first launch after a link costs.** Twice, the first start of a freshly linked
   extensions build printed nothing for a minute, and the next start was normal. Not looked into.
-- **The store's default address is undecided.** Today there is none, and a new profile shows
-  an empty store until one is set. The owner's word so far: "Store defaults to chrome store for
-  now... we can change it to mock or just visit mock store for testing". What "chrome store"
-  means for a store that is a catalogue and package files, which Google's isn't, is a question
-  still to put to him. Nothing is built for it.
+- **The store** is decided: it is a website, the Chrome Web Store by default, and the mock
+  store when the two switches name it. Left open by how Chromium's installer works: there is
+  one download address for all installs, so the two stores can't both install in one run.

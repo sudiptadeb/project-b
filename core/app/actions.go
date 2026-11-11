@@ -29,7 +29,7 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	add("app.showAll", "Show All", func() { e.AppCommand(engine.AppShowAll) })
 	add("app.quit", "Quit Project B", closeWindow)
 
-	add("tab.new", "New Tab", func() { a.Tabs.Create() })
+	add("tab.new", "New Tab", func() { a.Shell.Interaction("tab.new", func() { a.Tabs.Create() }) })
 	add("address.focus", "Open Location…", a.Shell.FocusAddressBar)
 	add("window.close", "Close Window", closeWindow)
 	// The settings page sits over the tabs like a tab of its own, so closing the tab
@@ -39,7 +39,7 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 			a.Settings.Close()
 			return
 		}
-		a.Tabs.CloseActive()
+		a.Shell.Interaction("tab.close", a.Tabs.CloseActive)
 	})
 
 	for _, c := range []struct {
@@ -58,9 +58,9 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 		add(c.id, c.title, func() { e.Edit(c.cmd) })
 	}
 
-	side := add("view.tabsSide", "Tabs on Side", func() { a.Prefs.SetTabLayout(prefs.TabsVertical) })
+	side := add("view.tabsSide", "Tabs on Side", func() { a.Shell.SwitchTabLayout(prefs.TabsVertical) })
 	side.Checked = func() bool { return a.Prefs.TabLayout() == prefs.TabsVertical }
-	top := add("view.tabsTop", "Tabs on Top", func() { a.Prefs.SetTabLayout(prefs.TabsHorizontal) })
+	top := add("view.tabsTop", "Tabs on Top", func() { a.Shell.SwitchTabLayout(prefs.TabsHorizontal) })
 	top.Checked = func() bool { return a.Prefs.TabLayout() == prefs.TabsHorizontal }
 
 	stop := add("nav.stop", "Stop", a.Tabs.Stop)

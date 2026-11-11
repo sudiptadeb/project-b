@@ -40,7 +40,6 @@ import "C"
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,6 +47,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"projectb/app"
@@ -194,8 +194,11 @@ var (
 
 //export PBStart
 func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char) {
+	timeline.Mark("go.starting")
 	if table := C.GoString(hookTable); table != content.TableHash {
-		log.Fatalf("the library's hook table is %s, Go's is %s: regenerate with tools/gen_hooks.py and rebuild", table, content.TableHash)
+		timeline.Errorf("the library's hook table is %s, Go's is %s: regenerate with tools/gen_hooks.py and rebuild", table, content.TableHash)
+		timeline.Close()
+		os.Exit(1)
 	}
 	// The table is C memory that lives as long as the process.
 	native = &nativeEngine{calls: calls}
@@ -213,10 +216,47 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)
+	timeline.Mark("go.started")
 }
 
 //export PBStop
-func PBStop() { theApp.Stop() }
+func PBStop() {
+	theApp.Stop()
+	timeline.Close()
+}
+
+// The timeline's kinds as they cross, PBTimelineKind in pb_abi.h.
+var timelineKinds = []timeline.Kind{timeline.KindMark, timeline.KindBegin, timeline.KindEnd, timeline.KindInfo, timeline.KindWarn, timeline.KindError}
+
+// PBTimelineStart starts the timeline: its file goes in the profile, and time zero is
+// processAge nanoseconds ago.
+//
+//export PBTimelineStart
+func PBTimelineStart(profileDir *C.char, processAge C.int64_t) {
+	timeline.Start(C.GoString(profileDir), time.Duration(processAge), printer())
+}
+
+// PBTimelineNow is the time on the timeline, in nanoseconds since process start. The
+// adapter reads it once, to place its own clock on ours.
+//
+//export PBTimelineNow
+func PBTimelineNow() C.int64_t { return C.int64_t(timeline.NowNanos()) }
+
+// PBTimelineRecord records one entry from the adapter, on any thread. t is its time, or
+// -1 for now.
+//
+//export PBTimelineRecord
+func PBTimelineRecord(kind C.int32_t, t C.int64_t, name *C.char, nameLen C.size_t, text *C.char, textLen C.size_t) {
+	timeline.Record(timelineKinds[kind], timeline.SrcEngine, C.GoStringN(name, C.int(nameLen)), C.GoStringN(text, C.int(textLen)), int64(t))
+}
+
+// PBTimelinePageOrigin says when one of our pages' own clock started: see
+// timeline.PageOrigin.
+//
+//export PBTimelinePageOrigin
+func PBTimelinePageOrigin(page *C.char, t C.int64_t) {
+	timeline.PageOrigin(C.GoString(page), int64(t))
+}
 
 //export PBRunPosted
 func PBRunPosted() {

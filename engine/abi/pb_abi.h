@@ -8,7 +8,7 @@
 // core/content/hooks_gen.go by tools/gen_hooks.py.
 //
 // Threading: every call in both directions happens on the main thread, except
-// post_wakeup, which any thread may call.
+// post_wakeup and the timeline's calls, which any thread may make.
 //
 // Strings are only valid for the length of the call. Whoever keeps one copies it.
 
@@ -114,6 +114,16 @@ typedef enum PBWindowRequest {
   PB_WINDOW_FULL_SCREEN = 4,
 } PBWindowRequest;
 
+// What an entry on the timeline is. Matches timelineKinds in core/cmd/lib/main.go.
+typedef enum PBTimelineKind {
+  PB_TIMELINE_MARK = 0,   // a moment
+  PB_TIMELINE_BEGIN = 1,  // a span's two ends
+  PB_TIMELINE_END = 2,
+  PB_TIMELINE_INFO = 3,   // a line of log
+  PB_TIMELINE_WARN = 4,
+  PB_TIMELINE_ERROR = 5,
+} PBTimelineKind;
+
 // What Go can ask the adapter to do. Handed over once, at start.
 typedef struct PBEngineCalls {
   // Makes a hidden tab. show_tab shows one tab and hides the rest.
@@ -193,6 +203,22 @@ typedef struct PBGoCalls {
   // The switches the flags saved in the profile ask for, one per line, such as
   // "--pb-extensions". Called once, before content starts. The caller frees it.
   char* (*launch_switches)(const char* profile_dir);
+
+  // The timeline, Go's record of what happened and when (core/timeline). The adapter
+  // uses these through engine/browser/timeline.h. Times are nanoseconds since process
+  // start. timeline_start comes first: the file goes in the profile, and the process
+  // is already process_age old.
+  void (*timeline_start)(const char* profile_dir, int64_t process_age);
+  int64_t (*timeline_now)(void);
+  // kind is a PBTimelineKind; t is the entry's time, or -1 for now.
+  void (*timeline_record)(int32_t kind,
+                          int64_t t,
+                          const char* name,
+                          size_t name_length,
+                          const char* text,
+                          size_t text_length);
+  // The moment one of our pages' own clock started, by its channel's name.
+  void (*timeline_page_origin)(const char* page, int64_t t);
 } PBGoCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_ABI_H_

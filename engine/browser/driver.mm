@@ -302,11 +302,10 @@ void Stats(const std::string& id) {
   NSWindow* window = TheWindow();
   Reply(id, base::StringPrintf(
                 "{\"cgoCallNs\":%.1f,\"hookOffNs\":%.1f,\"hookOnNs\":%.1f,"
-                "\"firstPaintMs\":%lld,\"go\":%s,"
+                "\"go\":%s,"
                 "\"key\":%d,\"main\":%d,\"visible\":%d,\"occlusionVisible\":%d,"
                 "\"ignoredStaleBounds\":%zu}",
                 ns, hook_off_ns, hook_on_ns,
-                Engine::Get()->shell()->first_paint().InMilliseconds(),
                 go_stats.c_str(), window.isKeyWindow, window.isMainWindow,
                 window.isVisible,
                 (window.occlusionState & NSWindowOcclusionStateVisible) != 0,
@@ -451,6 +450,14 @@ void Run(const std::string& line) {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {
     Stats(id);
+  } else if (cmd == "timeline") {
+    // The timeline kept in memory after entry <since>, as ProjectB.getTimeline answers.
+    hooks::Args args;
+    args.Str("ProjectB.getTimeline");
+    args.Str("{\"since\":" + (parts.size() > 2 ? parts[2] : "0") + "}");
+    PBValue result{};
+    hooks::Ask(PB_EVENT_DEVTOOLS_COMMAND, args, &result);
+    Reply(id, hooks::TakeString(result));
   } else if (cmd == "color") {
     NSColor* c = [TheWindow().backgroundColor
         colorUsingColorSpace:NSColorSpace.sRGBColorSpace];

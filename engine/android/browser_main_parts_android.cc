@@ -13,6 +13,7 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/shell_page.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 
 namespace project_b {
@@ -45,6 +46,7 @@ BrowserMainParts* BrowserMainParts::Get() {
 // Android owns the message loop and the window, so the window can't come first here as it does on
 // the Mac. Java asks for StartApp once content says it's ready.
 int BrowserMainParts::PreMainMessageLoopRun() {
+  timeline::Mark("content.ready");
   CHECK(base::CreateDirectory(ChromiumDataDir()));
   browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
   RegisterShellWebUI(browser_context_.get());
@@ -53,7 +55,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 
 void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
   window_ = std::make_unique<Window>(base::DoNothing());
+  timeline::Mark("window.created");
   shell_ = std::make_unique<ShellPage>(browser_context_.get());
+  timeline::Mark("shell.created");
   window_->SetShellContents(shell_->contents());
   engine_ = std::make_unique<Engine>(browser_context_.get(), window_.get(),
                                      shell_.get());

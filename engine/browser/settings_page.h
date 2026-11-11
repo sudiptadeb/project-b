@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "build/build_config.h"
-
+#include "content/public/browser/web_contents_observer.h"
 #include "project_b/engine/browser/hooks_gen.h"
 
 namespace content {
@@ -22,7 +22,8 @@ inline constexpr int64_t kSettingsPageId = -1;
 // The settings page: chrome://settings/, an app of its own in a WebContents of its own, over the whole
 // window while it is open, so the shell never carries it. It talks to Go as the shell
 // does, under its own message name.
-class SettingsPage : public WebContentsDelegateHooks {
+class SettingsPage : public content::WebContentsObserver,
+                     public WebContentsDelegateHooks {
  public:
   explicit SettingsPage(content::BrowserContext* browser_context);
   SettingsPage(const SettingsPage&) = delete;
@@ -34,6 +35,9 @@ class SettingsPage : public WebContentsDelegateHooks {
   void Send(const std::string& json);
 
  private:
+  // content::WebContentsObserver:
+  void DidFinishNavigation(content::NavigationHandle* handle) override;
+
   // content::WebContentsDelegate:
   content::WebContents* hook_contents() const override;
   bool HandleKeyboardEvent(content::WebContents* source,

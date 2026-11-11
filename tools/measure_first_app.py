@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Numbers for the first app: startup, memory, boundary cost, overlay cost."""
+"""Numbers for the first app: memory, boundary cost, overlay cost. Start-up and
+responsiveness are tools/measure.py's, from the app's timeline."""
 
 import importlib.util
 import json
@@ -31,17 +32,7 @@ def cpu_seconds(pids):
 
 
 def main():
-    print("== first paint, warm, milliseconds after process start")
     profile = tempfile.mkdtemp(prefix="pb-measure-")
-    samples = []
-    for _ in range(6):
-        app = drive.App(profile)
-        app.wait("!!document.querySelector('input')", 30)
-        time.sleep(0.2)
-        samples.append(json.loads(app.cmd("stats", timeout=60))["firstPaintMs"])
-        app.close()
-    print(samples, "median", sorted(samples)[len(samples) // 2], flush=True)
-
     app = drive.App(profile)
     app.wait("!!document.querySelector('input')", 30)
     drive.visit(app, "https://example.com/")

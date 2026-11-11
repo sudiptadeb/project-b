@@ -49,6 +49,8 @@ source_set("browser") {
     "../browser/settings_page.h",
     "../browser/shell_page.cc",
     "../browser/shell_page.h",
+    "../browser/timeline.cc",
+    "../browser/timeline.h",
     "../browser/window.h",
     "../browser_main_delegate.cc",
     "../browser_main_delegate.h",

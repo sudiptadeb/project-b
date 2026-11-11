@@ -25,6 +25,7 @@
 #include "project_b/engine/browser/mac_app.h"
 #endif
 #include "project_b/engine/browser/shell_page.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
 #include "ui/gfx/geometry/rect_f.h"
@@ -495,11 +496,13 @@ void Engine::OpenSettings() {
     return;
   }
   settings_ = std::make_unique<SettingsPage>(browser_context_);
+  timeline::Mark("settings.open.created");
 #if BUILDFLAG(IS_ANDROID)
   window_->SetOverlayContents(settings_->contents());
 #else
   window_->SetOverlayView(settings_->contents()->GetNativeView());
 #endif
+  timeline::Mark("settings.open.shown");
   settings_->Load();
   settings_->contents()->Focus();
 }

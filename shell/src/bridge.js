@@ -2,11 +2,13 @@
 // global the main process calls. Under the mock it's HTTP. Nothing else knows. The shell
 // and the settings page each have a channel: 'shell' or 'settings'.
 
+import { timeline } from '@/timeline.js';
+
 const real = typeof window.chrome?.send === 'function';
 
 export function bridge(channel) {
   let sending = Promise.resolve();
-  return {
+  const b = {
     // send delivers one command, in order.
     send(msg) {
       const body = JSON.stringify(msg);
@@ -30,8 +32,21 @@ export function bridge(channel) {
       events.onopen = onOpen;
     },
   };
+  // The page's entries on the app's timeline go the same way.
+  b.timeline = timeline(channel, b.send);
+  return b;
 }
 
 const shell = bridge('shell');
-export const send = shell.send;
 export const listen = shell.listen;
+export const { mark, end, painted, firstPaint } = shell.timeline;
+
+// The commands that start an interaction the timeline measures, and its span. The span
+// begins here, at the user's click, and Go has the shell end it once the result is drawn.
+const spans = { newTab: 'tab.new', closeTab: 'tab.close', setTabLayout: 'tabs.layout' };
+
+export function send(msg) {
+  const span = msg.t === 'run' && msg.text === 'app.settings' ? 'settings.open' : spans[msg.t];
+  if (span) shell.timeline.begin(span);
+  shell.send(msg);
+}

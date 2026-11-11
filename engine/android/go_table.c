@@ -19,6 +19,10 @@ JNIEXPORT jlong JNICALL Java_dev_projectb_browser_GoCore_table(JNIEnv* env, jcla
       .go_stats = PBGoStats,
       .version = PBVersion,
       .launch_switches = PBLaunchSwitches,
+      .timeline_start = PBTimelineStart,
+      .timeline_now = PBTimelineNow,
+      .timeline_record = PBTimelineRecord,
+      .timeline_page_origin = PBTimelinePageOrigin,
   };
   return (jlong)(intptr_t)&go;
 }

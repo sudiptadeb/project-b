@@ -4,6 +4,7 @@
 #include "base/android/library_loader/library_loader_hooks.h"
 #include "content/public/app/content_jni_onload.h"
 #include "content/public/app/content_main.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser_main_delegate.h"
 
 namespace {
@@ -23,6 +24,8 @@ bool InitializeNative(
 
 JNI_EXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   base::android::InitVM(vm);
+  // Kept until the main process starts the timeline; a child's is never read.
+  project_b::timeline::Mark("main.entered");
   base::android::SetNativeInitializationHook(InitializeNative);
   return JNI_VERSION_1_4;
 }

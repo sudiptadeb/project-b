@@ -5,11 +5,13 @@
 
 #include "base/base64.h"
 #include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
 #include "ui/base/window_open_disposition.h"
@@ -36,10 +38,19 @@ PageTab::~PageTab() {
 // A page coming back from history already has its icon and may not announce it again.
 void PageTab::DidFinishNavigation(content::NavigationHandle* handle) {
   if (handle->IsInPrimaryMainFrame() && handle->HasCommitted() &&
+      !handle->IsSameDocument()) {
+    timeline::Mark("tab.committed", "tab=" + base::NumberToString(id_));
+  }
+  if (handle->IsInPrimaryMainFrame() && handle->HasCommitted() &&
       !handle->IsErrorPage() && !contents_->GetFaviconURLs().empty()) {
     FetchFavicon(contents_->GetFaviconURLs());
   }
   WebContentsObserverHooks::DidFinishNavigation(handle);
+}
+
+void PageTab::DidFirstVisuallyNonEmptyPaint() {
+  timeline::Mark("tab.first_paint", "tab=" + base::NumberToString(id_));
+  WebContentsObserverHooks::DidFirstVisuallyNonEmptyPaint();
 }
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {

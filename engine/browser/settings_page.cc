@@ -8,6 +8,7 @@
 #include "content/public/browser/web_ui.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "url/gurl.h"
 
@@ -20,11 +21,13 @@ namespace project_b {
 SettingsPage::SettingsPage(content::BrowserContext* browser_context)
     : contents_(content::WebContents::Create(
           content::WebContents::CreateParams(browser_context))) {
+  Observe(contents_.get());
   hooks::TagTab(contents_.get(), kSettingsPageId);
   contents_->SetDelegate(this);
 }
 
 SettingsPage::~SettingsPage() {
+  Observe(nullptr);
   contents_->SetDelegate(nullptr);
 }
 
@@ -39,6 +42,10 @@ void SettingsPage::Send(const std::string& json) {
     std::vector<base::ValueView> args = {json};
     web_ui->CallJavascriptFunctionUnsafe("__shellReceive", args);
   }
+}
+
+void SettingsPage::DidFinishNavigation(content::NavigationHandle* handle) {
+  timeline::PageCommitted("settings", handle);
 }
 
 // Go gets the key first; one it doesn't use goes to the menu bar.

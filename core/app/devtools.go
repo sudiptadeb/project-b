@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"projectb/engine"
+	"projectb/timeline"
 )
 
 // DevToolsCommand answers our own DevTools commands, which a client of the debugging
@@ -12,6 +13,7 @@ import (
 //	ProjectB.getTabs              {tabs: [the tabs as the shell has them], active: id}
 //	ProjectB.isAllowedURL {url}   {allowed: whether policy lets a tab load it}
 //	ProjectB.panic                panics in Go, as a bug would
+//	ProjectB.getTimeline {since}  {entries: [the timeline kept in memory, after entry since], last: seq}
 //
 // The port is only open when the app is started with --remote-debugging-port, and a
 // client of it can already drive the whole browser.
@@ -27,6 +29,15 @@ func (a *App) DevToolsCommand(method string, params []byte) (any, error) {
 			return nil, err
 		}
 		return map[string]any{"allowed": a.Policy.IsAllowedURL(p.URL)}, nil
+	case "ProjectB.getTimeline":
+		var p struct {
+			Since uint64 `json:"since"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		entries, last := timeline.Since(p.Since)
+		return map[string]any{"entries": entries, "last": last}, nil
 	case "ProjectB.panic":
 		panic("ProjectB.panic, asked for over DevTools")
 	}

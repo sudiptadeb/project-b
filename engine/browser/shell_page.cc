@@ -12,7 +12,6 @@
 #include "base/memory/ref_counted_memory.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
-#include "base/process/process.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
@@ -32,6 +31,7 @@
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/settings_page.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -312,12 +312,8 @@ void ShellPage::RenderFrameCreated(content::RenderFrameHost* frame) {
   }
 }
 
-void ShellPage::DidFirstVisuallyNonEmptyPaint() {
-  if (first_paint_.is_zero()) {
-    first_paint_ = base::Time::Now() - base::Process::Current().CreationTime();
-    LOG(INFO) << "shell first paint " << first_paint_.InMilliseconds()
-              << "ms after process start";
-  }
+void ShellPage::DidFinishNavigation(content::NavigationHandle* handle) {
+  timeline::PageCommitted("shell", handle);
 }
 
 // Go's window manager takes back what a dead shell claimed, so the page keeps working

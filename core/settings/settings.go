@@ -77,6 +77,8 @@ func (m *Manager) Open() {
 		return
 	}
 	m.open = true
+	timeline.Begin("settings.open")
+	timeline.Mark("settings.open.go")
 	m.eng.OpenSettings()
 }
 
@@ -122,6 +124,9 @@ func (m *Manager) Handle(msg []byte) {
 			p.Snapshot(snapshot)
 		}
 		m.send(snapshot)
+		timeline.Mark("settings.ready")
+	case "timeline":
+		timeline.FromPage("settings", msg)
 	case "close":
 		m.Close()
 	case "setTabLayout":

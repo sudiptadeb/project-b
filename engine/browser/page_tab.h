@@ -27,6 +27,7 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
  private:
   // content::WebContentsObserver:
   void DidFinishNavigation(content::NavigationHandle* handle) override;
+  void DidFirstVisuallyNonEmptyPaint() override;
   void TitleWasSet(content::NavigationEntry* entry) override;
   void DidUpdateFaviconURL(
       content::RenderFrameHost* render_frame_host,

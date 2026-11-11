@@ -25,6 +25,15 @@ void PBCrash(int32_t kind);
 char* PBGoStats(void);
 char* PBVersion(void);
 char* PBLaunchSwitches(const char* profile_dir);
+void PBTimelineStart(const char* profile_dir, int64_t process_age);
+int64_t PBTimelineNow(void);
+void PBTimelineRecord(int32_t kind,
+                      int64_t t,
+                      const char* name,
+                      size_t name_length,
+                      const char* text,
+                      size_t text_length);
+void PBTimelinePageOrigin(const char* page, int64_t t);
 
 #ifdef __cplusplus
 }

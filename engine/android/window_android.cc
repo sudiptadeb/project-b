@@ -10,9 +10,11 @@
 #include "base/android/jni_string.h"
 #include "base/android/scoped_java_ref.h"
 #include "base/check.h"
+#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "cc/slim/layer.h"
 #include "cc/slim/solid_color_layer.h"
+#include "components/viz/common/frame_timing_details.h"
 #include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/compositor_client.h"
 #include "content/public/browser/navigation_controller.h"
@@ -23,6 +25,7 @@
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/page_tab.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/android/view_android.h"
@@ -71,6 +74,13 @@ class BrowserWindow : public content::CompositorClient {
   // Over the shell, last in the tree.
   void SetOverlay(content::WebContents* contents) {
     root_->AddChild(contents->GetNativeView()->GetLayer());
+    // When the window's first frame with the overlay in it reached the screen, whatever
+    // the overlay's page had drawn by then.
+    compositor_->RequestSuccessfulPresentationTimeForNextFrame(
+        base::BindOnce([](const viz::FrameTimingDetails& details) {
+          timeline::MarkAt("settings.open.overlay_on_screen",
+                           details.presentation_feedback.timestamp);
+        }));
   }
 
   void RemoveOverlay(content::WebContents* contents) {
@@ -187,8 +197,10 @@ static int64_t JNI_BrowserWindow_Start(JNIEnv* env,
                                        const JavaRef<jobject>& obj,
                                        const JavaRef<jobject>& jwindow_android,
                                        int64_t go_table,
+                                       int64_t process_age_ms,
                                        const JavaRef<jstring>& jblocked_hosts) {
   SetGo(reinterpret_cast<const PBGoCalls*>(go_table));
+  timeline::Start(ProfileDir(), base::Milliseconds(process_age_ms));
   g_browser_window = new BrowserWindow(
       env, obj, ui::WindowAndroid::FromJavaWindowAndroid(jwindow_android));
   BrowserMainParts::Get()->StartApp(

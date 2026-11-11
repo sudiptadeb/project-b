@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Process;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -70,7 +72,11 @@ final class BrowserWindow extends FrameLayout {
 
     /** Content is ready: make the surface, then the native side, which starts the app and Go. */
     void start(long goTable, String blockedHosts) {
-        nativeWindow = BrowserWindowJni.get().start(this, windowAndroid, goTable, blockedHosts);
+        // How old the process is, for the timeline's time zero.
+        long processAgeMs = SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime();
+        nativeWindow =
+                BrowserWindowJni.get()
+                        .start(this, windowAndroid, goTable, processAgeMs, blockedHosts);
         SurfaceView surface = new SurfaceView(getContext());
         surface.setZOrderMediaOverlay(true);
         // A SurfaceView defaults to 16 bits per pixel.
@@ -365,6 +371,7 @@ final class BrowserWindow extends FrameLayout {
                 BrowserWindow self,
                 WindowAndroid windowAndroid,
                 long goTable,
+                long processAgeMs,
                 String blockedHosts);
 
         void surfaceCreated(long nativeBrowserWindow);

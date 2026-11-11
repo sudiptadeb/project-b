@@ -7,6 +7,7 @@ import { extensionsMessage } from '@extensions';
 
 const channel = bridge('settings');
 export const send = channel.send;
+export const { mark, end, firstPaint } = channel.timeline;
 
 export const state = reactive({
   ready: false,
@@ -48,6 +49,7 @@ export function connect() {
             section: m.section,
             ready: true,
           });
+          mark('settings.snapshot');
           break;
         case 'theme':
           state.theme = m.theme;

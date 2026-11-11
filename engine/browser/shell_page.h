@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "base/memory/weak_ptr.h"
-#include "base/time/time.h"
 #include "build/build_config.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "project_b/engine/browser/hooks_gen.h"
@@ -36,13 +35,10 @@ class ShellPage : public content::WebContentsObserver,
   void Load();
   void Send(const std::string& json);
 
-  // How long after process start the shell first painted. Zero until it has.
-  base::TimeDelta first_paint() const { return first_paint_; }
-
  private:
   // content::WebContentsObserver:
   void RenderFrameCreated(content::RenderFrameHost* frame) override;
-  void DidFirstVisuallyNonEmptyPaint() override;
+  void DidFinishNavigation(content::NavigationHandle* handle) override;
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override;
 
@@ -53,7 +49,6 @@ class ShellPage : public content::WebContentsObserver,
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
   std::unique_ptr<content::WebContents> contents_;
-  base::TimeDelta first_paint_;
   base::WeakPtrFactory<ShellPage> weak_factory_{this};
 };
 

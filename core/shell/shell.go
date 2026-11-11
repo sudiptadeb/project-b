@@ -43,6 +43,8 @@ type Manager struct {
 	keys    func() map[string]string
 	os      string
 	parts   []Part
+	// moving is the span waiting for the shell's next layout report, or "".
+	moving string
 }
 
 // Part is what another manager adds to the shell's contract: its state in the snapshot,
@@ -59,6 +61,31 @@ func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
 // each action shows, on platform os, for the shell's hints.
 func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager, run func(action string), keys func() map[string]string, os string) *Manager {
 	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os}
+}
+
+// Interaction runs what one thing the user asked for does, as a span on the timeline: it
+// begins here unless the shell began it at the click, and ends once the shell has drawn
+// the result.
+func (m *Manager) Interaction(name string, do func()) {
+	timeline.Begin(name)
+	timeline.Mark(name + ".go")
+	do()
+	timeline.Mark(name + ".done")
+	m.send(map[string]any{"t": "paint", "span": name})
+}
+
+// SwitchTabLayout is the interaction that moves the tabs. The page moves too, a step
+// later: the shell measures where it now goes and Go places it. So this span ends once
+// the shell has drawn after that.
+func (m *Manager) SwitchTabLayout(layout string) {
+	if layout == m.prefs.TabLayout() {
+		return
+	}
+	timeline.Begin("tabs.layout")
+	timeline.Mark("tabs.layout.go")
+	m.moving = "tabs.layout"
+	m.prefs.SetTabLayout(layout)
+	timeline.Mark("tabs.layout.done")
 }
 
 // Handle takes one command from the shell.
@@ -92,6 +119,9 @@ func (m *Manager) Handle(msg []byte) {
 			p.Snapshot(snapshot)
 		}
 		m.send(snapshot)
+		timeline.Mark("shell.ready")
+	case "timeline":
+		timeline.FromPage("shell", msg)
 	case "navigate":
 		m.tabs.Navigate(c.Text)
 	case "back":
@@ -101,13 +131,13 @@ func (m *Manager) Handle(msg []byte) {
 	case "reload":
 		m.tabs.Reload()
 	case "newTab":
-		m.tabs.Create()
+		m.Interaction("tab.new", func() { m.tabs.Create() })
 	case "closeTab":
-		m.tabs.Close(engine.TabID(c.ID))
+		m.Interaction("tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":
 		m.tabs.Activate(engine.TabID(c.ID))
 	case "setTabLayout":
-		m.prefs.SetTabLayout(c.Text)
+		m.SwitchTabLayout(c.Text)
 	case "run":
 		m.run(c.Text)
 	case "relaunch":
@@ -124,6 +154,11 @@ func (m *Manager) Handle(msg []byte) {
 			return
 		}
 		m.window.HandleShellLayout(l)
+		if m.moving != "" {
+			timeline.Mark(m.moving + ".page_moved")
+			m.send(map[string]any{"t": "paint", "span": m.moving})
+			m.moving = ""
+		}
 	case "window":
 		if r, ok := requests[c.Text]; ok {
 			m.window.Request(r)

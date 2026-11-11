@@ -16,6 +16,10 @@ int main(int argc, const char** argv) {
       .go_stats = PBGoStats,
       .version = PBVersion,
       .launch_switches = PBLaunchSwitches,
+      .timeline_start = PBTimelineStart,
+      .timeline_now = PBTimelineNow,
+      .timeline_record = PBTimelineRecord,
+      .timeline_page_origin = PBTimelinePageOrigin,
   };
   return ProjectBMain(argc, argv, &go);
 }

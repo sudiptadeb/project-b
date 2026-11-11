@@ -21,6 +21,7 @@
 #include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "project_b/engine/common/extensions_on.h"
 
@@ -53,6 +54,7 @@ BrowserMainParts::~BrowserMainParts() = default;
 int BrowserMainParts::PreMainMessageLoopRun() {
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
+  timeline::Mark("content.ready");
 
   screen_ = std::make_unique<display::ScopedNativeScreen>();
   CHECK(base::CreateDirectory(ChromiumDataDir()));
@@ -72,8 +74,10 @@ int BrowserMainParts::PreMainMessageLoopRun() {
                                                      std::move(*quit));
       },
       &quit_));
+  timeline::Mark("window.created");
 
   shell_ = std::make_unique<ShellPage>(browser_context_.get());
+  timeline::Mark("shell.created");
   window_->SetShellView(shell_->contents()->GetNativeView());
   engine_ = std::make_unique<Engine>(browser_context_.get(), window_.get(),
                                      shell_.get());
@@ -87,6 +91,7 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   // Go has given the window its first layout, frame included, so its first frame on
   // screen is already the frame colour. It still shows before any renderer has drawn.
   window_->Show();
+  timeline::Mark("window.shown");
   window_->ListenForState(base::BindRepeating([](const Window::State& s) {
     hooks::Args args;
     args.Double(s.size.width());

@@ -2,7 +2,7 @@
 // by what they send, and a new shell starts from a snapshot.
 
 import { computed, reactive } from 'vue';
-import { listen, send } from '@/bridge.js';
+import { end, listen, mark, painted, send } from '@/bridge.js';
 import { extensionsMessage } from '@extensions';
 
 import { phone } from '@/phone.js';
@@ -107,6 +107,11 @@ export function connect() {
           state.crashReport = m.crashReport;
           state.platform = m.platform;
           state.keys = m.keys;
+          mark('shell.snapshot');
+          break;
+        // Go asks for a span to end once what it just sent is drawn.
+        case 'paint':
+          painted(() => end(m.span));
           break;
         case 'keys':
           state.keys = m.keys;

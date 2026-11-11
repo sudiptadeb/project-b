@@ -39,7 +39,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
     <p class="pbx-prompt-text">Its data is deleted too.</p>
     <div class="pbx-prompt-buttons">
       <button type="button" class="text-button" @click="answer(false)">Cancel</button>
-      <button type="button" class="text-button pbx-primary" @click="answer(true)">Remove</button>
+      <button type="button" class="text-button primary" @click="answer(true)">Remove</button>
     </div>
   </dialog>
   <dialog v-else ref="dialog" class="pbx-prompt" :aria-label="`Add ${prompt.name}`">
@@ -51,7 +51,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
       </div>
     </div>
     <template v-if="prompt.permissions && prompt.permissions.length">
-      <p class="pbx-prompt-text">It can:</p>
+      <p class="pbx-prompt-label">It can</p>
       <ul class="pbx-prompt-list">
         <li v-for="p in prompt.permissions" :key="p">{{ p }}</li>
       </ul>
@@ -59,7 +59,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
     <p v-else class="pbx-prompt-text">It asks for no permissions.</p>
     <div class="pbx-prompt-buttons">
       <button type="button" class="text-button" @click="answer(false)">Cancel</button>
-      <button type="button" class="text-button pbx-primary" @click="answer(true)">Add extension</button>
+      <button type="button" class="text-button primary" @click="answer(true)">Add extension</button>
     </div>
   </dialog>
 </template>
@@ -74,7 +74,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-float);
 }
 
 /* The page behind fades toward the bar's colour. */
@@ -104,11 +104,28 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   margin: 16px 0 0;
 }
 
+.pbx-prompt-label {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* The permissions as the manifest names them, in a hairline box that scrolls past six. */
 .pbx-prompt-list {
+  max-height: 168px;
   margin: 6px 0 0;
-  padding-left: 20px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  padding: 4px 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  list-style: none;
+  font-size: 13px;
+}
+
+.pbx-prompt-list li {
+  padding: 4px 12px;
+  overflow-wrap: anywhere;
 }
 
 .pbx-prompt-buttons {
@@ -116,12 +133,5 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
-}
-
-.pbx-primary,
-.pbx-primary:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--surface);
 }
 </style>

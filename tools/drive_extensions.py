@@ -129,7 +129,7 @@ def answer_prompt(app, yes=True):
     it said."""
     app.wait("!!document.querySelector('.pbx-prompt')", 60)
     text = app.js("document.querySelector('.pbx-prompt').innerText")
-    menu_click(app, ".pbx-prompt " + (".pbx-primary" if yes else "button:not(.pbx-primary)"))
+    menu_click(app, ".pbx-prompt " + (".primary" if yes else "button:not(.primary)"))
     app.wait("!document.querySelector('.pbx-prompt')", 20)
     return text
 

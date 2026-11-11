@@ -19,6 +19,7 @@ import (
 
 	"projectb/app"
 	"projectb/engine"
+	"projectb/flags"
 	"projectb/mockengine"
 	"projectb/update"
 )
@@ -42,7 +43,21 @@ func main() {
 	version := flag.String("version", "", "the version this build is")
 	releases := flag.String("releases", "", "the release manifest URL or path")
 	appPath := flag.String("app", "", "the installed bundle to replace on relaunch")
+	// A test can add flags of its own, in registry.json's form, to see every type drawn.
+	moreFlags := flag.String("flags", "", "a file of flags to add to the registry's")
 	flag.Parse()
+	if *moreFlags != "" {
+		b, err := os.ReadFile(*moreFlags)
+		if err == nil {
+			var rows []flags.Flag
+			if rows, err = flags.Parse(b); err == nil {
+				flags.All = append(flags.All, rows...)
+			}
+		}
+		if err != nil {
+			log.Fatalf("-flags: %v", err)
+		}
+	}
 
 	e := mockengine.New()
 	var a *app.App

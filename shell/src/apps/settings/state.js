@@ -23,8 +23,9 @@ export const state = reactive({
   // user picked. '' is the first.
   section: '',
   keyboard: { platform: 'mac', templates: [], template: '', following: true, groups: [], missing: [], gone: [], problems: [] },
-  // The flags as saved, whether a relaunch is waiting, and the build flags.
-  flags: { flags: [], relaunch: false, builds: [] },
+  // Every flag with its saved value, whether its build has it, and whether it waits for a
+  // relaunch.
+  flags: [],
 });
 
 export function connect() {

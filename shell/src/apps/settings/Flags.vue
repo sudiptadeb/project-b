@@ -1,75 +1,67 @@
 <script setup>
 import { send, state } from './state.js';
 
-// Flags: switches the app reads as it starts, saved in the profile by Go. A change waits
-// for the next launch, so Relaunch shows while what is saved differs from what runs. The
-// build flags say what this build was made with; tools/build.sh sets them.
+// Flags, as core/flags/registry.json defines them, each drawn by its type: a switch for a
+// boolean, a select for an enum, a field for the rest. A change waits for the next launch,
+// so Relaunch shows beside each flag whose saved value isn't the one running.
 
-function setText(flag, e) {
-  send({ t: 'setFlag', id: flag.id, text: e.target.value.trim() });
-  // Go answers with the flags when it saves; a value it refuses goes back to the saved one.
+function set(flag, text) {
+  send({ t: 'setFlag', id: flag.id, text });
+}
+
+// Go answers with the flags when it saves; a value it refuses goes back to the saved one.
+function setField(flag, e) {
+  set(flag, e.target.value.trim());
   e.target.value = flag.value;
 }
 </script>
 
 <template>
-  <div>
-    <section aria-labelledby="flags">
-      <div class="head">
-        <h2 id="flags">Flags</h2>
-        <button v-if="state.flags.relaunch" type="button" class="text-button primary" @click="send({ t: 'relaunch' })">Relaunch</button>
-      </div>
-      <div class="card">
-        <label v-for="f in state.flags.flags" :key="f.id" class="row" :class="{ off: !f.built }">
-          <span class="label">
-            {{ f.name }}
-            <span v-if="!f.built" class="note">Not in this build</span>
-          </span>
-          <input
-            v-if="f.kind === 'switch'"
-            type="checkbox"
-            role="switch"
-            class="switch"
-            :disabled="!f.built"
-            :checked="f.value === 'on'"
-            :aria-checked="String(f.value === 'on')"
-            @change="send({ t: 'setFlag', id: f.id, text: $event.target.checked ? 'on' : '' })"
-          />
-          <input
-            v-else
-            type="text"
-            class="field"
-            placeholder="Off"
-            spellcheck="false"
-            :value="f.value"
-            @change="setText(f, $event)"
-            @keydown.enter="$event.target.blur()"
-          />
+  <section aria-labelledby="flags">
+    <h2 id="flags">Flags</h2>
+    <div class="card">
+      <div v-for="f in state.flags" :key="f.id" class="row">
+        <label class="label" :for="'flag-' + f.id">
+          {{ f.name }}
+          <span class="note">{{ f.built ? f.description : 'Not in this build' }}</span>
         </label>
+        <button v-if="f.pending" type="button" class="text-button primary" @click="send({ t: 'relaunch' })">Relaunch</button>
+        <input
+          v-if="f.type === 'boolean'"
+          :id="'flag-' + f.id"
+          type="checkbox"
+          role="switch"
+          class="switch"
+          :disabled="!f.built"
+          :checked="f.value === 'on'"
+          :aria-checked="String(f.value === 'on')"
+          @change="set(f, $event.target.checked ? 'on' : '')"
+        />
+        <select v-else-if="f.type === 'enum'" :id="'flag-' + f.id" :disabled="!f.built" :value="f.value" @change="set(f, $event.target.value)">
+          <option value="">Off</option>
+          <option v-for="c in f.choices" :key="c" :value="c">{{ c }}</option>
+        </select>
+        <input
+          v-else
+          :id="'flag-' + f.id"
+          :type="f.type === 'number' ? 'number' : 'text'"
+          :inputmode="f.type === 'numbers' ? 'numeric' : undefined"
+          :min="f.min"
+          :max="f.max"
+          class="field"
+          placeholder="Off"
+          spellcheck="false"
+          :disabled="!f.built"
+          :value="f.value"
+          @change="setField(f, $event)"
+          @keydown.enter="$event.target.blur()"
+        />
       </div>
-    </section>
-
-    <section aria-labelledby="build-flags">
-      <h2 id="build-flags">Build</h2>
-      <div class="card">
-        <div v-for="b in state.flags.builds" :key="b.id" class="row">
-          <span class="label">{{ b.name }}</span>
-          <span class="value">{{ b.on ? 'In this build' : 'Not in this build' }}</span>
-        </div>
-      </div>
-    </section>
-  </div>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 30px;
-  margin-top: -6px;
-}
-
 .note {
   display: block;
   font-size: 12px;
@@ -77,9 +69,8 @@ function setText(flag, e) {
   color: var(--muted);
 }
 
-.value {
-  font-size: 13px;
-  color: var(--muted);
+select {
+  width: 200px;
 }
 
 .field {
@@ -92,6 +83,10 @@ function setText(flag, e) {
   background: var(--surface);
   color: inherit;
   font: inherit;
+}
+
+.field::-webkit-inner-spin-button {
+  appearance: none;
 }
 
 .field::placeholder {

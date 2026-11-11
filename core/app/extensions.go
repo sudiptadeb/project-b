@@ -26,7 +26,7 @@ func (a *App) Extensions() *extensions.Manager { return extensionManagers[a] }
 // extension manager out. Only while the Extensions flag is on: off, the build carries
 // the code and nothing of it runs.
 func startExtensions(a *App, e engine.Engine, cfg Config) {
-	if !a.Flags.On(flags.Extensions) {
+	if !a.Flags.IsOn(flags.Extensions) {
 		return
 	}
 	eng := e.(engine.Extensions)

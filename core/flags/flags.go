@@ -1,74 +1,159 @@
-// Package flags owns the flags: switches the app reads once, as it starts. Each is saved in
-// flags.json in the profile and becomes a command-line switch for the engine before
-// Chromium starts, so a change takes effect on the next launch. The settings page's Flags
-// section shows them and offers a relaunch while what is saved differs from what the app
-// started with.
+// Package flags owns the flags. A flag is a named command-line switch: off until the user
+// gives it a value, applied at launch, and its code may be left out of a build. Each is
+// defined once, in registry.json. The values are saved in flags.json in the profile, and
+// before Chromium starts the ones the app launched with become switches for the engine.
+// The settings page's Flags section offers Relaunch beside each flag whose saved value
+// isn't yet the one running.
 package flags
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 )
 
-// Kinds of flag.
+// The types of value. A saved value is the text after the switch's "=", or "on" for a
+// boolean; "" is off.
 const (
-	KindSwitch = "switch" // on or off: "on" or ""
-	KindText   = "text"   // a value, or "" for off
+	Boolean = "boolean" // --switch
+	Number  = "number"  // a whole number, in min..max when given
+	Enum    = "enum"    // one of choices
+	String  = "string"  // text, matching pattern when given
+	Numbers = "numbers" // numbers separated by commas
+	Strings = "strings" // strings separated by commas
 )
 
-// Flag is one flag as the program defines it.
+// Flag is one row of registry.json.
 type Flag struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Kind string `json:"kind"`
-	// Build names the build flag the flag needs, or "" when every build has what it turns on.
-	Build string `json:"build,omitempty"`
-	// valid says whether a text value can be used; toSwitch is the switch for a value.
-	valid    func(string) bool
-	toSwitch func(string) string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Switch is the command-line switch, without its dashes.
+	Switch string `json:"switch"`
+	Type   string `json:"type"`
+	// Build says the flag's code can be left out of a build: WITHOUT=<id> tools/build.sh.
+	Build bool `json:"build,omitempty"`
+	// Min and Max bound a number, or each of numbers.
+	Min *int `json:"min,omitempty"`
+	Max *int `json:"max,omitempty"`
+	// Choices are an enum's values.
+	Choices []string `json:"choices,omitempty"`
+	// Pattern is what a string, or each of strings, must match.
+	Pattern string `json:"pattern,omitempty"`
+
+	pattern *regexp.Regexp
 }
 
-// Flag ids.
-const (
-	Extensions      = "extensions"
-	RemoteDebugging = "remoteDebugging"
-	Features        = "features"
-)
-
-var featureList = regexp.MustCompile(`^[A-Za-z0-9_.:<>,]+$`)
-
-// All is every flag, in the order the settings page lists them.
-var All = []Flag{
-	{
-		ID: Extensions, Name: "Extensions", Kind: KindSwitch, Build: "extensions",
-		toSwitch: func(string) string { return "--pb-extensions" },
-	},
-	{
-		ID: RemoteDebugging, Name: "Remote debugging port", Kind: KindText,
-		valid: func(v string) bool {
-			p, err := strconv.Atoi(v)
-			return err == nil && p >= 1024 && p <= 65535
-		},
-		toSwitch: func(v string) string { return "--remote-debugging-port=" + v },
-	},
-	{
-		ID: Features, Name: "Chromium features", Kind: KindText,
-		valid:    featureList.MatchString,
-		toSwitch: func(v string) string { return "--enable-features=" + v },
-	},
+// Parse reads rows in registry.json's form, refusing a key it doesn't know and a row that
+// doesn't hold together.
+func Parse(b []byte) ([]Flag, error) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	var rows []Flag
+	if err := d.Decode(&rows); err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if err := rows[i].check(); err != nil {
+			return nil, fmt.Errorf("flag %q: %w", rows[i].ID, err)
+		}
+	}
+	return rows, nil
 }
 
-// Builds is every build flag, by id and name: what tools/build.sh can leave out.
-var Builds = []struct{ ID, Name string }{
-	{"extensions", "Extensions"},
+func mustParse(b []byte) []Flag {
+	rows, err := Parse(b)
+	if err != nil {
+		panic("registry.json: " + err.Error())
+	}
+	return rows
 }
 
-// builds is the build flags this build was made with. A tagged file adds its own.
+// check says what is wrong with a row, and compiles its pattern.
+func (f *Flag) check() error {
+	if f.ID == "" || f.Name == "" || f.Description == "" || f.Switch == "" {
+		return fmt.Errorf("needs an id, a name, a description and a switch")
+	}
+	number := f.Type == Number || f.Type == Numbers
+	text := f.Type == String || f.Type == Strings
+	switch {
+	case !slices.Contains([]string{Boolean, Number, Enum, String, Numbers, Strings}, f.Type):
+		return fmt.Errorf("type %q", f.Type)
+	case (f.Enum() != (len(f.Choices) > 0)):
+		return fmt.Errorf("choices are for an enum, and an enum needs them")
+	case !number && (f.Min != nil || f.Max != nil):
+		return fmt.Errorf("min and max are for numbers")
+	case !text && f.Pattern != "":
+		return fmt.Errorf("a pattern is for strings")
+	}
+	if f.Pattern != "" {
+		p, err := regexp.Compile(f.Pattern)
+		if err != nil {
+			return err
+		}
+		f.pattern = p
+	}
+	return nil
+}
+
+// Enum says whether the flag is an enum.
+func (f Flag) Enum() bool { return f.Type == Enum }
+
+// normal is a value as it is saved, or false when the flag can't take it. Spaces around
+// a list's commas go.
+func (f Flag) normal(v string) (string, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", true
+	}
+	switch f.Type {
+	case Boolean:
+		return v, v == "on"
+	case Number:
+		return v, f.number(v)
+	case Enum:
+		return v, slices.Contains(f.Choices, v)
+	case String:
+		return v, f.text(v)
+	}
+	items := strings.Split(v, ",")
+	for i, item := range items {
+		items[i] = strings.TrimSpace(item)
+		if f.Type == Numbers && !f.number(items[i]) || f.Type == Strings && !f.text(items[i]) {
+			return "", false
+		}
+	}
+	return strings.Join(items, ","), true
+}
+
+func (f Flag) number(v string) bool {
+	n, err := strconv.Atoi(v)
+	return err == nil && (f.Min == nil || n >= *f.Min) && (f.Max == nil || n <= *f.Max)
+}
+
+func (f Flag) text(v string) bool {
+	return v != "" && (f.pattern == nil || f.pattern.MatchString(v))
+}
+
+// toSwitch is the command-line switch for a value that is on.
+func (f Flag) toSwitch(v string) string {
+	if f.Type == Boolean {
+		return "--" + f.Switch
+	}
+	return "--" + f.Switch + "=" + v
+}
+
+// builds is the build flags this build was made with, by id. A tagged file adds its own.
 var builds = map[string]bool{}
+
+func (f Flag) built() bool { return !f.Build || builds[f.ID] }
 
 func byID(id string) (Flag, bool) {
 	for _, f := range All {
@@ -79,20 +164,7 @@ func byID(id string) (Flag, bool) {
 	return Flag{}, false
 }
 
-// usable says whether a flag can take a value: the build has it, and the value is one.
-func usable(f Flag, v string) bool {
-	if f.Build != "" && !builds[f.Build] {
-		return false
-	}
-	switch f.Kind {
-	case KindSwitch:
-		return v == "" || v == "on"
-	default:
-		return v == "" || f.valid(v)
-	}
-}
-
-// Manager holds the flags as saved and as the app started with them.
+// Manager holds the flags as saved and as the app launched with them.
 type Manager struct {
 	path     string
 	saved    map[string]string
@@ -100,8 +172,8 @@ type Manager struct {
 	onChange []func()
 }
 
-// New reads the flags saved under dir. What the file holds for a flag that isn't one, or a
-// value that can't be used, is dropped.
+// New reads the flags saved under dir. What the file holds for a flag that isn't one, that
+// isn't in this build, or that the flag can't take, is dropped.
 func New(dir string) *Manager {
 	m := &Manager{path: filepath.Join(dir, "flags.json"), saved: map[string]string{}}
 	var file map[string]string
@@ -111,23 +183,22 @@ func New(dir string) *Manager {
 		}
 	}
 	for id, v := range file {
-		if f, ok := byID(id); ok && v != "" && usable(f, v) {
+		f, ok := byID(id)
+		if !ok || !f.built() {
+			continue
+		}
+		if v, ok := f.normal(v); ok && v != "" {
 			m.saved[id] = v
 		}
 	}
-	m.launched = clone(m.saved)
+	m.launched = make(map[string]string, len(m.saved))
+	for k, v := range m.saved {
+		m.launched[k] = v
+	}
 	return m
 }
 
-func clone(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
-// Switches are the command-line switches the flags the app started with ask for.
+// Switches are the command-line switches of the flags the app launched with.
 func (m *Manager) Switches() []string {
 	var out []string
 	for _, f := range All {
@@ -138,17 +209,21 @@ func (m *Manager) Switches() []string {
 	return out
 }
 
-// On says whether a flag was on when the app started.
-func (m *Manager) On(id string) bool { return m.launched[id] != "" }
+// IsOn says whether a flag was on when the app launched.
+func (m *Manager) IsOn(id string) bool { return m.launched[id] != "" }
 
 // OnChanged subscribes to a flag being saved with a new value.
 func (m *Manager) OnChanged(f func()) { m.onChange = append(m.onChange, f) }
 
-// Set saves a flag's value for the next launch: "on" or "" for a switch, the value or ""
-// for text. A flag that isn't one, or a value it can't take, is ignored.
+// Set saves a flag's value for the next launch; "" turns it off. A flag that isn't one or
+// isn't in this build, or a value it can't take, is ignored.
 func (m *Manager) Set(id, v string) {
 	f, ok := byID(id)
-	if !ok || !usable(f, v) || m.saved[id] == v {
+	if !ok || !f.built() {
+		return
+	}
+	v, ok = f.normal(v)
+	if !ok || v == m.saved[id] {
 		return
 	}
 	if v == "" {
@@ -166,36 +241,17 @@ func (m *Manager) Set(id, v string) {
 type FlagView struct {
 	Flag
 	Value string `json:"value"`
-	// Built is false when the build lacks what the flag turns on.
+	// Built is false when the build left the flag's code out.
 	Built bool `json:"built"`
+	// Pending is true while the saved value waits for a relaunch.
+	Pending bool `json:"pending"`
 }
 
-// BuildView is one build flag as the settings page shows it.
-type BuildView struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	On   bool   `json:"on"`
-}
-
-// View is the Flags section: each flag with its saved value, whether a relaunch is needed
-// for them to take effect, and the build flags this build was made with.
-type View struct {
-	Flags    []FlagView  `json:"flags"`
-	Relaunch bool        `json:"relaunch"`
-	Builds   []BuildView `json:"builds"`
-}
-
-// View returns what the settings page shows.
-func (m *Manager) View() View {
-	v := View{Flags: []FlagView{}, Builds: []BuildView{}}
-	for _, b := range Builds {
-		v.Builds = append(v.Builds, BuildView{b.ID, b.Name, builds[b.ID]})
-	}
+// View is every flag as the settings page shows it.
+func (m *Manager) View() []FlagView {
+	v := []FlagView{}
 	for _, f := range All {
-		v.Flags = append(v.Flags, FlagView{Flag: f, Value: m.saved[f.ID], Built: f.Build == "" || builds[f.Build]})
-		if m.saved[f.ID] != m.launched[f.ID] {
-			v.Relaunch = true
-		}
+		v = append(v, FlagView{Flag: f, Value: m.saved[f.ID], Built: f.built(), Pending: m.saved[f.ID] != m.launched[f.ID]})
 	}
 	return v
 }

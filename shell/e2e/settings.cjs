@@ -31,13 +31,21 @@ const releaseServer = http.createServer((req, res) => {
 const installed = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-installed-'));
 fs.mkdirSync(path.join(installed, 'Project B.app/Contents/MacOS'), { recursive: true });
 
+// Flags of the types registry.json has no row of yet, so the page draws every type.
+const moreFlags = path.join(profile, 'more-flags.json');
+fs.writeFileSync(moreFlags, JSON.stringify([
+  { id: 'mode', name: 'Mode', description: 'An enum', switch: 'pb-mode', type: 'enum', choices: ['fast', 'slow'] },
+  { id: 'label', name: 'Label', description: 'A string', switch: 'pb-label', type: 'string', pattern: '^[a-z]+$' },
+  { id: 'sizes', name: 'Sizes', description: 'Numbers', switch: 'pb-sizes', type: 'numbers', min: 1 },
+]));
+
 let server;
 async function startServer() {
   // A server left over from another run would answer in ours' place.
   if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
     throw new Error(`port ${port} already has a server: stop it and run again`);
   }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`,
+  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-flags=${moreFlags}`,
     '-version=0.2.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`], { stdio: 'ignore' });
   for (let i = 0; i < 100; i++) {
     try {
@@ -157,18 +165,42 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   const relaunch = page.getByRole('button', { name: 'Relaunch' });
   check('Flags lists the flags, none waiting', await page.getByRole('region', { name: 'Flags' }).getByText('Chromium features').isVisible() && (await relaunch.count()) === 0);
   check('Extensions is off and can\'t be turned on in a build without them', await page.getByRole('switch', { name: /Extensions/ }).isDisabled());
-  check('the build flags say so', (await page.getByRole('region', { name: 'Build' }).textContent()).includes('Not in this build'));
-  const port = page.getByRole('textbox', { name: 'Remote debugging port' });
+  check('and says so', (await page.locator('.row', { hasText: 'Extensions' }).textContent()).includes('Not in this build'));
+  const port = page.getByLabel('Remote debugging port');
   await port.fill('80');
   await port.press('Enter');
   check('a port it can\'t use is refused', await until(async () => (await port.inputValue()) === '') && flagsFile() === null);
   await port.fill('9333');
   await port.press('Enter');
   check('a port is saved, and Relaunch shows', await until(async () => flagsFile()?.remoteDebugging === '9333' && await relaunch.isVisible()), JSON.stringify(flagsFile()));
+  check('beside that flag only', (await relaunch.count()) === 1 && (await page.locator('.row', { has: port }).getByRole('button', { name: 'Relaunch' }).count()) === 1);
+  check('each flag says what it does', await page.getByText('Let DevTools clients connect on this port').isVisible());
   await page.screenshot({ path: path.join(out, 'settings-flags.png') });
   await port.fill('');
   await port.press('Enter');
   check('cleared, nothing waits', await until(async () => (await relaunch.count()) === 0 && JSON.stringify(flagsFile()) === '{}'));
+
+  // The other types.
+  const mode = page.getByLabel('Mode');
+  check('an enum is a select, Off first', (await mode.evaluate((s) => [...s.options].map((o) => o.text).join())) === 'Off,fast,slow');
+  await mode.selectOption('slow');
+  check('picking a choice saves it', await until(async () => flagsFile()?.mode === 'slow' && (await page.locator('.row', { has: mode }).getByRole('button', { name: 'Relaunch' }).count()) === 1));
+  await mode.selectOption('');
+  const label = page.getByLabel('Label');
+  await label.fill('Not Lower');
+  await label.press('Enter');
+  check('a string the pattern refuses is not saved', await until(async () => (await label.inputValue()) === '') && !('label' in (flagsFile() || {})));
+  const sizes = page.getByLabel('Sizes');
+  await sizes.fill('1, 2 ,3');
+  await sizes.press('Enter');
+  check('a list of numbers is saved without the spaces', await until(async () => flagsFile()?.sizes === '1,2,3' && (await sizes.inputValue()) === '1,2,3'), JSON.stringify(flagsFile()));
+  await sizes.fill('1,0');
+  await sizes.press('Enter');
+  check('and refused when one is out of range', await until(async () => (await sizes.inputValue()) === '1,2,3'));
+  await page.screenshot({ path: path.join(out, 'settings-flags-types.png') });
+  await sizes.fill('');
+  await sizes.press('Enter');
+  await until(() => JSON.stringify(flagsFile()) === '{}');
 
   // Keyboard.
   await page.getByRole('button', { name: 'Keyboard' }).click();

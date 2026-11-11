@@ -6,13 +6,16 @@ set -eu
 
 FROM=$1
 APP="Project B.app"
-DMG="$SHARE/project-b.dmg"
-GUEST_DMG="/Volumes/My Shared Files/share/project-b.dmg"
+# A new name each time: the VM's view of the shared folder can keep an old file's data
+# under a name it has seen, and hdiutil then calls the image corrupted.
+NAME="project-b-$(date +%Y%m%d-%H%M%S).dmg"
+DMG="$SHARE/$NAME"
+GUEST_DMG="/Volumes/My Shared Files/share/$NAME"
 MOUNT=/tmp/pb-dmg
 
+rm -f "$SHARE"/project-b*.dmg
 case "$FROM" in
     http*) curl -fsSL -o "$DMG" "$FROM" ;;
-    "$DMG") ;;
     *) cp "$FROM" "$DMG" ;;
 esac
 

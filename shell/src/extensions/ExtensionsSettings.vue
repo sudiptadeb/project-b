@@ -36,7 +36,7 @@ const open = ref('');
               {{ e.name }} <span class="pbx-version">{{ e.version }}</span>
               <span class="pbx-description">{{ e.description }}</span>
             </span>
-            <button type="button" class="text-button pbx-quiet" :aria-expanded="open === e.id" @click="open = open === e.id ? '' : e.id">Details</button>
+            <button type="button" class="text-button quiet" :aria-expanded="open === e.id" @click="open = open === e.id ? '' : e.id">Details</button>
             <button
               type="button"
               class="icon-button"
@@ -56,7 +56,7 @@ const open = ref('');
               :aria-checked="String(e.enabled)"
               @change="send({ t: 'extensionSetEnabled', extension: e.id, on: $event.target.checked })"
             />
-            <button type="button" class="text-button pbx-quiet" :aria-label="`Remove ${e.name}`" @click="send({ t: 'extensionRemove', extension: e.id })">Remove</button>
+            <button type="button" class="text-button quiet" :aria-label="`Remove ${e.name}`" @click="send({ t: 'extensionRemove', extension: e.id })">Remove</button>
           </div>
           <dl v-if="open === e.id" class="pbx-details" :aria-label="`Details of ${e.name}`">
             <dt>ID</dt>
@@ -143,18 +143,6 @@ const open = ref('');
 
 .pbx-extension {
   gap: 12px;
-}
-
-.pbx-quiet {
-  border-color: transparent;
-  background: none;
-  color: var(--muted);
-}
-
-.pbx-quiet:hover:not(:disabled),
-.pbx-quiet[aria-expanded='true'] {
-  background: var(--accent-tint);
-  color: inherit;
 }
 
 .pbx-pinned {

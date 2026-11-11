@@ -215,7 +215,7 @@ watch(
 }
 
 .field:focus-within {
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 input {
@@ -258,7 +258,7 @@ input::placeholder {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-float);
 }
 
 /* One line per item, the title then the address, the way a tab row in the design reads

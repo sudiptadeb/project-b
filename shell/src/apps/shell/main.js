@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import '@/design.css';
 import App from './App.vue';
 import { vDrag, vShell } from './regions.js';
 import { connect, phone } from './state.js';

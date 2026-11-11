@@ -193,7 +193,7 @@ watch(menu, (on) => {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-float);
 }
 
 .pbx-row {

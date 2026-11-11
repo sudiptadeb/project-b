@@ -1,0 +1,110 @@
+/* The shared look of every app in shell/src/apps: the type, the floating shadow, the focus
+   ring and the controls. Each app's main.js imports it. docs/design-system.md describes
+   it; the colours are tones.js's, set on the root by theme.js. */
+
+:root {
+  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  /* Anything that floats over the rest: a menu, the suggestions, a dialog. */
+  --shadow-float: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --focus-ring: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+}
+
+/* An icon alone: a flat 28px square with a 6px radius. */
+.icon-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--icon);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--accent-tint);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Words: 30px high, a hairline, a 6px radius. .primary is the one answer a dialog wants;
+   .quiet sits in a row without a border until it is pointed at. */
+.text-button {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.text-button:hover:not(:disabled) {
+  background: var(--accent-tint);
+}
+
+.text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.text-button.primary,
+.text-button.primary:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.text-button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.text-button.quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+.text-button.quiet:hover:not(:disabled),
+.text-button.quiet[aria-expanded='true'] {
+  background: var(--accent-tint);
+  color: inherit;
+}
+
+.icon-button:focus-visible,
+.text-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Fingers need bigger targets than a mouse does, and a touch screen has no hover. */
+.touch .icon-button {
+  width: 40px;
+  height: 40px;
+}
+
+.touch .icon-button:hover:not(:disabled) {
+  background: none;
+}
+
+.touch .text-button {
+  max-width: 100%;
+  min-height: 40px;
+  height: auto;
+}
+
+.touch .text-button:not(.primary, .quiet):hover:not(:disabled) {
+  background: var(--surface);
+}

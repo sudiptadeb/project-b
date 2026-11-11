@@ -72,7 +72,7 @@ function open(msg) {
   width: 280px;
   max-width: 85%;
   border-right: 1px solid var(--line);
-  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-float);
 }
 
 .sidebar.drawer .inner {
@@ -126,7 +126,7 @@ function open(msg) {
 
 .row:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 /* Borders carry separation: the active tab is a white card with a line, no shadow. */

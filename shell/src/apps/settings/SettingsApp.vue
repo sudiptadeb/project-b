@@ -67,14 +67,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 </template>
 
 <style>
-/* Type and surfaces from the Ulaa preferences design, at a page's size. The frame colour's
-   tones (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint) come from tones.js. */
-:root {
-  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
-}
-
+/* Surfaces from the Ulaa preferences design, at a page's size. Type and the controls are
+   design.css's; the frame colour's tones come from tones.js. */
 body {
   background: var(--bar);
 }
@@ -185,53 +179,10 @@ h2 {
   font-weight: 500;
 }
 
-.icon-button {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--icon);
-  cursor: pointer;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--accent-tint);
-}
-
-.text-button {
-  flex: none;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: inherit;
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.text-button:hover:not(:disabled) {
-  background: var(--accent-tint);
-}
-
-.text-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.icon-button:focus-visible,
-.text-button:focus-visible,
 .nav-item:focus-visible,
 select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 select {
@@ -288,7 +239,7 @@ select {
 
 .switch:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 /* Fingers need bigger targets than a mouse does, and a touch screen has no hover. */
@@ -297,13 +248,4 @@ select {
   row-gap: 8px;
 }
 
-.touch .text-button {
-  max-width: 100%;
-  min-height: 40px;
-  height: auto;
-}
-
-.touch .text-button:hover:not(:disabled) {
-  background: var(--surface);
-}
 </style>

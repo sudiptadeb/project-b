@@ -298,17 +298,6 @@ kbd.clash {
   font-size: 12px;
 }
 
-.text-button.quiet {
-  border-color: transparent;
-  background: none;
-  color: var(--muted);
-}
-
-.text-button.quiet:hover:not(:disabled) {
-  background: var(--accent-tint);
-  color: inherit;
-}
-
 .menu-switch {
   display: flex;
   align-items: center;

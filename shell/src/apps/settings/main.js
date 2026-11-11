@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import '@/design.css';
 import SettingsApp from './SettingsApp.vue';
 import { phone } from '@/phone.js';
 import { connect } from './state.js';

@@ -100,7 +100,7 @@ button:hover b {
 
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
   border-radius: 4px;
 }
 </style>

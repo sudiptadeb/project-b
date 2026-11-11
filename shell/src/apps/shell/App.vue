@@ -50,14 +50,8 @@ watchEffect(() => {
    snapshot, the same values the window paints natively, and the frame colour's tones
    (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint) are set from it by
    tones.js. Icons and the sidebar's New Tab take a deeper ink, so the frame is the one
-   thing in the full accent. */
-:root {
-  font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-  color: var(--text);
-  -webkit-font-smoothing: antialiased;
-}
-
-/* The root has no background: the page shows through wherever nothing is painted. */
+   thing in the full accent. The root has no background: the page shows through wherever
+   nothing is painted. */
 .app {
   position: relative;
   display: flex;
@@ -90,46 +84,5 @@ watchEffect(() => {
   position: absolute;
   inset: 0;
   z-index: 3;
-}
-
-
-/* Every control in the shell is a flat 28px square with a 6px radius. */
-.icon-button {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--icon);
-  cursor: pointer;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--accent-tint);
-}
-
-.icon-button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.icon-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
-}
-
-/* Fingers need bigger targets than a mouse does, and a touch screen has no hover. */
-.touch .icon-button {
-  width: 40px;
-  height: 40px;
-}
-
-.touch .icon-button:hover:not(:disabled) {
-  background: none;
 }
 </style>

@@ -8,6 +8,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/location.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
@@ -16,6 +17,8 @@
 #include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "content/public/browser/browser_task_traits.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -322,7 +325,18 @@ void ShellPage::DidFirstVisuallyNonEmptyPaint() {
 void ShellPage::PrimaryMainFrameRenderProcessGone(
     base::TerminationStatus status) {
   hooks::Fire(PB_EVENT_SHELL_CRASHED, hooks::Args());
-  contents_->GetController().Reload(content::ReloadType::NORMAL, false);
+  // The reload waits for a later task. Content is still telling its observers the
+  // process is gone, and a renderer started before they have all heard is one that
+  // those who track renderers lose.
+  content::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<ShellPage> self) {
+                       if (self) {
+                         self->contents_->GetController().Reload(
+                             content::ReloadType::NORMAL, false);
+                       }
+                     },
+                     weak_factory_.GetWeakPtr()));
 }
 
 // Go gets the key first; one it doesn't use goes to the menu bar.

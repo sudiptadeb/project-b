@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -53,6 +54,7 @@ class ShellPage : public content::WebContentsObserver,
 
   std::unique_ptr<content::WebContents> contents_;
   base::TimeDelta first_paint_;
+  base::WeakPtrFactory<ShellPage> weak_factory_{this};
 };
 
 }  // namespace project_b

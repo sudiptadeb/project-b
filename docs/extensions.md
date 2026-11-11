@@ -220,17 +220,18 @@ To keep the store up, build it and hand it to amarit:
 
 ## The build flag
 
-One switch: `EXTENSIONS=0 tools/build.sh` leaves them out. Default on. It sets three things from
-one variable. What runs is then the Extensions flag's to say, as [flags.md](flags.md) describes.
+Extensions is a build flag (`"build": true` in `core/flags/registry.json`), built in unless
+`WITHOUT=extensions tools/build.sh`. What runs is then the Extensions flag's to say.
+[flags.md](flags.md) describes both.
 
-| Layer | On | Off |
+| Layer | Built in | Left out |
 |---|---|---|
-| GN: `project_b_extensions` (`engine/extensions.gni`) | `engine/extensions/` is compiled and `//extensions` is linked; `BUILDFLAG(PB_EXTENSIONS)` guards the few calls into it from existing files | No dependency on `//extensions`, so nothing of it links |
-| Go: build tag `extensions` | `core/extensions/`, and one tagged file each in `engine`, `mockengine`, `content`, `app`, `cmd/lib`, `cmd/dev` | None of them is compiled |
+| GN: `project_b_extensions` (`engine/flags.gni`) | `engine/extensions/` is compiled and `//extensions` is linked; `BUILDFLAG(PB_EXTENSIONS)` guards the few calls into it from existing files | No dependency on `//extensions`, so nothing of it links |
+| Go: build tag `extensions` | `core/extensions/`, and one tagged file each in `engine`, `mockengine`, `content`, `app`, `cmd/lib`, `cmd/dev`, `flags` | None of them is compiled |
 | Shell: the `@extensions` alias | `shell/src/extensions/` | `shell/src/extensions-off/`, the same names with nothing in them |
 
-Keep a build without extensions in its own folder (`EXTENSIONS=0 OUT=out/noext`). The flag is Mac only; the Android
-build refuses it.
+Keep a build without extensions in its own folder (`WITHOUT=extensions OUT=out/noext`). It is
+Mac only; the Android build leaves it out.
 
 Measured on the build Mac, same arguments otherwise (not official, `symbol_level = 0`):
 
@@ -267,7 +268,7 @@ flag in one folder rebuilds our own files and links again, under a minute, becau
 
 ## Tests
 
-The extension checks are part of two of the existing groups, unless `EXTENSIONS=0`.
+The extension checks are part of two of the existing groups, unless `WITHOUT=extensions`.
 
 - `tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
   tests: the prompt in both pages, a package, load unpacked, pins, the popup, and the `tabs` and
@@ -283,7 +284,7 @@ The extension checks are part of two of the existing groups, unless `EXTENSIONS=
   clicks in it, restarts, turns one off and removes it. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
-- `EXTENSIONS=0 tools/test.sh app` runs `tools/check_no_extensions.py`: the library
+- `WITHOUT=extensions tools/test.sh app` runs `tools/check_no_extensions.py`: the library
   has no symbol of namespace `extensions`, and the main binary none of Go's extension packages.
 
 The mock engine's fake runtime (`core/mockengine/extensions.go`) reads a package's manifest as

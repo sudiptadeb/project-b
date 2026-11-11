@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests extensions in the real app, built with EXTENSIONS=1, through its driver.
+"""Tests extensions in the real app, built with them (no WITHOUT=extensions), through its driver.
 
 It starts the mock store on the folder tools/fetch-extensions.sh and
 tools/pack-test-extension.py fill, starts the app with that store as its store, and
@@ -338,10 +338,10 @@ def flag_off_checks():
     settings(app, "[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Flags').click()")
     settings_wait(app, "!!document.querySelector('#flags')")
     settings_click(app, "[role=switch]")
-    settings_wait(app, "!!document.querySelector('.head .primary')")
+    settings_wait(app, "!!document.querySelector('.row .primary')")
     with open(os.path.join(profile, "flags.json")) as f:
         check("the Extensions switch saves the flag, and Relaunch shows", json.load(f) == {"extensions": "on"})
-    settings_click(app, ".head .primary")
+    settings_click(app, ".row .primary")
     app.proc.wait(timeout=30)
     App.running.remove(app)
     again = []

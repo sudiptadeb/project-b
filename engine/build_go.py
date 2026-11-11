@@ -35,7 +35,7 @@ def main():
     core = os.path.join(repo, "core")
     for root, _, files in os.walk(core):
         for name in files:
-            if name.endswith((".go", ".mod")) and not name.endswith("_test.go"):
+            if name.endswith((".go", ".mod", ".json")) and not name.endswith("_test.go"):
                 rel = os.path.relpath(os.path.join(root, name), core)
                 deps.append(os.path.join(link, "core", rel))
     with open(depfile, "w") as f:

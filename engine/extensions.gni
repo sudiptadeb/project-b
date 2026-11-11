@@ -1,6 +1,0 @@
-declare_args() {
-  # Chrome extensions: Chromium's //extensions and our embedder for it, Go's extension
-  # managers and the shell's extension UI. EXTENSIONS=1 tools/build.sh sets it, with the
-  # Go build tag and the shell's alias. Mac only. See docs/extensions.md.
-  project_b_extensions = false
-}

@@ -1,9 +1,8 @@
 // Extensions on the mock engine, in a real browser: the settings page installs from the
 // test extension's package, loads an unpacked one, turns them off and on and removes them; the toolbar's
 // puzzle menu pins a button, which shows a badge and opens its popup where it sits. Last,
-// a build without EXTENSIONS=1 has none of this in it.
-// Run: node shell/e2e/extensions.cjs   (from the repo root, after `EXTENSIONS=1 npm run build`
-// in shell/, and tools/fetch-extensions.sh and tools/pack-test-extension.py for the store)
+// a build with WITHOUT=extensions has none of this in it.
+// Run: node shell/e2e/extensions.cjs   (from the repo root, after `npm run build` in shell/, and tools/fetch-extensions.sh and tools/pack-test-extension.py for the store)
 
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
@@ -32,7 +31,7 @@ if (!fs.existsSync(path.join(storeDir, 'catalogue.json'))) {
   cannotRun('No mock store: run tools/fetch-extensions.sh and tools/pack-test-extension.py first.');
 }
 if (!fs.readFileSync(path.join(root, 'shell/dist/shell/shell.js'), 'utf8').includes('pbx-')) {
-  cannotRun('shell/dist was built without extensions: run `EXTENSIONS=1 npm run build` in shell/ first.');
+  cannotRun('shell/dist was built without extensions: run `npm run build` in shell/ without WITHOUT=extensions first.');
 }
 
 fs.mkdirSync(out, { recursive: true });
@@ -271,10 +270,9 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   await stopServers();
   fs.rmSync(profile, { recursive: true, force: true });
 
-  // A build without EXTENSIONS=1 has none of the extensions UI in it.
+  // A build with WITHOUT=extensions has none of the extensions UI in it.
   const off = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-no-extensions-'));
-  const env = { ...process.env };
-  delete env.EXTENSIONS;
+  const env = { ...process.env, WITHOUT: 'extensions' };
   const shellDir = path.join(root, 'shell');
   for (const app of fs.readdirSync(path.join(shellDir, 'src/apps'))) {
     execFileSync('npx', ['vite', 'build', '--logLevel', 'error', '--outDir', path.join(off, app)], { cwd: shellDir, env: { ...env, VITE_APP: app }, stdio: 'inherit' });

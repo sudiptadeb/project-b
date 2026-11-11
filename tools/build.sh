@@ -2,17 +2,17 @@
 # Builds the first app's library and two binaries. Flat on purpose; safe to re-run.
 # RELEASE=1 OUT=out/rel tools/build.sh makes an official-style build: no DCHECKs, link-time
 # optimisation, no symbols. It takes hours and can't be rebuilt quickly.
-# Chrome extensions are in the build unless EXTENSIONS=0: the engine's GN arg, Go's build
-# tag and the shell's extension UI, all three from this one switch. They run only while
-# the Extensions flag is on (docs/flags.md). Keep a build without them in a folder of its
-# own (EXTENSIONS=0 OUT=out/noext), so switching doesn't rebuild either.
+# Every build flag (core/flags/registry.json) is built in unless WITHOUT names it:
+# WITHOUT=extensions tools/build.sh. GN, Go's build tags and the shell all read it from
+# there (docs/flags.md). Keep such a build in a folder of its own (OUT=out/noext), so
+# switching doesn't rebuild either.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/chromium/src
 OUT=${OUT:-out/pb}
 RELEASE=${RELEASE:-0}
-export EXTENSIONS=${EXTENSIONS:-1}
+export WITHOUT=${WITHOUT:-}
 TARGETS=${TARGETS:-project_b project_b_helper}
 
 # depot_tools goes in front of the caller's PATH; everything else (npm, go...) stays.
@@ -143,7 +143,7 @@ ARGS
 else
   echo "is_official_build = false" >> "$OUT/args.gn"
 fi
-[ "$EXTENSIONS" = 1 ] && echo "project_b_extensions = true" >> "$OUT/args.gn"
+echo "project_b_without = \"$WITHOUT\"" >> "$OUT/args.gn"
 
 echo "=== $(date '+%F %T') gn gen"
 gn gen "$OUT" 2>&1 | tee "$OUT/gn.log"

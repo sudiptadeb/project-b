@@ -2,7 +2,7 @@
 # that load it. See docs/first-app.md.
 
 import("//build/config/mac/mac_sdk.gni")
-import("//project_b/engine/extensions.gni")
+import("//project_b/engine/flags.gni")
 import("//third_party/inspector_protocol/inspector_protocol.gni")
 import("//tools/grit/repack.gni")
 if (project_b_extensions) {
@@ -28,9 +28,9 @@ action("go_core") {
     rebase_path(depfile, root_build_dir),
     mac_deployment_target,
   ]
-  if (project_b_extensions) {
-    args += [ "extensions" ]
-  }
+
+  # Each build flag the build has is a Go build tag of the same name.
+  args += project_b_built
 }
 
 source_set("go_core_lib") {

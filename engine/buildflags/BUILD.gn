@@ -1,7 +1,7 @@
 # What a build was configured with, for the C++ that differs by it.
 
 import("//build/buildflag_header.gni")
-import("//project_b/engine/extensions.gni")
+import("//project_b/engine/flags.gni")
 
 buildflag_header("buildflags") {
   header = "buildflags.h"

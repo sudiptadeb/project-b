@@ -1,0 +1,26 @@
+# The build flags: the rows of core/flags/registry.json with "build": true. Each is built
+# unless named in project_b_without, which tools/build.sh sets from WITHOUT. A name there
+# that isn't a build flag stops gn gen. docs/flags.md.
+declare_args() {
+  project_b_without = ""
+}
+
+_without = filter_exclude(string_split(project_b_without, ","), [ "" ])
+_build_flags = []
+
+# The ids of the build flags this build has. Each is also the Go build tag.
+project_b_built = []
+foreach(_flag, read_file("//project_b/core/flags/registry.json", "json")) {
+  if (defined(_flag.build) && _flag.build) {
+    _build_flags += [ _flag.id ]
+    if (filter_include([ _flag.id ], _without) == []) {
+      project_b_built += [ _flag.id ]
+    }
+  }
+}
+assert(filter_exclude(_without, _build_flags) == [],
+       "project_b_without names something that isn't a build flag")
+
+# Chrome extensions: Chromium's //extensions and our embedder for it, Go's extension
+# managers and the shell's extension UI. Mac only. docs/extensions.md.
+project_b_extensions = filter_include([ "extensions" ], project_b_built) != []

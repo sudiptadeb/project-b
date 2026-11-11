@@ -1,4 +1,4 @@
-import { readdirSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
@@ -7,10 +7,17 @@ import vue from '@vitejs/plugin-vue';
 // what apps share in src/ (imported as @/). `VITE_APP=<app> vite build` builds one app into
 // dist/<app>/ as index.html, <app>.js and <app>.css; `npm run build` builds every app.
 // `npm run dev` serves them all, with hot reload, against core/cmd/dev on :8765.
-// EXTENSIONS=1 builds or serves them with the extensions UI: @extensions is src/extensions
-// then, and src/extensions-off, which has nothing in it, otherwise.
+// Each build flag in core/flags/registry.json is @<id>: src/<id>, or src/<id>-off, which has
+// the same names with nothing in them, when WITHOUT names it, as tools/build.sh does.
 const dev = 'http://127.0.0.1:8765';
 const apps = resolve(__dirname, 'src/apps');
+const without = (process.env.WITHOUT || '').split(',').filter((id) => id);
+const builds = JSON.parse(readFileSync(resolve(__dirname, '../core/flags/registry.json'), 'utf8')).filter((f) => f.build);
+const unknown = without.filter((id) => !builds.some((f) => f.id === id));
+if (unknown.length) throw new Error(`WITHOUT names what isn't a build flag: ${unknown.join(', ')}`);
+const buildFlags = Object.fromEntries(
+  builds.map((f) => ['@' + f.id, resolve(__dirname, 'src', without.includes(f.id) ? f.id + '-off' : f.id)]),
+);
 
 export default defineConfig(({ command }) => {
   const app = process.env.VITE_APP;
@@ -24,7 +31,7 @@ export default defineConfig(({ command }) => {
     base: './',
     resolve: {
       alias: {
-        '@extensions': resolve(__dirname, process.env.EXTENSIONS === '1' ? 'src/extensions' : 'src/extensions-off'),
+        ...buildFlags,
         '@': resolve(__dirname, 'src'),
       },
     },

@@ -20,12 +20,13 @@
 #   tools/test.sh android   The Android app on the emulator.
 #                           Needs the emulator running and the APK, or PB_APK.
 #
-# Builds have Chrome extensions in them unless made with EXTENSIONS=0, and so do the
-# tests: mock and app add Go's tests with the tag, the extension UI on the mock engine's
-# fake runtime, and the real app installing from the mock store with the Extensions flag
-# on, and running none of it with the flag off. They need tools/fetch-extensions.sh and
-# tools/pack-test-extension.py to have filled .tools/extensions/. EXTENSIONS=0 tests a
-# build made without them (PB_BIN), and app checks that it has no extension code in it.
+# The tests follow the build flags (core/flags/registry.json) as tools/build.sh does: all
+# in unless WITHOUT names them. With extensions in, mock and app add Go's tests with the
+# tag, the extension UI on the mock engine's fake runtime, and the real app installing
+# from the mock store with the Extensions flag on, and running none of it with the flag
+# off. They need tools/fetch-extensions.sh and tools/pack-test-extension.py to have filled
+# .tools/extensions/. WITHOUT=extensions tests a build made without them (PB_BIN), and app
+# checks that it has no extension code in it.
 #
 # Several groups can be named at once. A group or a test that lacks what it needs says so
 # and ends with exit 2 instead of running. Each test prints ok or FAIL per check; the end is
@@ -34,7 +35,12 @@
 set -u
 cd "$(dirname "$0")/.."
 
-EXTENSIONS=${EXTENSIONS:-1}
+export WITHOUT=${WITHOUT:-}
+# The build flags this run has, comma-separated: Go's build tags.
+BUILT=$(python3 -c 'import json, os, sys
+out = set(filter(None, os.environ["WITHOUT"].split(",")))
+print(",".join(f["id"] for f in json.load(open("core/flags/registry.json")) if f.get("build") and f["id"] not in out))')
+built() { case ",$BUILT," in *",$1,"*) return 0 ;; esac; return 1; }
 BIN=${PB_BIN:-chromium/src/out/pb/project_b}
 APK=${PB_APK:-build/android/project-b-content.apk}
 ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-emulator-5600}"
@@ -71,22 +77,21 @@ need_app() {
 mock() {
     [ -d shell/node_modules ] || cannot mock "run \`npm install\` in shell/ first."
     run "Go managers" go -C core test ./...
+    [ -n "$BUILT" ] && run "Go managers, with $BUILT" go -C core test -tags "$BUILT" ./...
     run "build the shell" npm --prefix shell run build
     run "the shell on the mock engine" node shell/e2e/first-app.cjs
     run "the settings page on the mock engine" node shell/e2e/settings.cjs
-    [ "$EXTENSIONS" = 1 ] || return
+    built extensions || return
     need_store mock
-    run "Go managers, with extensions" go -C core test -tags extensions ./...
-    run "build the shell, with extensions" env EXTENSIONS=1 npm --prefix shell run build
     run "extensions on the mock engine" node shell/e2e/extensions.cjs
 }
 
 app() {
     need_app app
-    [ "$EXTENSIONS" = 1 ] && need_store app
+    built extensions && need_store app
     run "the real app through its driver" python3 tools/drive_first_app.py
     run "the real app through ChromeDriver" python3 tools/drive_chromedriver.py
-    if [ "$EXTENSIONS" = 1 ]; then
+    if built extensions; then
         run "extensions in the real app" env PB_BIN="$BIN" python3 tools/drive_extensions.py
     else
         run "no extension code in the app" python3 tools/check_no_extensions.py "$BIN"

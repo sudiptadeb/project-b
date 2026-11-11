@@ -78,6 +78,7 @@ android_static_analysis = "off"
 root_extra_deps = [ "//project_b/engine/android:project_b_apk" ]
 project_b_version = "$VERSION"
 project_b_version_code = $VERSION_CODE
+project_b_without = "extensions"
 ARGS
 
 echo "=== $(date '+%F %T') gn gen"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks that a build made without EXTENSIONS=1 has no extension code in it.
+"""Checks that a build made with WITHOUT=extensions has no extension code in it.
 
     python3 tools/check_no_extensions.py [path to project_b]
 

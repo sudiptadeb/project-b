@@ -257,6 +257,14 @@ def run_parts(parts):
     sys.exit(1 if failures else 0)
 
 
+def version_checks():
+    """--version prints the release, or that it's a development build, and exits without
+    starting the app."""
+    r = subprocess.run([BIN, "--version"], capture_output=True, text=True, timeout=10)
+    want = bundle_version() or "development build"
+    check("--version prints the version and exits", r.returncode == 0 and re.fullmatch(rf"Project B {re.escape(want)}, Chromium [0-9.]+\n", r.stdout) is not None, (r.returncode, r.stdout))
+
+
 def settings_checks():
     """Menus, keys and the settings page in the real app: the menu bar Go builds, keys
     through Go, and the settings page, a page of its own over the whole window."""
@@ -897,4 +905,4 @@ def browsing_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [browsing_checks, settings_checks])
+    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [version_checks, browsing_checks, settings_checks])

@@ -36,7 +36,6 @@ Take an item off when it lands or is dropped.
 
 ## Small fixes
 
-- `--version` prints the version and exits. Do it with the next feature.
 - A page's own full screen (`requestFullscreen()`, such as a video's full-screen button) isn't
   supported: no tab hook takes the window to full screen, so the page's promise never settles.
   Supporting it is the fix; how it behaves is for the owner.

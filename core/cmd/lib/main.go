@@ -317,4 +317,16 @@ func PBGoStats() *C.char {
 	return C.CString(string(b))
 }
 
+// PBVersion is what --version prints first: the release this build is, or "development
+// build" for one that isn't a release. The caller frees the string.
+//
+//export PBVersion
+func PBVersion() *C.char {
+	v := appVersion()
+	if v == "" {
+		v = "development build"
+	}
+	return C.CString("Project B " + v)
+}
+
 func main() {}

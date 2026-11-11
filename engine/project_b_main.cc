@@ -1,10 +1,17 @@
 #include "project_b/engine/abi/pb_main.h"
 
+#include <stdlib.h>
+#include <unistd.h>
+
+#include <string>
 #include <utility>
 
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
+#include "base/files/file_util.h"
+#include "base/strings/strcat.h"
+#include "base/version_info/version_info.h"
 #include "content/public/app/content_main.h"
 #include "content/public/common/content_switches.h"
 #include "project_b/engine/browser/go.h"
@@ -14,6 +21,15 @@
 
 int ProjectBMain(int argc, const char** argv, const PBGoCalls* go) {
   base::CommandLine::Init(argc, argv);
+
+  if (go && base::CommandLine::ForCurrentProcess()->HasSwitch("version")) {
+    char* ours = go->version();
+    std::string line = base::StrCat(
+        {ours, ", Chromium ", version_info::GetVersionNumber(), "\n"});
+    free(ours);
+    base::WriteFileDescriptor(STDOUT_FILENO, line);
+    return 0;
+  }
 
   if (go) {
     // Go's runtime started when the binary loaded and handles SIGSEGV, SIGBUS and

@@ -19,6 +19,9 @@ import (
 // engine/android/build_go.py. The APK's own versionName is the same.
 var version string
 
+// appVersion is the release this APK is.
+func appVersion() string { return version }
+
 // updateConfig describes this build to the updater. The APK is the release: a newer one is
 // downloaded into the profile and handed to Android's package installer, which refuses one
 // signed with another key and asks the user.

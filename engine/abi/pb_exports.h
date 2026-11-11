@@ -23,6 +23,7 @@ void PBForceGC(void);
 int PBRecoverNilDeref(void);
 void PBCrash(int32_t kind);
 char* PBGoStats(void);
+char* PBVersion(void);
 
 #ifdef __cplusplus
 }

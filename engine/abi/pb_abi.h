@@ -179,6 +179,9 @@ typedef struct PBGoCalls {
   void (*crash)(int32_t kind);
   // Returns a string the caller frees with free().
   char* (*go_stats)(void);
+
+  // What --version prints first, such as "Project B 0.2.17". The caller frees it.
+  char* (*version)(void);
 } PBGoCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_ABI_H_

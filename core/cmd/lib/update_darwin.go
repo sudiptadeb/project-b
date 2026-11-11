@@ -12,17 +12,33 @@ import (
 // profile): a downloaded bundle must be signed with it.
 const signingLeafSHA1 = "59b20dfe02ee393a05173eec84daa8c662c845be"
 
-// updateConfig describes this build to the updater. A binary running from a build directory
-// rather than an installed bundle has no version, and never updates.
-func updateConfig(profileDir string) update.Config {
+// installedBundle is the app bundle this binary runs from, or "" for a binary in a build
+// directory.
+func installedBundle() string {
 	exe, err := os.Executable()
 	if err != nil {
-		return update.Config{}
+		return ""
 	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
-	bundle := update.BundleOf(exe)
+	return update.BundleOf(exe)
+}
+
+// appVersion is the version the installed bundle says it is, or "" for a build directory.
+func appVersion() string {
+	bundle := installedBundle()
+	if bundle == "" {
+		return ""
+	}
+	version, _ := update.Version(bundle)
+	return version
+}
+
+// updateConfig describes this build to the updater. A binary running from a build directory
+// rather than an installed bundle has no version, and never updates.
+func updateConfig(profileDir string) update.Config {
+	bundle := installedBundle()
 	if bundle == "" {
 		return update.Config{}
 	}

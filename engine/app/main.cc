@@ -14,6 +14,7 @@ int main(int argc, const char** argv) {
       .recover_nil_deref = PBRecoverNilDeref,
       .crash = PBCrash,
       .go_stats = PBGoStats,
+      .version = PBVersion,
   };
   return ProjectBMain(argc, argv, &go);
 }

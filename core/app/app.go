@@ -45,6 +45,10 @@ type App struct {
 	keyIn engine.Surface
 }
 
+// starters are what a build tag adds to Start. A tagged file appends one when it loads,
+// so nothing here names it; each builds its managers and wires them to the rest.
+var starters []func(a *App, e engine.Engine, cfg Config)
+
 // Start builds everything, on the main thread. The caller then gives the returned App
 // to the engine as its listener.
 func Start(e engine.Engine, cfg Config) *App {
@@ -93,6 +97,9 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
 	a.Window.OnControlsChanged(func(engine.Rect, float64) { a.Commands.RefreshMenu() })
 	a.Commands.Load()
+	for _, start := range starters {
+		start(a, e, cfg)
+	}
 
 	a.History.Load(nil)
 	a.Tabs.Create()

@@ -26,6 +26,9 @@ import (
 //go:embed mock_page.html
 var mockPage embed.FS
 
+// routes are what a build tag adds to the server for its tests.
+var routes []func(mux *http.ServeMux, e *mockengine.Engine)
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
 	shellDir := flag.String("shell", "../shell/dist", "the built pages, one folder each")
@@ -123,6 +126,9 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(out)
 	})
+	for _, add := range routes {
+		add(mux, e)
+	}
 
 	log.Printf("mock engine on http://%s", *addr)
 	log.Fatal(http.ListenAndServe(*addr, mux))

@@ -42,7 +42,18 @@ type Manager struct {
 	run     func(action string)
 	keys    func() map[string]string
 	os      string
+	parts   []Part
 }
+
+// Part is what another manager adds to the shell's contract: its state in the snapshot,
+// and commands of its own. Handle says whether the command was one of its.
+type Part struct {
+	Snapshot func(into map[string]any)
+	Handle   func(t string, msg []byte) bool
+}
+
+// AddPart adds a part.
+func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
 
 // New returns a manager. run runs an action by id, as a menu item would; keys says the key
 // each action shows, on platform os, for the shell's hints.
@@ -59,7 +70,7 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
-		m.send(map[string]any{
+		snapshot := map[string]any{
 			"t":            "snapshot",
 			"engine":       m.eng.Name(),
 			"tabs":         m.tabs.All(),
@@ -76,7 +87,11 @@ func (m *Manager) Handle(msg []byte) {
 			"crashReport":  m.crash.Report(),
 			"platform":     m.os,
 			"keys":         m.keys(),
-		})
+		}
+		for _, p := range m.parts {
+			p.Snapshot(snapshot)
+		}
+		m.send(snapshot)
 	case "navigate":
 		m.tabs.Navigate(c.Text)
 	case "back":
@@ -120,6 +135,11 @@ func (m *Manager) Handle(msg []byte) {
 	case "focusShell":
 		m.eng.FocusShell()
 	default:
+		for _, p := range m.parts {
+			if p.Handle(c.T, msg) {
+				return
+			}
+		}
 		log.Printf("shell: unknown command %q", c.T)
 	}
 }
@@ -171,6 +191,9 @@ func (m *Manager) FocusAddressBar() {
 	m.eng.FocusShell()
 	m.send(map[string]any{"t": "focusAddressBar"})
 }
+
+// Send sends one message to the shell, for a part.
+func (m *Manager) Send(v any) { m.send(v) }
 
 // send sends to the shell.
 func (m *Manager) send(v any) {

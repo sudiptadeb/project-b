@@ -64,6 +64,9 @@ type Events struct {
 	OnModsChanged     func(m engine.Mods)
 	OnProcessCrashed  func(p engine.ProcessCrash)
 	OnDevTools        func(method string, params []byte) (result any, err error)
+
+	// more are the events a build tag adds, by number.
+	more map[Hook]func(r *reader) (Value, bool)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -113,6 +116,10 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 			log.Printf("content: bad OS bindings: %v", err)
 		} else if e.OnOSBindings != nil {
 			e.OnOSBindings(byTitle)
+		}
+	default:
+		if f := e.more[id]; f != nil {
+			return f(r)
 		}
 	case eventProcessCrashed:
 		if e.OnProcessCrashed != nil {

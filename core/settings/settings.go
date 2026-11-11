@@ -33,6 +33,29 @@ type Manager struct {
 	update   *update.Manager
 	commands *commands.Manager
 	open     bool
+	// section is the section a caller asked the page to show, or "" for its first.
+	section string
+	parts   []Part
+}
+
+// Part is what another manager adds to the settings page's contract: its state in the
+// snapshot, and commands of its own. Handle says whether the command was one of its.
+type Part struct {
+	Snapshot func(into map[string]any)
+	Handle   func(t string, msg []byte) bool
+}
+
+// AddPart adds a part.
+func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
+
+// OpenSection opens the settings page at one of its sections, by id.
+func (m *Manager) OpenSection(section string) {
+	m.section = section
+	if m.open {
+		m.send(map[string]any{"t": "section", "section": section})
+		return
+	}
+	m.Open()
 }
 
 // New returns a manager.
@@ -56,6 +79,7 @@ func (m *Manager) Close() {
 		return
 	}
 	m.open = false
+	m.section = ""
 	m.commands.SetRecording(false)
 	m.eng.CloseSettings()
 }
@@ -72,7 +96,7 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
-		m.send(map[string]any{
+		snapshot := map[string]any{
 			"t":            "snapshot",
 			"windowColor":  m.window.Color(),
 			"frameWidth":   m.window.FrameWidth(),
@@ -84,7 +108,12 @@ func (m *Manager) Handle(msg []byte) {
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"keyboard":     m.commands.View(),
-		})
+		}
+		snapshot["section"] = m.section
+		for _, p := range m.parts {
+			p.Snapshot(snapshot)
+		}
+		m.send(snapshot)
 	case "close":
 		m.Close()
 	case "setTabLayout":
@@ -116,6 +145,11 @@ func (m *Manager) Handle(msg []byte) {
 	case "recording":
 		m.commands.SetRecording(c.On)
 	default:
+		for _, p := range m.parts {
+			if p.Handle(c.T, msg) {
+				return
+			}
+		}
 		log.Printf("settings: unknown command %q", c.T)
 	}
 }
@@ -150,6 +184,9 @@ func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
 func (m *Manager) KeyboardChanged() {
 	m.send(map[string]any{"t": "keyboard", "keyboard": m.commands.View()})
 }
+
+// Send sends one message to the settings page while it is open, for a part.
+func (m *Manager) Send(v any) { m.send(v) }
 
 func (m *Manager) send(v any) {
 	if !m.open {

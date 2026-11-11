@@ -3,6 +3,7 @@
 
 import { reactive } from 'vue';
 import { bridge } from '@/bridge.js';
+import { extensionsMessage } from '@extensions';
 
 const channel = bridge('settings');
 export const send = channel.send;
@@ -18,12 +19,16 @@ export const state = reactive({
   autoUpdate: true,
   update: { phase: '' },
   running: '',
+  // The section showing: the one Go asks for when it opens the page at one, or the one the
+  // user picked. '' is the first.
+  section: '',
   keyboard: { platform: 'mac', templates: [], template: '', following: true, groups: [], missing: [], gone: [], problems: [] },
 });
 
 export function connect() {
   channel.listen(
     (m) => {
+      extensionsMessage(m);
       switch (m.t) {
         case 'snapshot':
           Object.assign(state, {
@@ -36,6 +41,7 @@ export function connect() {
             update: m.update,
             running: m.running,
             keyboard: m.keyboard,
+            section: m.section,
             ready: true,
           });
           break;
@@ -56,6 +62,9 @@ export function connect() {
           break;
         case 'controls':
           state.controls = m.controls;
+          break;
+        case 'section':
+          state.section = m.section;
           break;
         case 'keyboard':
           state.keyboard = m.keyboard;

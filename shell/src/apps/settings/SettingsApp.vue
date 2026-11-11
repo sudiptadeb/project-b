@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { extensionsSection } from '@extensions';
 import { phone } from '@/phone.js';
 import { useTheme } from '@/theme.js';
 import General from './General.vue';
@@ -10,11 +11,13 @@ import { send, state } from './state.js';
 // frame colour and the theme, as the shell's do.
 useTheme(state);
 
+// The page shows state.section when it is one of these, else the first.
 const sections = [
-  { id: 'general', label: 'General' },
-  { id: 'keyboard', label: 'Keyboard' },
-];
-const section = ref('general');
+  { id: 'general', label: 'General', component: General },
+  { id: 'keyboard', label: 'Keyboard', component: Keyboard },
+  extensionsSection,
+].filter((s) => s);
+const section = computed(() => sections.find((s) => s.id === state.section) || sections[0]);
 
 // The header leaves the native window buttons their space, as the shell's top row does.
 const headerStart = computed(() => {
@@ -26,7 +29,8 @@ function close() {
   send({ t: 'close' });
 }
 
-// Escape closes, unless a key is being recorded, which takes Escape for itself.
+// Escape closes, unless something on the page took Escape for itself: a key being
+// recorded, or a dialog.
 function onKey(e) {
   if (e.key === 'Escape' && !e.defaultPrevented) close();
 }
@@ -43,20 +47,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
       </button>
     </header>
     <div class="body">
-      <!-- A phone has no keyboard shortcuts, so only General applies there. -->
+      <!-- A phone has no keyboard shortcuts or extensions, so only General applies there. -->
       <nav v-if="!phone" class="nav" aria-label="Settings sections">
         <button
           v-for="s in sections"
           :key="s.id"
           type="button"
           class="nav-item"
-          :aria-current="section === s.id ? 'page' : undefined"
-          @click="section = s.id"
+          :aria-current="section === s ? 'page' : undefined"
+          @click="state.section = s.id"
         >{{ s.label }}</button>
       </nav>
       <main class="content">
-        <General v-if="phone || section === 'general'" />
-        <Keyboard v-else />
+        <General v-if="phone" />
+        <component :is="section.component" v-else />
       </main>
     </div>
   </div>

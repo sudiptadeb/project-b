@@ -25,7 +25,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import drive_first_app as d  # noqa: E402
-from drive_chromedriver import cdp, listening_ports, ws_open  # noqa: E402
+from drive_chromedriver import cdp, listening_ports, ws_open, ws_send  # noqa: E402
 
 ROOT = d.ROOT
 OUT = os.path.join(ROOT, "build/basics")
@@ -431,7 +431,26 @@ def a30(app):
 
 
 def a31(app):
-    not_written("the behaviour is undecided: recover from a Go panic in a hook, or crash loudly")
+    """Go's first panic is caught and the browser carries on; the second crashes the app.
+    ProjectB.panic, our own DevTools command, panics inside Go's hook as a bug would."""
+    version = json.load(urllib.request.urlopen(f"http://127.0.0.1:{devtools(app.profile)}/json/version"))
+    s = ws_open(version["webSocketDebuggerUrl"])[0]
+    before = cdp(s, 1, "ProjectB.getTabs")
+    if len(before.get("result", {}).get("tabs", [])) != 1:
+        return False, f"ProjectB.getTabs gave {before}"
+    cdp(s, 2, "ProjectB.panic")
+    after = cdp(s, 3, "ProjectB.getTabs")
+    log = open(os.path.join(app.profile, "crashes.log")).read() if os.path.exists(os.path.join(app.profile, "crashes.log")) else ""
+    if "result" not in after or "Go recovered a panic" not in log:
+        return False, f"after the first panic: {after}, crashes.log {log!r}"
+    ws_send(s, json.dumps({"id": 4, "method": "ProjectB.panic", "params": {}}))
+    try:
+        code = app.proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        return False, "the app carried on after a second panic"
+    d.App.running.remove(app)
+    crash = open(os.path.join(app.profile, "crash.log")).read()
+    return code != 0 and "a second panic in Go" in crash, f"exit code {code}, crash.log {crash[:120]!r}"
 
 
 def a32(app):
@@ -531,7 +550,7 @@ AREAS = [
     (28, "Safe Browsing: a malware test page warns", a28, ()),
     (29, "shell bridge: pages have no chrome.send", a29, ()),
     (30, "renderer crash: a crashed tab comes back on reload", a30, ()),
-    (31, "Go-side faults", a31, ()),
+    (31, "Go-side faults: the first panic is caught, the second crashes", a31, ("--remote-debugging-port=0",)),
     (32, "session restore: the tabs come back after a crash", a32, ()),
     (33, "shutdown: closing with a load in flight exits cleanly", a33, ()),
     (34, "updates: the updater's own tests", a34, ()),
@@ -550,7 +569,7 @@ def attempt(fn, extra, out):
     extra = [e.replace("PROXY", f"127.0.0.1:{PORT}") for e in extra]
     try:
         app = None
-        if fn not in (a11, a31, a34, a38):
+        if fn not in (a11, a34, a38):
             app = start(extra)
             app.profile = app.proc.args[1].split("=", 1)[1]
             ready(app)

@@ -135,7 +135,7 @@ func (m *Manager) Handle(msg []byte) {
 	case "closeTab":
 		m.Interaction("tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":
-		m.tabs.Activate(engine.TabID(c.ID))
+		m.Interaction("tab.activate", func() { m.tabs.Activate(engine.TabID(c.ID)) })
 	case "setTabLayout":
 		m.SwitchTabLayout(c.Text)
 	case "run":

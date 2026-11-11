@@ -9,7 +9,9 @@
 
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
+#include "base/time/time.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "project_b/engine/browser/timeline.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
@@ -460,6 +462,16 @@ gfx::RectF Window::popup_bounds() const {
                     f.size.width, f.size.height);
 }
 #endif
+
+void Window::NoteClick(const gfx::PointF& in_window, base::TimeTicks made) {
+  PBContainerView* container = impl_->container;
+  NSView* hit = [container hitTest:NSMakePoint(in_window.x(), in_window.y())];
+  if (hit && ([hit isDescendantOf:container.shellView] ||
+              (container.overlayView &&
+               [hit isDescendantOf:container.overlayView]))) {
+    timeline::Input("input.click", made);
+  }
+}
 
 void Window::RemoveOverlayView(gfx::NativeView view) {
   NSView* overlay = view.GetNativeNSView();

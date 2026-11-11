@@ -12,12 +12,17 @@
 #include "base/json/json_writer.h"
 #include "base/observer_list.h"
 #include "base/strings/sys_string_conversions.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "project_b/engine/abi/pb_abi.h"
+#include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/timeline.h"
+#include "project_b/engine/browser/window.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_code_conversion_mac.h"
+#include "ui/gfx/geometry/point_f.h"
 
 #import "base/mac/scoped_sending_event.h"
 #import "base/message_loop/message_pump_apple.h"
@@ -47,6 +52,19 @@
   base::mac::ScopedSendingEvent sendingEventScoper;
   content::ScopedNotifyNativeEventProcessorObserver scopedObserverNotifier(
       &self->_observers, event);
+  // A key press or a click goes on the timeline with the time the OS made it, before
+  // anything of ours handles it. NSEvent counts its seconds on TimeTicks' clock.
+  const base::TimeTicks made =
+      base::TimeTicks() + base::Seconds(event.timestamp);
+  project_b::Engine* engine = project_b::Engine::Get();
+  if (event.type == NSEventTypeKeyDown && !event.isARepeat) {
+    project_b::timeline::Input("input.key", made);
+  } else if (event.type == NSEventTypeLeftMouseUp && engine &&
+             event.window ==
+                 engine->window()->native_window().GetNativeNSWindow()) {
+    engine->window()->NoteClick(
+        gfx::PointF(event.locationInWindow.x, event.locationInWindow.y), made);
+  }
   [super sendEvent:event];
   // Content drops a modifier's release after a key the browser handled, so Go hears
   // about modifiers here, from the app, for actions held like the app switcher.

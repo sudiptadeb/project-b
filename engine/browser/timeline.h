@@ -38,6 +38,12 @@ void MarkAt(std::string_view name, base::TimeTicks at);
 void Begin(std::string_view name);
 void End(std::string_view name);
 
+// One click or key press, as a span: it begins when the OS made the event, by the
+// event's own time, has the stage "<name>.window" now, as our window gets it, and is
+// ended by whoever the event was for once it has it: the page's script for a click
+// ("input.click"), Go for a key ("input.key"). The first gap is the OS's, the second ours.
+void Input(std::string_view name, base::TimeTicks made);
+
 // Call from DidFinishNavigation of one of our pages, "shell" or "settings". When the
 // page's document committed, its JavaScript's clock started at the navigation's start;
 // this tells the timeline when that was, and marks "<page>.committed".

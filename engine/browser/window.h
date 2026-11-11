@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "project_b/engine/buildflags/buildflags.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
@@ -135,6 +137,11 @@ class Window {
   void Maximize();
   void SetFullscreen(bool fullscreen);
   void Restore();
+
+  // A click the OS made at this time, at this point in the window's own coordinates, is
+  // about to be delivered. One the shell or the settings page will get goes on the
+  // timeline, as "input.click".
+  void NoteClick(const gfx::PointF& in_window, base::TimeTicks made);
 
   gfx::NativeWindow native_window() const;
   // Development only, for the driver.

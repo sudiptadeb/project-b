@@ -32,6 +32,7 @@
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
+#include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
@@ -162,6 +163,11 @@ std::string SendMouse(NSEventType type, double x, double y, int clicks) {
       [hit mouseDown:event];
       break;
     case NSEventTypeLeftMouseUp:
+      // What the window's sendEvent: does, which nothing calls here.
+      if (kind == "shell" || kind == "settings") {
+        timeline::Input("input.click",
+                        base::TimeTicks() + base::Seconds(event.timestamp));
+      }
       [hit mouseUp:event];
       break;
     default:
@@ -185,6 +191,8 @@ void SendKey(NSString* chars, unsigned short code, NSEventModifierFlags flags) {
                                        keyCode:code];
     NSResponder* responder = window.firstResponder;
     if (type == NSEventTypeKeyDown) {
+      timeline::Input("input.key",
+                      base::TimeTicks() + base::Seconds(event.timestamp));
       if ((flags & NSEventModifierFlagCommand) &&
           [responder performKeyEquivalent:event]) {
         continue;

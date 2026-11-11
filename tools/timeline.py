@@ -5,8 +5,11 @@ An entry is a dict as ProjectB.getTimeline gives it: seq, t (nanoseconds since p
 start), kind, src, name, text, and dur on an end. The same entries come from the lines
 of timeline.log or of Android's logcat, through parse().
 
-Run on a file, it writes a trace that ui.perfetto.dev and chrome://tracing open:
+Run on a file, it prints every span with its stages, in milliseconds since the span
+began, and with a second file writes a trace that ui.perfetto.dev and chrome://tracing
+open:
 
+    tools/timeline.py ~/.project-b/default/timeline.log
     tools/timeline.py ~/.project-b/default/timeline.log trace.json
 """
 
@@ -92,10 +95,16 @@ def trace(entries):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
     with open(sys.argv[1], errors="replace") as f:
         found = parse(f)
-    with open(sys.argv[2], "w") as f:
-        json.dump(trace(found), f)
-    print(f"{len(found)} entries -> {sys.argv[2]}")
+    if len(sys.argv) == 3:
+        with open(sys.argv[2], "w") as f:
+            json.dump(trace(found), f)
+        print(f"{len(found)} entries -> {sys.argv[2]}")
+    else:
+        for span in spans(found):
+            stages = sorted(span["stages"].items(), key=lambda kv: kv[1])
+            print("%12.3f %-14s %9.3f ms  %s" % (span["begin"] / 1e6, span["name"], span["dur"] / 1e6,
+                                                 "  ".join("%s %.3f" % (n.removeprefix(span["name"]), t / 1e6) for n, t in stages)))

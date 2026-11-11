@@ -341,6 +341,13 @@ def timeline_checks():
     moved = span_after(lambda: click(app, "button[aria-label^='Tabs on']"), "tabs.layout")
     check("moving the tabs is a span that covers the page moving", in_order(moved, ["tabs.layout.go", "tabs.layout.done", "tabs.layout.page_moved"]), moved)
 
+    # Each click and key press is a span of its own, from the OS's time for the event to
+    # our code having it, with the window getting it between.
+    inputs = [s for s in timeline.spans(read()) if s["name"] in ("input.click", "input.key")]
+    check("a click and a key press are each a span from the OS's event, through the window, to the shell or Go",
+          {"input.click", "input.key"} <= {s["name"] for s in inputs} and
+          all(0 <= s["stages"].get(s["name"] + ".window", -1) <= s["dur"] < 5e9 for s in inputs), inputs[:4])
+
     # A LOG in the engine's C++ is an entry.
     app.cmd("strayshell")
     logged = lambda es, src, kind: [e for e in es if e["src"] == src and e["kind"] == kind]

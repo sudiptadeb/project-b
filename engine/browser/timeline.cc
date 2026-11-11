@@ -103,6 +103,11 @@ void End(std::string_view name) {
   Record(PB_TIMELINE_END, base::TimeTicks(), name, {});
 }
 
+void Input(std::string_view name, base::TimeTicks made) {
+  Record(PB_TIMELINE_BEGIN, made, name, {});
+  Mark(base::StrCat({name, ".window"}));
+}
+
 void PageCommitted(std::string_view page, content::NavigationHandle* handle) {
   if (!handle->IsInPrimaryMainFrame() || !handle->HasCommitted() ||
       handle->IsSameDocument()) {

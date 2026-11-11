@@ -15,6 +15,7 @@ import (
 	"projectb/shell"
 	"projectb/suggest"
 	"projectb/tabs"
+	"projectb/timeline"
 	"projectb/update"
 	"projectb/window"
 )
@@ -176,6 +177,8 @@ func themeOf(t string) engine.Theme {
 // Key hands a key press to the commands manager, which decides what it runs.
 func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
 	a.keyIn = in
+	// The key press the window put on the timeline has reached us.
+	timeline.End("input.key")
 	return a.Commands.Key(k, phase)
 }
 

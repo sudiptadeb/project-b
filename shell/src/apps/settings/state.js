@@ -7,7 +7,7 @@ import { extensionsMessage } from '@extensions';
 
 const channel = bridge('settings');
 export const send = channel.send;
-export const { mark, end, firstPaint } = channel.timeline;
+export const { mark, end, firstPaint, inputs } = channel.timeline;
 
 export const state = reactive({
   ready: false,

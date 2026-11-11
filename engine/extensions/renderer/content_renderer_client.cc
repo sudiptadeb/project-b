@@ -8,7 +8,10 @@
 #include "extensions/renderer/dispatcher.h"
 #include "extensions/renderer/extensions_renderer_client.h"
 #include "services/service_manager/public/cpp/binder_registry.h"
+#include "url/gurl.h"
 #include "third_party/blink/public/platform/web_string.h"
+#include "third_party/blink/public/web/web_document.h"
+#include "third_party/blink/public/web/web_local_frame.h"
 #include "third_party/blink/public/web/web_security_policy.h"
 
 namespace project_b {
@@ -30,6 +33,17 @@ class RendererClient : public extensions::ExtensionsRendererClient {
   }
 };
 
+// The Chrome Web Store's page in Project B's words: its Add and Remove button names
+// Project B, and the banner telling the visitor to switch to Chrome is gone. The button
+// is found by the class the store's markup gives it from the first paint; once the
+// store's script runs, the Remove state carries a name of its own (jsname).
+constexpr char kWebStoreHost[] = "chromewebstore.google.com";
+constexpr char kWebStoreCss[] = R"css(
+button[data-idom-class=Bd8P3] > span[jsname=V67aGc] { font-size: 0; }
+button[data-idom-class=Bd8P3] > span[jsname=V67aGc]::after { content: "Add to Project B"; font-size: 14px; }
+button[data-idom-class=Bd8P3][jsname=ajZLRd] > span[jsname=V67aGc]::after { content: "Remove from Project B"; }
+.xX710b:has(button[jsname=oGfC5c]) { display: none; }
+)css";
 // The Mojo interfaces //extensions offers the browser from a frame. It adds them to
 // this registry when the frame is made, and content asks here when the browser binds
 // one. It lives and dies with its frame.
@@ -81,6 +95,12 @@ void ContentRendererClient::WebViewCreated(blink::WebView* web_view,
 
 void ContentRendererClient::RunScriptsAtDocumentStart(
     content::RenderFrame* render_frame) {
+  blink::WebLocalFrame* frame = render_frame->GetWebFrame();
+  if (render_frame->IsMainFrame() &&
+      GURL(frame->GetDocument().Url()).host() == kWebStoreHost) {
+    frame->GetDocument().InsertStyleSheet(
+        blink::WebString::FromUtf8(kWebStoreCss));
+  }
   extensions_->RunScriptsAtDocumentStart(render_frame);
 }
 

@@ -1,6 +1,6 @@
 # To do
 
-What is decided but not built, and what is waiting for a discussion. Last updated 2026-11-10.
+What is decided but not built, and what is waiting for a discussion. Last updated 2026-11-11.
 Take an item off when it lands or is dropped.
 
 ## For discussion with the owner first
@@ -32,6 +32,10 @@ Take an item off when it lands or is dropped.
   behaviour is listed in [extensions.md](extensions.md#checks-to-discuss). No release carries
   the flag until those are decided, and until the URL policy above covers what extensions
   request.
+- **Checking store packages against Google's signature.** Today a Web Store package is held to
+  the plain CRX3 check only, not to Google's publisher proof. No checks for now, by the owner's
+  call; to discuss later.
+- **The window's drag region.** Whether it can be simplified. The current fix is in 0.2.23.
 
 ## Decided, not started
 

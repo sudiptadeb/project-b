@@ -59,6 +59,43 @@ JSON.stringify(all.filter(w => w.kCGWindowLayer == 0 && ["Project B", "project_b
 """
 
 
+# A left-button drag from (x1, y1) by (dx, dy) in screen points, in 20 steps, posted inside
+# the VM with each event's movement set. The window server moves a window by those
+# movements; Screen Sharing's pointer events carry movements that lose part of a drag, so
+# over it even Terminal's title bar moved only some of the way.
+DRAG = """
+ObjC.import("CoreGraphics");
+ObjC.import("Foundation");
+function run(argv) {
+  const [x1, y1, dx, dy] = argv.map(Number);
+  const post = (type, x, y, mx, my) => {
+    const e = $.CGEventCreateMouseEvent($(), type, $.CGPointMake(x, y), $.kCGMouseButtonLeft);
+    $.CGEventSetIntegerValueField(e, $.kCGMouseEventDeltaX, mx);
+    $.CGEventSetIntegerValueField(e, $.kCGMouseEventDeltaY, my);
+    $.CGEventPost($.kCGHIDEventTap, e);
+  };
+  post($.kCGEventMouseMoved, x1, y1, 0, 0);
+  $.NSThread.sleepForTimeInterval(0.3);
+  post($.kCGEventLeftMouseDown, x1, y1, 0, 0);
+  $.NSThread.sleepForTimeInterval(0.2);
+  let x = x1, y = y1;
+  for (let i = 1; i <= 20; i++) {
+    const nx = Math.round(x1 + dx * i / 20), ny = Math.round(y1 + dy * i / 20);
+    post($.kCGEventLeftMouseDragged, nx, ny, nx - x, ny - y);
+    x = nx;
+    y = ny;
+    $.NSThread.sleepForTimeInterval(0.02);
+  }
+  $.NSThread.sleepForTimeInterval(0.2);
+  post($.kCGEventLeftMouseUp, x, y, 0, 0);
+}
+"""
+
+
+def drag(x1, y1, x2, y2):
+    guest("/usr/bin/osascript", "-l", "JavaScript", "-e", DRAG, *map(str, (x1, y1, x2 - x1, y2 - y1)))
+
+
 def window():
     """The app's largest window as (x, y, w, h), or None."""
     found = json.loads(guest("/usr/bin/osascript", "-l", "JavaScript", "-e", WINDOWS) or "[]")
@@ -250,7 +287,7 @@ def drags(name, x, y, home, expect="moves the window"):
     """expect is "moves the window", "resizes the window" for the edges AppKit keeps for
     itself, or "leaves the window alone"."""
     win = window_or_stop(f"dragging {name} {expect}")
-    vnc.drag(win[0] + x, win[1] + y, win[0] + x + MOVE[0], win[1] + y + MOVE[1])
+    drag(win[0] + x, win[1] + y, win[0] + x + MOVE[0], win[1] + y + MOVE[1])
     time.sleep(0.6)
     now = window()
     moved, resized = (now[0] - win[0], now[1] - win[1]), (now[2] - win[2], now[3] - win[3])
@@ -282,7 +319,7 @@ def selects_text(home):
     time.sleep(0.3)
     win = window_or_stop("dragging across the address field selects text, not the window")
     text = V["field"][0] + 12  # The input's padding.
-    vnc.drag(win[0] + text + 10, win[1] + TOP, win[0] + text + 90, win[1] + TOP)
+    drag(win[0] + text + 10, win[1] + TOP, win[0] + text + 90, win[1] + TOP)
     time.sleep(0.6)
     now = window()
     shot("address-field-drag")

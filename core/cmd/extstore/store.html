@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Mock extension store</title>
+<style>
+  body { font: 14px/1.4 system-ui; margin: 32px auto; max-width: 720px; padding: 0 16px; }
+  h1 { font-size: 18px; }
+  li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #ddd; }
+  ul { list-style: none; padding: 0; }
+  img { width: 32px; height: 32px; }
+  .text { flex: 1; min-width: 0; }
+  .description { color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button { font: inherit; padding: 4px 12px; }
+</style>
+<h1>Mock extension store</h1>
+<p>Each button installs as the Chrome Web Store's does, through <code>chrome.webstorePrivate</code>.
+  The browser gives this page that API when it is started with
+  <code>--apps-gallery-url</code> naming this address.</p>
+<ul id="items"></ul>
+<script>
+// The store's page: the catalogue, with a button for each extension. A press hands the
+// browser the extension's manifest, which it asks the user about, and on yes tells it to
+// download and install the package.
+const list = document.getElementById('items');
+
+function say(item, text) {
+  item.querySelector('.status').textContent = text;
+}
+
+async function install(entry, item) {
+  if (!chrome.webstorePrivate) {
+    say(item, 'This page has no chrome.webstorePrivate.');
+    return;
+  }
+  const manifest = await (await fetch('manifest/' + entry.id)).text();
+  chrome.webstorePrivate.beginInstallWithManifest3({ id: entry.id, manifest, localizedName: entry.name }, (result) => {
+    if (chrome.runtime.lastError) {
+      say(item, chrome.runtime.lastError.message);
+      return;
+    }
+    say(item, 'Installing');
+    chrome.webstorePrivate.completeInstall(entry.id, () => {
+      say(item, chrome.runtime.lastError ? chrome.runtime.lastError.message : 'Installed');
+    });
+  });
+}
+
+fetch('catalogue.json').then((r) => r.json()).then((catalogue) => {
+  for (const entry of catalogue) {
+    const item = document.createElement('li');
+    item.dataset.id = entry.id;
+    const icon = document.createElement('img');
+    icon.src = entry.icon;
+    icon.alt = '';
+    const text = document.createElement('div');
+    text.className = 'text';
+    const name = document.createElement('div');
+    name.textContent = entry.name + ' ' + entry.version;
+    const description = document.createElement('div');
+    description.className = 'description';
+    description.textContent = entry.description;
+    text.append(name, description);
+    const status = document.createElement('span');
+    status.className = 'status';
+    const button = document.createElement('button');
+    button.textContent = 'Add to Project B';
+    button.addEventListener('click', () => install(entry, item));
+    item.append(icon, text, status, button);
+    list.append(item);
+  }
+});
+</script>

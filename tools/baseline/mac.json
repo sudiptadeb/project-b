@@ -1,0 +1,323 @@
+{
+ "commit": "eb7e957",
+ "date": "2026-11-12",
+ "machine": "arm64, macOS 26.7.1",
+ "platform": "mac",
+ "session": "a person's desktop",
+ "spans": {
+  "input.click": {
+   "dur": {
+    "max": 7.511,
+    "median": 2.474,
+    "min": 1.097,
+    "n": 60
+   },
+   "stages": {
+    "input.click.window": {
+     "max": 0.182,
+     "median": 0.021,
+     "min": 0.008,
+     "n": 60
+    }
+   }
+  },
+  "input.key": {
+   "dur": {
+    "max": 1.77,
+    "median": 0.544,
+    "min": 0.173,
+    "n": 30
+   },
+   "stages": {
+    "input.key.window": {
+     "max": 0.103,
+     "median": 0.034,
+     "min": 0.009,
+     "n": 30
+    }
+   }
+  },
+  "settings.open": {
+   "dur": {
+    "max": 142.595,
+    "median": 132.396,
+    "min": 118.051,
+    "n": 10
+   },
+   "stages": {
+    "settings.committed": {
+     "max": 20.254,
+     "median": 16.125,
+     "min": 11.675,
+     "n": 10
+    },
+    "settings.first_paint": {
+     "max": 80.395,
+     "median": 70.696,
+     "min": 63.638,
+     "n": 10
+    },
+    "settings.mounted": {
+     "max": 42.34,
+     "median": 38.125,
+     "min": 33.238,
+     "n": 10
+    },
+    "settings.navigation_start": {
+     "max": 3.51,
+     "median": 2.483,
+     "min": 2.038,
+     "n": 10
+    },
+    "settings.on_screen": {
+     "max": 142.595,
+     "median": 132.396,
+     "min": 118.051,
+     "n": 10
+    },
+    "settings.open.created": {
+     "max": 2.706,
+     "median": 1.925,
+     "min": 1.565,
+     "n": 10
+    },
+    "settings.open.go": {
+     "max": 0.484,
+     "median": 0.285,
+     "min": 0.15,
+     "n": 10
+    },
+    "settings.open.shown": {
+     "max": 3.431,
+     "median": 2.419,
+     "min": 1.977,
+     "n": 10
+    },
+    "settings.ready": {
+     "max": 43.252,
+     "median": 38.974,
+     "min": 34.169,
+     "n": 10
+    },
+    "settings.script": {
+     "max": 36.34,
+     "median": 31.925,
+     "min": 27.138,
+     "n": 10
+    },
+    "settings.snapshot": {
+     "max": 44.54,
+     "median": 40.175,
+     "min": 35.438,
+     "n": 10
+    }
+   }
+  },
+  "tab.activate": {
+   "dur": {
+    "max": 20.3,
+    "median": 13.65,
+    "min": 10.9,
+    "n": 10
+   },
+   "stages": {
+    "tab.activate.done": {
+     "max": 3.213,
+     "median": 1.695,
+     "min": 1.455,
+     "n": 10
+    },
+    "tab.activate.go": {
+     "max": 0.272,
+     "median": 0.157,
+     "min": 0.007,
+     "n": 10
+    }
+   }
+  },
+  "tab.close": {
+   "dur": {
+    "max": 30.5,
+    "median": 11.95,
+    "min": 3.734,
+    "n": 20
+   },
+   "stages": {
+    "tab.close.done": {
+     "max": 4.43,
+     "median": 2.48,
+     "min": 0.964,
+     "n": 20
+    },
+    "tab.close.go": {
+     "max": 0.181,
+     "median": 0.012,
+     "min": 0.0,
+     "n": 20
+    }
+   }
+  },
+  "tab.new": {
+   "dur": {
+    "max": 29.925,
+    "median": 20.85,
+    "min": 12.2,
+    "n": 20
+   },
+   "stages": {
+    "tab.new.done": {
+     "max": 23.554,
+     "median": 12.365,
+     "min": 6.082,
+     "n": 20
+    },
+    "tab.new.go": {
+     "max": 5.516,
+     "median": 0.028,
+     "min": 0.0,
+     "n": 20
+    }
+   }
+  },
+  "tabs.layout": {
+   "dur": {
+    "max": 37.9,
+    "median": 29.95,
+    "min": 22.0,
+    "n": 20
+   },
+   "stages": {
+    "tabs.layout.done": {
+     "max": 9.499,
+     "median": 5.998,
+     "min": 3.905,
+     "n": 20
+    },
+    "tabs.layout.go": {
+     "max": 0.782,
+     "median": 0.201,
+     "min": 0.097,
+     "n": 20
+    },
+    "tabs.layout.page_moved": {
+     "max": 24.331,
+     "median": 14.314,
+     "min": 7.936,
+     "n": 20
+    }
+   }
+  }
+ },
+ "starts": 10,
+ "startup": {
+  "content.ready": {
+   "max": 100.626,
+   "median": 67.83,
+   "min": 58.449,
+   "n": 10
+  },
+  "go.started": {
+   "max": 162.14,
+   "median": 122.068,
+   "min": 113.434,
+   "n": 10
+  },
+  "go.starting": {
+   "max": 153.967,
+   "median": 114.057,
+   "min": 106.017,
+   "n": 10
+  },
+  "main.entered": {
+   "max": 55.226,
+   "median": 26.776,
+   "min": 23.656,
+   "n": 10
+  },
+  "process.start": {
+   "max": 0.0,
+   "median": 0.0,
+   "min": 0.0,
+   "n": 10
+  },
+  "shell.committed": {
+   "max": 252.634,
+   "median": 197.131,
+   "min": 184.087,
+   "n": 10
+  },
+  "shell.created": {
+   "max": 149.523,
+   "median": 109.672,
+   "min": 101.858,
+   "n": 10
+  },
+  "shell.first_paint": {
+   "max": 287.563,
+   "median": 230.058,
+   "min": 215.435,
+   "n": 10
+  },
+  "shell.mounted": {
+   "max": 277.463,
+   "median": 220.258,
+   "min": 205.22,
+   "n": 10
+  },
+  "shell.navigation_start": {
+   "max": 149.663,
+   "median": 109.908,
+   "min": 102.02,
+   "n": 10
+  },
+  "shell.on_screen": {
+   "max": 353.663,
+   "median": 295.908,
+   "min": 279.335,
+   "n": 10
+  },
+  "shell.ready": {
+   "max": 277.775,
+   "median": 220.568,
+   "min": 205.506,
+   "n": 10
+  },
+  "shell.script": {
+   "max": 265.363,
+   "median": 207.908,
+   "min": 193.32,
+   "n": 10
+  },
+  "shell.snapshot": {
+   "max": 289.463,
+   "median": 232.208,
+   "min": 217.435,
+   "n": 10
+  },
+  "tab.committed": {
+   "max": 246.156,
+   "median": 189.747,
+   "min": 177.659,
+   "n": 10
+  },
+  "tab.first_paint": {
+   "max": 260.633,
+   "median": 205.305,
+   "min": 196.353,
+   "n": 10
+  },
+  "window.created": {
+   "max": 146.496,
+   "median": 107.205,
+   "min": 99.502,
+   "n": 10
+  },
+  "window.shown": {
+   "max": 175.738,
+   "median": 136.536,
+   "min": 127.325,
+   "n": 10
+  }
+ },
+ "version": "0.2.26"
+}

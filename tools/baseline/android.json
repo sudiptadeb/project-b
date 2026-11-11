@@ -1,0 +1,213 @@
+{
+ "commit": "59fa2c4",
+ "date": "2026-11-12",
+ "machine": "sdk_gphone16k_arm64, Android 16",
+ "platform": "android",
+ "session": "emulator",
+ "spans": {
+  "settings.open": {
+   "dur": {
+    "max": 219.177,
+    "median": 162.785,
+    "min": 115.15,
+    "n": 10
+   },
+   "stages": {
+    "settings.committed": {
+     "max": 79.865,
+     "median": 77.835,
+     "min": 52.74,
+     "n": 10
+    },
+    "settings.first_paint": {
+     "max": 161.677,
+     "median": 117.412,
+     "min": 83.85,
+     "n": 10
+    },
+    "settings.mounted": {
+     "max": 145.477,
+     "median": 106.311,
+     "min": 69.15,
+     "n": 10
+    },
+    "settings.navigation_start": {
+     "max": 9.778,
+     "median": 7.164,
+     "min": 4.766,
+     "n": 10
+    },
+    "settings.on_screen": {
+     "max": 219.177,
+     "median": 162.785,
+     "min": 115.15,
+     "n": 10
+    },
+    "settings.open.created": {
+     "max": 2.464,
+     "median": 1.657,
+     "min": 0.894,
+     "n": 10
+    },
+    "settings.open.go": {
+     "max": 1.827,
+     "median": 0.766,
+     "min": 0.416,
+     "n": 10
+    },
+    "settings.open.overlay_on_screen": {
+     "max": 52.941,
+     "median": 44.888,
+     "min": 32.134,
+     "n": 10
+    },
+    "settings.open.shown": {
+     "max": 9.75,
+     "median": 7.052,
+     "min": 4.526,
+     "n": 10
+    },
+    "settings.ready": {
+     "max": 146.321,
+     "median": 107.598,
+     "min": 70.115,
+     "n": 10
+    },
+    "settings.script": {
+     "max": 142.977,
+     "median": 104.061,
+     "min": 67.05,
+     "n": 10
+    },
+    "settings.snapshot": {
+     "max": 147.577,
+     "median": 108.311,
+     "min": 71.15,
+     "n": 10
+    }
+   }
+  },
+  "tab.new": {
+   "dur": {
+    "max": 31.7,
+    "median": 20.1,
+    "min": 9.9,
+    "n": 10
+   },
+   "stages": {
+    "tab.new.done": {
+     "max": 4.708,
+     "median": 3.645,
+     "min": 2.832,
+     "n": 10
+    },
+    "tab.new.go": {
+     "max": 0.671,
+     "median": 0.487,
+     "min": 0.194,
+     "n": 10
+    }
+   }
+  }
+ },
+ "starts": 10,
+ "startup": {
+  "content.ready": {
+   "max": 673.465,
+   "median": 281.584,
+   "min": 254.725,
+   "n": 10
+  },
+  "go.started": {
+   "max": 837.257,
+   "median": 358.216,
+   "min": 327.2,
+   "n": 10
+  },
+  "go.starting": {
+   "max": 820.82,
+   "median": 348.004,
+   "min": 316.936,
+   "n": 10
+  },
+  "main.entered": {
+   "max": 354.884,
+   "median": 181.999,
+   "min": 159.654,
+   "n": 10
+  },
+  "process.start": {
+   "max": 0.0,
+   "median": 0.0,
+   "min": 0.0,
+   "n": 10
+  },
+  "shell.committed": {
+   "max": 1560.302,
+   "median": 634.715,
+   "min": 565.004,
+   "n": 10
+  },
+  "shell.created": {
+   "max": 776.37,
+   "median": 322.119,
+   "min": 286.938,
+   "n": 10
+  },
+  "shell.first_paint": {
+   "max": 1652.095,
+   "median": 871.648,
+   "min": 794.258,
+   "n": 10
+  },
+  "shell.mounted": {
+   "max": 1638.095,
+   "median": 663.072,
+   "min": 590.658,
+   "n": 10
+  },
+  "shell.navigation_start": {
+   "max": 793.995,
+   "median": 334.897,
+   "min": 298.358,
+   "n": 10
+  },
+  "shell.on_screen": {
+   "max": 1717.995,
+   "median": 989.219,
+   "min": 930.358,
+   "n": 10
+  },
+  "shell.ready": {
+   "max": 1639.057,
+   "median": 664.296,
+   "min": 593.224,
+   "n": 10
+  },
+  "shell.script": {
+   "max": 1615.295,
+   "median": 645.177,
+   "min": 582.858,
+   "n": 10
+  },
+  "shell.snapshot": {
+   "max": 1653.995,
+   "median": 669.672,
+   "min": 600.758,
+   "n": 10
+  },
+  "tab.committed": {
+   "max": 1520.324,
+   "median": 640.791,
+   "min": 560.9,
+   "n": 10
+  },
+  "window.created": {
+   "max": 700.298,
+   "median": 315.421,
+   "min": 283.638,
+   "n": 10
+  }
+ },
+ "version": "0.2.26"
+}

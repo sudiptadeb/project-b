@@ -18,6 +18,13 @@
 #   tools/test.sh android   The Android app on the emulator.
 #                           Needs the emulator running and the APK, or PB_APK.
 #
+# EXTENSIONS=1 adds the checks of a build with Chrome extensions to mock and app: Go's
+# tests with the tag, the extension UI on the mock engine's fake runtime, and the real
+# app installing from the mock store. They need tools/fetch-extensions.sh and
+# tools/pack-test-extension.py to have filled .tools/extensions/, and for app a build
+# made with EXTENSIONS=1 (PB_BIN, or chromium/src/out/ext). Without it, app checks that
+# the build has no extension code in it.
+#
 # Several groups can be named at once. A group or a test that lacks what it needs says so
 # and ends with exit 2 instead of running. Each test prints ok or FAIL per check; the end is
 # one line per test: passed, FAILED or DID NOT RUN. Exit 1 if any failed. README.md, "Test
@@ -25,7 +32,12 @@
 set -u
 cd "$(dirname "$0")/.."
 
-BIN=${PB_BIN:-chromium/src/out/pb/project_b}
+EXTENSIONS=${EXTENSIONS:-0}
+if [ "$EXTENSIONS" = 1 ]; then
+    BIN=${PB_BIN:-chromium/src/out/ext/project_b}
+else
+    BIN=${PB_BIN:-chromium/src/out/pb/project_b}
+fi
 APK=${PB_APK:-build/android/project-b-content.apk}
 ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-emulator-5600}"
 VM_PYTHON=$HOME/PW_TOOLS/macos-vm/venv/bin/python
@@ -50,6 +62,10 @@ cannot() {
     exit 2
 }
 
+need_store() {
+    [ -f .tools/extensions/catalogue.json ] || cannot "$1" "no mock store in .tools/extensions. Run tools/fetch-extensions.sh and tools/pack-test-extension.py."
+}
+
 need_app() {
     [ -x "$BIN" ] || cannot "$1" "no app at $BIN. Build it with tools/build.sh, or point PB_BIN at a project_b binary."
 }
@@ -60,12 +76,23 @@ mock() {
     run "build the shell" npm --prefix shell run build
     run "the shell on the mock engine" node shell/e2e/first-app.cjs
     run "the settings page on the mock engine" node shell/e2e/settings.cjs
+    [ "$EXTENSIONS" = 1 ] || return
+    need_store mock
+    run "Go managers, with extensions" go -C core test -tags extensions ./...
+    run "build the shell, with extensions" env EXTENSIONS=1 npm --prefix shell run build
+    run "extensions on the mock engine" node shell/e2e/extensions.cjs
 }
 
 app() {
     need_app app
+    if [ "$EXTENSIONS" = 1 ]; then
+        need_store app
+        run "extensions in the real app" env PB_BIN="$BIN" python3 tools/drive_extensions.py
+        return
+    fi
     run "the real app through its driver" python3 tools/drive_first_app.py
     run "the real app through ChromeDriver" python3 tools/drive_chromedriver.py
+    run "no extension code in the app" python3 tools/check_no_extensions.py "$BIN"
 }
 
 basics() {

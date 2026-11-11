@@ -1,7 +1,7 @@
 //go:build extensions
 
-// Package extensions owns what the browser decides about extensions: which store it
-// installs from, which buttons are pinned to the toolbar, and what each button shows.
+// Package extensions owns what the browser decides about extensions: the answer to an
+// install's question, which buttons are pinned to the toolbar, and what each button shows.
 // The engine runs the extensions and remembers which are installed; this package asks it.
 package extensions
 
@@ -17,8 +17,7 @@ import (
 
 // saved is what this package keeps in the profile, in extensions.json.
 type saved struct {
-	StoreURL string   `json:"storeUrl"`
-	Pinned   []string `json:"pinned"`
+	Pinned []string `json:"pinned"`
 }
 
 // Button is one extension's toolbar button as a tab shows it.
@@ -34,51 +33,27 @@ type Button struct {
 	Pinned         bool   `json:"pinned"`
 }
 
-// Item is one extension the store offers.
-type Item struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Size        int64  `json:"size"`
-	Crx         string `json:"crx"`
-	Icon        string `json:"icon"`
-	// Phase is "" or, while an install runs, "downloading" or "installing".
-	Phase string `json:"phase"`
-}
-
 // View is everything the extension manager in settings shows.
 type View struct {
-	StoreURL     string                `json:"storeUrl"`
-	Installed    []engine.Extension    `json:"installed"`
-	Pinned       []string              `json:"pinned"`
-	Catalogue    []Item                `json:"catalogue"`
-	CatalogueErr string                `json:"catalogueError"`
-	Prompt       *engine.InstallPrompt `json:"prompt"`
+	Installed []engine.Extension    `json:"installed"`
+	Pinned    []string              `json:"pinned"`
+	Prompt    *engine.InstallPrompt `json:"prompt"`
 	// Error is why the last install or load failed, until the next one starts.
 	Error string `json:"error"`
 }
 
-// Manager owns the store setting, the pins, the buttons and the installs under way.
+// Manager owns the pins, the buttons and the install waiting for an answer.
 type Manager struct {
 	eng  engine.Extensions
-	post func(func())
-	dir  string
 	path string
 
 	saved   saved
 	list    []engine.Extension
 	actions map[string]*action
 
-	catalogue    []Item
-	catalogueErr string
-	// phases is the install under way for a store item, by its id; downloads is which
-	// item a downloaded package belongs to, by the package's path.
-	phases    map[string]string
-	downloads map[string]string
-	prompt    *engine.InstallPrompt
-	failure   string
-	choosing  engine.PathKind
+	prompt   *engine.InstallPrompt
+	failure  string
+	choosing engine.PathKind
 	// popup is the extension whose popup is open, or "".
 	popup string
 
@@ -87,13 +62,12 @@ type Manager struct {
 	onClicked func(id string)
 }
 
-// New returns a manager with what the profile in dir saved. post runs a function on the
-// main thread; activeTab says which tab is showing.
-func New(eng engine.Extensions, dir string, post func(func()), activeTab func() engine.TabID) *Manager {
+// New returns a manager with what the profile in dir saved. activeTab says which tab
+// is showing.
+func New(eng engine.Extensions, dir string, activeTab func() engine.TabID) *Manager {
 	m := &Manager{
-		eng: eng, post: post, dir: dir, path: filepath.Join(dir, "extensions.json"),
-		actions: map[string]*action{}, phases: map[string]string{}, downloads: map[string]string{},
-		activeTab: activeTab,
+		eng: eng, path: filepath.Join(dir, "extensions.json"),
+		actions: map[string]*action{}, activeTab: activeTab,
 	}
 	if b, err := os.ReadFile(m.path); err == nil {
 		if err := json.Unmarshal(b, &m.saved); err != nil {
@@ -138,16 +112,11 @@ func (m *Manager) Get(id string) (engine.Extension, bool) {
 
 // View returns what the extension manager in settings shows.
 func (m *Manager) View() View {
-	items := make([]Item, len(m.catalogue))
-	for i, it := range m.catalogue {
-		it.Phase = m.phases[it.ID]
-		items[i] = it
-	}
 	// Lists go to the page as lists, never null.
 	return View{
-		StoreURL: m.saved.StoreURL, Installed: append([]engine.Extension{}, m.list...),
+		Installed: append([]engine.Extension{}, m.list...),
 		Pinned:    append([]string{}, m.saved.Pinned...),
-		Catalogue: items, CatalogueErr: m.catalogueErr, Prompt: m.prompt, Error: m.failure,
+		Prompt:    m.prompt, Error: m.failure,
 	}
 }
 
@@ -241,14 +210,8 @@ func (m *Manager) AnswerPrompt(accept bool) {
 	m.changed()
 }
 
-// HandleInstallDone clears the install's progress, removes the package this manager
-// downloaded for it, and keeps the reason when it failed.
+// HandleInstallDone keeps the reason when an install or a load failed.
 func (m *Manager) HandleInstallDone(r engine.InstallResult) {
-	if item, ok := m.downloads[r.Path]; ok {
-		delete(m.downloads, r.Path)
-		delete(m.phases, item)
-		os.Remove(r.Path)
-	}
 	m.failure = r.Error
 	m.changed()
 }

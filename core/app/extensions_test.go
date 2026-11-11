@@ -7,8 +7,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,82 +109,65 @@ func pack(t *testing.T, file, version string) {
 	}
 }
 
-// store serves a folder holding the test extension at one version, as extstore does.
-func store(t *testing.T, version string) string {
-	t.Helper()
-	dir := t.TempDir()
-	os.Mkdir(filepath.Join(dir, "crx"), 0o700)
-	crx := "crx/" + testExtensionID + "_" + version + ".crx"
-	pack(t, filepath.Join(dir, crx), version)
-	catalogue, _ := json.Marshal([]map[string]any{{"id": testExtensionID, "name": "Project B test extension", "version": version, "crx": crx}})
-	os.WriteFile(filepath.Join(dir, "catalogue.json"), catalogue, 0o600)
-	s := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	t.Cleanup(s.Close)
-	return s.URL
-}
-
-func (r *extRig) installFromStore(url string) {
+// install installs the test extension from a package file, as Install package does, and
+// says yes to the prompt.
+func (r *extRig) install() {
 	r.t.Helper()
-	r.on(func() { r.m.SetStoreURL(url) })
-	r.until("the catalogue", func() bool { return len(r.m.View().Catalogue) == 1 })
-	r.on(func() { r.m.Install(testExtensionID) })
-	r.until("the install prompt", func() bool { return r.m.View().Prompt != nil })
+	r.beginInstall()
 	r.on(func() { r.m.AnswerPrompt(true) })
 	r.until("the install", func() bool { return len(r.m.Installed()) == 1 })
 }
 
-func TestInstallFromTheStore(t *testing.T) {
-	dir := t.TempDir()
-	r := startExtensions(t, dir)
-	url := store(t, "1.0")
-	r.on(func() { r.m.SetStoreURL(url + "/") })
-	r.until("the catalogue", func() bool { return len(r.m.View().Catalogue) == 1 })
-	r.on(func() { r.m.Install(testExtensionID) })
-	r.until("the install prompt", func() bool { return r.m.View().Prompt != nil })
+// beginInstall picks a package of the test extension and waits for the engine to ask.
+func (r *extRig) beginInstall() {
+	r.t.Helper()
+	file := filepath.Join(r.t.TempDir(), "test.crx")
+	pack(r.t, file, "1.0")
+	r.x.FireExtension("choose", "", file)
+	r.on(func() { r.m.InstallPackage() })
+	r.until("the install prompt", func() bool { return r.m.Prompt() != nil })
+}
+
+func TestInstallAsksFirst(t *testing.T) {
+	r := startExtensions(t, t.TempDir())
+	r.beginInstall()
 
 	var v extensions.View
 	r.on(func() { v = r.m.View() })
 	if p := v.Prompt; p.Name != "Project B test extension" || p.Version != "1.0" || !strings.Contains(strings.Join(p.Permissions, " "), "tabs") {
 		t.Fatalf("prompt: %+v", p)
 	}
-	if v.Catalogue[0].Phase != "installing" || len(v.Installed) != 0 {
-		t.Fatalf("before the answer: phase %q, installed %d", v.Catalogue[0].Phase, len(v.Installed))
+	if len(v.Installed) != 0 {
+		t.Fatalf("installed before the answer: %d", len(v.Installed))
 	}
 
-	r.on(func() { r.m.AnswerPrompt(true) })
+	// The shell has the prompt too, for an install a store's page begins, and answers it.
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if p, _ := m["extensions"].(map[string]any)["prompt"].(map[string]any); p["name"] != "Project B test extension" {
+		t.Fatalf("the shell's prompt: %v", m["extensions"])
+	}
+	r.shell(`{"t":"extensionAnswerPrompt","on":true}`)
 	r.until("the install", func() bool { return len(r.m.Installed()) == 1 })
 	r.on(func() { v = r.m.View() })
 	if e := v.Installed[0]; e.ID != testExtensionID || !e.Enabled || e.ActionPopup != "chrome-extension://"+testExtensionID+"/popup.html" {
 		t.Fatalf("installed: %+v", e)
 	}
-	if v.Catalogue[0].Phase != "" || v.Prompt != nil || v.Error != "" {
+	if v.Prompt != nil || v.Error != "" {
 		t.Fatalf("after the install: %+v", v)
-	}
-	if left, _ := os.ReadDir(filepath.Join(dir, "extension-downloads")); len(left) != 0 {
-		t.Fatalf("the downloaded package was left behind: %v", left)
 	}
 }
 
 func TestDecliningThePromptInstallsNothing(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
-	url := store(t, "1.0")
-	r.on(func() { r.m.SetStoreURL(url) })
-	r.until("the catalogue", func() bool { return len(r.m.View().Catalogue) == 1 })
-	r.on(func() { r.m.Install(testExtensionID) })
-	r.until("the install prompt", func() bool { return r.m.View().Prompt != nil })
+	r.beginInstall()
 	r.on(func() { r.m.AnswerPrompt(false) })
-	r.until("the install to end", func() bool { return r.m.View().Catalogue[0].Phase == "" })
+	r.until("the prompt to go", func() bool { return r.m.Prompt() == nil })
 	r.on(func() {
 		if v := r.m.View(); len(v.Installed) != 0 || v.Error != "" {
 			t.Fatalf("after declining: %+v", v)
 		}
 	})
-}
-
-func TestAStoreThatIsNotThereSaysSo(t *testing.T) {
-	r := startExtensions(t, t.TempDir())
-	r.on(func() { r.m.SetStoreURL("http://127.0.0.1:1") })
-	r.until("the error", func() bool { return r.m.View().CatalogueErr != "" })
 }
 
 func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
@@ -227,7 +208,7 @@ func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
 func TestPinsButtonsAndThePopup(t *testing.T) {
 	dir := t.TempDir()
 	r := startExtensions(t, dir)
-	r.installFromStore(store(t, "1.0"))
+	r.install()
 
 	var buttons []extensions.Button
 	r.on(func() { buttons = r.m.Buttons() })
@@ -282,7 +263,7 @@ func TestPinsButtonsAndThePopup(t *testing.T) {
 
 func TestDisabledExtensionHasNoButton(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
-	r.installFromStore(store(t, "1.0"))
+	r.install()
 	r.on(func() { r.m.SetEnabled(testExtensionID, false) })
 	r.until("the button to go", func() bool { return len(r.m.Buttons()) == 0 && len(r.m.Installed()) == 1 })
 	r.on(func() { r.m.SetEnabled(testExtensionID, true) })
@@ -291,7 +272,7 @@ func TestDisabledExtensionHasNoButton(t *testing.T) {
 
 func TestTabsAPI(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
-	r.installFromStore(store(t, "1.0"))
+	r.install()
 	r.visit("https://example.com/")
 
 	var all []map[string]any
@@ -371,7 +352,7 @@ func itoa(id engine.TabID) string {
 
 func TestActionAPI(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
-	r.installFromStore(store(t, "1.0"))
+	r.install()
 	r.visit("https://example.com/")
 	var tab engine.TabID
 	r.on(func() { tab = r.a.Tabs.ActiveID() })

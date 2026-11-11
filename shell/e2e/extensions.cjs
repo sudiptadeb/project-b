@@ -1,5 +1,5 @@
 // Extensions on the mock engine, in a real browser: the settings page installs from the
-// mock store, loads an unpacked one, turns them off and on and removes them; the toolbar's
+// test extension's package, loads an unpacked one, turns them off and on and removes them; the toolbar's
 // puzzle menu pins a button, which shows a badge and opens its popup where it sits. Last,
 // a build without EXTENSIONS=1 has none of this in it.
 // Run: node shell/e2e/extensions.cjs   (from the repo root, after `EXTENSIONS=1 npm run build`
@@ -15,10 +15,10 @@ const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
 const port = 8811;
 const base = `http://127.0.0.1:${port}`;
-const storePort = 8812;
-const store = `http://127.0.0.1:${storePort}`;
 const storeDir = path.join(root, '.tools/extensions');
 const unpacked = path.join(root, 'tools/test-extension');
+// The same extension as a package, as tools/pack-test-extension.py packs it.
+const packaged = path.join(storeDir, 'crx/oepjjojhhaclfhmopocgmdfbeiffpheh_1.0.crx');
 
 // The test extension, as tools/pack-test-extension.py packs it into the store.
 const id = 'oepjjojhhaclfhmopocgmdfbeiffpheh';
@@ -38,16 +38,12 @@ if (!fs.readFileSync(path.join(root, 'shell/dist/shell/shell.js'), 'utf8').inclu
 fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-extensions-'));
 const bin = path.join(out, 'dev-extensions');
-const storeBin = path.join(out, 'extstore');
 execFileSync('go', ['build', '-tags', 'extensions', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
-execFileSync('go', ['build', '-o', storeBin, './cmd/extstore'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
 let server;
-let storeServer;
 async function startServers() {
-  storeServer = spawn(storeBin, ['-dir', storeDir, '-addr', `127.0.0.1:${storePort}`], { stdio: 'ignore' });
   server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`], { stdio: 'ignore' });
-  for (const url of [base + '/mock/regions', store + '/catalogue.json']) {
+  for (const url of [base + '/mock/regions']) {
     for (let i = 0; ; i++) {
       try {
         await fetch(url);
@@ -60,7 +56,7 @@ async function startServers() {
   }
 }
 async function stopServers() {
-  for (const p of [server, storeServer]) {
+  for (const p of [server]) {
     const gone = new Promise((r) => p.once('exit', r));
     p.kill('SIGTERM');
     await gone;
@@ -119,35 +115,44 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   let page = await open();
 
   await page.getByRole('button', { name: 'Extensions' }).click();
-  const installed = page.getByRole('region', { name: 'Installed' });
-  const storeList = page.getByRole('region', { name: 'Store' });
-  check('settings shows the Extensions section', await installed.getByText('No extensions installed').isVisible() && await storeList.getByText("Set the store's URL to see what it offers.").isVisible());
+  let installed = page.getByRole('region', { name: 'Installed' });
+  const storeRow = page.getByRole('region', { name: 'Store' });
+  check('settings shows the Extensions section', await installed.getByText('No extensions installed').isVisible() && await storeRow.getByText('Chrome Web Store').isVisible());
 
-  await page.getByLabel('Address').fill(store);
-  await page.getByRole('button', { name: 'Set', exact: true }).click();
-  const item = storeList.getByRole('group', { name });
-  check('setting the store lists its catalogue', await until(async () => (await storeList.locator('.pbx-extension').count()) === 6 && await item.isVisible()), String(await storeList.locator('.pbx-extension').count()));
-  check('with each item\'s size', /^(\d+ KB|\d+\.\d MB)$/.test(await item.locator('.pbx-size').textContent()));
+  // The store is a website, which opens in a tab.
+  await storeRow.getByRole('button', { name: 'Open' }).click();
+  check('the store opens in a tab, from under the settings page', await until(async () => (await regions()).settingsOpen === false && (await shell.getByRole('tab').count()) === 2));
+  await shell.getByRole('button', { name: 'Settings', exact: true }).click();
+  await until(async () => (await regions()).settingsOpen === true);
+  page = await open();
+  await page.getByRole('button', { name: 'Extensions' }).click();
+  installed = page.getByRole('region', { name: 'Installed' });
 
+  // A package file, which the engine asks about before it installs.
+  const pick = async () => {
+    await fire('choose', '', packaged);
+    await page.getByRole('button', { name: 'Install package' }).click();
+  };
   const dialog = page.getByRole('dialog');
-  await item.getByRole('button', { name: 'Install' }).click();
-  check('Install asks first, with what it can do', await until(async () => (await dialog.count()) === 1 && (await dialog.textContent()).includes(`Add "${name}"?`)));
+  await pick();
+  check('Install package asks first, with what it can do', await until(async () => (await dialog.count()) === 1 && (await dialog.textContent()).includes(`Add "${name}"?`)));
   const asked = await dialog.locator('li').allTextContents();
   check('the prompt lists the permissions', asked.includes('storage') && asked.includes('tabs'), asked.join(', '));
+  check('the shell has the prompt too, for an install a store\'s page begins', await until(async () => (await shell.getByRole('dialog').count()) === 1));
   await page.keyboard.press('Escape');
   check('Escape answers Cancel', await until(async () => (await dialog.count()) === 0));
   await sleep(200);
   check('and leaves the settings page open', (await regions()).settingsOpen === true);
-  await item.getByRole('button', { name: 'Install' }).click();
+  await pick();
   await dialog.waitFor();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
-  check('Cancel installs nothing', await until(async () => (await dialog.count()) === 0) && await installed.getByText('No extensions installed').isVisible() && (await item.getByRole('button').textContent()) === 'Install');
+  check('Cancel installs nothing', await until(async () => (await dialog.count()) === 0) && await installed.getByText('No extensions installed').isVisible());
 
-  await item.getByRole('button', { name: 'Install' }).click();
-  await dialog.getByRole('button', { name: 'Add extension' }).click();
+  // The shell's copy answers as the settings page's does.
+  await pick();
+  await shell.getByRole('dialog').getByRole('button', { name: 'Add extension' }).click();
   const rows = installed.getByRole('group', { name });
-  check('Add extension installs it', await until(async () => (await rows.count()) === 1));
-  check('and the store says Installed', await until(async () => (await item.getByRole('button').textContent()) === 'Installed' && await item.getByRole('button').isDisabled()));
+  check('Add extension, in the shell, installs it', await until(async () => (await rows.count()) === 1 && (await shell.getByRole('dialog').count()) === 0));
   await rows.first().getByRole('button', { name: 'Details' }).click();
   const details = page.getByRole('definition');
   check('Details shows its ID, source and toolbar button', (await details.allTextContents()).join('|').startsWith(`${id}|1.0|Package|`) && (await page.locator('.pbx-details').textContent()).includes('Yes'), (await details.allTextContents()).join('|'));
@@ -237,7 +242,6 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
 
   await page.getByRole('region', { name: 'Installed' }).getByRole('button', { name: `Remove ${name}` }).click();
   check('Remove takes it away', await until(async () => await page.getByRole('region', { name: 'Installed' }).getByText('No extensions installed').isVisible()));
-  check('from the store\'s view too', await until(async () => (await page.getByRole('region', { name: 'Store' }).getByRole('group', { name }).getByRole('button').textContent()) === 'Install'));
   await puzzle.click();
   check('and from the menu', await until(async () => (await menu.textContent()).includes('No extensions installed')));
 
@@ -264,6 +268,5 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
 })().catch(async (err) => {
   console.error(err);
   server?.kill('SIGTERM');
-  storeServer?.kill('SIGTERM');
   process.exit(1);
 });

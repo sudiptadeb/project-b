@@ -1,38 +1,19 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { send } from '@/apps/settings/state.js';
 import ExtensionIcon from './ExtensionIcon.vue';
 import InstallPrompt from './InstallPrompt.vue';
 import PinIcon from './PinIcon.vue';
 import { extensions } from './state.js';
 
-// The extension manager: what is installed, and what the store offers. Go owns all of it;
-// the page shows it and sends the user's changes back.
+// The extension manager: what is installed, the ways to add one from this machine, and the
+// way to the store. Go owns all of it; the page shows it and sends the user's changes back.
 const view = computed(() => extensions.value);
 const installed = computed(() => view.value.installed || []);
 const pinned = (id) => (view.value.pinned || []).includes(id);
 
 // The one extension whose details are open.
 const open = ref('');
-
-// The store's address as the user types it, until it is set.
-const storeText = ref('');
-watch(() => view.value.storeUrl, (url) => (storeText.value = url), { immediate: true });
-
-// What a store item's button says: an install under way, or how the item compares with
-// what is installed.
-function installState(item) {
-  if (item.phase === 'downloading') return { label: 'Downloading…', busy: true };
-  if (item.phase === 'installing') return { label: 'Installing…', busy: true };
-  const have = installed.value.find((e) => e.id === item.id);
-  if (!have) return { label: 'Install', busy: false };
-  if (have.version === item.version) return { label: 'Installed', busy: true };
-  return { label: 'Update', busy: false };
-}
-
-// A package under a megabyte keeps a second decimal, so it doesn't read as nothing.
-// A package's size as people read it: megabytes, or kilobytes for a small one.
-const packageSize = (size) => (size < 1e6 ? Math.ceil(size / 1e3) + ' KB' : (size / 1e6).toFixed(1) + ' MB');
 </script>
 
 <template>
@@ -105,29 +86,13 @@ const packageSize = (size) => (size < 1e6 ? Math.ceil(size / 1e3) + ' KB' : (siz
       </div>
     </section>
 
+    <!-- The store is a website: an extension is installed from its own page. -->
     <section aria-labelledby="pbx-store">
       <h2 id="pbx-store">Store</h2>
       <div class="card">
-        <form class="row" @submit.prevent="send({ t: 'extensionSetStore', text: storeText.trim() })">
-          <label class="pbx-store-label" for="pbx-store-url">Address</label>
-          <input id="pbx-store-url" v-model="storeText" class="pbx-url" autocomplete="off" autocapitalize="off" spellcheck="false" />
-          <button type="submit" class="text-button">Set</button>
-          <button type="button" class="text-button" :disabled="!view.storeUrl" @click="send({ t: 'extensionRefreshStore' })">Refresh</button>
-        </form>
-        <div v-if="!view.storeUrl" class="row">
-          <span class="label pbx-muted">Set the store's URL to see what it offers.</span>
-        </div>
-        <div v-else-if="view.catalogueError" class="row">
-          <span class="label pbx-message" role="alert">{{ view.catalogueError }}</span>
-        </div>
-        <div v-for="item in view.catalogue" :key="item.id" class="row pbx-extension" :aria-label="item.name" role="group">
-          <ExtensionIcon :src="item.icon" :name="item.name" :size="24" />
-          <span class="label">
-            {{ item.name }} <span class="pbx-version">{{ item.version }}</span>
-            <span class="pbx-description">{{ item.description }}</span>
-          </span>
-          <span class="pbx-muted pbx-size">{{ packageSize(item.size) }}</span>
-          <button type="button" class="text-button" :disabled="installState(item).busy" @click="send({ t: 'extensionInstall', extension: item.id })">{{ installState(item).label }}</button>
+        <div class="row">
+          <span class="label">Chrome Web Store</span>
+          <button type="button" class="text-button" @click="send({ t: 'extensionOpenStore' })">Open</button>
         </div>
       </div>
     </section>
@@ -178,11 +143,6 @@ const packageSize = (size) => (size < 1e6 ? Math.ceil(size / 1e3) + ' KB' : (siz
 
 .pbx-extension {
   gap: 12px;
-}
-
-.pbx-size {
-  flex: none;
-  font-size: 12px;
 }
 
 .pbx-quiet {
@@ -238,27 +198,4 @@ const packageSize = (size) => (size < 1e6 ? Math.ceil(size / 1e3) + ' KB' : (siz
   font-size: 12px;
 }
 
-.pbx-store-label {
-  flex: none;
-  font-weight: 500;
-}
-
-.pbx-url {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  box-sizing: border-box;
-  background: var(--surface);
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-}
-
-.pbx-url:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
-}
 </style>

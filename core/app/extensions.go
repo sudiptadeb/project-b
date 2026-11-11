@@ -25,7 +25,7 @@ func (a *App) Extensions() *extensions.Manager { return extensionManagers[a] }
 // extension manager out.
 func startExtensions(a *App, e engine.Engine, cfg Config) {
 	eng := e.(engine.Extensions)
-	m := extensions.New(eng, cfg.ProfileDir, e.Post, a.Tabs.ActiveID)
+	m := extensions.New(eng, cfg.ProfileDir, a.Tabs.ActiveID)
 	api := chromeapi.New(eng, a.Tabs, m, a.Window.FullScreen)
 	extensionManagers[a] = m
 	eng.SetExtensionsListener(&extensionEvents{m, api})
@@ -45,9 +45,7 @@ func startExtensions(a *App, e engine.Engine, cfg Config) {
 	a.Shell.AddPart(extensionsShellPart(a, m, buttons))
 
 	m.OnChanged(func() { a.Settings.Send(map[string]any{"t": "extensions", "extensions": m.View()}) })
-	a.Settings.AddPart(extensionsSettingsPart(m))
-
-	m.RefreshCatalogue()
+	a.Settings.AddPart(extensionsSettingsPart(a, m))
 }
 
 // extensionEvents is the engine's extension listener: each function only forwards.
@@ -67,6 +65,10 @@ func (x *extensionEvents) PathChosen(path string) { x.m.HandlePathChosen(path) }
 func (x *extensionEvents) ExtensionBlockedCount(id string, tab engine.TabID, count int) {
 	x.m.HandleBlockedCount(id, tab, count)
 }
+
+// webStore is where "Chrome Web Store" in the extension manager goes. An extension is
+// installed from the store's own page.
+const webStore = "https://chromewebstore.google.com/"
 
 // extensionCommand is what the shell and the settings page send about extensions.
 type extensionCommand struct {
@@ -104,19 +106,18 @@ func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[strin
 }
 
 // The settings page's part: the extension manager's view in its snapshot, and its commands.
-func extensionsSettingsPart(m *extensions.Manager) settings.Part {
+func extensionsSettingsPart(a *App, m *extensions.Manager) settings.Part {
 	return settings.Part{
 		Snapshot: func(into map[string]any) { into["extensions"] = m.View() },
 		Handle: func(t string, msg []byte) bool {
 			var c extensionCommand
 			json.Unmarshal(msg, &c)
 			switch t {
-			case "extensionSetStore":
-				m.SetStoreURL(c.Text)
-			case "extensionRefreshStore":
-				m.RefreshCatalogue()
-			case "extensionInstall":
-				m.Install(c.ID)
+			case "extensionOpenStore":
+				// The store is a website: it opens in a tab, which the settings page
+				// would cover.
+				a.Settings.Close()
+				a.Tabs.Open(webStore)
 			case "extensionAnswerPrompt":
 				m.AnswerPrompt(c.On)
 			case "extensionLoadUnpacked":

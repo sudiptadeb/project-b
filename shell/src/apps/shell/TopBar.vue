@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import AddressBar from './AddressBar.vue';
 import NavButtons from './NavButtons.vue';
 import { send } from '@/bridge.js';
+import { ExtensionsToolbar } from '@extensions';
 import { activeTab, controlSpace as controls, phone, state, tabsOnTop } from './state.js';
 
 // With the tabs on the side this row is the title bar: it holds the space for the native
@@ -39,6 +40,7 @@ function switchLayout() {
     <div v-else class="space" style="width: 4px"></div>
     <NavButtons />
     <AddressBar />
+    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar && !phone" />
     <button
       v-if="!phone"
       class="icon-button layout"

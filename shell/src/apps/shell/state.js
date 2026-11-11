@@ -3,6 +3,7 @@
 
 import { computed, reactive } from 'vue';
 import { listen, send } from '@/bridge.js';
+import { extensionsMessage } from '@extensions';
 
 import { phone } from '@/phone.js';
 
@@ -88,6 +89,7 @@ export function setHandlers(handlers) {
 export function connect() {
   listen(
     (m) => {
+      extensionsMessage(m);
       switch (m.t) {
         case 'snapshot':
           state.engine = m.engine;

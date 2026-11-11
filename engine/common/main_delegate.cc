@@ -9,6 +9,14 @@
 #include "project_b/engine/common/content_client.h"
 #include "ui/base/resource/resource_bundle.h"
 
+#if BUILDFLAG(PB_EXTENSIONS)
+#include "content/public/renderer/content_renderer_client.h"
+#include "content/public/utility/content_utility_client.h"
+#include "project_b/engine/extensions/common/extensions_client.h"
+#include "project_b/engine/extensions/renderer/content_renderer_client.h"
+#include "project_b/engine/extensions/utility/content_utility_client.h"
+#endif
+
 #if BUILDFLAG(IS_MAC)
 #include "base/apple/bundle_locations.h"
 #include "base/apple/foundation_util.h"
@@ -48,6 +56,10 @@ std::optional<int> MainDelegate::BasicStartupComplete() {
 
   content_client_ = std::make_unique<ContentClient>();
   content::SetContentClient(content_client_.get());
+#if BUILDFLAG(PB_EXTENSIONS)
+  extensions_client_ = std::make_unique<ExtensionsClient>();
+  extensions::ExtensionsClient::Set(extensions_client_.get());
+#endif
   return std::nullopt;
 }
 
@@ -76,6 +88,18 @@ void MainDelegate::PreSandboxStartup() {
       pak.Append(FILE_PATH_LITERAL("project_b.pak")));
 #endif
 }
+
+#if BUILDFLAG(PB_EXTENSIONS)
+content::ContentRendererClient* MainDelegate::CreateContentRendererClient() {
+  renderer_client_ = std::make_unique<ContentRendererClient>();
+  return renderer_client_.get();
+}
+
+content::ContentUtilityClient* MainDelegate::CreateContentUtilityClient() {
+  utility_client_ = std::make_unique<ContentUtilityClient>();
+  return utility_client_.get();
+}
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
 // Android's looper is the message loop, so this only starts the browser and returns. Content never

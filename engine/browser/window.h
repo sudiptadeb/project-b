@@ -7,8 +7,10 @@
 
 #include "base/functional/callback.h"
 #include "build/build_config.h"
+#include "project_b/engine/buildflags/buildflags.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/native_ui_types.h"
 
@@ -95,6 +97,18 @@ class Window {
   // is there. The settings page is one.
   void SetOverlayView(gfx::NativeView view);
   void RemoveOverlayView(gfx::NativeView view);
+#if BUILDFLAG(PB_EXTENSIONS)
+  // A popup floats over the shell and the page, under an anchor rectangle given in
+  // shell coordinates: its right edge on the anchor's, kept inside the window. Presses
+  // inside it are its own. Calling SetPopupView again moves or resizes it.
+  void SetPopupView(gfx::NativeView view,
+                    const gfx::RectF& anchor,
+                    const gfx::Size& size);
+  void RemovePopupView(gfx::NativeView view);
+  // Development only, for the driver: where the popup is, in shell coordinates, or
+  // empty when there is none.
+  gfx::RectF popup_bounds() const;
+#endif
 
   void SetLayout(Layout layout);
 

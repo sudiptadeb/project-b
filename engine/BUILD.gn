@@ -5,6 +5,10 @@ import("//build/config/mac/mac_sdk.gni")
 import("//project_b/engine/extensions.gni")
 import("//third_party/inspector_protocol/inspector_protocol.gni")
 import("//tools/grit/repack.gni")
+if (project_b_extensions) {
+  import("//tools/json_schema_compiler/json_features.gni")
+  import("//tools/json_schema_compiler/json_schema_api.gni")
+}
 
 assert(is_mac, "The first app is Mac only so far")
 
@@ -50,8 +54,69 @@ source_set("common") {
     "//base",
     "//content/public/app",
     "//content/public/common",
+    "//project_b/engine/buildflags",
     "//ui/base",
   ]
+
+  # In a build with extensions, every process knows the chrome-extension: scheme and
+  # which APIs exist, a renderer runs //extensions' bindings and content scripts, and a
+  # utility process unzips packages.
+  if (project_b_extensions) {
+    sources += [
+      "extensions/common/extensions_client.cc",
+      "extensions/common/extensions_client.h",
+      "extensions/renderer/content_renderer_client.cc",
+      "extensions/renderer/content_renderer_client.h",
+      "extensions/utility/content_utility_client.cc",
+      "extensions/utility/content_utility_client.h",
+    ]
+    deps += [
+      ":extension_api_features",
+      ":extension_api_schemas",
+      ":extension_permission_features",
+      "//components/services/unzip:lib",
+      "//components/services/unzip/public/mojom",
+      "//content/public/renderer",
+      "//content/public/utility",
+      "//extensions/common",
+      "//extensions/common:core_api_provider",
+      "//extensions/renderer",
+      "//mojo/public/cpp/bindings",
+      "//third_party/blink/public:blink",
+    ]
+  }
+}
+
+if (project_b_extensions) {
+  # The browser's own extension APIs, which Go answers. Their schemas are Chrome's
+  # files, used where they are; where each API appears is ours to say.
+  generated_json_strings("extension_api_schemas") {
+    sources = [
+      "//chrome/common/extensions/api/action.json",
+      "//chrome/common/extensions/api/commands.json",
+      "//chrome/common/extensions/api/tabs.json",
+      "//chrome/common/extensions/api/windows.json",
+    ]
+
+    # The compiler writes beside the schemas' folder as seen from root, and this puts
+    # that in our own generated folder.
+    root = "//chrome/common/extensions/api"
+    target_prefix = rebase_path(target_gen_dir, root_gen_dir)
+    bundle_name = "ProjectB"
+    root_namespace = "project_b::api::%(namespace)s"
+  }
+
+  json_features("extension_api_features") {
+    feature_type = "APIFeature"
+    method_name = "AddProjectBAPIFeatures"
+    sources = [ "extensions/common/api_features.json" ]
+  }
+
+  json_features("extension_permission_features") {
+    feature_type = "PermissionFeature"
+    method_name = "AddProjectBPermissionFeatures"
+    sources = [ "extensions/common/permission_features.json" ]
+  }
 }
 
 # The DevTools commands content leaves to the embedder that we answer: Browser's window
@@ -136,6 +201,7 @@ source_set("browser") {
     "//content/public/browser",
     "//content/public/common",
     "//net",
+    "//project_b/engine/buildflags",
     "//services/network/public/cpp",
     "//services/network/public/mojom",
     "//skia",
@@ -154,6 +220,45 @@ source_set("browser") {
     "AppKit.framework",
     "Cocoa.framework",
   ]
+
+  # The extension runtime: Chromium's //extensions, and our embedder for it.
+  if (project_b_extensions) {
+    sources += [
+      "abi/pb_extensions_abi.h",
+      "extensions/browser/api_client.cc",
+      "extensions/browser/api_client.h",
+      "extensions/browser/choose_path.h",
+      "extensions/browser/choose_path_mac.mm",
+      "extensions/browser/content_hooks.cc",
+      "extensions/browser/extension_system.cc",
+      "extensions/browser/extension_system.h",
+      "extensions/browser/extensions.cc",
+      "extensions/browser/extensions.h",
+      "extensions/browser/extensions_browser_client.cc",
+      "extensions/browser/extensions_browser_client.h",
+      "extensions/browser/go_function.cc",
+      "extensions/browser/go_function.h",
+      "extensions/browser/popup.cc",
+      "extensions/browser/popup.h",
+      "extensions/browser/web_contents_observer.cc",
+      "extensions/browser/web_contents_observer.h",
+    ]
+    deps += [
+      "//components/crx_file",
+      "//components/custom_handlers",
+      "//components/keyed_service/content",
+      "//components/pref_registry",
+      "//components/prefs",
+      "//components/user_prefs",
+      "//components/value_store",
+      "//extensions/browser",
+      "//extensions/browser:crx_installer",
+      "//extensions/common",
+      "//extensions/common/api",
+      "//extensions/common:mojom",
+    ]
+    frameworks += [ "UniformTypeIdentifiers.framework" ]
+  }
   configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
@@ -180,6 +285,19 @@ repack("pak") {
     "//ui/resources",
     "//ui/strings",
   ]
+  if (project_b_extensions) {
+    sources += [
+      "$root_gen_dir/extensions/extensions_browser_resources_100_percent.pak",
+      "$root_gen_dir/extensions/extensions_renderer_generated_resources.pak",
+      "$root_gen_dir/extensions/extensions_renderer_resources.pak",
+      "$root_gen_dir/extensions/extensions_resources.pak",
+      "$root_gen_dir/extensions/strings/extensions_strings_en-US.pak",
+    ]
+    deps += [
+      "//extensions:extensions_resources",
+      "//extensions/strings",
+    ]
+  }
   output = "$root_out_dir/project_b.pak"
 }
 

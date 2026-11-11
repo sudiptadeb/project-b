@@ -2,6 +2,7 @@
 
 #import <Cocoa/Cocoa.h>
 
+#include <algorithm>
 #include <cmath>
 #include <string_view>
 #include <utility>
@@ -22,6 +23,11 @@
 @property(nonatomic, weak) NSView* shellView;
 // Over everything while it is there, and it takes every press.
 @property(nonatomic, weak) NSView* overlayView;
+#if BUILDFLAG(PB_EXTENSIONS)
+// Floats over the shell and the pages, and takes the presses inside it: an
+// extension's popup.
+@property(nonatomic, strong) NSView* popupView;
+#endif
 // Holds every page view; the shown one is the only one not hidden.
 @property(nonatomic, strong) NSView* pages;
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions;
@@ -33,6 +39,9 @@
 
 @synthesize shellView = _shellView;
 @synthesize overlayView = _overlayView;
+#if BUILDFLAG(PB_EXTENSIONS)
+@synthesize popupView = _popupView;
+#endif
 @synthesize pages = _pages;
 
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions {
@@ -58,6 +67,11 @@
   if (self.overlayView) {
     return [self.overlayView hitTest:p];
   }
+#if BUILDFLAG(PB_EXTENSIONS)
+  if (self.popupView && NSPointInRect(p, self.popupView.frame)) {
+    return [self.popupView hitTest:p];
+  }
+#endif
   // Shell rectangles measure y from the top; Cocoa measures it from the bottom.
   const float y = self.bounds.size.height - p.y;
   for (const project_b::Window::Region& r : _regions) {
@@ -353,6 +367,55 @@ void Window::SetOverlayView(gfx::NativeView view) {
   impl_->container.overlayView = overlay;
   [impl_->container addSubview:overlay];
 }
+
+#if BUILDFLAG(PB_EXTENSIONS)
+// The popup's view sits in a holder that rounds its corners and draws a hairline
+// around it, as the system's own popovers have. The holder goes over everything.
+void Window::SetPopupView(gfx::NativeView view,
+                          const gfx::RectF& anchor,
+                          const gfx::Size& size) {
+  PBContainerView* container = impl_->container;
+  NSView* contents = view.GetNativeNSView();
+  if (!container.popupView) {
+    NSView* holder = [[NSView alloc] initWithFrame:NSZeroRect];
+    holder.wantsLayer = YES;
+    holder.layer.cornerRadius = 8;
+    holder.layer.masksToBounds = YES;
+    holder.layer.borderWidth = 1;
+    holder.layer.borderColor = NSColor.separatorColor.CGColor;
+    contents.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [holder addSubview:contents];
+    container.popupView = holder;
+    [container addSubview:holder];
+  }
+  // Under the anchor with a 4 point gap, right edges together, inside the window.
+  const NSRect bounds = container.bounds;
+  const CGFloat x =
+      std::clamp<CGFloat>(anchor.right() - size.width(), 0,
+                          std::max<CGFloat>(0, bounds.size.width - size.width()));
+  const CGFloat top = anchor.bottom() + 4;
+  container.popupView.frame = NSMakeRect(
+      x, bounds.size.height - top - size.height(), size.width(), size.height());
+  contents.frame = container.popupView.bounds;
+}
+
+void Window::RemovePopupView(gfx::NativeView view) {
+  [view.GetNativeNSView() removeFromSuperview];
+  [impl_->container.popupView removeFromSuperview];
+  impl_->container.popupView = nil;
+}
+
+gfx::RectF Window::popup_bounds() const {
+  NSView* popup = impl_->container.popupView;
+  if (!popup) {
+    return gfx::RectF();
+  }
+  const NSRect f = popup.frame;
+  return gfx::RectF(f.origin.x,
+                    impl_->container.bounds.size.height - NSMaxY(f),
+                    f.size.width, f.size.height);
+}
+#endif
 
 void Window::RemoveOverlayView(gfx::NativeView view) {
   NSView* overlay = view.GetNativeNSView();

@@ -1,0 +1,13 @@
+// The permissions Chrome declares outside //extensions that we honour. The rules are
+// Chrome's, from chrome/common/extensions/api/_permission_features.json.
+{
+  "scripting": {
+    "channel": "stable",
+    "extension_types": ["extension"],
+    "min_manifest_version": 3
+  },
+  "tabs": {
+    "channel": "stable",
+    "extension_types": ["extension"]
+  }
+}

@@ -20,6 +20,7 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/settings_page.h"
+#include "project_b/engine/buildflags/buildflags.h"
 #if !BUILDFLAG(IS_ANDROID)
 #include "project_b/engine/browser/mac_app.h"
 #endif
@@ -29,6 +30,11 @@
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(PB_EXTENSIONS)
+#include "extensions/browser/extensions_browser_client.h"
+#include "project_b/engine/extensions/browser/extensions.h"
+#endif
 
 namespace project_b {
 
@@ -266,6 +272,9 @@ const PBEngineCalls* Engine::Calls() {
 #if BUILDFLAG(IS_ANDROID)
       .install_update = CallInstallUpdate,
 #endif
+#if BUILDFLAG(PB_EXTENSIONS)
+      .extensions = Extensions::Calls,
+#endif
   };
   return &calls;
 }
@@ -303,6 +312,11 @@ PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   auto tab = std::make_unique<PageTab>(id, std::move(contents));
   PageTab* raw = tab.get();
   tab->contents()->WasHidden();
+#if BUILDFLAG(PB_EXTENSIONS)
+  // Extensions run in every tab: content scripts, messages, chrome.scripting.
+  extensions::ExtensionsBrowserClient::Get()
+      ->CreateExtensionWebContentsObserver(tab->contents());
+#endif
 #if BUILDFLAG(IS_ANDROID)
   window_->AddPageContents(tab->contents());
 #else

@@ -62,6 +62,7 @@ source_set("browser") {
   deps = [
     ":jni_headers",
     "//base",
+    "//project_b/engine/buildflags",
     "//cc/slim",
     "//components/embedder_support:user_agent",
     "//components/embedder_support/android:web_contents_delegate",

@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "content/public/common/content_client.h"
+#include "project_b/engine/buildflags/buildflags.h"
 
 namespace project_b {
 
@@ -16,6 +17,9 @@ class ContentClient : public content::ContentClient {
   ~ContentClient() override;
 
  private:
+#if BUILDFLAG(PB_EXTENSIONS)
+  void AddAdditionalSchemes(Schemes* schemes) override;
+#endif
   std::string_view GetDataResource(
       int resource_id,
       ui::ResourceScaleFactor scale_factor) override;

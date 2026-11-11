@@ -3,10 +3,28 @@
 #include "base/memory/ref_counted_memory.h"
 #include "ui/base/resource/resource_bundle.h"
 
+#if BUILDFLAG(PB_EXTENSIONS)
+#include "extensions/common/constants.h"
+#endif
+
 namespace project_b {
 
 ContentClient::ContentClient() = default;
 ContentClient::~ContentClient() = default;
+
+#if BUILDFLAG(PB_EXTENSIONS)
+// chrome-extension: is a scheme like https: a real origin, secure, with service workers,
+// and not held back by a page's own content security policy.
+void ContentClient::AddAdditionalSchemes(Schemes* schemes) {
+  schemes->standard_schemes.push_back(extensions::kExtensionScheme);
+  schemes->extension_schemes.push_back(extensions::kExtensionScheme);
+  schemes->savable_schemes.push_back(extensions::kExtensionScheme);
+  schemes->secure_schemes.push_back(extensions::kExtensionScheme);
+  schemes->service_worker_schemes.push_back(extensions::kExtensionScheme);
+  schemes->cors_enabled_schemes.push_back(extensions::kExtensionScheme);
+  schemes->csp_bypassing_schemes.push_back(extensions::kExtensionScheme);
+}
+#endif
 
 std::string_view ContentClient::GetDataResource(
     int resource_id,

@@ -155,6 +155,9 @@ typedef struct PBEngineCalls {
   // Android only: opens the system's package installer for the APK at path, where the user
   // confirms. The Mac swaps its own bundle, and leaves this null.
   void (*install_update)(const char* path);
+  // What a build with extensions adds: the table in pb_extensions_abi.h. Null in a build
+  // without, where nothing calls it.
+  const struct PBExtensionCalls* (*extensions)(void);
 } PBEngineCalls;
 
 // What the adapter can tell the Go core. The main binary fills it in from Go's exports

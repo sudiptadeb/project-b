@@ -1,0 +1,22 @@
+// Where the browser's own APIs appear: the ones Go answers (docs/extensions.md). The
+// rules are Chrome's, from chrome/common/extensions/api/_api_features.json, for
+// extensions only. Their schemas are Chrome's files, used in place.
+{
+  "action": {
+    "dependencies": ["manifest:action"],
+    "contexts": ["privileged_extension"]
+  },
+  "commands": {
+    "dependencies": ["manifest:commands"],
+    "contexts": ["privileged_extension"]
+  },
+  "tabs": {
+    "channel": "stable",
+    "extension_types": ["extension"],
+    "contexts": ["privileged_extension"]
+  },
+  "windows": {
+    "dependencies": ["api:tabs"],
+    "contexts": ["privileged_extension"]
+  }
+}

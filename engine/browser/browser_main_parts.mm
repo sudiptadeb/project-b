@@ -23,6 +23,10 @@
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
 
+#if BUILDFLAG(PB_EXTENSIONS)
+#include "project_b/engine/extensions/browser/extensions.h"
+#endif
+
 namespace project_b {
 
 // --user-data-dir names the profile as it does for Chrome, so tools that drive Chrome
@@ -52,6 +56,11 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   screen_ = std::make_unique<display::ScopedNativeScreen>();
   CHECK(base::CreateDirectory(ChromiumDataDir()));
   browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
+#if BUILDFLAG(PB_EXTENSIONS)
+  // The extension runtime comes up with the profile and loads what is installed, so
+  // Go finds it ready when it starts.
+  extensions_ = std::make_unique<Extensions>(browser_context_.get());
+#endif
   RegisterShellWebUI(browser_context_.get());
 
   window_ = std::make_unique<Window>(base::BindOnce(
@@ -106,6 +115,9 @@ void BrowserMainParts::PostMainMessageLoopRun() {
   Go().stop();
   engine_.reset();
   shell_.reset();
+#if BUILDFLAG(PB_EXTENSIONS)
+  extensions_.reset();
+#endif
   window_.reset();
   browser_context_.reset();
   screen_.reset();

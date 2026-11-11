@@ -74,9 +74,11 @@ class Engine {
   void FocusShell();
   void SendToShell(const char* json, size_t length);
 
+  // A tab's page, or null for an id that isn't a tab's.
+  content::WebContents* Contents(int64_t tab) const;
+
  private:
   PageTab* Add(std::unique_ptr<content::WebContents> contents);
-  content::WebContents* Contents(int64_t tab) const;
   // Whichever of our pages has the keyboard: the settings page, the shell or the tab.
   content::WebContents* FocusedContents() const;
 

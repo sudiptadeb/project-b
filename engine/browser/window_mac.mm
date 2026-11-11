@@ -10,15 +10,33 @@
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "third_party/skia/include/core/SkRegion.h"
+#include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
+
+// A part of the title bar that is the app's. AppKit asks every view, privately, which
+// part of the title bar it needs, and gives the rest to the window server, which moves
+// the window from there by itself, without asking the app. Our views are transparent
+// and need none, so one of these covers each part that is not a drag area. It draws
+// nothing, and the container's hitTest: never returns it.
+@interface PBAppAreaView : NSView
+@end
+
+@implementation PBAppAreaView
+
+- (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
+  return self.bounds;
+}
+
+@end
 
 // Answers the OS hit test by walking the layout's regions. Content's own views ask this
 // same question, so a view that loses the answer ignores the event (see
 // shouldIgnoreMouseEvent: in content/app_shim_remote_cocoa/render_widget_host_view_cocoa.mm).
 //
 // In a drag area the answer is nil, so the event falls through to the window's own
-// frame, which moves the window and, inside the title bar, zooms on a double-click.
-// That is how Chrome does it (components/remote_cocoa/app_shim/bridged_content_view.mm).
+// frame, which zooms on a double-click. The window server moves the window from a drag
+// area by itself, because the app areas leave it to the server.
 @interface PBContainerView : NSView
 @property(nonatomic, weak) NSView* shellView;
 // Over everything while it is there, and it takes every press.
@@ -35,6 +53,7 @@
 
 @implementation PBContainerView {
   std::vector<project_b::Window::Region> _regions;
+  NSMutableArray<PBAppAreaView*>* _appAreas;
 }
 
 @synthesize shellView = _shellView;
@@ -46,16 +65,41 @@
 
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions {
   _regions = std::move(regions);
+  [self updateAppAreas];
 }
 
-// AppKit asks this, privately, which part of the title bar the window server must leave
-// to the app. A transparent view leaves none, so the server moved the window from any
-// drag that started in the title bar strip, the address field included. The container
-// leaves all of itself: every press there goes through hitTest:, and only a drag area
-// falls through to the frame, which moves the window. Chrome's content view answers the
-// same (bridged_content_view.mm).
-- (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
-  return self.bounds;
+- (void)setOverlayView:(NSView*)overlayView {
+  _overlayView = overlayView;
+  [self updateAppAreas];
+}
+
+// The app's areas are everything but the drag areas. The overlay takes every press, so
+// while it is there the whole window is the app's.
+- (void)updateAppAreas {
+  const NSSize size = self.bounds.size;
+  SkRegion app(SkIRect::MakeWH(std::ceil(size.width), std::ceil(size.height)));
+  if (!self.overlayView) {
+    for (const project_b::Window::Region& r : _regions) {
+      if (r.area == project_b::Window::Area::kDrag) {
+        const gfx::Rect drag = gfx::ToEnclosedRect(r.rect);
+        app.op(SkIRect::MakeXYWH(drag.x(), drag.y(), drag.width(), drag.height()),
+               SkRegion::kDifference_Op);
+      }
+    }
+  }
+  for (PBAppAreaView* view in _appAreas) {
+    [view removeFromSuperview];
+  }
+  _appAreas = [NSMutableArray array];
+  for (SkRegion::Iterator it(app); !it.done(); it.next()) {
+    const SkIRect& r = it.rect();
+    // Shell rectangles measure y from the top; Cocoa measures it from the bottom.
+    PBAppAreaView* view = [[PBAppAreaView alloc]
+        initWithFrame:NSMakeRect(r.x(), size.height - r.bottom(), r.width(),
+                                 r.height())];
+    [_appAreas addObject:view];
+    [self addSubview:view];
+  }
 }
 
 - (NSView*)hitTest:(NSPoint)point {

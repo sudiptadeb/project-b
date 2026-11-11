@@ -412,11 +412,14 @@ def browsing_checks():
     print("hit over window buttons:", over_buttons, flush=True)
     # The window server moves the window by itself from whatever part of the title bar
     # AppKit gives it, without asking the app. Given the address bar, it moved the window
-    # on a drag there instead of selecting text.
+    # on a drag there instead of selecting text; given nothing, no drag moved it.
     region = app.cmd("dragregion")
     served = [tuple(map(float, r)) for r in re.findall(r"\{\{([\d.]+), ([\d.]+)\}, \{([\d.]+), ([\d.]+)\}\}", region)]
-    over_bar = [r for r in served if r[0] <= bar_x < r[0] + r[2] and r[1] <= window["content"][1] - bar_y < r[1] + r[3]]
-    check("the window server isn't given the address bar to drag by itself", region != "unknown" and not over_bar, region)
+    def given(x, y):
+        return any(r[0] <= x < r[0] + r[2] and r[1] <= window["content"][1] - y < r[1] + r[3] for r in served)
+    check("the window server isn't given the address bar to drag by itself", region != "unknown" and not given(bar_x, bar_y), region)
+    gap_x = window["buttonsEnd"] + 4
+    check("the window server is given the gap right of the window buttons", given(gap_x, BAR_Y), (gap_x, region))
     # An empty tab holds the blank page, so its page area is a page in content's own
     # colours, never the frame colour showing through. The frame colour used to take
     # over a few seconds in, so this looks after ten.

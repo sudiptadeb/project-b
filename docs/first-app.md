@@ -61,7 +61,7 @@ frame. In full screen it sends no drag areas. Close, minimise, zoom and full scr
 requests go through it too. The design: [window-manager.md](window-manager.md).
 
 `PBContainerView hitTest:` walks the layout's regions in order: a drag area answers nil,
-so AppKit's frame drags the window and, inside the title bar, zooms on a double-click; a
+so the press falls through to AppKit's frame, which zooms on a double-click; a
 shell area answers the shell's view; anything else the page. Content's own views ask
 the same `hitTest:` before accepting a mouse event, so nothing routes events by hand.
 That is how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
@@ -81,10 +81,11 @@ they are. Hit-testing from the window's frame view, as AppKit does, shows the ti
 does not swallow clicks over the shell: a point on a control returns the shell, a point
 on the empty strip returns the frame, a point on a window button returns the button.
 The window server, though, moves a window by itself, without asking the app, from any
-part of the title bar that AppKit says no view needs, and a transparent view needs
-none, so a drag across the address field moved the window. The content view claims the
-whole title bar from it (`_opaqueRectForWindowMoveWhenInTitlebar`, as Chrome's does), so
-every press there goes through the hit test.
+part of the title bar that AppKit says no view needs (`_opaqueRectForWindowMoveWhenInTitlebar`),
+and a transparent view needs none. So the container covers everything but the drag areas
+with empty views that each claim all of themselves: the window server moves the window
+from the drag areas, as it does any app's title bar, and every other press goes through
+the hit test, so a drag across the address field selects text.
 
 The window goes on screen once Go has given it its first layout, frame included, so even its
 first frame has them. Until the shell's first frame, content paints the shell's view

@@ -97,11 +97,12 @@ walks the list, so none of them knows the rule.
 ## Per platform
 
 - **macOS, today's code mapped.** `hitTest:` walks `Regions`: a drag area answers nil,
-  so AppKit's own frame moves the window through the window server; a shell area answers
-  the shell's view; anything else answers the page. The container already claims the
-  whole title bar with `_opaqueRectForWindowMoveWhenInTitlebar`, so the window server
-  asks before it moves anything. Double-click to zoom and the resize edges stay with
-  AppKit. `ReportControls` grows into the `WindowState` report.
+  so the press falls through to AppKit's frame; a shell area answers the shell's view;
+  anything else answers the page. The window server moves the window by itself from the
+  parts of the title bar no view claims (`_opaqueRectForWindowMoveWhenInTitlebar`), so
+  the container claims everything but the drag areas, with one empty view per rectangle
+  of the rest: the shell and the page are the app's, the drag areas the system's.
+  Double-click to zoom and the resize edges stay with AppKit. `ReportControls` grows into the `WindowState` report.
 - **Windows.** The window procedure answers WM_NCHITTEST from the same walk: HTCAPTION
   for a drag area, which tells Windows "this is title bar", so it moves the window, snaps
   it and maximises on a double-click by itself; HTCLIENT for the shell and the page.

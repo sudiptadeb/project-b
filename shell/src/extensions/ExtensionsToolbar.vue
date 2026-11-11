@@ -40,6 +40,23 @@ function onPress(e) {
 function onBlur() {
   menu.value = false;
 }
+
+// While a popup is open, a press anywhere in the shell closes it. The one exception is
+// the popup's own button: that press goes to Go as any press on it does, and Go closes
+// the popup it finds open. The engine closes it for a press outside the shell.
+function onPressWithPopup(e) {
+  const own = e.target.closest('[data-extension]');
+  if (!own || own.dataset.extension !== extensions.value.popup) send({ t: 'extensionClosePopup' });
+}
+// Nothing is known of extensions until the snapshot arrives.
+watch(
+  () => extensions.value?.popup,
+  (open) => {
+    if (open) window.addEventListener('pointerdown', onPressWithPopup, true);
+    else window.removeEventListener('pointerdown', onPressWithPopup, true);
+  },
+);
+
 watch(menu, (on) => {
   if (on) {
     window.addEventListener('keydown', onKey);
@@ -60,6 +77,7 @@ watch(menu, (on) => {
       :key="b.id"
       class="icon-button pbx-action"
       :class="{ 'pbx-open': extensions.popup === b.id }"
+      :data-extension="b.id"
       type="button"
       :disabled="!b.enabled"
       :aria-label="b.title || b.name"

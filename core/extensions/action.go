@@ -163,7 +163,7 @@ func (m *Manager) OpenPopup() string { return m.popup }
 // button with no popup tells its extension it was clicked.
 func (m *Manager) Click(id string, anchor engine.Rect) {
 	if m.popup == id {
-		m.eng.CloseExtensionPopup()
+		m.ClosePopup()
 		return
 	}
 	tab := m.activeTab()
@@ -176,6 +176,13 @@ func (m *Manager) Click(id string, anchor engine.Rect) {
 		m.changed()
 	} else if m.onClicked != nil {
 		m.onClicked(id)
+	}
+}
+
+// ClosePopup closes the popup that is open, if one is.
+func (m *Manager) ClosePopup() {
+	if m.popup != "" {
+		m.eng.CloseExtensionPopup()
 	}
 }
 

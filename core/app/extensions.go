@@ -87,6 +87,8 @@ func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[strin
 			switch t {
 			case "extensionClick":
 				m.Click(c.ID, c.Rect)
+			case "extensionClosePopup":
+				m.ClosePopup()
 			case "extensionPin":
 				m.Pin(c.ID, c.On)
 			case "extensionsManage":

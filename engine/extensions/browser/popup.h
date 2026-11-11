@@ -15,7 +15,9 @@ class Window;
 // An extension's popup: a page of the extension in a WebContents of its own, shown in a
 // view under the toolbar button that opened it, over the shell and the page. It takes
 // the size its page lays out to, as Chrome's does, and asks to be closed when the page
-// closes itself, the user presses Escape, or the keyboard goes elsewhere.
+// closes itself, the user presses Escape, or the keyboard goes to a page. When the
+// keyboard goes to the shell it stays: the shell knows which press was on the popup's
+// own button, which closes it, and closes it for any other.
 class ExtensionPopup : public extensions::ExtensionHost {
  public:
   // on_close runs, on a later task, when the popup should go; the owner destroys it.
@@ -31,6 +33,7 @@ class ExtensionPopup : public extensions::ExtensionHost {
 
  private:
   void AskToClose();
+  void CloseUnlessShellHasFocus();
 
   // extensions::ExtensionHost:
   void OnDidStopFirstLoad() override;

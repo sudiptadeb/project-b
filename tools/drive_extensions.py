@@ -87,7 +87,7 @@ def menu_click(app, selector):
     deadline = time.time() + 5
     while app.cmd("hit", x, y) != "shell":
         if time.time() > deadline:
-            raise TimeoutError(f"{selector} never became the shell's")
+            raise TimeoutError(f"{selector} never became the shell's: a press there lands on {app.cmd('hit', x, y)}")
         time.sleep(0.02)
     app.cmd("click", x, y)
 
@@ -149,6 +149,15 @@ def popup_box(app):
     return [float(v) for v in app.cmd("popup").split()]
 
 
+def open_popup(app):
+    """Presses the pinned button and returns the popup's box once it has its size."""
+    click(app, ".pbx-action")
+    deadline = time.time() + 20
+    while popup_box(app)[2] <= 25 and time.time() < deadline:
+        time.sleep(0.1)
+    return popup_box(app)
+
+
 def extension_checks():
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
@@ -204,11 +213,7 @@ def extension_checks():
     check("the button shows the badge its service worker set", int(app.js("document.querySelector('.pbx-action .pbx-badge').textContent")) >= 1)
 
     # The popup: a view of its own under the button, running the extension's page.
-    click(app, ".pbx-action")
-    deadline = time.time() + 20
-    while popup_box(app)[2] == 0 and time.time() < deadline:
-        time.sleep(0.1)
-    x, y, w, h = popup_box(app)
+    x, y, w, h = open_popup(app)
     bx, by, bw, bh = app.js("(()=>{const r=document.querySelector('.pbx-action').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()")
     check("the popup opens under its button", w >= 240 and h > 25 and abs((x + w) - (bx + bw)) <= 1 and y >= by + bh, (x, y, w, h, bx, by, bw, bh))
     deadline = time.time() + 20
@@ -220,6 +225,16 @@ def extension_checks():
     check("the popup's page reads storage and chrome.tabs.query", int(pages) >= 1 and any(PAGE in t for t in tabs), (pages, tabs))
     check("the shell marks the button whose popup is open", app.js("!!document.querySelector('.pbx-action.pbx-open')"))
 
+    # A second press on the button closes the popup, and it stays closed.
+    click(app, ".pbx-action")
+    deadline = time.time() + 10
+    while popup_box(app)[2] != 0 and time.time() < deadline:
+        time.sleep(0.05)
+    time.sleep(0.5)
+    check("a second press on the button closes the popup", popup_box(app)[2] == 0 and not app.js("!!document.querySelector('.pbx-action.pbx-open')"), popup_box(app))
+    x, y, w, h = open_popup(app)
+    check("and a third opens it again", w > 25, (x, y, w, h))
+
     # Its button calls chrome.tabs.create.
     rows = app.js(drive_first_app.ROWS)
     px, py = json.loads(app.cmd("evalpopup", "(()=>{const r=document.getElementById('open').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()"))
@@ -230,6 +245,9 @@ def extension_checks():
     while popup_box(app)[2] != 0 and time.time() < deadline:
         time.sleep(0.1)
     check("the popup closes when the keyboard goes elsewhere", popup_box(app)[2] == 0 and not app.js("!!document.querySelector('.pbx-action.pbx-open')"))
+    # The new tab takes the keyboard for its page once it has loaded.
+    app.wait(drive_first_app.TAB_READY, 30)
+    app.wait("document.hasFocus()", 15, page=True)
 
     pin(app, TEST_NAME, False)
     check("unpinning takes the button away", buttons(app) == [])
@@ -263,6 +281,7 @@ def extension_checks():
     settings_click(app, f"[aria-label={json.dumps('Remove ' + UBOL_NAME)}]")
     settings_wait(app, f"!({INSTALLED}).includes({json.dumps(UBOL_NAME)})", 30)
     check("Remove uninstalls it", True)
+
     app.close()
 
 

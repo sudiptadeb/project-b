@@ -9,6 +9,8 @@
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/common/mojom/view_type.mojom.h"
+#include "project_b/engine/browser/engine.h"
+#include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
@@ -100,9 +102,18 @@ bool ExtensionPopup::HandleKeyboardEvent(
   return extensions::ExtensionHost::HandleKeyboardEvent(source, event);
 }
 
+// Who has the keyboard now is known once the press that moved it is done, a task later.
 void ExtensionPopup::OnWebContentsLostFocus(
     content::RenderWidgetHost* render_widget_host) {
   if (shown_) {
+    content::GetUIThreadTaskRunner({})->PostTask(
+        FROM_HERE, base::BindOnce(&ExtensionPopup::CloseUnlessShellHasFocus,
+                                  weak_factory_.GetWeakPtr()));
+  }
+}
+
+void ExtensionPopup::CloseUnlessShellHasFocus() {
+  if (!Engine::Get()->shell()->contents()->GetRenderWidgetHostView()->HasFocus()) {
     AskToClose();
   }
 }

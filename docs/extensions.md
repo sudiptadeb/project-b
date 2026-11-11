@@ -202,8 +202,11 @@ flag in one folder rebuilds our own files and links again, under a minute, becau
   settings at Extensions.
 - **The popup** is a `WebContents` of its own in a native view over the shell, never a frame
   inside the shell. It takes the size its page lays out to (25 by 25 up to 800 by 600, as
-  Chrome's), and closes on Escape, when the page closes itself, when the keyboard goes
-  elsewhere, or on a second press of its button.
+  Chrome's), and closes on Escape, when the page closes itself, on a second press of its
+  button, and on a press anywhere else. The engine closes it when the keyboard goes to a
+  page. When the keyboard goes to the shell the engine leaves it, because only the shell knows
+  whether the press was on the popup's own button: that press goes to Go, which closes the
+  popup it finds open, and any other press in the shell asks Go to close it.
 - **Settings, Extensions.** Installed: enable, pin, remove, and details (id, version, source,
   permissions, site access). "Load unpacked" and "Install package…" open the system's panel.
   Store: the address, and the catalogue with Install. The install prompt is a dialog there.
@@ -273,8 +276,6 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 ## Open for the owner
 
-- **A second press of a pinned button reopens the popup.** The press takes the keyboard from
-  the popup, which closes it, and then the button opens it again. Chrome swallows that press.
 - **Uninstalling leaves the extension's stored data** (`chrome.storage`, IndexedDB) in the
   profile. Chrome's cleaner for it is in `//chrome`.
 - **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`. So are

@@ -5,6 +5,9 @@
 #                           Needs Go and `npm install`. No Chromium build, runs anywhere.
 #   tools/test.sh app       The real app through its driver and through ChromeDriver.
 #                           Needs the build, or PB_BIN, and ChromeDriver. No display.
+#   tools/test.sh basics    One check per area of the whole-browser checklist, on the real
+#                           app. Most fail today, on purpose: the result is a map of what
+#                           isn't built. Needs what the app group needs. Not part of a release.
 #   tools/test.sh screen    The real app in a person's desktop session: full screen, copy and
 #                           paste, and first paint in the real window.
 #                           NEEDS A PERSON LOGGED IN at this Mac's screen, with it unlocked,
@@ -65,6 +68,11 @@ app() {
     run "the real app through ChromeDriver" python3 tools/drive_chromedriver.py
 }
 
+basics() {
+    need_app basics
+    run "the basics, one check per area" python3 tools/check_basics.py
+}
+
 screen() {
     need_app screen
     echo "The screen group NEEDS A PERSON LOGGED IN at this Mac's screen. The app's window will show there."
@@ -90,8 +98,8 @@ android() {
 [ $# -gt 0 ] || { sed -n '2,/^set -u/p' "$0" | sed '$d' | cut -c3-; exit 2; }
 for group in "$@"; do
     case $group in
-        mock | app | screen | vm | android) $group ;;
-        *) echo "no group called $group: mock, app, screen, vm or android" >&2; exit 2 ;;
+        mock | app | basics | screen | vm | android) $group ;;
+        *) echo "no group called $group: mock, app, basics, screen, vm or android" >&2; exit 2 ;;
     esac
 done
 echo "$SUMMARY"

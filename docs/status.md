@@ -19,6 +19,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
     tools/build-and-wait.sh                    # incremental build of out/pb
     tools/test.sh mock                         # Go's tests, and the shell on the mock engine in Playwright
     tools/test.sh app                          # the real app, by its driver and by ChromeDriver; no display
+    tools/test.sh basics                       # one check per checklist area; most fail today, a map of gaps
     tools/test.sh screen                       # full screen, the clipboard, first paint; NEEDS A PERSON logged in at the screen
     tools/test.sh vm                           # real clicks in the macOS VM; needs a desktop login once per boot
     tools/test.sh android                      # the Android app on the emulator (amarit start project-b-emu)

@@ -1,19 +1,20 @@
 # Chrome extensions
 
-Project B can run Chrome's Manifest V3 extensions. It is a build-time feature, off by default.
+Project B can run Chrome's Manifest V3 extensions. Every build has them, and they run only while
+the Extensions flag is on (Settings, Flags; [flags.md](flags.md)). It is off by default.
 This is the design as built. The research behind it is in
 `project-b-research/chrome-extensions.md` and `chrome-extensions-reassessment.md`.
 
     tools/fetch-extensions.sh                     # five real packages into .tools/extensions/
     tools/pack-test-extension.py                  # ours, packed into the same folder
     (cd core && go run ./cmd/extstore -dir ../.tools/extensions)    # the mock store, on 127.0.0.1:8766
-    EXTENSIONS=1 OUT=out/ext tools/build.sh       # a build with extensions, in a folder of its own
-    chromium/src/out/ext/project_b
+    tools/build.sh                                # extensions are in the build by default
+    chromium/src/out/pb/project_b                 # then Settings, Flags, Extensions, and Relaunch
 
 The store is a website. Started like that, the store is the Chrome Web Store: visit
 `chromewebstore.google.com` and press "Add to Chrome". To make the mock store the store:
 
-    chromium/src/out/ext/project_b --apps-gallery-url=http://127.0.0.1:8766 \
+    chromium/src/out/pb/project_b --apps-gallery-url=http://127.0.0.1:8766 \
         --apps-gallery-download-url=http://127.0.0.1:8766/download/%s
 
 and visit `http://127.0.0.1:8766/`.
@@ -219,8 +220,8 @@ To keep the store up, build it and hand it to amarit:
 
 ## The build flag
 
-One switch: `EXTENSIONS=1 tools/build.sh`. Default off. It sets three things from one variable,
-and nothing checks anything at run time.
+One switch: `EXTENSIONS=0 tools/build.sh` leaves them out. Default on. It sets three things from
+one variable. What runs is then the Extensions flag's to say, as [flags.md](flags.md) describes.
 
 | Layer | On | Off |
 |---|---|---|
@@ -228,7 +229,7 @@ and nothing checks anything at run time.
 | Go: build tag `extensions` | `core/extensions/`, and one tagged file each in `engine`, `mockengine`, `content`, `app`, `cmd/lib`, `cmd/dev` | None of them is compiled |
 | Shell: the `@extensions` alias | `shell/src/extensions/` | `shell/src/extensions-off/`, the same names with nothing in them |
 
-Keep an extensions build in its own folder (`OUT=out/ext`). The flag is Mac only; the Android
+Keep a build without extensions in its own folder (`EXTENSIONS=0 OUT=out/noext`). The flag is Mac only; the Android
 build refuses it.
 
 Measured on the build Mac, same arguments otherwise (not official, `symbol_level = 0`):
@@ -266,21 +267,23 @@ flag in one folder rebuilds our own files and links again, under a minute, becau
 
 ## Tests
 
-`EXTENSIONS=1` adds to two of the existing groups.
+The extension checks are part of two of the existing groups, unless `EXTENSIONS=0`.
 
-- `EXTENSIONS=1 tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
+- `tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
   tests: the prompt in both pages, a package, load unpacked, pins, the popup, and the `tabs` and
   `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 38 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
-- `EXTENSIONS=1 tools/test.sh app`: `tools/drive_extensions.py`, 36 checks on the real app built
-  with the flag (`PB_BIN`, or `chromium/src/out/ext/project_b`). Started with the mock store as
+- `tools/test.sh app`: `tools/drive_extensions.py`, 46 checks on the real app
+  (`PB_BIN`, or `chromium/src/out/pb/project_b`), in profiles with the Extensions flag on, and
+  one with it off, where no button shows, the store's page has no store API, and the Flags
+  section's switch and Relaunch turn it on. Started with the mock store as
   its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
   sees the content script run and an ad host blocked, pins and unpins, opens the popup and
   clicks in it, restarts, turns one off and removes it. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
-- `tools/test.sh app`, without the flag, also runs `tools/check_no_extensions.py`: the library
+- `EXTENSIONS=0 tools/test.sh app` runs `tools/check_no_extensions.py`: the library
   has no symbol of namespace `extensions`, and the main binary none of Go's extension packages.
 
 The mock engine's fake runtime (`core/mockengine/extensions.go`) reads a package's manifest as

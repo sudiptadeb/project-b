@@ -20,12 +20,12 @@
 #   tools/test.sh android   The Android app on the emulator.
 #                           Needs the emulator running and the APK, or PB_APK.
 #
-# EXTENSIONS=1 adds the checks of a build with Chrome extensions to mock and app: Go's
-# tests with the tag, the extension UI on the mock engine's fake runtime, and the real
-# app installing from the mock store. They need tools/fetch-extensions.sh and
-# tools/pack-test-extension.py to have filled .tools/extensions/, and for app a build
-# made with EXTENSIONS=1 (PB_BIN, or chromium/src/out/ext). Without it, app checks that
-# the build has no extension code in it.
+# Builds have Chrome extensions in them unless made with EXTENSIONS=0, and so do the
+# tests: mock and app add Go's tests with the tag, the extension UI on the mock engine's
+# fake runtime, and the real app installing from the mock store with the Extensions flag
+# on, and running none of it with the flag off. They need tools/fetch-extensions.sh and
+# tools/pack-test-extension.py to have filled .tools/extensions/. EXTENSIONS=0 tests a
+# build made without them (PB_BIN), and app checks that it has no extension code in it.
 #
 # Several groups can be named at once. A group or a test that lacks what it needs says so
 # and ends with exit 2 instead of running. Each test prints ok or FAIL per check; the end is
@@ -34,12 +34,8 @@
 set -u
 cd "$(dirname "$0")/.."
 
-EXTENSIONS=${EXTENSIONS:-0}
-if [ "$EXTENSIONS" = 1 ]; then
-    BIN=${PB_BIN:-chromium/src/out/ext/project_b}
-else
-    BIN=${PB_BIN:-chromium/src/out/pb/project_b}
-fi
+EXTENSIONS=${EXTENSIONS:-1}
+BIN=${PB_BIN:-chromium/src/out/pb/project_b}
 APK=${PB_APK:-build/android/project-b-content.apk}
 ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-emulator-5600}"
 VM_PYTHON=$HOME/PW_TOOLS/macos-vm/venv/bin/python
@@ -87,14 +83,14 @@ mock() {
 
 app() {
     need_app app
-    if [ "$EXTENSIONS" = 1 ]; then
-        need_store app
-        run "extensions in the real app" env PB_BIN="$BIN" python3 tools/drive_extensions.py
-        return
-    fi
+    [ "$EXTENSIONS" = 1 ] && need_store app
     run "the real app through its driver" python3 tools/drive_first_app.py
     run "the real app through ChromeDriver" python3 tools/drive_chromedriver.py
-    run "no extension code in the app" python3 tools/check_no_extensions.py "$BIN"
+    if [ "$EXTENSIONS" = 1 ]; then
+        run "extensions in the real app" env PB_BIN="$BIN" python3 tools/drive_extensions.py
+    else
+        run "no extension code in the app" python3 tools/check_no_extensions.py "$BIN"
+    fi
 }
 
 basics() {

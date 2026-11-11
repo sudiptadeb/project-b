@@ -26,12 +26,12 @@ Take an item off when it lands or is dropped.
 - **Slowness, fixed at the cause, never masked:** a stale picture after a resize, and a brief
   flash at launch. The rejected masking attempts are on branch `parked-window`.
 - **Android:** the colour before Go starts. See [android.md](android.md#the-shell-on-a-phone).
-- **Extensions: the checks left out, and what is open.** A build with `EXTENSIONS=1` installs
-  and runs Chrome extensions from a mock store. Every check skipped on purpose (hashes,
-  publisher proof, blocklist, policy, content verification, host scrubbing) and every open
-  behaviour is listed in [extensions.md](extensions.md#checks-to-discuss). No release carries
-  the flag until those are decided, and until the URL policy above covers what extensions
-  request.
+- **Extensions: the checks left out, and what is open.** Releases carry extensions since 0.2.25,
+  with their flag off by default; turned on, they install from the Chrome Web Store. Every
+  check skipped on purpose (hashes, publisher proof, blocklist, policy, content verification,
+  host scrubbing) and every open behaviour is listed in
+  [extensions.md](extensions.md#checks-to-discuss), to decide before the flag is on by default,
+  along with the URL policy above covering what extensions request.
 - **Checking store packages against Google's signature.** Today a Web Store package is held to
   the plain CRX3 check only, not to Google's publisher proof. No checks for now, by the owner's
   call; to discuss later.

@@ -2,16 +2,17 @@
 # Builds the first app's library and two binaries. Flat on purpose; safe to re-run.
 # RELEASE=1 OUT=out/rel tools/build.sh makes an official-style build: no DCHECKs, link-time
 # optimisation, no symbols. It takes hours and can't be rebuilt quickly.
-# EXTENSIONS=1 tools/build.sh builds with Chrome extensions: the engine's GN arg, Go's
-# build tag and the shell's extension UI, all three from this one switch. Keep such a
-# build in a folder of its own (OUT=out/ext), so switching doesn't rebuild either.
+# Chrome extensions are in the build unless EXTENSIONS=0: the engine's GN arg, Go's build
+# tag and the shell's extension UI, all three from this one switch. They run only while
+# the Extensions flag is on (docs/flags.md). Keep a build without them in a folder of its
+# own (EXTENSIONS=0 OUT=out/noext), so switching doesn't rebuild either.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/chromium/src
 OUT=${OUT:-out/pb}
 RELEASE=${RELEASE:-0}
-export EXTENSIONS=${EXTENSIONS:-0}
+export EXTENSIONS=${EXTENSIONS:-1}
 TARGETS=${TARGETS:-project_b project_b_helper}
 
 # depot_tools goes in front of the caller's PATH; everything else (npm, go...) stays.

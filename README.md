@@ -75,9 +75,9 @@ that lacks what it needs says so and stops before running anything:
 A test also runs alone, as the top of its file says: `python3 tools/drive_first_app.py settings`
 runs only the menus, keys and settings page.
 
-Chrome extensions are a build-time feature, off by default. `EXTENSIONS=1 tools/build.sh`
-builds with them and `EXTENSIONS=1 tools/test.sh mock app` runs their checks:
-[docs/extensions.md](docs/extensions.md).
+Chrome extensions are in every build (`EXTENSIONS=0 tools/build.sh` leaves them out) and run
+only with their flag on, in Settings, Flags: [docs/extensions.md](docs/extensions.md) and
+[docs/flags.md](docs/flags.md).
 
 ### The groups that need a person
 

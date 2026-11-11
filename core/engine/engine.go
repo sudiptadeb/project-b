@@ -7,6 +7,8 @@
 // A worker goroutine that finishes something uses Post to get back onto it.
 package engine
 
+import "errors"
+
 // TabID identifies a tab across the boundary. Content's own objects never cross it.
 type TabID int64
 
@@ -216,7 +218,16 @@ type Listener interface {
 
 	// ProcessCrashed says a child process crashed.
 	ProcessCrashed(p ProcessCrash)
+
+	// DevToolsCommand is one of our own DevTools commands, ProjectB.*, from a client of
+	// the debugging port, with its params as JSON. The result is the reply's result,
+	// as JSON. ErrUnknownCommand leaves the reply to content, which says it has no such
+	// method.
+	DevToolsCommand(method string, params []byte) (result any, err error)
 }
+
+// ErrUnknownCommand is DevToolsCommand's answer for a method it doesn't have.
+var ErrUnknownCommand = errors.New("unknown command")
 
 // Area is what a press at a point does.
 type Area int

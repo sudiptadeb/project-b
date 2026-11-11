@@ -2,6 +2,7 @@ package content
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 
 	"projectb/engine"
@@ -21,6 +22,7 @@ const (
 	eventOSBindings     Hook = 9
 	eventModsChanged    Hook = 10
 	eventProcessCrashed Hook = 11
+	eventDevTools       Hook = 12
 )
 
 var eventNames = map[Hook]string{
@@ -35,6 +37,7 @@ var eventNames = map[Hook]string{
 	eventOSBindings:     "engine.OSBindings",
 	eventModsChanged:    "engine.ModsChanged",
 	eventProcessCrashed: "engine.ProcessCrashed",
+	eventDevTools:       "engine.DevToolsCommand",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -60,6 +63,7 @@ type Events struct {
 	OnOSBindings      func(byTitle map[string]engine.Key)
 	OnModsChanged     func(m engine.Mods)
 	OnProcessCrashed  func(p engine.ProcessCrash)
+	OnDevTools        func(method string, params []byte) (result any, err error)
 }
 
 func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
@@ -120,6 +124,25 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 				URL:      r.str(),
 			})
 		}
+	case eventDevTools:
+		// The answer is the reply's body as DevTools has it: its result or its error.
+		if e.OnDevTools == nil {
+			return Value{}, false
+		}
+		method, params := r.str(), r.str()
+		result, err := e.OnDevTools(method, []byte(params))
+		if errors.Is(err, engine.ErrUnknownCommand) {
+			return Value{}, false
+		}
+		body := map[string]any{"result": result}
+		if err != nil {
+			body = map[string]any{"error": map[string]any{"code": -32000, "message": err.Error()}}
+		}
+		b, err := json.Marshal(body)
+		if err != nil {
+			b, _ = json.Marshal(map[string]any{"error": map[string]any{"code": -32603, "message": err.Error()}})
+		}
+		return Value{S: string(b)}, true
 	}
 	return Value{}, false
 }

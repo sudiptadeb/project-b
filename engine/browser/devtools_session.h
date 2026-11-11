@@ -15,12 +15,16 @@ namespace content {
 class DevToolsAgentHostClientChannel;
 }
 
+namespace crdtp {
+class Dispatchable;
+}
+
 namespace project_b {
 
 // One DevTools client's commands that content leaves to the embedder: Browser's window
 // commands, answered as Chrome answers them (chrome/browser/devtools/protocol/
-// browser_handler.cc) for our one window, whose id is 1. The rest fall through to
-// content. Generated from Blink's protocol as content_shell's are; see
+// browser_handler.cc) for our one window, whose id is 1, and our own ProjectB.*
+// commands, which Go answers. The rest fall through to content. Generated from Blink's protocol as content_shell's are; see
 // browser/protocol_config.json.
 class DevToolsSession : public protocol::FrontendChannel,
                         public protocol::Browser::Backend {
@@ -35,6 +39,9 @@ class DevToolsSession : public protocol::FrontendChannel,
       content::DevToolsManagerDelegate::NotHandledCallback callback);
 
  private:
+  // Returns whether the command was one of ours and is answered.
+  bool HandleOurs(const crdtp::Dispatchable& dispatchable);
+
   // protocol::FrontendChannel:
   void SendProtocolResponse(
       int call_id,

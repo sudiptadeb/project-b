@@ -46,6 +46,10 @@ typedef enum PBEvent {
   PB_EVENT_MODS_CHANGED = 10,           // i: the modifiers held now, PBMods
   PB_EVENT_PROCESS_CRASHED = 11,        // s: process type, i: base::TerminationStatus,
                                         // i: exit code, i: pid, s: a renderer's page or ""
+  PB_EVENT_DEVTOOLS_COMMAND = 12,       // s: method, s: params json; answers s: the
+                                        // reply's body, {"result": ...} or {"error": ...}.
+                                        // Only ProjectB.* methods; no answer leaves the
+                                        // command to content
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.

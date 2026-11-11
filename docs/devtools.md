@@ -56,6 +56,24 @@ Chrome's `chrome/browser/devtools/protocol/browser_handler.cc` answers them, in
 | `Browser.setWindowBounds` | Chrome's rules: a state can't be combined with a rectangle, and `normal` first leaves full screen, the Dock or zoom |
 | `Browser.close` | closes the window on a later task, which ends the app |
 
+## Our own commands
+
+Commands named `ProjectB.*` are Go's. `devtools_session.cc` hands each one's method and
+params, as JSON, to Go (`PB_EVENT_DEVTOOLS_COMMAND`), and Go's answer is the reply.
+They let a test see and do what only Go knows. Any client of the port sends them as it
+sends content's; ChromeDriver passes them through `goog:cdp`.
+
+| Command | Answer |
+|---|---|
+| `ProjectB.getTabs` | `{tabs, active}`: the tabs as Go's tab manager has them, and the shown one's id |
+| `ProjectB.isAllowedURL` `{url}` | `{allowed}`: whether policy lets a tab load it |
+| `ProjectB.panic` | none: it panics inside Go's hook, as a bug would (see "Crashes" in `first-app.md`) |
+
+A method Go doesn't have falls through to content, which says it wasn't found. The
+commands live in `core/app/devtools.go`; adding one is a Go change only. They need no
+switch of their own: the port is closed unless the app is started with it, and a client
+of it can already drive the whole browser and crash it (`Browser.crash`).
+
 ## Not here
 
 - Separate browser contexts (`Target.createBrowserContext`, Playwright's normal launch)

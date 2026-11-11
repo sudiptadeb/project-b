@@ -1,8 +1,16 @@
 #include "project_b/engine/browser/devtools_session.h"
 
+#include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "base/check.h"
+#include "base/containers/span.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/devtools_agent_host_client_channel.h"
 #include "content/public/browser/web_contents.h"
@@ -11,6 +19,7 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/inspector_protocol/crdtp/dispatch.h"
+#include "third_party/inspector_protocol/crdtp/json.h"
 #include "ui/gfx/geometry/rect.h"
 
 namespace project_b {
@@ -73,7 +82,43 @@ void DevToolsSession::HandleCommand(
       });
   // content::DevToolsSession has already parsed this message.
   CHECK(dispatchable.ok());
+  if (HandleOurs(dispatchable)) {
+    return;
+  }
   dispatcher_.Dispatch(dispatchable);
+}
+
+// Our own commands, ProjectB.*, are Go's: the method and its params as JSON cross, and
+// Go's answer is the reply's body. One Go doesn't answer falls through to content, which
+// replies that there is no such method.
+bool DevToolsSession::HandleOurs(const crdtp::Dispatchable& dispatchable) {
+  const std::string_view method =
+      base::as_string_view(base::span(dispatchable.Method()));
+  if (!base::StartsWith(method, "ProjectB.")) {
+    return false;
+  }
+  std::string params = "{}";
+  if (!dispatchable.Params().empty()) {
+    params.clear();
+    CHECK(crdtp::json::ConvertCBORToJSON(dispatchable.Params(), &params).ok());
+  }
+  hooks::Args args;
+  args.Str(std::string(method));
+  args.Str(params);
+  PBValue result{};
+  if (!hooks::Ask(PB_EVENT_DEVTOOLS_COMMAND, args, &result)) {
+    return false;
+  }
+  const std::string body = hooks::TakeString(result);
+  // The body is a JSON object; the reply is the same object with the command's id first.
+  CHECK(body.size() > 2 && body.front() == '{');
+  const std::string reply = base::StrCat(
+      {"{\"id\":", base::NumberToString(dispatchable.CallId()), ",",
+       std::string_view(body).substr(1)});
+  std::vector<uint8_t> cbor;
+  CHECK(crdtp::json::ConvertJSONToCBOR(crdtp::SpanFrom(reply), &cbor).ok());
+  channel_->DispatchProtocolMessageToClient(std::move(cbor));
+  return true;
 }
 
 void DevToolsSession::SendProtocolResponse(

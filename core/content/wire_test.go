@@ -1,6 +1,8 @@
 package content
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -97,6 +99,17 @@ func (r *recorder) WindowChanged(s engine.WindowState) {
 func (r *recorder) ShellCrashed() { r.note("shell crashed") }
 func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
 	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))
+}
+
+func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
+	r.note("devtools " + method + " " + string(params))
+	switch method {
+	case "ProjectB.echo":
+		return json.RawMessage(params), nil
+	case "ProjectB.fail":
+		return nil, errors.New("it failed")
+	}
+	return nil, engine.ErrUnknownCommand
 }
 
 func wired(t *testing.T) (*Hooks, *recorder, map[Hook]bool) {
@@ -234,5 +247,21 @@ func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {
 		t.Fatalf("counts %v", h.Counts())
+	}
+}
+
+func TestDevToolsCommandsAnswerWithTheirResultOrError(t *testing.T) {
+	h, _, _ := wired(t)
+	for _, c := range []struct{ method, params, answer string }{
+		{"ProjectB.echo", `{"a":1}`, `{"result":{"a":1}}`},
+		{"ProjectB.fail", `{}`, `{"error":{"code":-32000,"message":"it failed"}}`},
+	} {
+		v, ok := h.Dispatch(eventDevTools, pack(c.method, c.params))
+		if !ok || v.S != c.answer {
+			t.Errorf("%s: %v %q, want %q", c.method, ok, v.S, c.answer)
+		}
+	}
+	if _, ok := h.Dispatch(eventDevTools, pack("ProjectB.nothing", `{}`)); ok {
+		t.Error("an unknown command was answered, not left to content")
 	}
 }

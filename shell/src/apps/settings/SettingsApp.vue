@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { extensionsSection } from '@extensions';
 import { phone } from '@/phone.js';
 import { useTheme } from '@/theme.js';
+import Flags from './Flags.vue';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
 import { send, state } from './state.js';
@@ -11,13 +12,17 @@ import { send, state } from './state.js';
 // frame colour and the theme, as the shell's do.
 useTheme(state);
 
-// The page shows state.section when it is one of these, else the first.
-const sections = [
-  { id: 'general', label: 'General', component: General },
-  { id: 'keyboard', label: 'Keyboard', component: Keyboard },
-  extensionsSection,
-].filter((s) => s);
-const section = computed(() => sections.find((s) => s.id === state.section) || sections[0]);
+// The page shows state.section when it is one of these, else the first. Extensions is
+// there when the build has them and their flag is on.
+const sections = computed(() =>
+  [
+    { id: 'general', label: 'General', component: General },
+    { id: 'keyboard', label: 'Keyboard', component: Keyboard },
+    extensionsSection?.shown() && extensionsSection,
+    { id: 'flags', label: 'Flags', component: Flags },
+  ].filter((s) => s),
+);
+const section = computed(() => sections.value.find((s) => s.id === state.section) || sections.value[0]);
 
 // The header leaves the native window buttons their space, as the shell's top row does.
 const headerStart = computed(() => {

@@ -15,6 +15,7 @@ int main(int argc, const char** argv) {
       .crash = PBCrash,
       .go_stats = PBGoStats,
       .version = PBVersion,
+      .launch_switches = PBLaunchSwitches,
   };
   return ProjectBMain(argc, argv, &go);
 }

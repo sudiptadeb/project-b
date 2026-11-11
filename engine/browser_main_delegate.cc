@@ -2,6 +2,7 @@
 
 #include "build/build_config.h"
 #include "project_b/engine/browser/content_browser_client.h"
+#include "project_b/engine/common/extensions_on.h"
 
 #if BUILDFLAG(IS_MAC)
 #include "project_b/engine/browser/mac_app.h"
@@ -21,6 +22,12 @@ std::optional<int> BrowserMainDelegate::PreBrowserMain() {
 
 content::ContentBrowserClient*
 BrowserMainDelegate::CreateContentBrowserClient() {
+#if BUILDFLAG(PB_EXTENSIONS)
+  if (ExtensionsOn()) {
+    browser_client_ = std::make_unique<ExtensionsContentBrowserClient>();
+    return browser_client_.get();
+  }
+#endif
   browser_client_ = std::make_unique<ContentBrowserClient>();
   return browser_client_.get();
 }

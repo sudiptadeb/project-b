@@ -24,6 +24,7 @@ int PBRecoverNilDeref(void);
 void PBCrash(int32_t kind);
 char* PBGoStats(void);
 char* PBVersion(void);
+char* PBLaunchSwitches(const char* profile_dir);
 
 #ifdef __cplusplus
 }

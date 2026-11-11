@@ -314,8 +314,10 @@ PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   tab->contents()->WasHidden();
 #if BUILDFLAG(PB_EXTENSIONS)
   // Extensions run in every tab: content scripts, messages, chrome.scripting.
-  extensions::ExtensionsBrowserClient::Get()
-      ->CreateExtensionWebContentsObserver(tab->contents());
+  if (Extensions::Get()) {
+    extensions::ExtensionsBrowserClient::Get()
+        ->CreateExtensionWebContentsObserver(tab->contents());
+  }
 #endif
 #if BUILDFLAG(IS_ANDROID)
   window_->AddPageContents(tab->contents());

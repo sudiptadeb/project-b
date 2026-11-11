@@ -18,6 +18,7 @@ JNIEXPORT jlong JNICALL Java_dev_projectb_browser_GoCore_table(JNIEnv* env, jcla
       .crash = PBCrash,
       .go_stats = PBGoStats,
       .version = PBVersion,
+      .launch_switches = PBLaunchSwitches,
   };
   return (jlong)(intptr_t)&go;
 }

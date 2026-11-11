@@ -145,6 +145,31 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await autoUpdate.click();
   check('the switch turns automatic updates off and saves it', await until(() => prefsFile().autoUpdate === false));
 
+  // Flags: saved for the next launch, with Relaunch offered until they are what runs.
+  const flagsFile = () => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(profile, 'flags.json'), 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+  await page.getByRole('button', { name: 'Flags' }).click();
+  const relaunch = page.getByRole('button', { name: 'Relaunch' });
+  check('Flags lists the flags, none waiting', await page.getByRole('region', { name: 'Flags' }).getByText('Chromium features').isVisible() && (await relaunch.count()) === 0);
+  check('Extensions is off and can\'t be turned on in a build without them', await page.getByRole('switch', { name: /Extensions/ }).isDisabled());
+  check('the build flags say so', (await page.getByRole('region', { name: 'Build' }).textContent()).includes('Not in this build'));
+  const port = page.getByRole('textbox', { name: 'Remote debugging port' });
+  await port.fill('80');
+  await port.press('Enter');
+  check('a port it can\'t use is refused', await until(async () => (await port.inputValue()) === '') && flagsFile() === null);
+  await port.fill('9333');
+  await port.press('Enter');
+  check('a port is saved, and Relaunch shows', await until(async () => flagsFile()?.remoteDebugging === '9333' && await relaunch.isVisible()), JSON.stringify(flagsFile()));
+  await page.screenshot({ path: path.join(out, 'settings-flags.png') });
+  await port.fill('');
+  await port.press('Enter');
+  check('cleared, nothing waits', await until(async () => (await relaunch.count()) === 0 && JSON.stringify(flagsFile()) === '{}'));
+
   // Keyboard.
   await page.getByRole('button', { name: 'Keyboard' }).click();
   // The list only shows; clicking an action opens its editor.

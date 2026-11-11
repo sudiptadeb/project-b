@@ -4,12 +4,13 @@
 It starts the mock store on the folder tools/fetch-extensions.sh and
 tools/pack-test-extension.py fill, starts the app with that store as its store, and
 installs our test extension and uBlock Origin Lite from the store's page, as the Chrome
-Web Store's page installs. Then it loads the test extension unpacked, pins and unpins,
-opens the popup, and starts the app again. Last, in an app started as it ships, it
+Web Store's page installs, in a profile whose Extensions flag is on. Then it loads the test extension unpacked, pins and unpins,
+opens the popup, and starts the app again. With the flag off, nothing of extensions
+runs, and the Flags section's switch and Relaunch turn it on. Last, in an app started as it ships, it
 installs uBlock Origin Lite from the real chromewebstore.google.com. It needs the network,
 for that and for the ad host uBlock Origin Lite is seen blocking. Run it from the repo root:
 
-    PB_BIN=chromium/src/out/ext/project_b python3 tools/drive_extensions.py
+    PB_BIN=chromium/src/out/pb/project_b python3 tools/drive_extensions.py
 
 Results go to build/real/, as tools/drive_first_app.py's do.
 """
@@ -39,6 +40,15 @@ UBOL_ID = "ddkjiahejlhfcafbddmgiahcphecmpfh"
 UBOL_NAME = "uBlock Origin Lite"
 # An address every ad blocker's default lists block outright.
 AD_URL = "https://ad.doubleclick.net/ddm/ad/pb"
+
+
+def new_profile(extensions=True):
+    """A new profile, with the Extensions flag on as the settings page saves it."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    if extensions:
+        with open(os.path.join(profile, "flags.json"), "w") as f:
+            json.dump({"extensions": "on"}, f)
+    return profile
 
 
 def fetch_ad(app):
@@ -180,7 +190,7 @@ def pages_seen(app):
 
 
 def extension_checks():
-    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    profile = new_profile()
     app = App(profile, MOCK_STORE)
     app.wait("!!document.querySelector('input')", 30)
     check("the toolbar has the extensions button", app.js("!!document.querySelector('[aria-label=Extensions]')"))
@@ -311,9 +321,43 @@ def extension_checks():
     app.close()
 
 
+def flag_off_checks():
+    """The same build with the Extensions flag off: the code is there and none of it runs."""
+    profile = new_profile(extensions=False)
+    app = App(profile, MOCK_STORE)
+    app.wait("!!document.querySelector('input')", 30)
+    check("with the flag off the toolbar has no extensions button", not app.js("!!document.querySelector('[aria-label=Extensions]')"))
+    visit(app, STORE + "/")
+    app.wait("!!document.querySelector('li[data-id]')", 20, page=True)
+    check("and the store's page has no store API", app.js("!(window.chrome&&chrome.webstorePrivate)", page=True))
+
+    # Settings, Flags: the switch saves it, and Relaunch starts the app again on the same
+    # profile, with the same arguments.
+    click(app, "[aria-label='Settings']")
+    settings_wait(app, "!!document.querySelector('.nav')", 30)
+    settings(app, "[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Flags').click()")
+    settings_wait(app, "!!document.querySelector('#flags')")
+    settings_click(app, "[role=switch]")
+    settings_wait(app, "!!document.querySelector('.head .primary')")
+    with open(os.path.join(profile, "flags.json")) as f:
+        check("the Extensions switch saves the flag, and Relaunch shows", json.load(f) == {"extensions": "on"})
+    settings_click(app, ".head .primary")
+    app.proc.wait(timeout=30)
+    App.running.remove(app)
+    again = []
+    deadline = time.time() + 30
+    while not again and time.time() < deadline:
+        time.sleep(0.5)
+        ps = subprocess.run(["pgrep", "-f", "--", f"--profile={profile} "], capture_output=True, text=True).stdout.split()
+        again = [int(p) for p in ps if int(p) != app.proc.pid]
+    check("Relaunch ends the app and starts it again on the same profile", len(again) == 1, again)
+    for pid in again:
+        os.kill(pid, 15)
+
+
 def web_store_checks():
     """The app as it ships, with no store named: the store is the Chrome Web Store."""
-    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    app = App(new_profile())
     app.wait("!!document.querySelector('input')", 30)
     visit(app, PAGE)
     check("with no extension the ad host answers", fetch_ad(app) == "reached")
@@ -388,6 +432,6 @@ if __name__ == "__main__":
     subprocess.check_call(["go", "build", "-o", store_bin, "./cmd/extstore"], cwd=os.path.join(ROOT, "core"))
     store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", STORE.split("//")[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        run_parts([extension_checks, web_store_checks])
+        run_parts([extension_checks, flag_off_checks, web_store_checks])
     finally:
         store.terminate()

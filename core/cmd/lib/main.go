@@ -53,6 +53,7 @@ import (
 	"projectb/app"
 	"projectb/content"
 	"projectb/engine"
+	"projectb/flags"
 )
 
 // Where releases are published. The project and the URL are the ones in amarit.json at the
@@ -327,6 +328,14 @@ func PBVersion() *C.char {
 		v = "development build"
 	}
 	return C.CString("Project B " + v)
+}
+
+// PBLaunchSwitches is the switches the flags saved in the profile ask for, one per line,
+// for the adapter to add to the command line before content starts. The caller frees it.
+//
+//export PBLaunchSwitches
+func PBLaunchSwitches(profileDir *C.char) *C.char {
+	return C.CString(strings.Join(flags.New(C.GoString(profileDir)).Switches(), "\n"))
 }
 
 func main() {}

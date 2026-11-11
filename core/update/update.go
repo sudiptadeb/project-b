@@ -13,14 +13,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/sudiptadeb/amarit"
+
+	"projectb/relaunch"
 )
 
 // CheckInterval is how often the app looks for a release. One minute while the updater is
@@ -365,19 +365,8 @@ func (m *Manager) Relaunch() {
 	m.staged = ""
 	m.mu.Unlock()
 	log.Printf("update: %s is in place, previous release kept at %s; relaunching", m.cfg.App, previous)
-	relaunch(filepath.Join(m.cfg.App, "Contents", "MacOS", executable))
+	relaunch.After(filepath.Join(m.cfg.App, "Contents", "MacOS", executable), nil)
 	m.quit()
-}
-
-// relaunch starts the new app after this process has exited, from a shell that outlives
-// it. Starting it any earlier would run two copies on one profile.
-func relaunch(executable string) {
-	cmd := exec.Command("/bin/sh", "-c", `while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; exec "$2"`,
-		"relaunch", strconv.Itoa(os.Getpid()), executable)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
-		log.Printf("update: relaunch: %v", err)
-	}
 }
 
 // set stores the state and tells the listeners, on the main thread.

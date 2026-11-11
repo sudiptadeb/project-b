@@ -10,6 +10,7 @@ import (
 
 	"projectb/commands"
 	"projectb/engine"
+	"projectb/flags"
 	"projectb/prefs"
 	"projectb/update"
 	"projectb/window"
@@ -30,12 +31,15 @@ type Manager struct {
 	eng      engine.Engine
 	window   *window.Manager
 	prefs    *prefs.Manager
+	flags    *flags.Manager
 	update   *update.Manager
 	commands *commands.Manager
 	open     bool
 	// section is the section a caller asked the page to show, or "" for its first.
 	section string
 	parts   []Part
+	// relaunch starts the app again, for the flags to take effect.
+	relaunch func()
 }
 
 // Part is what another manager adds to the settings page's contract: its state in the
@@ -59,9 +63,12 @@ func (m *Manager) OpenSection(section string) {
 }
 
 // New returns a manager.
-func New(eng engine.Engine, w *window.Manager, p *prefs.Manager, u *update.Manager, c *commands.Manager) *Manager {
-	return &Manager{eng: eng, window: w, prefs: p, update: u, commands: c}
+func New(eng engine.Engine, w *window.Manager, p *prefs.Manager, f *flags.Manager, u *update.Manager, c *commands.Manager) *Manager {
+	return &Manager{eng: eng, window: w, prefs: p, flags: f, update: u, commands: c}
 }
+
+// OnRelaunch names what the Flags section's Relaunch does.
+func (m *Manager) OnRelaunch(f func()) { m.relaunch = f }
 
 // Open puts the settings page over the window. It is one page: opening it again does
 // nothing.
@@ -108,6 +115,7 @@ func (m *Manager) Handle(msg []byte) {
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"keyboard":     m.commands.View(),
+			"flags":        m.flags.View(),
 		}
 		snapshot["section"] = m.section
 		for _, p := range m.parts {
@@ -144,6 +152,12 @@ func (m *Manager) Handle(msg []byte) {
 		m.commands.DismissMissing()
 	case "recording":
 		m.commands.SetRecording(c.On)
+	case "setFlag":
+		m.flags.Set(c.ID, c.Text)
+	case "relaunch":
+		if m.relaunch != nil {
+			m.relaunch()
+		}
 	default:
 		for _, p := range m.parts {
 			if p.Handle(c.T, msg) {
@@ -183,6 +197,11 @@ func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
 // KeyboardChanged sends the keys again after any change to them.
 func (m *Manager) KeyboardChanged() {
 	m.send(map[string]any{"t": "keyboard", "keyboard": m.commands.View()})
+}
+
+// FlagsChanged sends the flags again after one is saved.
+func (m *Manager) FlagsChanged() {
+	m.send(map[string]any{"t": "flags", "flags": m.flags.View()})
 }
 
 // Send sends one message to the settings page while it is open, for a part.

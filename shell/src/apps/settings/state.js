@@ -23,6 +23,8 @@ export const state = reactive({
   // user picked. '' is the first.
   section: '',
   keyboard: { platform: 'mac', templates: [], template: '', following: true, groups: [], missing: [], gone: [], problems: [] },
+  // The flags as saved, whether a relaunch is waiting, and the build flags.
+  flags: { flags: [], relaunch: false, builds: [] },
 });
 
 export function connect() {
@@ -41,6 +43,7 @@ export function connect() {
             update: m.update,
             running: m.running,
             keyboard: m.keyboard,
+            flags: m.flags,
             section: m.section,
             ready: true,
           });
@@ -68,6 +71,9 @@ export function connect() {
           break;
         case 'keyboard':
           state.keyboard = m.keyboard;
+          break;
+        case 'flags':
+          state.flags = m.flags;
           break;
       }
     },

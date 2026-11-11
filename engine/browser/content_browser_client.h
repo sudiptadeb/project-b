@@ -39,11 +39,16 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
   std::string GetUserAgent() override;
   std::vector<base::FilePath> GetNetworkContextsParentDirectory() override;
 
+};
+
 #if BUILDFLAG(PB_EXTENSIONS)
-  // What //extensions needs from content's embedder: an extension's pages in a process
-  // of their own, the chrome-extension: scheme, its Mojo interfaces, and its place in
-  // front of the network for the request APIs. All in
-  // engine/extensions/browser/content_hooks.cc.
+// The counter when the Extensions flag is on (ExtensionsOn()): it adds what //extensions
+// needs from content's embedder: an extension's pages in a process of their own, the
+// chrome-extension: scheme, its Mojo interfaces, and its place in front of the network
+// for the request APIs. All in engine/extensions/browser/content_hooks.cc. With the flag
+// off the plain counter is used and none of it runs.
+class ExtensionsContentBrowserClient : public ContentBrowserClient {
+ private:
   void SiteInstanceGotProcessAndSite(
       content::SiteInstance* site_instance) override;
   bool DoesSiteRequireDedicatedProcess(content::BrowserContext* browser_context,
@@ -117,8 +122,9 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
       bool is_for_isolated_world,
       bool is_for_service_worker,
       network::mojom::URLLoaderFactoryParams* factory_params) override;
-#endif
 };
+#endif
+
 
 }  // namespace project_b
 

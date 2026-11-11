@@ -6,7 +6,8 @@
 // time it was last written, so no crash overwrites another, and the shell is told where
 // it is and where macOS put its own report of that process.
 //
-// A child process that crashes is one line in crashes.log, which is kept.
+// A child process that crashes is one line in crashes.log, which is kept, and so is a
+// panic Go caught and carried on from, with its stack beside it in panic-<time>.log.
 package crash
 
 import (
@@ -112,19 +113,36 @@ func (m *Manager) Stop() {
 
 // ProcessCrashed adds a line about a child process that crashed to crashes.log.
 func (m *Manager) ProcessCrashed(p engine.ProcessCrash) {
+	line := fmt.Sprintf("%s %s %s, exit code %d, pid %d", time.Now().Format(time.DateTime), p.Type, p.Status, p.ExitCode, p.PID)
+	if p.URL != "" {
+		line += ", " + p.URL
+	}
+	m.appendLine(line)
+}
+
+func (m *Manager) appendLine(line string) {
 	f, err := os.OpenFile(m.children, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
 		log.Printf("crash: %v", err)
 		return
 	}
 	defer f.Close()
-	line := fmt.Sprintf("%s %s %s, exit code %d, pid %d", time.Now().Format(time.DateTime), p.Type, p.Status, p.ExitCode, p.PID)
-	if p.URL != "" {
-		line += ", " + p.URL
-	}
 	if _, err := fmt.Fprintln(f, line); err != nil {
 		log.Printf("crash: %v", err)
 	}
+}
+
+// Panicked keeps a panic Go caught and carried on from: its stack goes to
+// panic-<time>.log, and a line saying where to crashes.log.
+func (m *Manager) Panicked(where string, value any, stack []byte) {
+	now := time.Now()
+	name := filepath.Join(filepath.Dir(m.current), "panic-"+now.Format("2006-01-02-150405")+".log")
+	report := fmt.Sprintf("pid %d, panic in %s: %v\n\n%s", os.Getpid(), where, value, stack)
+	if err := os.WriteFile(name, []byte(report), 0o600); err != nil {
+		log.Printf("crash: %v", err)
+	}
+	log.Print(report)
+	m.appendLine(fmt.Sprintf("%s Go recovered a panic in %s: %v, the stack is in %s", now.Format(time.DateTime), where, value, name))
 }
 
 // Last is the log of the last run's crash, or "" if it didn't crash or the notice was

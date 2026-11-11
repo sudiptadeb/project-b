@@ -120,3 +120,21 @@ func TestAChildProcessCrashIsALineAndNoNotice(t *testing.T) {
 		t.Fatalf("crashes.log = %q", b)
 	}
 }
+
+func TestACaughtPanicIsALineWithItsStackBeside(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir, "")
+	m.Panicked("engine.DevToolsCommand", "boom", []byte("goroutine 1 [running]:\nmain.f()"))
+	m.Stop()
+	b, _ := os.ReadFile(filepath.Join(dir, "crashes.log"))
+	stacks, _ := filepath.Glob(filepath.Join(dir, "panic-*.log"))
+	if len(stacks) != 1 || !strings.Contains(string(b), " Go recovered a panic in engine.DevToolsCommand: boom, the stack is in "+stacks[0]) {
+		t.Fatalf("crashes.log = %q, stacks %v", b, stacks)
+	}
+	if s, _ := os.ReadFile(stacks[0]); !strings.Contains(string(s), "main.f()") {
+		t.Fatalf("the stack file = %q", s)
+	}
+	if New(dir, "").Last() != "" {
+		t.Fatal("a caught panic brings up the notice")
+	}
+}

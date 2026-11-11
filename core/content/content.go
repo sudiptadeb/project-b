@@ -9,6 +9,11 @@
 // hook never does.
 package content
 
+import (
+	"fmt"
+	"runtime/debug"
+)
+
 // Hook is a hook's number, shared with the adapter.
 type Hook int32
 
@@ -26,10 +31,21 @@ type Optional[T any] struct {
 }
 
 // Hooks is every hook the adapter can raise. There is one per process; cmd/lib makes
-// it and hands every crossing to Dispatch.
+// it and hands every crossing to Dispatch, and every function posted to the main thread
+// to Run.
+//
+// A panic in Go is caught at that boundary once: OnPanic is told, the call returns as if
+// Go had not answered, and the browser carries on. A navigation gate that panics blocks
+// the navigation rather than let it through. A second panic in the same run is not
+// caught: the app crashes, and its crash log has the stack.
 type Hooks struct {
 	subscribe func(Hook)
 	counts    map[Hook]int
+	panics    int
+
+	// OnPanic is told about the panic that was caught: where it happened, its value and
+	// the stack where it was raised.
+	OnPanic func(where string, value any, stack []byte)
 
 	Observer ObserverHooks
 	Delegate DelegateHooks
@@ -49,8 +65,17 @@ func New(subscribe func(Hook)) *Hooks {
 }
 
 // Dispatch takes one crossing and returns the answer, if a handler gave one.
-func (h *Hooks) Dispatch(id Hook, args []Value) (Value, bool) {
+func (h *Hooks) Dispatch(id Hook, args []Value) (v Value, ok bool) {
 	h.counts[id]++
+	defer func() {
+		if p := recover(); p != nil {
+			h.panicked(h.name(id), p)
+			v, ok = Value{}, false
+			if id >= firstThrottle {
+				v, ok = Value{I: int64(NavigationThrottleThrottleActionBlockRequest)}, true
+			}
+		}
+	}()
 	r := &reader{v: args}
 	switch {
 	case id < FirstHook:
@@ -65,15 +90,41 @@ func (h *Hooks) Dispatch(id Hook, args []Value) (Value, bool) {
 	return h.Throttle.dispatch(id, r)
 }
 
+// Run runs a function posted to the main thread, with the same catch for a panic as
+// Dispatch.
+func (h *Hooks) Run(fn func()) {
+	defer func() {
+		if p := recover(); p != nil {
+			h.panicked("a posted function", p)
+		}
+	}()
+	fn()
+}
+
+// panicked is called from the deferred function that recovered p, so the stack still
+// holds the frames that raised it.
+func (h *Hooks) panicked(where string, p any) {
+	h.panics++
+	if h.panics > 1 {
+		panic(fmt.Sprintf("a second panic in Go, in %s: %v", where, p))
+	}
+	if h.OnPanic != nil {
+		h.OnPanic(where, p, debug.Stack())
+	}
+}
+
+func (h *Hooks) name(id Hook) string {
+	if name, ok := Names[id]; ok {
+		return name
+	}
+	return eventNames[id]
+}
+
 // Counts returns how often each hook has crossed, by name. For stats.
 func (h *Hooks) Counts() map[string]int {
 	out := map[string]int{}
 	for id, n := range h.counts {
-		name, ok := Names[id]
-		if !ok {
-			name = eventNames[id]
-		}
-		out[name] = n
+		out[h.name(id)] = n
 	}
 	return out
 }

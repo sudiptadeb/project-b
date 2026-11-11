@@ -135,6 +135,13 @@ report at" macOS's report of that process, with a close button, which sends
   nil dereferences included: the runtime writes its report, with every goroutine's stack,
   into `crash.log` (`debug.SetCrashOutput`). A fault in C++ called from Go is reported
   there too, as "signal arrived during cgo execution".
+- **A Go panic, caught once:** a panic in a hook or in a function posted to the main
+  thread is recovered at the boundary (`core/content/content.go`). The call returns as if
+  Go hadn't answered, so content does its default, except a navigation gate, which blocks
+  the navigation rather than let it through. `crashes.log` gets a line, the stack goes to
+  `panic-<time>.log` beside it, and the browser carries on with no notice. A second panic
+  in the same run isn't caught: it crashes as above, and `crash.log` has both stacks.
+  `ProjectB.panic` over DevTools forces one (`docs/devtools.md`).
 - **Native, in the main process**: macOS writes a report with every thread's stack,
   symbolized, to `~/Library/Logs/DiagnosticReports/project_b-<time>.ips` (a run outside
   the desktop session gets `/Library/Logs/DiagnosticReports`). Go finds the one with the

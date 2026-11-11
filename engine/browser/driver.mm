@@ -38,6 +38,7 @@
 #include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
+#include "project_b/engine/buildflags/buildflags.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -45,6 +46,10 @@
 #include "third_party/skia/include/core/SkRect.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(PB_EXTENSIONS)
+#include "project_b/engine/extensions/browser/extensions.h"
+#endif
 
 // Private, for the driver only: AppKit's description of the window's drag region.
 @interface NSWindow (PBDriverPrivate)
@@ -104,6 +109,12 @@ std::string Classify(NSView* hit) {
       [hit isDescendantOf:settings->contents()->GetNativeView().GetNativeNSView()]) {
     return "settings";
   }
+#if BUILDFLAG(PB_EXTENSIONS)
+  content::WebContents* popup = Extensions::Get()->popup_contents();
+  if (popup && [hit isDescendantOf:popup->GetNativeView().GetNativeNSView()]) {
+    return "popup";
+  }
+#endif
   if (hit == TheWindow().contentView) {
     return "container";
   }
@@ -135,7 +146,8 @@ std::string SendMouse(NSEventType type, double x, double y, int clicks) {
                                       pressure:clicks ? 1.0 : 0.0];
   NSView* hit = HitFromFrame(x, y);
   const std::string kind = Classify(hit);
-  if (kind != "shell" && kind != "page" && kind != "settings") {
+  if (kind != "shell" && kind != "page" && kind != "settings" &&
+      kind != "popup") {
     return kind;
   }
   switch (type) {
@@ -409,6 +421,24 @@ void Run(const std::string& line) {
     } else {
       Reply(id, "ERR no settings page");
     }
+#if BUILDFLAG(PB_EXTENSIONS)
+  } else if (cmd == "evalpopup") {
+    // In the open extension popup's page.
+    if (content::WebContents* popup = Extensions::Get()->popup_contents()) {
+      Eval(id, popup, rest(2));
+    } else {
+      Reply(id, "ERR no popup");
+    }
+  } else if (cmd == "popup") {
+    // Where the popup is, in shell coordinates: x y w h, all zero for none.
+    const gfx::RectF b = Engine::Get()->window()->popup_bounds();
+    Reply(id, base::StringPrintf("%.0f %.0f %.0f %.0f", b.x(), b.y(), b.width(),
+                                 b.height()));
+  } else if (cmd == "choose") {
+    // What the next folder or package chooser answers, in place of the system's panel.
+    Extensions::Get()->ChooseForDriver(base::FilePath(rest(2)));
+    Reply(id, "ok");
+#endif
   } else if (cmd == "mods") {
     // What the app reports when the modifiers change; "mods 0" lets go of them all.
     ReportModifiers(static_cast<uint64_t>(number(2)));

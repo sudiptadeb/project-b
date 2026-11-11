@@ -54,8 +54,10 @@ class ExtensionsClient : public extensions::ExtensionsClient {
 
   const NoMessages no_messages_;
   ScriptingAllowlist scripting_allowlist_;
-  // There is no web store: installs come from the store Go names. These stay empty.
-  const GURL no_url_;
+  // The store is the Chrome Web Store, or the one --apps-gallery-url names.
+  GURL webstore_base_url_;
+  GURL new_webstore_base_url_;
+  GURL webstore_update_url_;
 };
 
 }  // namespace project_b

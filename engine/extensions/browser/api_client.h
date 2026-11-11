@@ -25,6 +25,11 @@ class ExtensionsAPIClient : public extensions::ExtensionsAPIClient {
   extensions::MessagingDelegate* GetMessagingDelegate() override;
   extensions::WebstorePrivateAPIDelegate* GetWebstorePrivateAPIDelegate()
       override;
+  extensions::ManagementAPIDelegate* CreateManagementAPIDelegate()
+      const override;
+  std::unique_ptr<extensions::SupervisedUserExtensionsDelegate>
+  CreateSupervisedUserExtensionsDelegate(
+      content::BrowserContext* browser_context) const override;
 
   std::unique_ptr<extensions::MessagingDelegate> messaging_delegate_;
   std::unique_ptr<extensions::WebstorePrivateAPIDelegate> webstore_delegate_;

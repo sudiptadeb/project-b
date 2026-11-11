@@ -5,27 +5,33 @@
 
 #include <utility>
 
+#include "base/barrier_closure.h"
 #include "base/base64.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/files/file_util.h"
-#include "base/barrier_closure.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
+#include "base/memory/ptr_util.h"
+#include "base/no_destructor.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
+#include "base/version_info/version_info.h"
 #include "components/crx_file/crx_verifier.h"
 #include "components/custom_handlers/protocol_handler_registry.h"
+#include "components/enterprise/browser/promotion/promotion_prefs.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/json_pref_store.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/pref_service_factory.h"
+#include "components/update_client/update_query_params.h"
+#include "components/update_client/update_query_params_delegate.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/storage_partition.h"
@@ -45,8 +51,10 @@
 #include "extensions/browser/forced_extensions/install_stage_tracker.h"
 #include "extensions/browser/install/crx_install_error.h"
 #include "extensions/browser/install_tracker.h"
+#include "extensions/browser/install_verifier.h"
 #include "extensions/browser/permissions/permissions_updater.h"
 #include "extensions/browser/permissions_manager.h"
+#include "extensions/browser/shared_module_service.h"
 #include "extensions/browser/uninstall_reason.h"
 #include "extensions/browser/unpacked_installer.h"
 #include "extensions/common/api/commands/commands_handler.h"
@@ -66,6 +74,22 @@
 #include "project_b/engine/extensions/browser/extension_system.h"
 #include "project_b/engine/extensions/browser/extensions_browser_client.h"
 #include "project_b/engine/extensions/browser/popup.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/gfx/codec/png_codec.h"
+
+namespace extensions {
+
+// //extensions lets only a class of this name make its shared module service, and
+// leaves the class to the embedder. Chrome's is a keyed service factory; ours makes one.
+class SharedModuleServiceFactory {
+ public:
+  static std::unique_ptr<SharedModuleService> Create(
+      content::BrowserContext* browser_context) {
+    return base::WrapUnique(new SharedModuleService(browser_context));
+  }
+};
+
+}  // namespace extensions
 
 namespace project_b {
 
@@ -73,7 +97,10 @@ namespace {
 
 Extensions* g_extensions = nullptr;
 
-// The installer asks its client before it installs; ours passes the question to Go.
+// Whoever installs asks its client first; ours passes the question to Go. The
+// installer of a package asks with ConfirmInstall, once it has unpacked it. A store's
+// page asks with ShowInstallDialog, before anything is downloaded, with the manifest
+// and the icon the page gave.
 class PromptClient : public extensions::ExtensionInstallPromptClient {
   void OnInstallSuccess(scoped_refptr<const extensions::Extension> extension,
                         SkBitmap* icon) override {}
@@ -82,7 +109,8 @@ class PromptClient : public extensions::ExtensionInstallPromptClient {
   void SetSkipPostInstallUI(bool skip_ui) override {}
   void ConfirmInstall(DoneCallback install_callback,
                       const extensions::Extension* extension) override {
-    Extensions::Get()->AskToInstall(extension, std::move(install_callback));
+    Extensions::Get()->AskToInstall(extension, std::string(),
+                                    std::move(install_callback));
   }
   // The installer asks these of a client it was told is updating from Chrome's own
   // extensions page or its web store, which ours never is.
@@ -101,7 +129,25 @@ class PromptClient : public extensions::ExtensionInstallPromptClient {
   void ShowInstallDialog(DoneCallback install_callback,
                          const extensions::Extension* extension,
                          const SkBitmap* icon) override {
-    NOTREACHED();
+    std::string data_url;
+    if (icon && !icon->drawsNothing()) {
+      std::optional<std::vector<uint8_t>> png =
+          gfx::PNGCodec::EncodeBGRASkBitmap(*icon,
+                                            /*discard_transparency=*/false);
+      data_url = base::StrCat({"data:image/png;base64,", base::Base64Encode(*png)});
+    }
+    Extensions::Get()->AskToInstall(extension, data_url,
+                                    std::move(install_callback));
+  }
+};
+
+// The Web Store's download address wants to know which browser asks: without the
+// version it has no package to give. This says what Chrome says, for the Chromium we
+// carry.
+class StoreQueryParams : public update_client::UpdateQueryParamsDelegate {
+  std::string GetExtraParams() override {
+    return base::StrCat({"&prodchannel=stable&prodversion=",
+                         version_info::GetVersionNumber(), "&lang=en-US"});
   }
 };
 
@@ -196,6 +242,9 @@ Extensions::Extensions(content::BrowserContext* browser_context)
   DCHECK(!g_extensions);
   g_extensions = this;
 
+  static base::NoDestructor<StoreQueryParams> store_query_params;
+  update_client::UpdateQueryParams::SetDelegate(store_query_params.get());
+
   client_ = std::make_unique<ExtensionsBrowserClient>(browser_context);
   extensions::ExtensionsBrowserClient::Set(client_.get());
   extensions::EnsureBrowserContextKeyedServiceFactoriesBuilt();
@@ -209,6 +258,8 @@ Extensions::Extensions(content::BrowserContext* browser_context)
   extensions::RuntimeAPI::RegisterPrefs(registry.get());
   custom_handlers::ProtocolHandlerRegistry::RegisterProfilePrefs(
       registry.get());
+  // The store's page asks its API about an enterprise banner, which keeps its answer here.
+  enterprise_promotion::RegisterProfilePrefs(registry.get());
   PrefServiceFactory factory;
   factory.set_user_prefs(base::MakeRefCounted<JsonPrefStore>(
       browser_context->GetPath().Append("extension-prefs.json")));
@@ -224,6 +275,10 @@ Extensions::Extensions(content::BrowserContext* browser_context)
       browser_context, extensions::ExtensionPrefs::Get(browser_context));
   install_stage_tracker_ =
       std::make_unique<extensions::InstallStageTracker>(browser_context);
+  install_verifier_ = std::make_unique<extensions::InstallVerifier>(
+      extensions::ExtensionPrefs::Get(browser_context), browser_context);
+  shared_modules_ =
+      extensions::SharedModuleServiceFactory::Create(browser_context);
   extensions::ExtensionSystem* system =
       extensions::ExtensionSystem::Get(browser_context);
   system->InitForRegularProfile(true);
@@ -240,6 +295,8 @@ Extensions::~Extensions() {
   popup_.reset();
   extensions::ExtensionRegistry::Get(browser_context_)->RemoveObserver(this);
   protocol_handlers_->Shutdown();
+  shared_modules_.reset();
+  install_verifier_.reset();
   install_stage_tracker_.reset();
   install_tracker_.reset();
   blocklist_.reset();
@@ -352,10 +409,16 @@ void Extensions::InstallDone(const base::FilePath& path,
   hooks::Fire(PB_EVENT_EXTENSION_INSTALL_DONE, args);
 }
 
-// The prompt carries what the manifest asks for, as it wrote it, and the icon from
-// the unpacked package.
+std::unique_ptr<extensions::ExtensionInstallPromptClient>
+Extensions::CreateInstallPrompt() {
+  return std::make_unique<PromptClient>();
+}
+
+// The prompt carries what the manifest asks for, as it wrote it, and the icon: the
+// one the asker has, or else the one in the unpacked package.
 void Extensions::AskToInstall(
     const extensions::Extension* extension,
+    const std::string& icon,
     extensions::ExtensionInstallPromptClient::DoneCallback done) {
   const int64_t prompt = next_prompt_++;
   prompts_[prompt] = std::move(done);
@@ -369,6 +432,10 @@ void Extensions::AskToInstall(
   AppendStrings(extension, "host_permissions", &permissions);
   details.Set("permissions", std::move(permissions));
 
+  if (!icon.empty()) {
+    OnPromptIconRead(prompt, std::move(details), Icons{icon, {}});
+    return;
+  }
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock()},
       base::BindOnce(

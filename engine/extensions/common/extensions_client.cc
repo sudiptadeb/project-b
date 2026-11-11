@@ -3,13 +3,17 @@
 #include <memory>
 #include <string_view>
 
+#include "base/command_line.h"
 #include "extensions/common/alias.h"
 #include "extensions/common/core_extensions_api_provider.h"
+#include "extensions/common/extension_urls.h"
 #include "extensions/common/extensions_api_provider.h"
 #include "extensions/common/mojom/api_permission_id.mojom-shared.h"
 #include "extensions/common/permissions/api_permission.h"
 #include "extensions/common/permissions/permissions_info.h"
+#include "extensions/common/switches.h"
 #include "extensions/common/url_pattern_set.h"
+#include "extensions/common/webstore_override.h"
 #include "project_b/engine/extension_api_features.h"
 #include "project_b/engine/extension_permission_features.h"
 #include "project_b/engine/generated_schemas.h"
@@ -63,6 +67,11 @@ class APIProvider : public extensions::ExtensionsAPIProvider {
 ExtensionsClient::ExtensionsClient() {
   AddAPIProvider(std::make_unique<extensions::CoreExtensionsAPIProvider>());
   AddAPIProvider(std::make_unique<APIProvider>());
+  // chrome.webstorePrivate, which a store's page installs with, belongs to the Chrome
+  // Web Store's own origin. This is Chromium's rule for giving it to one more: the
+  // origin --apps-gallery-url names, which is how our mock store gets it.
+  SetFeatureDelegatedAvailabilityCheckMap(
+      extensions::webstore_override::CreateAvailabilityCheckMap());
 }
 
 ExtensionsClient::~ExtensionsClient() = default;
@@ -87,9 +96,20 @@ extensions::PermissionIDSet ExtensionsClient::NoMessages::GetAllPermissionIDs(
   return {};
 }
 
-void ExtensionsClient::Initialize() {}
+void ExtensionsClient::Initialize() {
+  InitializeWebStoreUrls(base::CommandLine::ForCurrentProcess());
+}
 
-void ExtensionsClient::InitializeWebStoreUrls(base::CommandLine* command_line) {}
+void ExtensionsClient::InitializeWebStoreUrls(base::CommandLine* command_line) {
+  webstore_update_url_ = extension_urls::GetDefaultWebstoreUpdateUrl();
+  if (command_line->HasSwitch(extensions::switches::kAppsGalleryURL)) {
+    webstore_base_url_ = new_webstore_base_url_ = GURL(
+        command_line->GetSwitchValueASCII(extensions::switches::kAppsGalleryURL));
+  } else {
+    webstore_base_url_ = GURL(extension_urls::kChromeWebstoreBaseURL);
+    new_webstore_base_url_ = GURL(extension_urls::kNewChromeWebstoreBaseURL);
+  }
+}
 
 const extensions::PermissionMessageProvider&
 ExtensionsClient::GetPermissionMessageProvider() const {
@@ -131,15 +151,15 @@ bool ExtensionsClient::IsScriptableURL(const GURL& url,
 }
 
 const GURL& ExtensionsClient::GetWebstoreBaseURL() const {
-  return no_url_;
+  return webstore_base_url_;
 }
 
 const GURL& ExtensionsClient::GetNewWebstoreBaseURL() const {
-  return no_url_;
+  return new_webstore_base_url_;
 }
 
 const GURL& ExtensionsClient::GetWebstoreUpdateURL() const {
-  return no_url_;
+  return webstore_update_url_;
 }
 
 bool ExtensionsClient::IsBlocklistUpdateURL(const GURL& url) const {

@@ -134,10 +134,15 @@ bool ContentBrowserClient::ShouldUseSpareRenderProcessHost(
       browser_context, site_url, refused_reason);
 }
 
-// A renderer learns at its start that it is an extension's process.
+// A renderer learns at its start that it is an extension's process, and where the store is.
 void ContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
+  // A renderer has to know which origin is the store to give its page the store's API.
+  static const char* const kStoreSwitches[] = {
+      extensions::switches::kAppsGalleryURL};
+  command_line->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
+                                 kStoreSwitches);
   content::RenderProcessHost* process =
       content::RenderProcessHost::FromID(child_process_id);
   if (process &&

@@ -9,10 +9,12 @@
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/api/messaging/messaging_delegate.h"
 #include "extensions/browser/api/webstore_private/webstore_private_api_delegate.h"
+#include "extensions/browser/supervised_user_extensions_delegate.h"
 #include "project_b/engine/abi/pb_extensions_abi.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/extensions/browser/go_function.h"
+#include "project_b/engine/extensions/browser/management_delegate.h"
 
 namespace project_b {
 
@@ -43,9 +45,9 @@ class MessagingDelegate : public extensions::MessagingDelegate {
   }
 };
 
-// //extensions carries the web store's private API whether or not anything can use
-// it, and its services ask for this at start. Nothing here is a web store, so no page
-// ever reaches the API and none of these is called.
+// What chrome.webstorePrivate, the API a store's page installs with, asks the browser
+// beyond the install itself: allowlists, the signed-in account, Safe Browsing and
+// enterprise promotion. We have none of them, and each answer says so.
 class WebstoreDelegate : public extensions::WebstorePrivateAPIDelegate {
   std::vector<KeyedServiceBaseFactory*> GetWebStoreAPIFactoryDependencies()
       override {
@@ -113,6 +115,23 @@ void ExtensionsAPIClient::UpdateActionCount(
 
 extensions::MessagingDelegate* ExtensionsAPIClient::GetMessagingDelegate() {
   return messaging_delegate_.get();
+}
+
+// chrome.management takes ownership of what this returns.
+extensions::ManagementAPIDelegate*
+ExtensionsAPIClient::CreateManagementAPIDelegate() const {
+  return new ManagementDelegate();
+}
+
+// An install from a store's page asks whether the user is a child who needs a parent's
+// yes. There are no accounts, so nobody is.
+std::unique_ptr<extensions::SupervisedUserExtensionsDelegate>
+ExtensionsAPIClient::CreateSupervisedUserExtensionsDelegate(
+    content::BrowserContext* browser_context) const {
+  class NoChildren : public extensions::SupervisedUserExtensionsDelegate {
+    bool IsChild() const override { return false; }
+  };
+  return std::make_unique<NoChildren>();
 }
 
 extensions::WebstorePrivateAPIDelegate*

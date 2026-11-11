@@ -2,8 +2,11 @@
 
 #include <utility>
 
+#include "base/containers/span.h"
+#include "base/functional/bind.h"
 #include "base/notreached.h"
 #include "build/build_config.h"
+#include "components/image_fetcher/core/image_decoder.h"
 #include "components/version_info/channel.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/render_frame_host.h"
@@ -12,11 +15,14 @@
 #include "extensions/browser/api/core_extensions_browser_api_provider.h"
 #include "extensions/browser/api/extensions_api_client.h"
 #include "extensions/browser/api/runtime/runtime_api_delegate.h"
+#include "extensions/browser/crx_installer.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_host_delegate.h"
+#include "extensions/browser/extension_install_prompt_client.h"
 #include "extensions/browser/extension_management_client.h"
 #include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extensions_browser_interface_binders.h"
+#include "extensions/browser/install_prompt_data.h"
 #include "extensions/browser/kiosk/kiosk_delegate.h"
 #include "extensions/browser/managed_installation_mode.h"
 #include "extensions/browser/process_manager_delegate.h"
@@ -24,6 +30,7 @@
 #include "extensions/browser/scoped_extension_keep_alive.h"
 #include "extensions/browser/updater/null_extension_cache.h"
 #include "extensions/browser/url_request_util.h"
+#include "extensions/browser/webstore_installer.h"
 #include "extensions/common/api/runtime.h"
 #include "extensions/common/features/feature_channel.h"
 #include "extensions/common/manifest_handlers/options_page_info.h"
@@ -38,9 +45,11 @@
 #include "project_b/engine/extensions/browser/extensions.h"
 #include "project_b/engine/extensions/browser/go_function.h"
 #include "project_b/engine/extensions/browser/web_contents_observer.h"
+#include "services/data_decoder/public/cpp/decode_image.h"
 #include "services/network/public/mojom/url_loader.mojom.h"
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "third_party/blink/public/mojom/mediastream/media_stream.mojom.h"
+#include "ui/gfx/image/image.h"
 
 namespace project_b {
 
@@ -212,6 +221,36 @@ class NoPolicy : public extensions::ExtensionManagementClient {
   }
 
   const extensions::URLPatternSet no_hosts_;
+};
+
+// Decodes a picture a store's page named, in the sandboxed decoder process.
+class ImageDecoder : public image_fetcher::ImageDecoder {
+  void DecodeImage(const std::string& image_data,
+                   const gfx::Size& desired_image_frame_size,
+                   data_decoder::DataDecoder* data_decoder,
+                   image_fetcher::ImageDecodedCallback callback) override {
+    data_decoder::DecodeImageCallback decoded = base::BindOnce(
+        [](image_fetcher::ImageDecodedCallback callback,
+           const SkBitmap& bitmap) {
+          std::move(callback).Run(gfx::Image::CreateFrom1xBitmap(bitmap));
+        },
+        std::move(callback));
+    // The caller may have a decoder process to share; without one this picture gets
+    // its own.
+    if (data_decoder) {
+      data_decoder::DecodeImage(
+          data_decoder, base::as_byte_span(image_data),
+          data_decoder::mojom::ImageCodec::kDefault, /*shrink_to_fit=*/false,
+          data_decoder::kDefaultMaxSizeInBytes, desired_image_frame_size,
+          std::move(decoded));
+    } else {
+      data_decoder::DecodeImageIsolated(
+          base::as_byte_span(image_data),
+          data_decoder::mojom::ImageCodec::kDefault, /*shrink_to_fit=*/false,
+          data_decoder::kDefaultMaxSizeInBytes, desired_image_frame_size,
+          std::move(decoded));
+    }
+  }
 };
 
 class KioskDelegate : public extensions::KioskDelegate {
@@ -543,10 +582,50 @@ ExtensionsBrowserClient::GetInstallStageTracker(
   return Extensions::Get()->install_stage_tracker();
 }
 
+extensions::InstallVerifier* ExtensionsBrowserClient::GetInstallVerifier(
+    content::BrowserContext* context) {
+  return Extensions::Get()->install_verifier();
+}
+
+extensions::SharedModuleService*
+ExtensionsBrowserClient::GetSharedModuleService(
+    content::BrowserContext* context) {
+  return Extensions::Get()->shared_modules();
+}
+
 extensions::ExtensionManagementClient*
 ExtensionsBrowserClient::GetExtensionManagementClient(
     content::BrowserContext* context) {
   return management_client_.get();
+}
+
+std::unique_ptr<extensions::ExtensionInstallPromptClient>
+ExtensionsBrowserClient::CreateInstallPrompt(
+    content::WebContents* web_contents,
+    std::unique_ptr<extensions::InstallPromptData> prompt) {
+  return Extensions::Get()->CreateInstallPrompt();
+}
+
+std::unique_ptr<image_fetcher::ImageDecoder>
+ExtensionsBrowserClient::CreateImageDecoder() {
+  return std::make_unique<ImageDecoder>();
+}
+
+// The user said yes on the store's page, which the approval records, so this installer
+// asks nothing. The package is checked as any other is: a plain CRX3.
+scoped_refptr<extensions::CrxInstaller>
+ExtensionsBrowserClient::CreateCrxInstallerFromDownloadItem(
+    content::BrowserContext* context,
+    const download::DownloadItem& download) {
+  scoped_refptr<extensions::CrxInstaller> installer =
+      extensions::CrxInstaller::Create(
+          context, nullptr,
+          extensions::WebstoreInstaller::GetAssociatedApproval(download));
+  installer->set_off_store_install_allow_reason(
+      extensions::CrxInstaller::OffStoreInstallAllowedBecausePref);
+  installer->set_install_immediately(true);
+  installer->set_delete_source(true);
+  return installer;
 }
 
 custom_handlers::ProtocolHandlerRegistry*

@@ -133,6 +133,15 @@ class ExtensionsBrowserClient : public extensions::ExtensionsBrowserClient {
   extensions::ScriptExecutor* GetScriptExecutorForTab(
       content::WebContents& web_contents) override;
   base::FilePath GetUserDataDir() override;
+  // What installing from a store's page needs: the prompt, a decoder for the icon the
+  // page names, and an installer for the package once it is downloaded.
+  std::unique_ptr<extensions::ExtensionInstallPromptClient> CreateInstallPrompt(
+      content::WebContents* web_contents,
+      std::unique_ptr<extensions::InstallPromptData> prompt) override;
+  std::unique_ptr<image_fetcher::ImageDecoder> CreateImageDecoder() override;
+  scoped_refptr<extensions::CrxInstaller> CreateCrxInstallerFromDownloadItem(
+      content::BrowserContext* context,
+      const download::DownloadItem& download) override;
   // The installer won't run without these: a hold on the profile, a blocklist to
   // consult, somewhere to report its progress, and a policy to ask.
   extensions::Blocklist* GetBlocklist(content::BrowserContext* context) override;
@@ -141,6 +150,10 @@ class ExtensionsBrowserClient : public extensions::ExtensionsBrowserClient {
   extensions::InstallStageTracker* GetInstallStageTracker(
       content::BrowserContext* context) override;
   extensions::ExtensionManagementClient* GetExtensionManagementClient(
+      content::BrowserContext* context) override;
+  extensions::InstallVerifier* GetInstallVerifier(
+      content::BrowserContext* context) override;
+  extensions::SharedModuleService* GetSharedModuleService(
       content::BrowserContext* context) override;
   std::unique_ptr<extensions::ScopedBrowserContextKeepAlive>
   CreateUpdaterKeepAlive(content::BrowserContext* context) override;

@@ -28,6 +28,8 @@ class CrxInstallError;
 class CrxInstaller;
 class InstallStageTracker;
 class InstallTracker;
+class InstallVerifier;
+class SharedModuleService;
 }  // namespace extensions
 
 namespace project_b {
@@ -91,11 +93,24 @@ class Extensions : public extensions::ExtensionRegistryObserver,
   extensions::InstallStageTracker* install_stage_tracker() const {
     return install_stage_tracker_.get();
   }
+  // An install from a store's page also wants these two. The verifier is never
+  // started, so it verifies nothing.
+  extensions::InstallVerifier* install_verifier() const {
+    return install_verifier_.get();
+  }
+  extensions::SharedModuleService* shared_modules() const {
+    return shared_modules_.get();
+  }
 
-  // The installer's question, which goes to Go. done runs with the answer.
+  // The installer's question, which goes to Go. done runs with the answer. The icon
+  // is read from the extension's files, unless the asker has it as a data: URL.
   void AskToInstall(
       const extensions::Extension* extension,
+      const std::string& icon,
       extensions::ExtensionInstallPromptClient::DoneCallback done);
+  // A prompt for an install that begins somewhere other than Install: a store's page.
+  std::unique_ptr<extensions::ExtensionInstallPromptClient>
+  CreateInstallPrompt();
 
  private:
   // What an extension shows in our UI that takes reading files: its icons, as data: URLs.
@@ -172,6 +187,8 @@ class Extensions : public extensions::ExtensionRegistryObserver,
   std::unique_ptr<extensions::Blocklist> blocklist_;
   std::unique_ptr<extensions::InstallTracker> install_tracker_;
   std::unique_ptr<extensions::InstallStageTracker> install_stage_tracker_;
+  std::unique_ptr<extensions::InstallVerifier> install_verifier_;
+  std::unique_ptr<extensions::SharedModuleService> shared_modules_;
   std::map<std::string, Icons> icons_;
   // The install prompts Go hasn't answered yet.
   std::map<int64_t, extensions::ExtensionInstallPromptClient::DoneCallback>

@@ -56,14 +56,16 @@ std::optional<int> MainDelegate::BasicStartupComplete() {
 
   content_client_ = std::make_unique<ContentClient>();
   content::SetContentClient(content_client_.get());
-#if BUILDFLAG(PB_EXTENSIONS)
-  extensions_client_ = std::make_unique<ExtensionsClient>();
-  extensions::ExtensionsClient::Set(extensions_client_.get());
-#endif
   return std::nullopt;
 }
 
 void MainDelegate::PreSandboxStartup() {
+#if BUILDFLAG(PB_EXTENSIONS)
+  // Here, not earlier: the client holds the store's URLs, and a URL can't be made
+  // before content has named its schemes.
+  extensions_client_ = std::make_unique<ExtensionsClient>();
+  extensions::ExtensionsClient::Set(extensions_client_.get());
+#endif
 #if BUILDFLAG(IS_ANDROID)
   // A renderer has a different user and can't open the APK, so it was handed an open file.
   auto* descriptors = base::GlobalDescriptors::GetInstance();

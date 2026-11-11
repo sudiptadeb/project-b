@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { send } from '@/bridge.js';
 import ExtensionIcon from './ExtensionIcon.vue';
+import InstallPrompt from './InstallPrompt.vue';
 import PinIcon from './PinIcon.vue';
 import { extensions } from './state.js';
 
@@ -123,10 +124,20 @@ watch(menu, (on) => {
         <button type="button" class="pbx-item pbx-manage" @click="manage">Manage extensions</button>
       </div>
     </div>
+    <!-- An install a store's page began asks here, over the page. The cover makes the
+         whole window the shell's while it does, so no press reaches the page. -->
+    <div v-if="extensions.prompt" v-shell class="pbx-cover">
+      <InstallPrompt :prompt="extensions.prompt" :send="send" />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.pbx-cover {
+  position: fixed;
+  inset: 0;
+}
+
 /* The same 4px apart as the other toolbar buttons, and 12px from the address bar. */
 .pbx-toolbar {
   flex: none;

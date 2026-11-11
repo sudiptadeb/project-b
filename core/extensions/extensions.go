@@ -220,7 +220,11 @@ func (m *Manager) HandlePathChosen(path string) {
 	m.changed()
 }
 
-// HandlePrompt shows the engine's question in the settings page.
+// Prompt is the install waiting for the user's answer, or nil.
+func (m *Manager) Prompt() *engine.InstallPrompt { return m.prompt }
+
+// HandlePrompt shows the engine's question: in the shell, over the page of a store that
+// asked, and in the settings page, where a package or a folder is picked.
 func (m *Manager) HandlePrompt(p engine.InstallPrompt) {
 	m.prompt = &p
 	m.changed()

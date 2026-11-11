@@ -37,7 +37,7 @@ func startExtensions(a *App, e engine.Engine, cfg Config) {
 	// The shell draws the buttons; they differ by tab, so they go again when the active
 	// tab changes.
 	buttons := func() map[string]any {
-		return map[string]any{"buttons": m.Buttons(), "popup": m.OpenPopup()}
+		return map[string]any{"buttons": m.Buttons(), "popup": m.OpenPopup(), "prompt": m.Prompt()}
 	}
 	sendButtons := func() { a.Shell.Send(map[string]any{"t": "extensions", "extensions": buttons()}) }
 	m.OnChanged(sendButtons)
@@ -76,8 +76,8 @@ type extensionCommand struct {
 	Rect engine.Rect `json:"rect"`
 }
 
-// The shell's part: the buttons in its snapshot, and a press on one, a pin, and the
-// menu's way to the extension manager.
+// The shell's part: the buttons and the install prompt in its snapshot, and a press on a
+// button, a pin, the prompt's answer, and the menu's way to the extension manager.
 func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[string]any) shell.Part {
 	return shell.Part{
 		Snapshot: func(into map[string]any) { into["extensions"] = buttons() },
@@ -87,6 +87,8 @@ func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[strin
 			switch t {
 			case "extensionClick":
 				m.Click(c.ID, c.Rect)
+			case "extensionAnswerPrompt":
+				m.AnswerPrompt(c.On)
 			case "extensionClosePopup":
 				m.ClosePopup()
 			case "extensionPin":

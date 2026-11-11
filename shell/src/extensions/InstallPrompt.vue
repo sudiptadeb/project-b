@@ -1,16 +1,17 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
-import { send } from '@/apps/settings/state.js';
 import ExtensionIcon from './ExtensionIcon.vue';
 
-// The engine asking whether to install an extension, as a modal dialog over the settings
-// page. The answer goes to Go, which takes the prompt away.
-defineProps({ prompt: Object });
+// The engine asking whether to install an extension, as a modal dialog. The shell shows
+// it over the page of a store that asked, and the settings page over itself, where a
+// package or a folder is picked. The answer goes to Go through the page's own send, and
+// Go takes the prompt away.
+const props = defineProps({ prompt: Object, send: Function });
 
 const dialog = ref(null);
 
 function answer(on) {
-  send({ t: 'extensionAnswerPrompt', on });
+  props.send({ t: 'extensionAnswerPrompt', on });
 }
 
 // Escape answers Cancel, and only that: the settings page leaves an Escape it sees

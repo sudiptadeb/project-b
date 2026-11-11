@@ -132,7 +132,7 @@ const packageSize = (size) => (size < 1e6 ? Math.ceil(size / 1e3) + ' KB' : (siz
       </div>
     </section>
 
-    <InstallPrompt v-if="view.prompt" :prompt="view.prompt" />
+    <InstallPrompt v-if="view.prompt" :prompt="view.prompt" :send="send" />
   </div>
 </template>
 

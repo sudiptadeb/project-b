@@ -8,6 +8,7 @@ import (
 	"projectb/engine"
 	"projectb/extensions"
 	"projectb/extensions/chromeapi"
+	"projectb/flags"
 	"projectb/settings"
 	"projectb/shell"
 )
@@ -22,8 +23,12 @@ func (a *App) Extensions() *extensions.Manager { return extensionManagers[a] }
 
 // startExtensions builds the extension manager and Chrome's API on Go's tabs, and wires
 // them: the engine's extension events in, the shell's buttons and the settings page's
-// extension manager out.
+// extension manager out. Only while the Extensions flag is on: off, the build carries
+// the code and nothing of it runs.
 func startExtensions(a *App, e engine.Engine, cfg Config) {
+	if !a.Flags.On(flags.Extensions) {
+		return
+	}
 	eng := e.(engine.Extensions)
 	m := extensions.New(eng, cfg.ProfileDir, a.Tabs.ActiveID)
 	api := chromeapi.New(eng, a.Tabs, m, a.Window.FullScreen)

@@ -100,6 +100,8 @@ Use these classes; never leave a `<button>`, `<select>` or `<input>` to the brow
   Add `.quiet` for an action inside a row (Details, Remove, Reset).
 - `.switch`: a checkbox drawn as a switch (settings).
 - `select`: settings' style.
+- A text input: 30px high, a hairline, radius 6, `Off` as its placeholder when empty means
+  off (`.field` in `Flags.vue`).
 
 ## Patterns
 

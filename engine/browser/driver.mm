@@ -110,7 +110,8 @@ std::string Classify(NSView* hit) {
     return "settings";
   }
 #if BUILDFLAG(PB_EXTENSIONS)
-  content::WebContents* popup = Extensions::Get()->popup_contents();
+  content::WebContents* popup =
+      Extensions::Get() ? Extensions::Get()->popup_contents() : nullptr;
   if (popup && [hit isDescendantOf:popup->GetNativeView().GetNativeNSView()]) {
     return "popup";
   }
@@ -424,7 +425,8 @@ void Run(const std::string& line) {
 #if BUILDFLAG(PB_EXTENSIONS)
   } else if (cmd == "evalpopup") {
     // In the open extension popup's page.
-    if (content::WebContents* popup = Extensions::Get()->popup_contents()) {
+    if (content::WebContents* popup =
+            Extensions::Get() ? Extensions::Get()->popup_contents() : nullptr) {
       Eval(id, popup, rest(2));
     } else {
       Reply(id, "ERR no popup");

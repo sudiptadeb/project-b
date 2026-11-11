@@ -15,6 +15,7 @@ import (
 
 	"projectb/engine"
 	"projectb/extensions"
+	"projectb/flags"
 	"projectb/mockengine"
 )
 
@@ -34,8 +35,17 @@ type extRig struct {
 
 func startExtensions(t *testing.T, dir string) *extRig {
 	t.Helper()
+	flags.New(dir).Set(flags.Extensions, "on")
 	r := start(t, dir)
 	return &extRig{rig: r, x: r.e, m: r.a.Extensions()}
+}
+
+// With the Extensions flag off, the build's extension code doesn't run.
+func TestExtensionsWaitForTheirFlag(t *testing.T) {
+	r := start(t, t.TempDir())
+	if r.a.Extensions() != nil {
+		t.Fatal("the extension manager started with the flag off")
+	}
 }
 
 // on runs fn on the main thread and waits for it.

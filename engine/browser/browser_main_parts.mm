@@ -22,6 +22,7 @@
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
+#include "project_b/engine/common/extensions_on.h"
 
 #if BUILDFLAG(PB_EXTENSIONS)
 #include "project_b/engine/extensions/browser/extensions.h"
@@ -59,7 +60,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 #if BUILDFLAG(PB_EXTENSIONS)
   // The extension runtime comes up with the profile and loads what is installed, so
   // Go finds it ready when it starts.
-  extensions_ = std::make_unique<Extensions>(browser_context_.get());
+  if (ExtensionsOn()) {
+    extensions_ = std::make_unique<Extensions>(browser_context_.get());
+  }
 #endif
   RegisterShellWebUI(browser_context_.get());
 

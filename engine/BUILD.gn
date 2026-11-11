@@ -47,6 +47,7 @@ source_set("common") {
   sources = [
     "common/content_client.cc",
     "common/content_client.h",
+    "common/extensions_on.h",
     "common/main_delegate.cc",
     "common/main_delegate.h",
   ]

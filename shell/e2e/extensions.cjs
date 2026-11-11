@@ -37,6 +37,9 @@ if (!fs.readFileSync(path.join(root, 'shell/dist/shell/shell.js'), 'utf8').inclu
 
 fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-extensions-'));
+// The Extensions flag, as the settings page saves it.
+const setFlag = (on) => fs.writeFileSync(path.join(profile, 'flags.json'), JSON.stringify(on ? { extensions: 'on' } : {}));
+setFlag(true);
 const bin = path.join(out, 'dev-extensions');
 execFileSync('go', ['build', '-tags', 'extensions', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
@@ -244,6 +247,24 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   check('Remove takes it away', await until(async () => await page.getByRole('region', { name: 'Installed' }).getByText('No extensions installed').isVisible()));
   await puzzle.click();
   check('and from the menu', await until(async () => (await menu.textContent()).includes('No extensions installed')));
+
+  // With the flag off, the build's extensions don't start. The server's restart cuts the
+  // pages' event streams, which is no error of theirs.
+  const before = errors.length;
+  await page.close();
+  await stopServers();
+  setFlag(false);
+  await startServers();
+  await shell.goto(base + '/');
+  await shell.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
+  errors.splice(before);
+  check('with the flag off the shell has no extensions toolbar', (await shell.locator('.pbx-toolbar').count()) === 0);
+  await shell.getByRole('button', { name: 'Settings', exact: true }).click();
+  await until(async () => (await regions()).settingsOpen === true);
+  page = await open();
+  check('and settings no Extensions section', (await page.getByRole('navigation').getByRole('button', { name: 'Extensions' }).count()) === 0);
+  await page.getByRole('button', { name: 'Flags' }).click();
+  check('but the flag is there to turn on', await page.getByRole('switch', { name: /Extensions/ }).isEnabled());
 
   check('no errors in the pages', errors.length === 0, errors.join(' | '));
   await browser.close();

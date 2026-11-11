@@ -6,9 +6,11 @@ import (
 	"projectb/commands"
 	"projectb/crash"
 	"projectb/engine"
+	"projectb/flags"
 	"projectb/history"
 	"projectb/policy"
 	"projectb/prefs"
+	"projectb/relaunch"
 	"projectb/settings"
 	"projectb/shell"
 	"projectb/suggest"
@@ -35,6 +37,7 @@ type App struct {
 	Policy   *policy.Manager
 	Window   *window.Manager
 	Prefs    *prefs.Manager
+	Flags    *flags.Manager
 	Update   *update.Manager
 	Shell    *shell.Manager
 	Commands *commands.Manager
@@ -59,13 +62,15 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Suggest = suggest.New(a.History)
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
+	a.Flags = flags.New(cfg.ProfileDir)
 	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()))
 	closeWindow := func() { a.Window.Request(engine.WindowClose) }
 	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
 	a.Commands = commands.New(e, cfg.ProfileDir, a.Window.FullScreen)
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
-	a.Settings = settings.New(e, a.Window, a.Prefs, a.Update, a.Commands)
+	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
+	a.Settings.OnRelaunch(func() { relaunch.Self(); closeWindow() })
 	a.registerActions(e, closeWindow)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
@@ -89,6 +94,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 	a.Update.OnChanged(a.Settings.UpdateChanged)
 	a.Commands.OnChanged(a.Settings.KeyboardChanged)
+	a.Flags.OnChanged(a.Settings.FlagsChanged)
 	a.Commands.OnChanged(a.Shell.KeysChanged)
 	// What the menu shows enabled or checked follows the active tab, the layout and full
 	// screen.

@@ -189,6 +189,10 @@ typedef struct PBGoCalls {
 
   // What --version prints first, such as "Project B 0.2.17". The caller frees it.
   char* (*version)(void);
+
+  // The switches the flags saved in the profile ask for, one per line, such as
+  // "--pb-extensions". Called once, before content starts. The caller frees it.
+  char* (*launch_switches)(const char* profile_dir);
 } PBGoCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_ABI_H_

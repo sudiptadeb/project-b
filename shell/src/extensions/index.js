@@ -3,9 +3,16 @@
 // same names and nothing in them.
 import ExtensionsSettings from './ExtensionsSettings.vue';
 import ExtensionsToolbar from './ExtensionsToolbar.vue';
+import { extensions } from './state.js';
 
 export { ExtensionsToolbar };
 export { extensionsMessage } from './state.js';
 
-// The settings page's Extensions section.
-export const extensionsSection = { id: 'extensions', label: 'Extensions', component: ExtensionsSettings };
+// The settings page's Extensions section, shown while Go sends the extension manager: only
+// with the Extensions flag on.
+export const extensionsSection = {
+  id: 'extensions',
+  label: 'Extensions',
+  component: ExtensionsSettings,
+  shown: () => extensions.value != null,
+};

@@ -31,6 +31,7 @@
 #include "extensions/common/mojom/web_request_host.mojom.h"
 #include "extensions/common/switches.h"
 #include "project_b/engine/browser/content_browser_client.h"
+#include "project_b/engine/common/extensions_on.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
 #include "url/gurl.h"
 
@@ -54,7 +55,7 @@ const extensions::Extension* ExtensionFor(
 
 // A process that will run an extension's pages is recorded as that extension's, which
 // is what lets it use the extension's APIs.
-void ContentBrowserClient::SiteInstanceGotProcessAndSite(
+void ExtensionsContentBrowserClient::SiteInstanceGotProcessAndSite(
     content::SiteInstance* site_instance) {
   ContentBrowserClientHooks::SiteInstanceGotProcessAndSite(site_instance);
   content::BrowserContext* context =
@@ -68,7 +69,7 @@ void ContentBrowserClient::SiteInstanceGotProcessAndSite(
       extension->id(), site_instance->GetProcess()->GetID());
 }
 
-bool ContentBrowserClient::DoesSiteRequireDedicatedProcess(
+bool ExtensionsContentBrowserClient::DoesSiteRequireDedicatedProcess(
     content::BrowserContext* browser_context,
     const GURL& effective_site_url) {
   return extensions::ExtensionRegistry::Get(browser_context)
@@ -79,14 +80,14 @@ bool ContentBrowserClient::DoesSiteRequireDedicatedProcess(
 }
 
 // All of an extension's pages share one process.
-bool ContentBrowserClient::ShouldUseProcessPerSite(
+bool ExtensionsContentBrowserClient::ShouldUseProcessPerSite(
     content::BrowserContext* browser_context,
     const content::SecurityPrincipal& security_principal) {
   return ExtensionFor(browser_context, security_principal) != nullptr;
 }
 
 // An extension's pages go only in that extension's process, and nothing else does.
-bool ContentBrowserClient::IsSuitableHost(
+bool ExtensionsContentBrowserClient::IsSuitableHost(
     content::RenderProcessHost* process_host,
     const content::SecurityPrincipal& security_principal) {
   content::BrowserContext* context = process_host->GetBrowserContext();
@@ -99,7 +100,7 @@ bool ContentBrowserClient::IsSuitableHost(
   return !process_map->Contains(process_host->GetID());
 }
 
-bool ContentBrowserClient::CanCommitURL(content::RenderProcessHost* process_host,
+bool ExtensionsContentBrowserClient::CanCommitURL(content::RenderProcessHost* process_host,
                                         const GURL& url) {
   content::BrowserContext* context = process_host->GetBrowserContext();
   const extensions::Extension* extension =
@@ -115,14 +116,14 @@ bool ContentBrowserClient::CanCommitURL(content::RenderProcessHost* process_host
                                                         url.GetPath());
 }
 
-bool ContentBrowserClient::IsHandledURL(const GURL& url) {
+bool ExtensionsContentBrowserClient::IsHandledURL(const GURL& url) {
   return url.SchemeIs(extensions::kExtensionScheme) ||
          ContentBrowserClientHooks::IsHandledURL(url);
 }
 
 // An extension's process is told what it is on its command line, so one content
 // started ahead of need, for any site, can't become one.
-bool ContentBrowserClient::ShouldUseSpareRenderProcessHost(
+bool ExtensionsContentBrowserClient::ShouldUseSpareRenderProcessHost(
     content::BrowserContext* browser_context,
     const GURL& site_url,
     std::optional<SpareProcessRefusedByEmbedderReason>& refused_reason) {
@@ -134,13 +135,15 @@ bool ContentBrowserClient::ShouldUseSpareRenderProcessHost(
       browser_context, site_url, refused_reason);
 }
 
-// A renderer learns at its start that it is an extension's process, and where the store is.
-void ContentBrowserClient::AppendExtraCommandLineSwitches(
+// A child process learns at its start that extensions are on, whether it is an
+// extension's process, and where the store is.
+void ExtensionsContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
   // A renderer has to know which origin is the store to give its page the store's API.
   static const char* const kStoreSwitches[] = {
       extensions::switches::kAppsGalleryURL};
+  command_line->AppendSwitch(kExtensionsSwitch);
   command_line->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
                                  kStoreSwitches);
   content::RenderProcessHost* process =
@@ -152,7 +155,7 @@ void ContentBrowserClient::AppendExtraCommandLineSwitches(
   }
 }
 
-void ContentBrowserClient::ExposeInterfacesToRenderer(
+void ExtensionsContentBrowserClient::ExposeInterfacesToRenderer(
     service_manager::BinderRegistry* registry,
     blink::AssociatedInterfaceRegistry* associated_registry,
     content::RenderProcessHost* render_process_host) {
@@ -164,7 +167,7 @@ void ContentBrowserClient::ExposeInterfacesToRenderer(
                           render_process_host->GetID()));
 }
 
-void ContentBrowserClient::RegisterAssociatedInterfaceBindersForRenderFrameHost(
+void ExtensionsContentBrowserClient::RegisterAssociatedInterfaceBindersForRenderFrameHost(
     content::RenderFrameHost& render_frame_host,
     blink::AssociatedInterfaceRegistry& associated_registry) {
   ContentBrowserClientHooks::
@@ -188,7 +191,7 @@ void ContentBrowserClient::RegisterAssociatedInterfaceBindersForRenderFrameHost(
           &render_frame_host));
 }
 
-void ContentBrowserClient::RegisterAssociatedInterfaceBindersForServiceWorker(
+void ExtensionsContentBrowserClient::RegisterAssociatedInterfaceBindersForServiceWorker(
     const content::ServiceWorkerVersionBaseInfo& service_worker_version_info,
     blink::AssociatedInterfaceRegistry& associated_registry) {
   const content::ChildProcessId process =
@@ -207,7 +210,7 @@ void ContentBrowserClient::RegisterAssociatedInterfaceBindersForServiceWorker(
 }
 
 // The interfaces an extension's own frames get, beyond what a web page has.
-void ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
+void ExtensionsContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
     content::RenderFrameHost* render_frame_host,
     mojo::BinderMapWithContext<content::RenderFrameHost*>* map) {
   const extensions::Extension* extension = ExtensionFor(
@@ -224,7 +227,7 @@ void ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
 // factory each for a navigation, a worker's script, a service worker's update and a
 // page's own requests.
 mojo::PendingRemote<network::mojom::URLLoaderFactory>
-ContentBrowserClient::CreateNonNetworkNavigationURLLoaderFactory(
+ExtensionsContentBrowserClient::CreateNonNetworkNavigationURLLoaderFactory(
     const std::string& scheme,
     content::FrameTreeNodeId frame_tree_node_id) {
   if (scheme != extensions::kExtensionScheme) {
@@ -236,7 +239,7 @@ ContentBrowserClient::CreateNonNetworkNavigationURLLoaderFactory(
       false);
 }
 
-void ContentBrowserClient::RegisterNonNetworkWorkerMainResourceURLLoaderFactories(
+void ExtensionsContentBrowserClient::RegisterNonNetworkWorkerMainResourceURLLoaderFactories(
     content::BrowserContext* browser_context,
     const std::optional<url::Origin>& request_initiator,
     network::mojom::RequestDestination request_destination,
@@ -247,7 +250,7 @@ void ContentBrowserClient::RegisterNonNetworkWorkerMainResourceURLLoaderFactorie
           browser_context, request_initiator));
 }
 
-void ContentBrowserClient::
+void ExtensionsContentBrowserClient::
     RegisterNonNetworkServiceWorkerUpdateURLLoaderFactories(
         content::BrowserContext* browser_context,
         NonNetworkURLLoaderFactoryMap* factories) {
@@ -257,7 +260,7 @@ void ContentBrowserClient::
           browser_context));
 }
 
-void ContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFactories(
+void ExtensionsContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFactories(
     int render_process_id,
     int render_frame_id,
     const std::optional<url::Origin>& request_initiator_origin,
@@ -271,7 +274,7 @@ void ContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFactories(
 
 // webRequest and declarativeNetRequest sit in front of the network here: each new
 // loader factory is wrapped when an extension has rules or listeners for it.
-void ContentBrowserClient::WillCreateURLLoaderFactory(
+void ExtensionsContentBrowserClient::WillCreateURLLoaderFactory(
     content::BrowserContext* browser_context,
     content::RenderFrameHost* frame,
     int render_process_id,
@@ -302,7 +305,7 @@ void ContentBrowserClient::WillCreateURLLoaderFactory(
 }
 
 // What an extension's own requests, and its content scripts', may reach across origins.
-void ContentBrowserClient::OverrideURLLoaderFactoryParams(
+void ExtensionsContentBrowserClient::OverrideURLLoaderFactoryParams(
     content::BrowserContext* browser_context,
     const url::Origin& origin,
     bool is_for_isolated_world,

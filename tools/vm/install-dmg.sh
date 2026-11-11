@@ -11,7 +11,7 @@ GUEST_DMG="/Volumes/My Shared Files/share/project-b.dmg"
 MOUNT=/tmp/pb-dmg
 
 case "$FROM" in
-    http*) curl -fsS -o "$DMG" "$FROM" ;;
+    http*) curl -fsSL -o "$DMG" "$FROM" ;;
     "$DMG") ;;
     *) cp "$FROM" "$DMG" ;;
 esac

@@ -287,10 +287,41 @@ func (m *Manager) Duplicate() {
 }
 
 // Open opens a URL in a new last tab and shows it.
-func (m *Manager) Open(u string) {
+func (m *Manager) Open(u string) { m.OpenIn(u, true) }
+
+// OpenIn opens a URL in a new last tab, shown or behind the active one.
+func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
 	id := m.eng.CreateTab()
-	m.HandleTabOpened(m.active, id, u, true)
+	m.HandleTabOpened(m.active, id, u, foreground)
 	m.eng.LoadURL(id, u)
+	return id
+}
+
+// Get returns a copy of one tab.
+func (m *Manager) Get(id engine.TabID) (Tab, bool) {
+	if t, ok := m.tabs[id]; ok {
+		return *t, true
+	}
+	return Tab{}, false
+}
+
+// ReloadTab reloads one tab, with or without the cache.
+func (m *Manager) ReloadTab(id engine.TabID, bypassCache bool) {
+	if m.tabs[id] == nil {
+		return
+	}
+	if bypassCache {
+		m.eng.ReloadBypassingCache(id)
+	} else {
+		m.eng.Reload(id)
+	}
+}
+
+// Load loads a URL in one tab.
+func (m *Manager) Load(id engine.TabID, u string) {
+	if m.tabs[id] != nil {
+		m.eng.LoadURL(id, u)
+	}
 }
 
 // zoomFactors are the steps zooming in and out moves through, as browsers have them.

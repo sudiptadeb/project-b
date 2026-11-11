@@ -178,6 +178,17 @@ asks with the same prompt, shown in the settings page. "Load unpacked" loads a f
 prompt, as Chrome's does. The extension manager has a link that opens the Chrome Web Store in a
 tab.
 
+A store page's Remove button asks first, as Chrome's does: `//extensions` hands the question to
+our management delegate, which asks through the install prompt marked as a removal, and removes
+only on a yes. Remove in the extension manager removes at once.
+
+**The Chrome Web Store's words.** The page says "Add to Chrome", and tells a browser that isn't
+Chrome to switch. A style sheet the renderer adds to that page, and no other
+(`content_renderer_client.cc`), makes the button read "Add to Project B" and "Remove from
+Project B" and hides the banner. It is CSS only: it finds the button by the names the store's
+markup gives it (a class and `jsname`), so it stops working, harmlessly, when Google renames
+them. The extensions test checks it.
+
 Removing an extension removes what it stored too: everything kept under its origin, its
 `chrome.storage`, and for a packaged one its files.
 
@@ -250,7 +261,8 @@ flag in one folder rebuilds our own files and links again, under a minute, becau
   permissions, site access). "Load unpacked" and "Install package…" open the system's panel.
   Store: a link that opens the Chrome Web Store in a tab.
 - **The install prompt** is one dialog, shown by the shell over the page for an install a
-  store's page began, and by the settings page for a package picked there.
+  store's page began, and by the settings page for a package picked there. A store page's
+  Remove asks with the same dialog, as "Remove?".
 
 ## Tests
 
@@ -288,7 +300,6 @@ Every check below was left out on purpose, to be discussed and then built or dro
 - A package from the mock store is not checked against anything the store said: no hash, no
   size. The fetch script that fills the mock store checks neither a hash nor that a file is a CRX.
 - Any origin named with `--apps-gallery-url` is a store, over plain http too.
-- A store page's Remove button removes at once. Chrome asks "Remove?" first.
 - The supervised-user question (a child needing a parent's yes) is always answered no.
 
 **In the installer**

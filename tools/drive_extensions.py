@@ -124,12 +124,12 @@ def close_settings(app):
         time.sleep(0.05)
 
 
-def answer_prompt(app):
-    """Waits for the install prompt the shell shows over the page, says yes, and returns
-    what it said."""
+def answer_prompt(app, yes=True):
+    """Waits for the prompt the shell shows over the page, answers it, and returns what
+    it said."""
     app.wait("!!document.querySelector('.pbx-prompt')", 60)
     text = app.js("document.querySelector('.pbx-prompt').innerText")
-    menu_click(app, ".pbx-prompt .pbx-primary")
+    menu_click(app, ".pbx-prompt " + (".pbx-primary" if yes else "button:not(.pbx-primary)"))
     app.wait("!document.querySelector('.pbx-prompt')", 20)
     return text
 
@@ -326,23 +326,53 @@ def web_store_checks():
 
     # uBlock Origin Lite's page there, and its own "Add to Chrome".
     visit(app, f"{WEB_STORE}detail/ublock-origin-lite/{UBOL_ID}")
-    add = "[...document.querySelectorAll('button')].find(b=>/^add to chrome$/i.test(b.innerText.trim()))"
-    app.wait(f"!!({add})", 60, page=True)
+    app.wait(f"!!({store_button('add')})", 60, page=True)
     check("the store's page has the store's API", app.js("!!chrome.webstorePrivate", page=True))
-    x, y = app.js(f"(()=>{{const b={add};b.scrollIntoView({{block:'center'}});const r=b.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
-    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
-    time.sleep(0.5)
-    app.cmd("click", px + x, py + y)
+    check("the store's button says Add to Project B", "Add to Project B" in button_words(app, "add"), button_words(app, "add"))
+    check("the store's banner asking to switch to Chrome is hidden", app.js("!document.querySelector('button[jsname=oGfC5c]')?.checkVisibility()", page=True))
+    click_store_button(app, "add")
     prompt = answer_prompt(app)
     check("Add to Chrome asks through our prompt, with the store's manifest", UBOL_NAME in prompt and "declarativeNetRequest" in prompt, prompt)
-    app.wait("[...document.querySelectorAll('button')].some(b=>/^remove from chrome$/i.test(b.innerText.trim()))", 120, page=True)
+    app.wait(f"!!({store_button('remove')})", 120, page=True)
     check("the package downloads and installs, and the store's page sees it", True)
+    check("the store's button then says Remove from Project B", "Remove from Project B" in button_words(app, "remove"), button_words(app, "remove"))
 
     pin(app, UBOL_NAME, True)
     check("uBlock Origin Lite from the Chrome Web Store has its button", buttons(app) == [UBOL_NAME], buttons(app))
     visit(app, PAGE)
     check("and blocks a known ad host", fetch_ad(app) == "blocked")
+
+    # Its "Remove from Chrome" asks first; Cancel keeps it.
+    visit(app, f"{WEB_STORE}detail/ublock-origin-lite/{UBOL_ID}")
+    app.wait(f"!!({store_button('remove')})", 60, page=True)
+    click_store_button(app, "remove")
+    prompt = answer_prompt(app, yes=False)
+    check("Remove from Chrome asks first", f'Remove "{UBOL_NAME}"?' in prompt, prompt)
+    time.sleep(1)
+    check("and Cancel keeps it", buttons(app) == [UBOL_NAME] and app.js(f"!!({store_button('remove')})", page=True), buttons(app))
+    click_store_button(app, "remove")
+    answer_prompt(app)
+    app.wait(f"!!({store_button('add')})", 30, page=True)
+    check("Remove removes it, and the store's page sees it", buttons(app) == [], buttons(app))
     app.close()
+
+
+def store_button(kind):
+    """The Chrome Web Store's Add or Remove button, found by the words it was written with."""
+    words = "add to chrome" if kind == "add" else "remove from chrome"
+    return f"[...document.querySelectorAll('button')].find(b=>b.innerText.trim().toLowerCase()==={json.dumps(words)})"
+
+
+def button_words(app, kind):
+    """What the button shows, which is what our style sheet puts after its own words."""
+    return app.js(f"getComputedStyle({store_button(kind)}.querySelector('span[jsname=V67aGc]'),'::after').content", page=True)
+
+
+def click_store_button(app, kind):
+    x, y = app.js(f"(()=>{{const b={store_button(kind)};b.scrollIntoView({{block:'center'}});const r=b.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
+    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
+    time.sleep(0.5)
+    app.cmd("click", px + x, py + y)
 
 
 if __name__ == "__main__":

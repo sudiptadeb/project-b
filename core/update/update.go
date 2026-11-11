@@ -50,6 +50,9 @@ type State struct {
 	Phase   string `json:"phase"`
 	Version string `json:"version,omitempty"` // the release being downloaded, ready, or refused
 	Error   string `json:"error,omitempty"`   // why it failed, in words a person can read
+	// Done and Total are how much of the release has downloaded, in bytes, while Downloading.
+	Done  int64 `json:"done,omitempty"`
+	Total int64 `json:"total,omitempty"`
 	// Check is how a check the user asked for went: Checking while it runs, then UpToDate,
 	// or CheckFailed with CheckError when the manifest couldn't be read. A check that finds
 	// a release moves Phase instead. Only the settings panel shows these; the bubble shows
@@ -248,7 +251,7 @@ func (m *Manager) check(ctx context.Context) (current bool, err error) {
 	if s.Phase == Ready && s.Version == d.Version {
 		return false, nil
 	}
-	m.set(State{Phase: Downloading, Version: d.Version})
+	m.set(State{Phase: Downloading, Version: d.Version, Total: d.Asset.Size})
 	app, err := m.fetch(ctx, d)
 	if err != nil {
 		log.Printf("update: %s: %v", d.Version, err)
@@ -275,7 +278,15 @@ func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error)
 		return "", err
 	}
 	defer os.RemoveAll(downloads)
+	stop := make(chan struct{})
+	watched := make(chan struct{})
+	go func() {
+		m.watchDownload(downloads, stop)
+		close(watched)
+	}()
 	archive, err := m.client.Download(ctx, d, downloads)
+	close(stop)
+	<-watched
 	if err != nil {
 		return "", err
 	}
@@ -399,6 +410,39 @@ func (m *Manager) notify(s State) {
 			f(s)
 		}
 	})
+}
+
+// watchDownload tells the shell how much of the release is in the download directory,
+// four times a second, until stop is closed. amarit's Download doesn't report progress, so
+// the file it writes there is the measure.
+func (m *Manager) watchDownload(dir string, stop <-chan struct{}) {
+	t := time.NewTicker(250 * time.Millisecond)
+	defer t.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+		entries, _ := os.ReadDir(dir)
+		var done int64
+		for _, e := range entries {
+			if info, err := e.Info(); err == nil {
+				done += info.Size()
+			}
+		}
+		m.mu.Lock()
+		s := m.state
+		s.Done = done
+		changed := s.Phase == Downloading && m.state != s
+		if changed {
+			m.state = s
+		}
+		m.mu.Unlock()
+		if changed {
+			m.notify(s)
+		}
+	}
 }
 
 func (m *Manager) stageDir() string    { return filepath.Join(m.cfg.StateDir, "stage") }

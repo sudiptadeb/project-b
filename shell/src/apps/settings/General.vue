@@ -38,7 +38,7 @@ const layouts = [
 const status = computed(() => {
   const s = state.update;
   if (s.check === 'checking') return 'Checking…';
-  if (s.phase === 'downloading') return `Downloading ${s.version}…`;
+  if (s.phase === 'downloading') return `Downloading ${s.version}… ${s.total ? Math.floor((100 * (s.done || 0)) / s.total) : 0}%`;
   if (s.phase === 'ready') return `${s.version} is ready to ${phone ? 'install' : 'relaunch'}`;
   if (s.phase === 'failed') return `Update${s.version ? ' to ' + s.version : ''} failed: ${s.error}`;
   if (s.check === 'current') return 'Up to date';

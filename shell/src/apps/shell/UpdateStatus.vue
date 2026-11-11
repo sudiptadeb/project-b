@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { send } from '@/bridge.js';
 import { phone, state } from './state.js';
 
@@ -8,11 +9,28 @@ import { phone, state } from './state.js';
 function relaunch() {
   send({ t: 'relaunch' });
 }
+
+// How much of the release has arrived, as a whole percentage, while it downloads.
+const percent = computed(() => {
+  const u = state.update;
+  return u.total ? Math.floor((100 * (u.done || 0)) / u.total) : 0;
+});
 </script>
 
 <template>
   <div v-if="state.update.phase" v-shell class="update" :class="state.update.phase">
-    <span v-if="state.update.phase === 'downloading'" role="status">Downloading Project B {{ state.update.version }}…</span>
+    <template v-if="state.update.phase === 'downloading'">
+      <span role="status">Downloading Project B {{ state.update.version }}… {{ percent }}%</span>
+      <span
+        class="progress"
+        role="progressbar"
+        aria-label="Update download"
+        :aria-valuenow="percent"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :style="{ width: percent + '%' }"
+      ></span>
+    </template>
     <button v-else-if="state.update.phase === 'ready'" type="button" @click="relaunch">
       Project B {{ state.update.version }} is ready. <b>{{ phone ? 'Install' : 'Relaunch' }} to update</b>
     </button>
@@ -47,6 +65,15 @@ function relaunch() {
 .update > * {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The download's progress: a line along the bubble's foot, in the accent. */
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
 }
 
 .update.failed {

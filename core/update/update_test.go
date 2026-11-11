@@ -71,6 +71,7 @@ type releaseServer struct {
 	downloads atomic.Int32
 	manifests atomic.Int32
 	url       string
+	serve     func(w http.ResponseWriter) // serves the asset instead of Served, when set
 }
 
 func release(t *testing.T, version string, good, served []byte) *releaseServer {
@@ -89,6 +90,10 @@ func release(t *testing.T, version string, good, served []byte) *releaseServer {
 	})
 	mux.HandleFunc("/asset.zip", func(w http.ResponseWriter, r *http.Request) {
 		rs.downloads.Add(1)
+		if rs.serve != nil {
+			rs.serve(w)
+			return
+		}
 		rs.mu.Lock()
 		defer rs.mu.Unlock()
 		w.Write(rs.Served)
@@ -107,6 +112,7 @@ func (rs *releaseServer) set(version string, good, served []byte) {
 
 type rig struct {
 	m      *Manager
+	mu     sync.Mutex // the download's progress is told from its own goroutine
 	states []State
 	quit   bool
 	app    string
@@ -118,7 +124,11 @@ func start(t *testing.T, running, releases string, verify func(string) error) *r
 	r := &rig{app: fakeApp(t, installed, running)}
 	cfg := Config{Project: "project-b", Version: running, Releases: releases, StateDir: filepath.Join(t.TempDir(), "updates"), App: r.app, Verify: verify}
 	r.m = New(cfg, func(f func()) { f() }, func() { r.quit = true })
-	r.m.OnChanged(func(s State) { r.states = append(r.states, s) })
+	r.m.OnChanged(func(s State) {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.states = append(r.states, s)
+	})
 	if r.m.client == nil {
 		t.Fatal("no client")
 	}
@@ -127,10 +137,16 @@ func start(t *testing.T, running, releases string, verify func(string) error) *r
 
 func (r *rig) check() { r.m.check(context.Background()) }
 
+// phases lists the phases the shell was shown, once each in a row: a download's progress
+// is more news in the same phase.
 func (r *rig) phases() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	var p []string
 	for _, s := range r.states {
-		p = append(p, s.Phase)
+		if len(p) == 0 || p[len(p)-1] != s.Phase {
+			p = append(p, s.Phase)
+		}
 	}
 	return strings.Join(p, " ")
 }
@@ -394,5 +410,32 @@ func TestInstallTakesTheDownloadAsItIs(t *testing.T) {
 	}
 	if quit {
 		t.Fatal("the app quit; the installer replaces it")
+	}
+}
+
+func TestDownloadShowsHowMuchHasArrived(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	half := make(chan struct{})
+	rest := make(chan struct{})
+	rs.serve = func(w http.ResponseWriter) {
+		w.Write(good[:len(good)/2])
+		w.(http.Flusher).Flush()
+		close(half)
+		<-rest
+		w.Write(good[len(good)/2:])
+	}
+	r := start(t, "0.1.0", rs.url, nil)
+	done := make(chan struct{})
+	go func() { r.check(); close(done) }()
+	<-half
+	s := eventually(t, r.m, func(s State) bool { return s.Done > 0 })
+	close(rest)
+	<-done
+	if s.Phase != Downloading || s.Done != int64(len(good)/2) || s.Total != int64(len(good)) {
+		t.Fatalf("mid-download state %+v, want %d of %d", s, len(good)/2, len(good))
+	}
+	if r.phases() != "downloading ready" {
+		t.Fatalf("phases %q", r.phases())
 	}
 }

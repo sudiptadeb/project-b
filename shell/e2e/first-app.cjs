@@ -431,8 +431,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
       res.end(JSON.stringify({ spec: 1, project: 'project-b', published: '2026-11-09T00:00:00Z', channels: { stable: '0.2.0' },
         releases: { '0.2.0': { assets: { 'darwin/arm64': { url: `http://127.0.0.1:${releasePort}/asset.zip`, sha256: crypto.createHash('sha256').update(good).digest('hex'), size: good.length } } } } }));
     } else {
-      res.writeHead(200, { 'Content-Length': served.length });
-      setTimeout(() => res.end(served), 1500);
+      // Half at once and the rest later, so the download is seen part-way.
+      const body = served;
+      res.writeHead(200, { 'Content-Length': body.length });
+      res.write(body.subarray(0, body.length >> 1));
+      setTimeout(() => res.end(body.subarray(body.length >> 1)), 1500);
     }
   });
   await new Promise((r) => releaseServer.listen(releasePort, '127.0.0.1', r));
@@ -446,8 +449,10 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.goto(base + '/');
   errors.length = 0;
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
-  await page.getByText(/Downloading Project B 0\.2\.0/).waitFor({ timeout: 10000 });
+  await page.getByText(/Downloading Project B 0\.2\.0… [1-9]\d?%/).waitFor({ timeout: 10000 });
   await settle(page);
+  const progress = Number(await page.getByRole('progressbar', { name: 'Update download' }).getAttribute('aria-valuenow'));
+  check('the bubble shows how much of the release has arrived', progress > 0 && progress < 100, String(progress));
   await page.screenshot({ path: path.join(out, '7-update-downloading.png') });
   r = await regions();
   let bb = await bubble.boundingBox();

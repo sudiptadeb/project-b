@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"projectb/engine"
@@ -49,18 +48,14 @@ func packOne(v reflect.Value) []Value {
 
 // recorder is an engine.Listener that writes down what it hears.
 type recorder struct {
-	got        []string
-	allow      bool
-	gatePanics bool
+	got   []string
+	allow bool
 }
 
 func (r *recorder) note(s string)           { r.got = append(r.got, s) }
 func (r *recorder) ShellMessage(msg []byte) { r.note("shell " + string(msg)) }
 func (r *recorder) NavigationStarting(tab engine.TabID, url string) bool {
 	r.note("starting " + url)
-	if r.gatePanics {
-		panic("the gate")
-	}
 	return r.allow
 }
 func (r *recorder) NavigationFinished(tab engine.TabID, url string) { r.note("finished " + url) }
@@ -113,8 +108,6 @@ func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 		return json.RawMessage(params), nil
 	case "ProjectB.fail":
 		return nil, errors.New("it failed")
-	case "ProjectB.panic":
-		panic("asked to")
 	}
 	return nil, engine.ErrUnknownCommand
 }
@@ -270,39 +263,5 @@ func TestDevToolsCommandsAnswerWithTheirResultOrError(t *testing.T) {
 	}
 	if _, ok := h.Dispatch(eventDevTools, pack("ProjectB.nothing", `{}`)); ok {
 		t.Error("an unknown command was answered, not left to content")
-	}
-}
-
-func TestTheFirstPanicIsCaughtAndTheSecondCrashes(t *testing.T) {
-	h, r, _ := wired(t)
-	var where string
-	var stack []byte
-	h.OnPanic = func(w string, value any, s []byte) { where, stack = w, s }
-	if _, ok := h.Dispatch(eventDevTools, pack("ProjectB.panic", `{}`)); ok {
-		t.Error("a hook that panicked gave an answer")
-	}
-	if where != "engine.DevToolsCommand" || !strings.Contains(string(stack), "DevToolsCommand") {
-		t.Errorf("OnPanic got %q and a stack without the panicking function:\n%s", where, stack)
-	}
-	// The browser carries on.
-	h.Dispatch(ObserverDidStartLoading, pack(WebContents{ID: 3}))
-	if r.got[len(r.got)-1] != "loading" {
-		t.Errorf("hooks stopped after the panic: %v", r.got)
-	}
-	defer func() {
-		if p := recover(); p == nil || !strings.Contains(fmt.Sprint(p), "a second panic") {
-			t.Errorf("the second panic gave %v", p)
-		}
-	}()
-	h.Run(func() { panic("again") })
-}
-
-func TestAGateThatPanicsBlocks(t *testing.T) {
-	h, r, _ := wired(t)
-	h.OnPanic = func(string, any, []byte) {}
-	r.gatePanics = true
-	v, ok := h.Dispatch(ThrottleWillStartRequest, pack(NavigationHandle{TabID: 1, IsInPrimaryMainFrame: true, URL: "https://example.com/"}))
-	if !ok || NavigationThrottleThrottleAction(v.I) != NavigationThrottleThrottleActionBlockRequest {
-		t.Errorf("a gate that panicked answered %v %v", v, ok)
 	}
 }

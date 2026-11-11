@@ -67,7 +67,7 @@ sends content's; ChromeDriver passes them through `goog:cdp`.
 |---|---|
 | `ProjectB.getTabs` | `{tabs, active}`: the tabs as Go's tab manager has them, and the shown one's id |
 | `ProjectB.isAllowedURL` `{url}` | `{allowed}`: whether policy lets a tab load it |
-| `ProjectB.panic` | none: it panics inside Go's hook, as a bug would (see "Crashes" in `first-app.md`) |
+| `ProjectB.panic` | none: it panics inside Go's hook, as a bug would, and the app crashes (see "Crashes" in `first-app.md`) |
 
 A method Go doesn't have falls through to content, which says it wasn't found. The
 commands live in `core/app/devtools.go`; adding one is a Go change only. They need no

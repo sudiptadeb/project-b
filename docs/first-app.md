@@ -131,17 +131,12 @@ both paths show whole: "Project B crashed last time. The log is at" that file, "
 report at" macOS's report of that process, with a close button, which sends
 `dismissCrash`. The snapshot carries both, as `crashLog` and `crashReport`.
 
-- **Go**, from an unrecovered panic or a fatal error in any goroutine, cgo callbacks and
-  nil dereferences included: the runtime writes its report, with every goroutine's stack,
+- **Go**, from a panic or a fatal error in any goroutine, cgo callbacks and nil
+  dereferences included. Go recovers none: a panic ends the app, since nothing would
+  bring back its tabs yet. `ProjectB.panic` over DevTools forces one in a hook
+  (`docs/devtools.md`): the runtime writes its report, with every goroutine's stack,
   into `crash.log` (`debug.SetCrashOutput`). A fault in C++ called from Go is reported
   there too, as "signal arrived during cgo execution".
-- **A Go panic, caught once:** a panic in a hook or in a function posted to the main
-  thread is recovered at the boundary (`core/content/content.go`). The call returns as if
-  Go hadn't answered, so content does its default, except a navigation gate, which blocks
-  the navigation rather than let it through. `crashes.log` gets a line, the stack goes to
-  `panic-<time>.log` beside it, and the browser carries on with no notice. A second panic
-  in the same run isn't caught: it crashes as above, and `crash.log` has both stacks.
-  `ProjectB.panic` over DevTools forces one (`docs/devtools.md`).
 - **Native, in the main process**: macOS writes a report with every thread's stack,
   symbolized, to `~/Library/Logs/DiagnosticReports/project_b-<time>.ips` (a run outside
   the desktop session gets `/Library/Logs/DiagnosticReports`). Go finds the one with the

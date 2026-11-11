@@ -211,7 +211,6 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)
-	hooks.OnPanic = theApp.Crash.Panicked
 }
 
 //export PBStop
@@ -224,7 +223,7 @@ func PBRunPosted() {
 	native.posted = nil
 	native.mu.Unlock()
 	for _, fn := range fns {
-		hooks.Run(fn)
+		fn()
 	}
 }
 

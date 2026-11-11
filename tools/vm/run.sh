@@ -2,7 +2,8 @@
 # Runs the VM checks on one DMG from start to end, with nobody watching:
 #   tools/vm/run.sh <path or URL of a DMG>
 #
-# It takes the VM's lock, starts the VM if it isn't running, installs the DMG, runs check.py,
+# It takes the VM's lock, starts the VM if it isn't running, readies it (prepare.py), installs
+# the DMG, runs check.py,
 # copies any crash reports the app left in the VM, and stops the VM again if it started it.
 # Everything lands in one folder under $VM_HOME/shots, which $VM_HOME/shots/latest-<VM> points
 # to: summary.txt (each check's line and the verdict), results.json, the shots, and
@@ -54,6 +55,7 @@ if ! pgrep -f "tart run .* $VM\$" > /dev/null; then
 fi
 echo "== start the VM"
 "$HERE/start.sh" || { echo "the VM didn't start"; exit 2; }
+"$PY" "$HERE/prepare.py" || { echo "the VM isn't ready for the checks"; exit 2; }
 echo "== install $DMG"
 "$HERE/install-dmg.sh" "$DMG" || { echo "couldn't install the DMG"; exit 2; }
 

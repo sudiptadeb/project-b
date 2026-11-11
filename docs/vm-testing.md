@@ -81,7 +81,7 @@ the guest's screen, not composites; each folder has an `ABOUT.txt` that says so.
   connection is dropped, so `rfb.py` waits a second after connecting.
 - The guest draws at 1x, 1440x900 pixels for 1440x900 points.
 - Clicking the wallpaper hides every window (Show Desktop), so the app is opened with `open`.
-  `EnableStandardClickToShowDesktop` is also off in this guest.
+  `prepare.py` also turns `EnableStandardClickToShowDesktop` off.
 - Resting the pointer on the green button opens macOS's Move & Resize menu, which takes the next
   click. After leaving full screen, the pointer moves away.
 - After a boot, an "App Background Activity" notice sits over the window's top right; `check.py`
@@ -90,9 +90,12 @@ the guest's screen, not composites; each folder has an `ABOUT.txt` that says so.
   zoomed frame.
 - `amarit run` on a unit removed seconds earlier stops the new process at once (exit 0, Tart prints
   "Stopping VM"). `stop.sh` keeps the unit and `start.sh` restarts it.
-- Once per VM: the first window move asks "tart-guest-agent wants to control System Events".
-  It was allowed on `pb-test` by a click through `rfb.py` and stays on the VM's disk. A new VM
-  shows it again: take a shot with `rfb.py` and click Allow.
+- Once per VM: the first window move asks "tart-guest-agent wants to control System Events",
+  and until someone answers, every such call waits and times out. `prepare.py`, which `run.sh`
+  runs after starting the VM, clicks the prompt's Allow through VNC and checks that System
+  Events then answers; the grant stays on the VM's disk. Writing it into the VM's TCC database
+  doesn't hold, because tccd keeps its own. On a VM that already allows it, `prepare.py` changes
+  nothing. It also turns off `EnableStandardClickToShowDesktop`.
 
 ## Why the VM needs a desktop login
 
@@ -133,7 +136,7 @@ With nobody watching, one command from a DMG to a verdict:
     tools/vm/setup.sh                 # once: Tart, Python, the image, the VM
     tools/vm/run.sh <DMG path or URL> # or tools/test.sh vm, on build/project-b.dmg or PB_DMG
 
-`run.sh` takes the VM's lock, starts the VM if it was stopped, installs the DMG, runs
+`run.sh` takes the VM's lock, starts the VM if it was stopped, readies it, installs the DMG, runs
 `check.py`, copies the app's crash reports from the VM, and stops the VM again if it started
 it. It writes everything to one folder, `~/PW_TOOLS/macos-vm/shots/<time>-<VM>`, which
 `shots/latest-<VM>` points to:
@@ -180,8 +183,7 @@ and one for a feature's:
 
 Each VM is made from the image, not from another VM, so they share nothing. Tart clones the
 image with APFS's copy-on-write, so a new VM takes little disk until it changes. macOS runs at
-most two macOS VMs at once. A new VM asks once for tart-guest-agent to control System Events
-(see Calibration).
+most two macOS VMs at once. `run.sh` readies a new VM by itself (`prepare.py`, see Calibration).
 
 What the checks need, and what they say when it's missing:
 

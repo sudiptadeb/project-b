@@ -2,10 +2,12 @@
 """Tests extensions in the real app, built with EXTENSIONS=1, through its driver.
 
 It starts the mock store on the folder tools/fetch-extensions.sh and
-tools/pack-test-extension.py fill, and in the app's own UI installs our test extension and
-uBlock Origin Lite from it, loads the test extension unpacked, pins and unpins, opens the
-popup, and starts the app again. It needs the network: uBlock Origin Lite is seen blocking
-a real ad host. Run it from the repo root:
+tools/pack-test-extension.py fill, starts the app with that store as its store, and
+installs our test extension and uBlock Origin Lite from the store's page, as the Chrome
+Web Store's page installs. Then it loads the test extension unpacked, pins and unpins,
+opens the popup, and starts the app again. Last, in an app started as it ships, it
+installs uBlock Origin Lite from the real chromewebstore.google.com. It needs the network,
+for that and for the ad host uBlock Origin Lite is seen blocking. Run it from the repo root:
 
     PB_BIN=chromium/src/out/ext/project_b python3 tools/drive_extensions.py
 
@@ -27,6 +29,10 @@ from drive_first_app import App, check, click, run_parts, visit
 ROOT = drive_first_app.ROOT
 STORE_DIR = os.path.join(ROOT, ".tools/extensions")
 STORE = "http://127.0.0.1:8767"
+# What makes the mock store the browser's store: its page gets the store's API, and
+# packages are fetched from it.
+MOCK_STORE = [f"--apps-gallery-url={STORE}", f"--apps-gallery-download-url={STORE}/download/%s"]
+WEB_STORE = "https://chromewebstore.google.com/"
 TEST_ID = "oepjjojhhaclfhmopocgmdfbeiffpheh"
 TEST_NAME = "Project B test extension"
 UBOL_ID = "ddkjiahejlhfcafbddmgiahcphecmpfh"
@@ -98,14 +104,13 @@ def row(name):
 
 
 INSTALLED = "[...document.querySelectorAll('section')[0].querySelectorAll('.pbx-extension')].map(e=>e.getAttribute('aria-label'))"
-STORE_BUTTON = "[...document.querySelectorAll('section')[1].querySelectorAll('.pbx-extension')].find(e=>e.getAttribute('aria-label')===%s).querySelector('button')"
 
 
 def open_extension_settings(app):
     click(app, "[aria-label='Extensions']")
     app.wait("!!document.querySelector('.pbx-menu')")
     menu_click(app, ".pbx-manage")
-    settings_wait(app, "!!document.querySelector('.pbx-url')", 30)
+    settings_wait(app, "!!document.querySelector('#pbx-installed')", 30)
 
 
 def close_settings(app):
@@ -119,15 +124,24 @@ def close_settings(app):
         time.sleep(0.05)
 
 
-def install_from_store(app, name):
-    button = STORE_BUTTON % json.dumps(name)
-    settings_wait(app, f"!!({button})")
-    x, y = settings(app, f"(()=>{{const r=({button}).getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()")
-    app.cmd("click", x, y)
-    settings_wait(app, "!!document.querySelector('.pbx-prompt')", 60)
-    prompt = settings(app, "document.querySelector('.pbx-prompt').innerText")
-    settings_click(app, ".pbx-prompt .pbx-primary")
-    settings_wait(app, f"({INSTALLED}).includes({json.dumps(name)})", 60)
+def answer_prompt(app):
+    """Waits for the install prompt the shell shows over the page, says yes, and returns
+    what it said."""
+    app.wait("!!document.querySelector('.pbx-prompt')", 60)
+    text = app.js("document.querySelector('.pbx-prompt').innerText")
+    menu_click(app, ".pbx-prompt .pbx-primary")
+    app.wait("!document.querySelector('.pbx-prompt')", 20)
+    return text
+
+
+def install_from_store(app, extension):
+    """Installs from the mock store's page, as a person does: its button, then yes."""
+    visit(app, STORE + "/")
+    item = f"li[data-id={extension}]"
+    app.wait(f"!!document.querySelector({json.dumps(item)})", 20, page=True)
+    drive_first_app.page_click(app, item + " button")
+    prompt = answer_prompt(app)
+    app.wait(f"document.querySelector({json.dumps(item + ' .status')}).textContent==='Installed'", 60, page=True)
     return prompt
 
 
@@ -167,7 +181,7 @@ def pages_seen(app):
 
 def extension_checks():
     profile = tempfile.mkdtemp(prefix="pb-profile-")
-    app = App(profile)
+    app = App(profile, MOCK_STORE)
     app.wait("!!document.querySelector('input')", 30)
     check("the toolbar has the extensions button", app.js("!!document.querySelector('[aria-label=Extensions]')"))
 
@@ -175,23 +189,16 @@ def extension_checks():
     visit(app, PAGE)
     check("with no extension the ad host answers", fetch_ad(app) == "reached")
 
+    # The store is a page to visit. Its buttons install as the Chrome Web Store's do.
+    prompt = install_from_store(app, TEST_ID)
+    check("the install prompt names the extension and its permissions", TEST_NAME in prompt and "tabs" in prompt and "storage" in prompt, prompt)
+    check("the test extension installs from the mock store's page", True)
+    prompt = install_from_store(app, UBOL_ID)
+    check("uBlock Origin Lite installs from the mock store's page", "declarativeNetRequest" in prompt, prompt)
+
     open_extension_settings(app)
     check("the extension manager opens from the toolbar's menu", True)
-    check("nothing is installed in a new profile", settings(app, INSTALLED) == [])
-
-    # The store.
-    settings_click(app, ".pbx-url")
-    app.cmd("type", STORE)
-    app.cmd("key", "enter")
-    settings_wait(app, "document.querySelectorAll('section')[1].querySelectorAll('.pbx-extension').length>=6", 30)
-    check("the store lists the fetched extensions and ours", True)
-
-    prompt = install_from_store(app, TEST_NAME)
-    check("the install prompt names the extension and its permissions", TEST_NAME in prompt and "tabs" in prompt and "storage" in prompt, prompt)
-    check("the test extension installs from the store", True)
-    prompt = install_from_store(app, UBOL_NAME)
-    check("uBlock Origin Lite installs from the store", "declarativeNetRequest" in prompt, prompt)
-    check("the store says both are installed", settings(app, f"({STORE_BUTTON % json.dumps(UBOL_NAME)}).textContent.trim()") == "Installed")
+    check("and lists both", sorted(settings(app, INSTALLED)) == sorted([TEST_NAME, UBOL_NAME]), settings(app, INSTALLED))
 
     # Load unpacked, through the chooser the driver answers for the user.
     app.cmd("choose", os.path.join(ROOT, "tools/test-extension"))
@@ -263,7 +270,7 @@ def extension_checks():
 
     # Everything survives a restart: what is installed is the engine's to remember, the
     # pin is Go's.
-    app = App(profile)
+    app = App(profile, MOCK_STORE)
     app.wait("!!document.querySelector('input')", 30)
     app.wait("document.querySelectorAll('.pbx-action').length===1", 30)
     check("the pin survives a restart", buttons(app) == [UBOL_NAME], buttons(app))
@@ -297,10 +304,44 @@ def extension_checks():
     for left in (1, 0):
         settings_click(app, f"[aria-label={json.dumps('Remove ' + TEST_NAME)}]")
         settings_wait(app, f"({INSTALLED}).length==={left}||{left}===0&&({INSTALLED}).length===0", 30)
-    install_from_store(app, TEST_NAME)
     close_settings(app)
+    install_from_store(app, TEST_ID)
     after = pages_seen(app)
     check("removing an extension deletes what it stored", before >= 2 and after == 1, (before, after))
+    app.close()
+
+
+def web_store_checks():
+    """The app as it ships, with no store named: the store is the Chrome Web Store."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    app.wait("!!document.querySelector('input')", 30)
+    visit(app, PAGE)
+    check("with no extension the ad host answers", fetch_ad(app) == "reached")
+
+    # The extension manager's way to the store.
+    open_extension_settings(app)
+    settings_click(app, "section[aria-labelledby=pbx-store] button")
+    app.wait(f"{drive_first_app.ROWS}===2&&{drive_first_app.VALUE}.startsWith({json.dumps(WEB_STORE)})", 30)
+    check("the extension manager opens the Chrome Web Store in a tab", app.cmd("hit", 500, 300) != "settings")
+
+    # uBlock Origin Lite's page there, and its own "Add to Chrome".
+    visit(app, f"{WEB_STORE}detail/ublock-origin-lite/{UBOL_ID}")
+    add = "[...document.querySelectorAll('button')].find(b=>/^add to chrome$/i.test(b.innerText.trim()))"
+    app.wait(f"!!({add})", 60, page=True)
+    check("the store's page has the store's API", app.js("!!chrome.webstorePrivate", page=True))
+    x, y = app.js(f"(()=>{{const b={add};b.scrollIntoView({{block:'center'}});const r=b.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
+    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
+    time.sleep(0.5)
+    app.cmd("click", px + x, py + y)
+    prompt = answer_prompt(app)
+    check("Add to Chrome asks through our prompt, with the store's manifest", UBOL_NAME in prompt and "declarativeNetRequest" in prompt, prompt)
+    app.wait("[...document.querySelectorAll('button')].some(b=>/^remove from chrome$/i.test(b.innerText.trim()))", 120, page=True)
+    check("the package downloads and installs, and the store's page sees it", True)
+
+    pin(app, UBOL_NAME, True)
+    check("uBlock Origin Lite from the Chrome Web Store has its button", buttons(app) == [UBOL_NAME], buttons(app))
+    visit(app, PAGE)
+    check("and blocks a known ad host", fetch_ad(app) == "blocked")
     app.close()
 
 
@@ -317,6 +358,6 @@ if __name__ == "__main__":
     subprocess.check_call(["go", "build", "-o", store_bin, "./cmd/extstore"], cwd=os.path.join(ROOT, "core"))
     store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", STORE.split("//")[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        run_parts([extension_checks])
+        run_parts([extension_checks, web_store_checks])
     finally:
         store.terminate()

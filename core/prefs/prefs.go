@@ -161,7 +161,13 @@ func (m *Manager) save() {
 		log.Printf("prefs: %v", err)
 		return
 	}
-	if err := os.WriteFile(m.path, append(b, '\n'), 0o600); err != nil {
+	// A new file renamed over the old, so no reader and no crash sees half of one.
+	tmp := m.path + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		log.Printf("prefs: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, m.path); err != nil {
 		log.Printf("prefs: %v", err)
 	}
 }

@@ -35,6 +35,9 @@ type Manager struct {
 	update   *update.Manager
 	commands *commands.Manager
 	open     bool
+	// Whether the page opened last has said it's ready. Until then nothing reaches it:
+	// its script isn't there to take a message, and its snapshot has it all.
+	heard bool
 	// section is the section a caller asked the page to show, or "" for its first.
 	section string
 	parts   []Part
@@ -77,6 +80,7 @@ func (m *Manager) Open() {
 		return
 	}
 	m.open = true
+	m.heard = false
 	timeline.Begin("settings.open")
 	timeline.Mark("settings.open.go")
 	m.eng.OpenSettings()
@@ -105,6 +109,7 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
+		m.heard = true
 		snapshot := map[string]any{
 			"t":            "snapshot",
 			"windowColor":  m.window.Color(),
@@ -213,7 +218,7 @@ func (m *Manager) FlagsChanged() {
 func (m *Manager) Send(v any) { m.send(v) }
 
 func (m *Manager) send(v any) {
-	if !m.open {
+	if !m.open || !m.heard {
 		return
 	}
 	b, err := json.Marshal(v)

@@ -152,8 +152,12 @@ func TestInstallAsksFirst(t *testing.T) {
 	}
 
 	// The shell has the prompt too, for an install a store's page begins, and answers it.
+	// It asks again, as a reloaded shell would; the snapshot from its start came before the prompt.
 	r.shell(`{"t":"ready"}`)
-	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	m := r.waitFor(func(m map[string]any) bool {
+		x, _ := m["extensions"].(map[string]any)
+		return m["t"] == "snapshot" && x["prompt"] != nil
+	})
 	if p, _ := m["extensions"].(map[string]any)["prompt"].(map[string]any); p["name"] != "Project B test extension" {
 		t.Fatalf("the shell's prompt: %v", m["extensions"])
 	}

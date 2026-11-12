@@ -43,6 +43,9 @@ type Manager struct {
 	keys    func() map[string]string
 	os      string
 	parts   []Part
+	// Whether the shell page has said it's ready. Until then nothing reaches it: its
+	// script isn't there to take a message, and the snapshot it asks for has it all.
+	heard bool
 	// moving is the span waiting for the shell's next layout report, or "".
 	moving string
 }
@@ -97,6 +100,7 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
+		m.heard = true
 		snapshot := map[string]any{
 			"t":            "snapshot",
 			"tabs":         m.tabs.All(),
@@ -231,6 +235,9 @@ func (m *Manager) Send(v any) { m.send(v) }
 
 // send sends to the shell.
 func (m *Manager) send(v any) {
+	if !m.heard {
+		return
+	}
 	b, err := json.Marshal(v)
 	if err != nil {
 		timeline.Errorf("shell: %v", err)
@@ -238,3 +245,6 @@ func (m *Manager) send(v any) {
 	}
 	m.eng.SendToShell(b)
 }
+
+// HandleShellCrashed waits for the reloaded shell to say it's ready, as the first did.
+func (m *Manager) HandleShellCrashed() { m.heard = false }

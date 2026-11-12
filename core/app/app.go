@@ -201,6 +201,9 @@ func (a *App) SettingsMessage(msg []byte) { a.Settings.Handle(msg) }
 
 func (a *App) WindowChanged(s engine.WindowState) { a.Window.HandleWindowChanged(s) }
 
-func (a *App) ShellCrashed() { a.Window.HandleShellCrashed() }
+func (a *App) ShellCrashed() {
+	a.Window.HandleShellCrashed()
+	a.Shell.HandleShellCrashed()
+}
 
 func (a *App) ProcessCrashed(p engine.ProcessCrash) { a.Crash.ProcessCrashed(p) }

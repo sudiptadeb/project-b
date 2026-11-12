@@ -39,6 +39,8 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	})
 	go e.Run()
 	<-ready
+	// The shell says it's ready as it starts, and only then hears from Go.
+	r.shell(`{"t":"ready"}`)
 	return r
 }
 
@@ -200,8 +202,10 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
 	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"page":{"x":0,"y":48,"w":800,"h":552},"viewW":800,"viewH":600}`)
-	r.shell(`{"t":"ready"}`)
-	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	// Once the main thread has run what was posted before this, the layout is in.
+	done := make(chan struct{})
+	r.e.Post(func() { close(done) })
+	<-done
 
 	l := r.e.Layout()
 	if l.Page != (engine.Rect{X: 0, Y: 48, W: 800, H: 552}) || l.FrameColor == "" {

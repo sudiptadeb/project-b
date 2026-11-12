@@ -4,6 +4,7 @@
 //   deskctl status
 //   deskctl windows
 //   deskctl shot <file.png> [app | pid]
+//   deskctl watch <pid> <file> <seconds>
 //   deskctl raise <app>
 //   deskctl move <x> <y>
 //   deskctl click <x> <y>
@@ -14,6 +15,7 @@
 // Coordinates are points from the top left of the main display.
 import AppKit
 import ApplicationServices
+import CoreMedia
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -97,6 +99,96 @@ func shot(_ path: String, app: String?) {
         done.signal()
     }
     done.wait()
+}
+
+// Keeps the latest frame of a process's largest window in `path`, for a reader on the same Mac
+// that needs frames faster than one `shot` per launch. The file is a 40-byte header, then the
+// pixels as BGRA rows. The header: "DESKWAT1", a UInt64 frame count that is odd while a frame
+// is being written, width, height and bytes per row as UInt32, 4 bytes unused, and the frame's
+// capture time as seconds since 1970 in a Double. ScreenCaptureKit sends a frame only when the window changed. It stops after
+// `seconds`, or when the window is gone.
+final class Watcher: NSObject, SCStreamOutput, SCStreamDelegate {
+    let path: String
+    var map: UnsafeMutableRawPointer?
+    var size = 0
+    var count: UInt64 = 0
+
+    init(path: String) { self.path = path }
+
+    func open(_ bytes: Int) {
+        if let map { munmap(map, size) }
+        let fd = Darwin.open(path, O_RDWR | O_CREAT, 0o600)
+        guard fd >= 0, ftruncate(fd, off_t(bytes)) == 0 else { fail("can't write \(path)") }
+        guard let m = mmap(nil, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), m != MAP_FAILED
+        else { fail("can't map \(path)") }
+        close(fd)
+        map = m
+        size = bytes
+        memcpy(m, "DESKWAT1", 8)
+    }
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        guard type == .screen, buffer.isValid,
+              let info = (CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first,
+              let raw = info[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete,
+              let pixels = CMSampleBufferGetImageBuffer(buffer) else { return }
+        CVPixelBufferLockBaseAddress(pixels, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixels, .readOnly) }
+        let width = CVPixelBufferGetWidth(pixels), height = CVPixelBufferGetHeight(pixels)
+        let stride = CVPixelBufferGetBytesPerRow(pixels)
+        if size != 40 + stride * height { open(40 + stride * height) }
+        guard let m = map, let base = CVPixelBufferGetBaseAddress(pixels) else { return }
+        let header = m.advanced(by: 8)
+        count += 1
+        header.storeBytes(of: count, as: UInt64.self)  // odd: writing
+        OSMemoryBarrier()
+        memcpy(m.advanced(by: 40), base, stride * height)
+        header.advanced(by: 8).storeBytes(of: UInt32(width), as: UInt32.self)
+        header.advanced(by: 12).storeBytes(of: UInt32(height), as: UInt32.self)
+        header.advanced(by: 16).storeBytes(of: UInt32(stride), as: UInt32.self)
+        m.advanced(by: 32).storeBytes(of: Date().timeIntervalSince1970, as: Double.self)
+        OSMemoryBarrier()
+        count += 1
+        header.storeBytes(of: count, as: UInt64.self)  // even: whole
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: Error) { fail("the capture stopped: \(error)") }
+}
+
+func watch(pid: pid_t, path: String, seconds: Double) {
+    let watcher = Watcher(path: path)
+    Task {
+        do {
+            let content = try await SCShareableContent.current
+            let matches = content.windows.filter {
+                $0.owningApplication?.processID == pid && $0.isOnScreen && $0.windowLayer == 0
+            }
+            guard let window = matches.max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
+            else { fail("no window on screen for pid \(pid)") }
+            let filter = SCContentFilter(desktopIndependentWindow: window)
+            let config = SCStreamConfiguration()
+            config.showsCursor = false
+            config.width = Int(window.frame.width * CGFloat(filter.pointPixelScale))
+            config.height = Int(window.frame.height * CGFloat(filter.pointPixelScale))
+            config.pixelFormat = kCVPixelFormatType_32BGRA
+            config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+            config.queueDepth = 4
+            let stream = SCStream(filter: filter, configuration: config, delegate: watcher)
+            try stream.addStreamOutput(watcher, type: .screen, sampleHandlerQueue: DispatchQueue(label: "frames"))
+            try await stream.startCapture()
+            print("watching", window.frame.width, "x", window.frame.height)
+            objc_setAssociatedObject(watcher, "stream", stream, .OBJC_ASSOCIATION_RETAIN)
+        } catch {
+            fail("capture failed: \(error)")
+        }
+    }
+    DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { exit(0) }
+    DispatchQueue.main.async {
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if kill(pid, 0) != 0 { exit(0) }
+        }
+    }
+    RunLoop.main.run()
 }
 
 // Input lands on whatever is on top at that point, so raise the target first.
@@ -191,13 +283,16 @@ func type(_ text: String) {
     }
 }
 
-// A capture that can't get through must not hang the caller forever.
-DispatchQueue.global().asyncAfter(deadline: .now() + 30) { fail("timed out") }
+let args = Array(CommandLine.arguments.dropFirst())
+
+// A capture that can't get through must not hang the caller forever. A watch ends itself.
+if args.first != "watch" {
+    DispatchQueue.global().asyncAfter(deadline: .now() + 30) { fail("timed out") }
+}
 
 // Connects to the window server; capturing a single window crashes without this.
 _ = NSApplication.shared
 
-let args = Array(CommandLine.arguments.dropFirst())
 func number(_ index: Int) -> Double {
     guard index < args.count, let value = Double(args[index]) else { fail("expected a number") }
     return value
@@ -211,6 +306,9 @@ case "windows":
 case "shot":
     guard args.count == 2 || args.count == 3 else { fail("shot <file.png> [app | pid]") }
     shot(args[1], app: args.count == 3 ? args[2] : nil)
+case "watch":
+    guard args.count == 4, let pid = pid_t(args[1]) else { fail("watch <pid> <file> <seconds>") }
+    watch(pid: pid, path: args[2], seconds: number(3))
 case "raise":
     needAccessibility()
     guard args.count == 2 else { fail("raise <app>") }
@@ -236,5 +334,5 @@ case "type":
     guard args.count == 2 else { fail("type <text>") }
     type(args[1])
 default:
-    fail("status | windows | shot <file> [app | pid] | raise <app> | move x y | click x y | drag x1 y1 x2 y2 | scroll x y dy [steps] [holdMs] | key code [mods] | type text")
+    fail("status | windows | shot <file> [app | pid] | watch pid file seconds | raise <app> | move x y | click x y | drag x1 y1 x2 y2 | scroll x y dy [steps] [holdMs] | key code [mods] | type text")
 }

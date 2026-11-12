@@ -24,6 +24,24 @@ def launchctl(*args):
     return subprocess.run(["launchctl", *args], capture_output=True, text=True)
 
 
+# A watch keeps running after this returns. It prints the job's label, which
+# `launchctl bootout gui/<uid>/<label>` ends; it also ends on its own.
+if sys.argv[1:2] == ["watch"] and len(sys.argv) == 5:
+    label = "dev.local.desk.watch.%s" % sys.argv[2]
+    log = sys.argv[3] + ".log"
+    launchctl("bootout", "%s/%s" % (DOMAIN, label))
+    with tempfile.TemporaryDirectory() as work:
+        plist = os.path.join(work, "job.plist")
+        with open(plist, "wb") as f:
+            plistlib.dump({"Label": label, "ProgramArguments": [DESKCTL, *sys.argv[1:]], "RunAtLoad": True,
+                           "LimitLoadToSessionType": "Aqua", "StandardOutPath": log, "StandardErrorPath": log}, f)
+        started = launchctl("bootstrap", DOMAIN, plist)
+    if started.returncode != 0:
+        sys.exit("can't start in the desktop session (nobody logged in?): " + started.stderr.strip())
+    print(label)
+    sys.exit(0)
+
+
 with tempfile.TemporaryDirectory() as work:
     out = os.path.join(work, "out")
     err = os.path.join(work, "err")

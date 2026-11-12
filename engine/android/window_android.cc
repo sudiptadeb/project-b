@@ -316,6 +316,9 @@ void Window::Zoom() {}
 
 void Window::ToggleFullScreen() {}
 
+// Android runs one copy of the app, so no other copy hands over to bring it forward.
+void Window::BringToFront() {}
+
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
   return false;
 }

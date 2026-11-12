@@ -40,6 +40,7 @@ import "C"
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,6 +55,7 @@ import (
 	"projectb/content"
 	"projectb/engine"
 	"projectb/flags"
+	"projectb/instance"
 	"projectb/timeline"
 )
 
@@ -190,7 +192,30 @@ var (
 	native *nativeEngine
 	hooks  *content.Hooks
 	theApp *app.App
+	owner  *instance.Owner
 )
+
+// PBClaimProfile is the first call, before anything is written to the profile: it returns
+// 1 when this copy owns the profile folder, and 0 when another copy owns it and has been
+// handed urls, one per line, so this copy quits.
+//
+//export PBClaimProfile
+func PBClaimProfile(profileDir, urls *C.char) C.int {
+	var list []string
+	if s := C.GoString(urls); s != "" {
+		list = strings.Split(s, "\n")
+	}
+	o, err := instance.Claim(C.GoString(profileDir), list)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "the profile folder: %v\n", err)
+		os.Exit(1)
+	}
+	if o == nil {
+		return 0
+	}
+	owner = o
+	return 1
+}
 
 //export PBStart
 func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char) {
@@ -216,12 +241,14 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)
+	owner.Serve(func(urls []string) { native.Post(func() { theApp.Handover(urls) }) })
 	timeline.Mark("go.started")
 }
 
 //export PBStop
 func PBStop() {
 	theApp.Stop()
+	owner.Close()
 	timeline.Close()
 }
 

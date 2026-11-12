@@ -17,7 +17,8 @@ research behind it is in `project-b-research/`: `ulaa-modes.md`,
 - Cookies and the cache are saved in the profile's `chromium/` folder (`Network/Cookies`,
   `Cache`), unencrypted, so a login survives a quit
   (`engine/browser/content_browser_client.cc`).
-- Nothing stops a second copy of the app from starting on the same folder.
+- One copy of the app per profile folder: a second copy started on it hands its URLs to
+  the running one and quits (`core/instance`).
 
 ## The four things
 

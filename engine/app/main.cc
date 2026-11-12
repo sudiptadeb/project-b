@@ -6,6 +6,7 @@
 
 int main(int argc, const char** argv) {
   static const PBGoCalls go = {
+      .claim_profile = PBClaimProfile,
       .start = PBStart,
       .stop = PBStop,
       .run_posted = PBRunPosted,

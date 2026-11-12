@@ -121,6 +121,9 @@ class Window {
   void Minimize();
   void Zoom();
   void ToggleFullScreen();
+  // Brings the window to the front and makes the app the active one, as when another
+  // copy started on this profile hands over to this one.
+  void BringToFront();
 
   bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 

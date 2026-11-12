@@ -106,12 +106,13 @@ typedef struct PBWindowLayout {
   int32_t theme;
 } PBWindowLayout;
 
-// Matches engine.WindowRequest. Each does what pressing that window button does.
+// Matches engine.WindowRequest. The first four do what pressing that window button does.
 typedef enum PBWindowRequest {
   PB_WINDOW_CLOSE = 1,
   PB_WINDOW_MINIMISE = 2,
   PB_WINDOW_ZOOM = 3,
   PB_WINDOW_FULL_SCREEN = 4,
+  PB_WINDOW_FRONT = 5,  // brings the window to the front and makes the app active
 } PBWindowRequest;
 
 // What an entry on the timeline is. Matches timelineKinds in core/cmd/lib/main.go.
@@ -173,6 +174,11 @@ typedef struct PBEngineCalls {
 // What the adapter can tell the Go core. The main binary fills it in from Go's exports
 // (pb_exports.h) and hands it to ProjectBMain. Helpers have no Go and no table.
 typedef struct PBGoCalls {
+  // The first call, before anything is written to the profile. Returns 1 when this copy
+  // owns the profile folder. Returns 0 when another copy owns it and has been handed
+  // urls, one per line, possibly none: this copy then quits.
+  int (*claim_profile)(const char* profile_dir, const char* urls);
+
   // hook_table is the hash of the generated hook list the adapter was built with; Go
   // refuses a library whose list differs from its own.
   void (*start)(const PBEngineCalls* calls,

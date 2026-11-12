@@ -174,7 +174,7 @@ func (e *Engine) Reload(id engine.TabID) {
 }
 
 // RequestWindow closes the window, goes in or out of full screen, and records every
-// request. A mock window has nothing to minimise or zoom.
+// request. A mock window has nothing to minimise, zoom or bring to the front.
 func (e *Engine) RequestWindow(r engine.WindowRequest) {
 	e.mu.Lock()
 	e.requests = append(e.requests, r)

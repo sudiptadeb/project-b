@@ -574,6 +574,12 @@ void Window::Minimize() {
   [impl_->window performMiniaturize:nil];
 }
 
+void Window::BringToFront() {
+  [impl_->window deminiaturize:nil];
+  [impl_->window makeKeyAndOrderFront:nil];
+  [NSApp activateIgnoringOtherApps:YES];
+}
+
 void Window::Maximize() {
   if (!impl_->window.zoomed) {
     [impl_->window performZoom:nil];

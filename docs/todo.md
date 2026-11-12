@@ -58,7 +58,6 @@ Take an item off when it lands or is dropped.
 ## Decided, not started
 
 - Move focus decisions into Go (fixes Cmd+W pressed twice quickly).
-- A single-instance lock.
 - An engine stress test against other engines, once the owner calls the engine solid.
 - **Extensions, later** ([extensions.md](extensions.md#open-for-the-owner)): updates on a
   timer, from the store each extension came from; an update that asks for more permissions

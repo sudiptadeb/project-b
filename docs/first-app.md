@@ -122,6 +122,13 @@ shell, so both change together, and `shell/src/tones.js` derives the shell's oth
 from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
 fills the colour itself, faint.
 
+## One copy per profile
+
+One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
+started on the same `--user-data-dir` or `--profile` writes nothing there: it hands the URLs
+on its command line to the running copy, which comes to the front and opens each in a new
+tab, and exits 0.
+
 ## Logs and timing
 
 The app keeps one timeline of what it did and when: start-up as marks, each interaction as

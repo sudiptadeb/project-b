@@ -14,6 +14,7 @@
 #include "base/process/process.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/time/time.h"
 #include "base/version_info/version_info.h"
 #include "content/public/app/content_main.h"
@@ -39,6 +40,14 @@ int ProjectBMain(int argc, const char** argv, const PBGoCalls* go) {
 
   if (go) {
     project_b::SetGo(go);
+    // One copy of the app per profile folder. A copy started on a folder another copy
+    // owns hands it the URLs on its command line and quits, having written nothing there.
+    std::string urls =
+        base::JoinString(base::CommandLine::ForCurrentProcess()->GetArgs(), "\n");
+    if (!go->claim_profile(project_b::ProfileDir().value().c_str(),
+                           urls.c_str())) {
+      return 0;
+    }
     project_b::timeline::Start(
         project_b::ProfileDir(),
         base::Time::Now() - base::Process::Current().CreationTime());

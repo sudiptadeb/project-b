@@ -9,6 +9,7 @@
 
 JNIEXPORT jlong JNICALL Java_dev_projectb_browser_GoCore_table(JNIEnv* env, jclass cls) {
   static const PBGoCalls go = {
+      .claim_profile = PBClaimProfile,
       .start = PBStart,
       .stop = PBStop,
       .run_posted = PBRunPosted,

@@ -163,6 +163,15 @@ func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 
 func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
 
+// Handover is the request of a copy started on this profile while this one runs: the
+// window comes to the front, and each URL opens in a new tab in front.
+func (a *App) Handover(urls []string) {
+	a.Window.Request(engine.WindowFront)
+	for _, u := range urls {
+		a.Tabs.Open(u)
+	}
+}
+
 // themeOf is the window's theme for a theme pref.
 func themeOf(t string) engine.Theme {
 	switch t {

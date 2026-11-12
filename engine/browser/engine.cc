@@ -157,6 +157,9 @@ void CallRequestWindow(int32_t request) {
     case PB_WINDOW_FULL_SCREEN:
       g_engine->window()->ToggleFullScreen();
       break;
+    case PB_WINDOW_FRONT:
+      g_engine->window()->BringToFront();
+      break;
   }
 }
 

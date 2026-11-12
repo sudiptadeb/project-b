@@ -134,7 +134,8 @@ type Engine interface {
 	Edit(c EditCommand)
 
 	// RequestWindow asks the native window to close, which ends the app, minimise,
-	// zoom, or go in or out of full screen. What follows arrives as WindowChanged.
+	// zoom, go in or out of full screen, or come to the front. What follows arrives as
+	// WindowChanged.
 	RequestWindow(r WindowRequest)
 
 	// SetWindowLayout is everything about how the window behaves, from the window
@@ -291,8 +292,9 @@ type WindowState struct {
 	FullScreen   bool
 }
 
-// WindowRequest is what the user asked the window to do. Each is what pressing that
-// window button does, so zoom and full screen go in or out.
+// WindowRequest is what the window is asked to do. The first four are what pressing that
+// window button does, so zoom and full screen go in or out. WindowFront brings the window
+// to the front and makes the app the active one.
 type WindowRequest int
 
 const (
@@ -300,4 +302,5 @@ const (
 	WindowMinimise
 	WindowZoom
 	WindowFullScreen
+	WindowFront
 )

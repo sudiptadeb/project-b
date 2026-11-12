@@ -8,7 +8,8 @@ import vue from '@vitejs/plugin-vue';
 // dist/<app>/ as index.html, <app>.js and <app>.css; `npm run build` builds every app.
 // `npm run dev` serves them all, with hot reload, against core/cmd/dev on :8765.
 // Each build flag in core/flags/registry.json is @<id>: src/<id>, or src/<id>-off, which has
-// the same names with nothing in them, when WITHOUT names it, as tools/build.sh does.
+// the same names with nothing in them, when WITHOUT names it, as the ninja build does
+// (engine/build_shell.py, which also points --outDir into the build folder).
 const dev = 'http://127.0.0.1:8765';
 const apps = resolve(__dirname, 'src/apps');
 const without = (process.env.WITHOUT || '').split(',').filter((id) => id);

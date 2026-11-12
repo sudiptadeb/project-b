@@ -14,6 +14,7 @@ assert(is_mac, "The first app is Mac only so far")
 
 declare_args() {
   project_b_go = "/opt/homebrew/bin/go"
+  project_b_node = "/opt/homebrew/bin/node"
 }
 
 # The Go core as a static archive. Only the main binary links it, so child processes
@@ -31,6 +32,22 @@ action("go_core") {
 
   # Each build flag the build has is a Go build tag of the same name.
   args += project_b_built
+}
+
+# The shell's pages, one folder per app: shell/shell/, shell/settings/. The engine serves
+# each from there as chrome://<app>/, and tools/package.sh copies them into the app.
+action("shell") {
+  script = "build_shell.py"
+  outputs = [ "$root_out_dir/shell/.stamp" ]
+  depfile = "$target_gen_dir/shell.d"
+  args = [
+    project_b_node,
+    rebase_path(outputs[0], root_build_dir),
+    rebase_path(depfile, root_build_dir),
+  ]
+
+  # The build flags left out, as WITHOUT for vite.
+  args += filter_exclude(string_split(project_b_without, ","), [ "" ])
 }
 
 source_set("go_core_lib") {
@@ -384,7 +401,10 @@ executable("project_b") {
     ":go_core_lib",
     ":project_b_content",
   ]
-  data_deps = [ ":project_b_helper" ]
+  data_deps = [
+    ":project_b_helper",
+    ":shell",
+  ]
 }
 
 # Child processes: the library, no Go.

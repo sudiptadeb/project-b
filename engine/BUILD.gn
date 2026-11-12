@@ -89,15 +89,27 @@ source_set("common") {
 }
 
 if (project_b_extensions) {
-  # The browser's own extension APIs, which Go answers. Their schemas are Chrome's
-  # files, used where they are; where each API appears is ours to say.
+  # The browser's own extension APIs, which Go answers: the one list of them
+  # (docs/extensions.md, "Adding an API"). Their schemas are Chrome's files, used where
+  # they are; where each API appears is ours to say, in api_features.json. The engine
+  # registers each function of these from go_apis.inc.
+  project_b_go_apis = [
+    "action",
+    "commands",
+    "tabs",
+    "windows",
+  ]
+  _go_apis_inc = []
+  foreach(api, project_b_go_apis) {
+    _go_apis_inc += [ "\"$api\"," ]
+  }
+  write_file("$target_gen_dir/extensions/go_apis.inc", _go_apis_inc)
+
   generated_json_strings("extension_api_schemas") {
-    sources = [
-      "//chrome/common/extensions/api/action.json",
-      "//chrome/common/extensions/api/commands.json",
-      "//chrome/common/extensions/api/tabs.json",
-      "//chrome/common/extensions/api/windows.json",
-    ]
+    sources = []
+    foreach(api, project_b_go_apis) {
+      sources += [ "//chrome/common/extensions/api/$api.json" ]
+    }
 
     # The compiler writes beside the schemas' folder as seen from root, and this puts
     # that in our own generated folder.
@@ -228,11 +240,13 @@ source_set("browser") {
   if (project_b_extensions) {
     sources += [
       "abi/pb_extensions_abi.h",
+      "extensions/browser/action_functions.cc",
       "extensions/browser/api_client.cc",
       "extensions/browser/api_client.h",
       "extensions/browser/choose_path.h",
       "extensions/browser/choose_path_mac.mm",
       "extensions/browser/content_hooks.cc",
+      "extensions/browser/engine_functions.h",
       "extensions/browser/extension_system.cc",
       "extensions/browser/extension_system.h",
       "extensions/browser/extensions.cc",

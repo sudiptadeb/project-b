@@ -6,6 +6,7 @@
 #include <string>
 
 #include "base/values.h"
+#include "extensions/browser/extension_function.h"
 #include "extensions/browser/extensions_browser_api_provider.h"
 
 namespace project_b {
@@ -24,8 +25,25 @@ GoAnswer AskGo(const std::string& extension_id,
                const base::ListValue& args,
                int64_t tab);
 
-// Registers every function of the APIs Go answers (tabs, windows, action, commands)
-// as the same C++ function, which carries the call to Go.
+// A function of an API Go answers. As it is, it has no logic: the function's name and
+// arguments go to Go as they came, and Go's answer goes back. A function that needs
+// the engine first, such as reading a file or taking a picture, is a subclass, listed
+// in go_function.cc's kEngineFunctions.
+class GoFunction : public ExtensionFunction {
+ public:
+  GoFunction();
+
+ protected:
+  ~GoFunction() override;
+
+  ResponseAction Run() override;
+
+  // Asks Go this function with these arguments, from this caller.
+  ResponseValue Ask(const base::ListValue& args);
+};
+
+// Registers every function of the APIs Go answers (engine/BUILD.gn's
+// project_b_go_apis): a GoFunction, or the subclass kEngineFunctions names.
 class GoAPIProvider : public extensions::ExtensionsBrowserAPIProvider {
  public:
   void RegisterExtensionFunctions(

@@ -135,9 +135,32 @@ What Go answers today:
 | `commands` | `getAll` |
 
 Two things cross differently, because only C++ can do them. `action.setIcon` names a file inside
-the extension, so the engine reads it and gives Go the picture as a data: URL. And the tab a
+the extension, so the engine reads it and gives Go the picture as a data: URL (an engine
+function, below). And the tab a
 message's sender is in (`sender.tab`) is asked of Go by the engine itself, as `tabs.get` with no
 extension.
+
+## Adding an API
+
+An API of the browser itself, one Chrome implements in `//chrome`, is answered in Go. Adding
+one, say `bookmarks`, is three places, each holding only what is new:
+
+1. **Its name** in `project_b_go_apis` in `engine/BUILD.gn`. That pulls in Chrome's schema,
+   `chrome/common/extensions/api/bookmarks.json`, and registers each of its functions.
+2. **Where it appears**, a row in `engine/extensions/common/api_features.json`, copied from
+   Chrome's `_api_features.json`; and its permission in `permission_features.json` and
+   `extensions_client.cc`, if it has one.
+3. **Its functions**, in `core/extensions/chromeapi/bookmarks.go`: one
+   `functions["bookmarks.get"] = func(a *API, c call) (any, error)` each, with `c.arg(i, &v)`
+   for the arguments. A function left out answers "… is not available in Project B".
+
+Adding a function to an API that is there is only step 3.
+
+**A function that needs the engine.** Some functions need C++ for a part: reading a file of
+the extension, taking a picture of a tab. Such a function is a subclass of `GoFunction`, in
+`engine/extensions/browser/<api>_functions.cc`, declared in `engine_functions.h` and listed
+in `kEngineFunctions` in `go_function.cc`. It does the engine's part and then calls `Ask`
+with the arguments Go should see, so the decision stays in Go. `action.setIcon` is one.
 
 ## Installing: the store is a website
 

@@ -349,7 +349,7 @@ def a20(app):
 def a21(app):
     go(app, P + "/a")
     window = json.loads(app.cmd("bounds"))
-    page, top = app.cmd("hit", 600, 300), app.cmd("hit", 1096, d.BAR_Y)
+    page, top = app.cmd("hit", 600, 300), app.cmd("hit", app.js("window.innerWidth") - 6, d.BAR_Y)
     return page == "page" and top == "frame", (page, top, window.get("reported"))
 
 

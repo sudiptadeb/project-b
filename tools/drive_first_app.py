@@ -506,7 +506,7 @@ def browsing_checks():
     check("the shell leaves exactly the window buttons' space, as the engine reported it", toggle_left == window["buttonsEnd"] + 8, (toggle_left, window))
     gap = app.cmd("hit", (window["buttonsEnd"] + toggle_left) / 2, BAR_Y)
     check("the gap after the window buttons falls through to the window frame, which drags", gap == "frame", gap)
-    right_end = app.cmd("hit", 1096, BAR_Y)
+    right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
     check("the right end of the top row falls through to the frame too", right_end == "frame", right_end)
     below_tabs = app.cmd("hit", 100, 600)
     check("the empty sidebar is shell, so it never drags the window", below_tabs == "shell", below_tabs)

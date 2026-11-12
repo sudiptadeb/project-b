@@ -13,3 +13,4 @@ __pycache__/
 /.keys/
 # Editor settings, per person.
 /.idea/
+/.claude/

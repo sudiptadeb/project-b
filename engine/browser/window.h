@@ -65,6 +65,10 @@ class Window {
     gfx::RectF controls;  // The window buttons, in shell coordinates; empty in full screen.
     double corner_radius;  // 0 in full screen.
     bool full_screen;
+    // The window's frame on screen, y down from the top of the main screen.
+    gfx::Rect bounds;
+    bool minimised;
+    bool zoomed;
   };
 
   // on_close runs when the window closes, on_key when it becomes the key window, and
@@ -153,6 +157,9 @@ class Window {
   void Maximize();
   void SetFullscreen(bool fullscreen);
   void Restore();
+  // Puts the window into a PBWindowMode from whatever it is in now. Leaving full screen
+  // for the Dock or zoom waits for macOS to finish leaving it.
+  void SetMode(int mode);
 
   // A click the OS made at this time, at this point in the window's own coordinates, is
   // about to be delivered. One the shell or the settings page will get goes on the

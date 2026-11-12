@@ -680,6 +680,30 @@ def move_checks():
     until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10)
 
 
+STATE = "/tmp/pb-state"  # In the guest: the driver's pipe and output, and a profile, for state_checks.
+
+
+def state_checks():
+    """A window's frame and state on a real screen, as Go asks for and reads them through
+    the driver's own DevTools commands: bounds set and read back, and Cmd+M minimising it,
+    which its tab is told as hidden."""
+    guest("/usr/bin/killall", "project_b")
+    ask = driven(STATE, f"{STATE}/profile")
+    window_or_stop("the app starts with one window")
+    windows_of_go = lambda: json.loads(ask("projectb", "getWindows", "{}"))["result"]["windows"]
+    ask("projectb", "setWindowBounds", json.dumps({"window": 1, "bounds": {"x": 200, "y": 150, "w": 900, "h": 600}}))
+    now = until(windows, lambda w: w == [(200, 150, 900, 600)])
+    check("a window's frame goes on screen where Go asks", now == [(200, 150, 900, 600)], str(now))
+    seen = until(windows_of_go, lambda w: w[0]["bounds"] == {"x": 200, "y": 150, "w": 900, "h": 600})
+    check("and Go reads back where it is", seen[0]["bounds"] == {"x": 200, "y": 150, "w": 900, "h": 600}, str(seen))
+    desk.key("cmd+m")
+    seen = until(windows_of_go, lambda w: w[0]["state"] == "minimised")
+    hidden = until(lambda: json.loads(ask("evaltab", "1", "document.visibilityState")), lambda v: v == "hidden")
+    check("Cmd+M minimises the window, Go reads it so, and its tab is told it is hidden",
+          seen[0]["state"] == "minimised" and hidden == "hidden", f"{seen} {hidden}")
+    guest("/usr/bin/killall", "project_b")
+
+
 if why := missing():
     screen.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
 os.makedirs(SHOTS, exist_ok=True)
@@ -707,6 +731,7 @@ time.sleep(1)
 if sys.argv[1:] == ["windows"]:
     window_checks()
     move_checks()
+    state_checks()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 
@@ -1166,5 +1191,6 @@ check("the layout button brings the tabs back to the side", float(np.mean(near(c
 check("Cmd+Q ends the app", quit_app())
 window_checks()
 move_checks()
+state_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

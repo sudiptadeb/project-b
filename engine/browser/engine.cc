@@ -29,6 +29,7 @@
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
+#include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "url/gurl.h"
@@ -224,6 +225,20 @@ void CallSetWindowLayout(int64_t window,
   }
 }
 
+void CallSetWindowBounds(int64_t window, double x, double y, double w, double h) {
+  CheckMainThread();
+#if !BUILDFLAG(IS_ANDROID)  // A phone's window fills the screen.
+  NativeWindow(window)->SetBounds(gfx::ToRoundedRect(gfx::RectF(x, y, w, h)));
+#endif
+}
+
+void CallSetWindowMode(int64_t window, int32_t mode) {
+  CheckMainThread();
+#if !BUILDFLAG(IS_ANDROID)  // A phone's window is always as it is.
+  NativeWindow(window)->SetMode(mode);
+#endif
+}
+
 void CallFocusTab(int64_t tab) {
   CheckMainThread();
   g_engine->FocusTab(tab);
@@ -306,6 +321,8 @@ const PBEngineCalls* Engine::Calls() {
       .edit = CallEdit,
       .create_window = CallCreateWindow,
       .request_window = CallRequestWindow,
+      .set_window_bounds = CallSetWindowBounds,
+      .set_window_mode = CallSetWindowMode,
       .set_window_layout = CallSetWindowLayout,
       .focus_tab = CallFocusTab,
       .focus_shell = CallFocusShell,
@@ -463,6 +480,12 @@ void Engine::ListenToWindow(int64_t id) {
         args.Double(s.controls.height());
         args.Double(s.corner_radius);
         args.Bool(s.full_screen);
+        args.Double(s.bounds.x());
+        args.Double(s.bounds.y());
+        args.Double(s.bounds.width());
+        args.Double(s.bounds.height());
+        args.Bool(s.minimised);
+        args.Bool(s.zoomed);
         hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
       },
       id));

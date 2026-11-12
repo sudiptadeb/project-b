@@ -12,6 +12,7 @@
 #include "base/time/time.h"
 #include "components/input/native_web_keyboard_event.h"
 #include "content/public/browser/web_contents.h"
+#include "project_b/engine/abi/pb_abi.h"
 #include "project_b/engine/browser/timeline.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/gfx/geometry/rect_conversions.h"
@@ -183,6 +184,8 @@
 
 @interface PBWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic) base::RepeatingClosure onStateMayHaveChanged;
+// Runs once the window has left full screen.
+@property(nonatomic) base::RepeatingClosure onLeftFullScreen;
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose
                           onKey:(base::RepeatingClosure)onKey
                     onMinimised:(base::RepeatingCallback<void(bool)>)onMinimised;
@@ -195,6 +198,7 @@
 }
 
 @synthesize onStateMayHaveChanged = _onStateMayHaveChanged;
+@synthesize onLeftFullScreen = _onLeftFullScreen;
 
 - (instancetype)initWithOnClose:(base::OnceClosure)onClose
                           onKey:(base::RepeatingClosure)onKey
@@ -215,12 +219,24 @@
   _onKey.Run();
 }
 
+- (void)windowDidMove:(NSNotification*)notification {
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
+  }
+}
+
 - (void)windowDidMiniaturize:(NSNotification*)notification {
   _onMinimised.Run(true);
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
+  }
 }
 
 - (void)windowDidDeminiaturize:(NSNotification*)notification {
   _onMinimised.Run(false);
+  if (_onStateMayHaveChanged) {
+    _onStateMayHaveChanged.Run();
+  }
 }
 
 - (void)windowDidResize:(NSNotification*)notification {
@@ -247,6 +263,7 @@
 // goes out now and once more then.
 - (void)windowDidExitFullScreen:(NSNotification*)notification {
   [notification.object toolbar].visible = YES;
+  _onLeftFullScreen.Run();
   if (_onStateMayHaveChanged) {
     _onStateMayHaveChanged.Run();
     base::RepeatingClosure again = _onStateMayHaveChanged;
@@ -271,6 +288,8 @@ struct Window::Impl {
   int theme = -1;
   double frame_width = -1;
   base::RepeatingCallback<void(const State&)> on_state;
+  // The mode SetMode asked for from full screen, which comes once it has left it, or -1.
+  int after_full_screen = -1;
   State last_state;
 
   // The close and zoom buttons bound the controls. In full screen macOS hides them.
@@ -326,10 +345,16 @@ struct Window::Impl {
         .controls = Controls(),
         .corner_radius = CornerRadius(),
         .full_screen = (window.styleMask & NSWindowStyleMaskFullScreen) != 0,
+        .bounds = gfx::ScreenRectFromNSRect(window.frame),
+        .minimised = static_cast<bool>(window.miniaturized),
+        .zoomed = static_cast<bool>(window.zoomed),
     };
     if (state.size == last_state.size && state.controls == last_state.controls &&
         state.corner_radius == last_state.corner_radius &&
-        state.full_screen == last_state.full_screen) {
+        state.full_screen == last_state.full_screen &&
+        state.bounds == last_state.bounds &&
+        state.minimised == last_state.minimised &&
+        state.zoomed == last_state.zoomed) {
       return;
     }
     last_state = state;
@@ -365,6 +390,14 @@ Window::Window(base::OnceClosure on_close,
       [[PBWindowDelegate alloc] initWithOnClose:std::move(on_close)
                                           onKey:std::move(on_key)
                                     onMinimised:std::move(on_minimised)];
+  impl_->delegate.onLeftFullScreen = base::BindRepeating(
+      [](Window* self) {
+        const int mode = std::exchange(self->impl_->after_full_screen, -1);
+        if (mode != -1) {
+          self->SetMode(mode);
+        }
+      },
+      base::Unretained(this));
   impl_->window.delegate = impl_->delegate;
 
   impl_->container = [[PBContainerView alloc]
@@ -632,6 +665,31 @@ void Window::Maximize() {
 void Window::SetFullscreen(bool fullscreen) {
   if (IsFullscreen() != fullscreen) {
     [impl_->window toggleFullScreen:nil];
+  }
+}
+
+void Window::SetMode(int mode) {
+  NSWindow* window = impl_->window;
+  if (IsFullscreen() && mode != PB_WINDOW_IN_FULL_SCREEN) {
+    impl_->after_full_screen = mode;
+    [window toggleFullScreen:nil];
+    return;
+  }
+  switch (mode) {
+    case PB_WINDOW_NORMAL:
+      Restore();
+      break;
+    case PB_WINDOW_MINIMISED:
+      [window miniaturize:nil];
+      break;
+    case PB_WINDOW_ZOOMED:
+      [window deminiaturize:nil];
+      Maximize();
+      break;
+    case PB_WINDOW_IN_FULL_SCREEN:
+      [window deminiaturize:nil];
+      SetFullscreen(true);
+      break;
   }
 }
 

@@ -17,6 +17,9 @@ import (
 //	ProjectB.moveTab {tab, window, index}
 //	                              moves a tab to a place in another window's list, or with
 //	                              window 0 into a new window of its own: {window: where it is}
+//	ProjectB.getWindows           {windows: [each window's id, bounds, state and whether it is in front]}
+//	ProjectB.setWindowBounds {window, bounds}
+//	                              puts a window's frame on screen there
 //
 // The port is only open when the app is started with --remote-debugging-port, and a
 // client of it can already drive the whole browser.
@@ -55,6 +58,18 @@ func (a *App) DevToolsCommand(method string, params []byte) (any, error) {
 		}
 		a.Tabs.Move(p.Tab, p.Window, p.Index)
 		return map[string]any{"window": p.Window}, nil
+	case "ProjectB.getWindows":
+		return map[string]any{"windows": a.Window.List()}, nil
+	case "ProjectB.setWindowBounds":
+		var p struct {
+			Window engine.WindowID `json:"window"`
+			Bounds engine.Rect     `json:"bounds"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		a.Window.SetBounds(p.Window, p.Bounds)
+		return map[string]any{}, nil
 	case "ProjectB.panic":
 		panic("ProjectB.panic, asked for over DevTools")
 	}

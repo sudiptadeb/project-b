@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"projectb/engine"
 	"projectb/mockengine"
 	"projectb/tabs"
+	"projectb/window"
 )
 
 // rig runs the real managers on the mock engine, as the dev server does.
@@ -719,7 +721,7 @@ func TestMovingATabToAnotherWindow(t *testing.T) {
 	var w engine.WindowID
 	var tab engine.TabID
 	var in []tabs.Tab
-	r.e.Post(func() { w, tab = r.a.NewWindow(); in = r.a.Tabs.AllIn(w) })
+	r.e.Post(func() { w, tab = r.a.NewWindow(""); in = r.a.Tabs.AllIn(w) })
 	r.e.Settle()
 	if w != 4 || len(in) != 1 || in[0].ID != tab {
 		t.Fatalf("NewWindow answered %v %v; its tabs %+v", w, tab, in)
@@ -743,4 +745,52 @@ func TestMoveTabToNewWindowFromTheMenu(t *testing.T) {
 		t.Fatalf("window 2: %v active %v", tabs, snap["active"])
 	}
 	r.waitFor(isTabs(1))
+}
+
+// The window manager is the one place another manager hears of windows opening, closing,
+// coming to the front and tabs moving between them, and reads each window's bounds and
+// state; bounds and state change as asked.
+func TestWindowsAsAnotherManagerSeesThem(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var events []window.Event
+	r.e.Post(func() { r.a.Window.OnEvent(func(e window.Event) { events = append(events, e) }) })
+	r.e.Settle()
+	r.openSecondWindow()
+	r.e.Fire(1, "focus", "")
+	r.e.Settle()
+	r.moveTab(1, 2, 0)
+
+	var list []window.Window
+	r.e.Post(func() { r.a.Window.SetBounds(2, engine.Rect{X: 200, Y: 100, W: 900, H: 600}) })
+	r.e.Settle()
+	// A state is set outright, and setting the one it is in asks the engine nothing.
+	r.e.Post(func() {
+		r.a.Window.SetState(2, window.StateZoomed)
+	})
+	r.e.Settle()
+	r.e.Post(func() {
+		r.a.Window.SetState(2, window.StateZoomed)
+		r.a.Window.SetState(2, window.StateMinimised)
+	})
+	r.e.Settle()
+	r.e.Post(func() { list = r.a.Window.List() })
+	r.e.Settle()
+	want := []window.Window{
+		{ID: 2, Bounds: engine.Rect{X: 200, Y: 100, W: 900, H: 600}, State: window.StateMinimised, Front: true},
+	}
+	// Window 1 closed when its only tab moved away, so window 2 is in front.
+	if !reflect.DeepEqual(list, want) || !slices.Equal(r.e.Modes(), []engine.WindowMode{engine.ModeZoomed, engine.ModeMinimised}) {
+		t.Fatalf("windows %+v, modes asked %v", list, r.e.Modes())
+	}
+	wantEvents := []window.Event{
+		{Kind: window.Opened, Window: 2}, {Kind: window.FrontChanged, Window: 2},
+		{Kind: window.BoundsChanged, Window: 2},
+		{Kind: window.FrontChanged, Window: 1}, {Kind: window.TabMoved, Window: 2, Tab: 1, From: 1, FromIndex: 0},
+		{Kind: window.Closed, Window: 1}, {Kind: window.FrontChanged, Window: 2},
+		{Kind: window.BoundsChanged, Window: 2},
+	}
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Fatalf("events %+v", events)
+	}
 }

@@ -67,7 +67,9 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
-	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()))
+	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
+	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
+	a.Tabs.OnMoved(a.Window.HandleTabMoved)
 	first := a.openWindow()
 	a.quit = func() { e.AppCommand(engine.AppQuit) }
 	a.Update = update.New(cfg.Update, e.Post, a.quit)
@@ -125,15 +127,20 @@ func (a *App) openWindow() engine.WindowID {
 	near := a.Tabs.Front()
 	a.lastWindow++
 	w := a.lastWindow
-	a.Tabs.AddWindow(w)
 	a.Window.Open(w, near)
+	a.Tabs.AddWindow(w)
 	return w
 }
 
-// NewWindow opens a window with one new tab, and returns both.
-func (a *App) NewWindow() (engine.WindowID, engine.TabID) {
+// NewWindow opens a window with one tab, and returns both: a new tab, or one loading u
+// when it isn't "".
+func (a *App) NewWindow(u string) (engine.WindowID, engine.TabID) {
 	w := a.openWindow()
-	return w, a.Tabs.CreateIn(w)
+	if u == "" {
+		return w, a.Tabs.CreateIn(w)
+	}
+	// The new window is in front, where OpenIn opens.
+	return w, a.Tabs.OpenIn(u, true)
 }
 
 // NewWindowWith opens a window holding a tab moved out of its window, with no tab of its

@@ -31,7 +31,7 @@ func (r *recorder) last() engine.WindowLayout { return r.layouts[len(r.layouts)-
 
 // one is a manager with window 1 open.
 func one(e *recorder) *Manager {
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
+	m := New(e, "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return 1 })
 	m.Open(1, 0)
 	return m
 }
@@ -221,5 +221,32 @@ func TestEachWindowHasItsOwnLayout(t *testing.T) {
 	m.SetColor("#4f9e9e")
 	if !reflect.DeepEqual(e.to[sent:], []engine.WindowID{1}) || !reflect.DeepEqual(m.Windows(), []engine.WindowID{1}) {
 		t.Fatalf("after window 2 closed the colour went to %v", e.to[sent:])
+	}
+}
+
+// Another manager reads each window's bounds, state and whether it is in front, and hears
+// windows open and close.
+func TestWhatAnotherManagerReadsAndHears(t *testing.T) {
+	front := engine.WindowID(1)
+	m := New(&recorder{}, "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return front })
+	var events []Event
+	m.OnEvent(func(e Event) { events = append(events, e) })
+	m.Open(1, 0)
+	m.Open(2, 1)
+	m.HandleWindowChanged(1, engine.WindowState{Bounds: engine.Rect{X: 80, Y: 60, W: 1280, H: 720}, Zoomed: true})
+	m.HandleWindowChanged(2, engine.WindowState{Bounds: engine.Rect{X: 109, Y: 89, W: 1280, H: 720}, Minimised: true})
+	front = 2
+	m.HandleFrontChanged(2)
+	m.HandleTabMoved(7, 1, 3, 2)
+	m.Close(1)
+	want := []Window{{ID: 2, Bounds: engine.Rect{X: 109, Y: 89, W: 1280, H: 720}, State: StateMinimised, Front: true}}
+	if got := m.List(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("windows %+v", got)
+	}
+	wantEvents := []Event{{Kind: Opened, Window: 1}, {Kind: Opened, Window: 2}, {Kind: BoundsChanged, Window: 1},
+		{Kind: BoundsChanged, Window: 2}, {Kind: FrontChanged, Window: 2},
+		{Kind: TabMoved, Window: 2, Tab: 7, From: 1, FromIndex: 3}, {Kind: Closed, Window: 1}}
+	if !reflect.DeepEqual(events, wantEvents) {
+		t.Fatalf("events %+v", events)
 	}
 }

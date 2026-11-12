@@ -140,6 +140,12 @@ type Engine interface {
 	// screen, or come to the front. What follows arrives as WindowClosed or
 	// WindowChanged.
 	RequestWindow(w WindowID, r WindowRequest)
+	// SetWindowBounds puts a window's frame on screen at r, y down from the top of the
+	// main screen. What follows arrives as WindowChanged.
+	SetWindowBounds(w WindowID, r Rect)
+	// SetWindowMode puts a window into a mode from whatever it is in now, where the
+	// requests above toggle. What follows arrives as WindowChanged.
+	SetWindowMode(w WindowID, m WindowMode)
 
 	// SetWindowLayout is everything about how a window behaves, from the window
 	// manager, whenever any of it changes: which tabs it shows, and where.
@@ -310,6 +316,9 @@ type WindowState struct {
 	Controls     Rect    // The native window buttons; empty when there are none.
 	CornerRadius float64 // 0 when the corners are square.
 	FullScreen   bool
+	Bounds       Rect // The window's frame on screen, points, y down from the top of the main screen.
+	Minimised    bool
+	Zoomed       bool
 }
 
 // WindowRequest is what the window is asked to do. The first four are what pressing that
@@ -323,4 +332,14 @@ const (
 	WindowZoom
 	WindowFullScreen
 	WindowFront
+)
+
+// WindowMode is how a window sits on screen.
+type WindowMode int
+
+const (
+	ModeNormal WindowMode = iota
+	ModeMinimised
+	ModeZoomed
+	ModeFullScreen
 )

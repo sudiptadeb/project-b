@@ -97,6 +97,9 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 				Controls:     engine.Rect{X: r.float(), Y: r.float(), W: r.float(), H: r.float()},
 				CornerRadius: r.float(),
 				FullScreen:   r.bool(),
+				Bounds:       engine.Rect{X: r.float(), Y: r.float(), W: r.float(), H: r.float()},
+				Minimised:    r.bool(),
+				Zoomed:       r.bool(),
 			})
 		}
 	case eventShellCrashed:

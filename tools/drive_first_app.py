@@ -14,6 +14,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py visible    # only the tabs a window shows
     python3 tools/drive_first_app.py windows    # only several windows
     python3 tools/drive_first_app.py move       # only moving a tab between windows
+    python3 tools/drive_first_app.py bounds     # only a window's frame, set and read
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -1183,6 +1184,23 @@ def move_checks():
     App.running.remove(app)
 
 
+def bounds_checks():
+    """Go puts a window's frame where it is asked, and reads back where it is, as the engine
+    reports it."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    app.wait("!!document.querySelector('input')", 30)
+    want = {"x": 200, "y": 150, "w": 900, "h": 600}
+    app.cmd("projectb", "setWindowBounds", json.dumps({"window": 1, "bounds": want}))
+    frame = json.loads(app.cmd("windows"))[0]["frame"]
+    check("a window's frame goes where Go asks", frame == [200, 150, 900, 600], frame)
+    deadline = time.time() + 10
+    seen = None
+    while seen != want and time.time() < deadline:
+        seen = json.loads(app.cmd("projectb", "getWindows", "{}"))["result"]["windows"][0]["bounds"]
+    check("and Go reads back where it is", seen == want, seen)
+    app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1201,5 +1219,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, cookie_checks]))

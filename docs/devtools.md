@@ -69,6 +69,8 @@ sends content's; ChromeDriver passes them through `goog:cdp`.
 | `ProjectB.isAllowedURL` `{url}` | `{allowed}`: whether policy lets a tab load it |
 | `ProjectB.getTimeline` `{since}` | `{entries, last}`: the app's timeline as kept in memory ([logging.md](logging.md)), after the entry numbered `since`, or all of it. Each entry has `seq`, `t` in nanoseconds since process start, `kind`, `src`, and `name`, `text` or `dur` |
 | `ProjectB.moveTab` `{tab, window, index}` | none: Go moves the tab to that place in the window's list, or with `window` 0 into a new window of its own ([windows.md](windows.md)) |
+| `ProjectB.getWindows` | `{windows}`: each window's `id`, `bounds` (its frame on screen, y down from the top of the main screen), `state` (`normal`, `minimised`, `zoomed` or `fullScreen`) and `front` |
+| `ProjectB.setWindowBounds` `{window, bounds}` | none: Go asks for the window's frame there |
 | `ProjectB.panic` | none: it panics inside Go's hook, as a bug would, and the app crashes (see "Crashes" in `first-app.md`) |
 
 A method Go doesn't have falls through to content, which says it wasn't found. The

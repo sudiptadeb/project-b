@@ -100,8 +100,11 @@ profile with no incognito, kiosk, guest or policy side, most answers are one lin
 
 The tab ids `//extensions` sees are the engine's own, which are Go's. Every tab is still reported
 in one window, id 1, and `chrome.windows` knows one window; what an extension asks of "the
-current window" is answered for the window in front. Real window ids are step 6 of
-[windows.md](windows.md).
+current window" is answered for the window in front. Go now offers what real windows need
+(step 6 of [windows.md](windows.md)): the windows with id, frame, state and which is in
+front, a tab's window, a new window with a URL or a moved tab, closing, focusing, frame and
+state, and events for windows opening, closing, coming to the front and tabs moving. The
+extension side still answers for one window.
 
 **What `//extensions` insisted on.** It would not start, or its installer
 would not run, without each of these, so each exists with nothing behind it:

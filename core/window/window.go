@@ -30,6 +30,9 @@ type Manager struct {
 	windows    map[engine.WindowID]*window
 	onChanged  []func(engine.WindowID, engine.Rect, float64)
 	onColor    []func(string)
+	onEvent    []func(Event)
+	// front says which window is in front, which the tabs manager keeps.
+	front func() engine.WindowID
 }
 
 // window is what the manager keeps for one window: the shell's last report, the
@@ -41,9 +44,9 @@ type window struct {
 }
 
 // New returns a manager with no windows. Every window it opens has the frame, color,
-// "#rrggbb", 4px wide, and the theme.
-func New(eng engine.Engine, color string, theme engine.Theme) *Manager {
-	return &Manager{eng: eng, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}}
+// "#rrggbb", 4px wide, and the theme. front says which window is in front.
+func New(eng engine.Engine, color string, theme engine.Theme, front func() engine.WindowID) *Manager {
+	return &Manager{eng: eng, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}, front: front}
 }
 
 // Open makes window id, a little down and right of window near, or where a first window
@@ -54,10 +57,14 @@ func (m *Manager) Open(id, near engine.WindowID) {
 	m.windows[id] = w
 	w.sent = m.layout(w)
 	m.eng.CreateWindow(id, near, w.sent)
+	m.event(Event{Kind: Opened, Window: id})
 }
 
 // Close forgets a window that closed.
-func (m *Manager) Close(id engine.WindowID) { delete(m.windows, id) }
+func (m *Manager) Close(id engine.WindowID) {
+	delete(m.windows, id)
+	m.event(Event{Kind: Closed, Window: id})
+}
 
 // Windows returns the open windows, in the order they were opened.
 func (m *Manager) Windows() []engine.WindowID {
@@ -129,6 +136,9 @@ func (m *Manager) HandleWindowChanged(id engine.WindowID, s engine.WindowState) 
 	old := w.state
 	w.state = s
 	m.update(id)
+	if s.Bounds != old.Bounds {
+		m.event(Event{Kind: BoundsChanged, Window: id})
+	}
 	if s.Controls != old.Controls || s.CornerRadius != old.CornerRadius {
 		for _, f := range m.onChanged {
 			f(id, s.Controls, s.CornerRadius)

@@ -36,7 +36,9 @@ typedef enum PBEvent {
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
   PB_EVENT_WINDOW_CHANGED = 4,          // i: window; d: w, d: h, the content area; d: x,
                                         // d: y, d: w, d: h, the window buttons; d: corner
-                                        // radius; i: full screen
+                                        // radius; i: full screen; d: x, d: y, d: w, d: h,
+                                        // its frame on screen, y down from the top of the
+                                        // main screen; i: minimised; i: zoomed
   PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
   PB_EVENT_SHELL_CRASHED = 6,           // i: window; its shell page's renderer died
   PB_EVENT_SETTINGS_MESSAGE = 7,        // i: window, s: json, from its settings page
@@ -125,6 +127,14 @@ typedef enum PBWindowRequest {
   PB_WINDOW_FRONT = 5,  // brings the window to the front and makes the app active
 } PBWindowRequest;
 
+// How a window sits on screen. Matches engine.WindowMode.
+typedef enum PBWindowMode {
+  PB_WINDOW_NORMAL = 0,
+  PB_WINDOW_MINIMISED = 1,
+  PB_WINDOW_ZOOMED = 2,
+  PB_WINDOW_IN_FULL_SCREEN = 3,
+} PBWindowMode;
+
 // What an entry on the timeline is. Matches timelineKinds in core/cmd/lib/main.go.
 typedef enum PBTimelineKind {
   PB_TIMELINE_MARK = 0,   // a moment
@@ -165,6 +175,10 @@ typedef struct PBEngineCalls {
                         const PBVisibleTab* tabs,
                         size_t tab_count);
   void (*request_window)(int64_t window, int32_t request);  // PBWindowRequest
+  // Puts the window's frame on screen there, y down from the top of the main screen.
+  void (*set_window_bounds)(int64_t window, double x, double y, double w, double h);
+  // Puts the window into a PBWindowMode from whatever it is in now.
+  void (*set_window_mode)(int64_t window, int32_t mode);
   // regions are in order: the first that holds a point decides. None holds it: the page
   // there. tabs are the tabs the window shows; every other tab is hidden.
   void (*set_window_layout)(int64_t window,

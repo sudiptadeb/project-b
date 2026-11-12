@@ -24,6 +24,17 @@ behind it is `project-b-research/windows-survey.md`.
   window it came from; keys go to the window in front.
 - Extensions see one window, id 1, and "the current window" is the window in front;
   DevTools' `newWindow` opens a tab.
+- The engine reports each window's frame on screen and whether it is minimised, zoomed or
+  in full screen with the rest of its state (`WindowChanged`), and puts a window's frame
+  where Go asks (`SetWindowBounds`), and puts it into normal, minimised, zoomed or full
+  screen from whatever it is in now (`SetWindowMode`; the window requests still toggle,
+  for the menu and the buttons). Go's window manager is where another manager reads the
+  windows, each with its id, frame, state and whether it is in front (`window.Manager.List`,
+  `Get`), sets a frame or a state (`SetBounds`, `SetState`), and hears windows open and
+  close, the window in front change, tabs move between windows, and a frame change
+  (`OnEvent`). `App.NewWindow` takes the first tab's URL and returns the new window and
+  its tab; `App.NewWindowWith` returns the window the tab is in. A minimised window's tabs are
+  told they are hidden.
 - Go moves a tab to a place in another window's list, or into a new window made for it,
   which then holds only that tab (`tabs.Manager.Move`, `App.NewWindowWith`). The tab keeps
   its id and its page goes on running: the engine moves its view when the other window's

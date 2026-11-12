@@ -72,6 +72,7 @@ type Engine struct {
 	windows    map[engine.WindowID]*window
 	feeds      map[engine.WindowID]*Feeds
 	requests   []engine.WindowRequest
+	modes      []engine.WindowMode
 	closed     []engine.WindowID
 	quit       bool
 	shownColor string
@@ -86,13 +87,15 @@ type Engine struct {
 type window struct {
 	layout engine.WindowLayout
 	// visible are the tabs the layout shows; the mock page shows the first, shown.
-	visible  []engine.TabID
-	shown    engine.TabID
-	hidden   []engine.TabID // Tabs told they are hidden by the last layout.
-	full     bool           // Full screen, so there are no window controls.
-	w, h     float64        // The window's content size.
-	settings bool
-	reported engine.WindowState // The last one reported.
+	visible           []engine.TabID
+	shown             engine.TabID
+	hidden            []engine.TabID // Tabs told they are hidden by the last layout.
+	full              bool           // Full screen, so there are no window controls.
+	w, h              float64        // The window's content size.
+	bounds            engine.Rect    // Its frame on screen.
+	minimised, zoomed bool
+	settings          bool
+	reported          engine.WindowState // The last one reported.
 }
 
 // Feeds are what one window's dev window hears.
@@ -143,7 +146,7 @@ func (e *Engine) reportWindow(w engine.WindowID) {
 	if win == nil {
 		return
 	}
-	s := engine.WindowState{W: win.w, H: win.h, FullScreen: win.full}
+	s := engine.WindowState{W: win.w, H: win.h, FullScreen: win.full, Bounds: win.bounds, Minimised: win.minimised, Zoomed: win.zoomed}
 	if !win.full {
 		s.Controls = Controls
 		s.CornerRadius = CornerRadius
@@ -183,7 +186,8 @@ func (e *Engine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
 	if len(e.windows) == 0 && e.shownColor == "" {
 		e.shownColor = l.FrameColor
 	}
-	e.windows[w] = &window{layout: l, w: Width, h: Height}
+	// Every mock window starts where the real first one does.
+	e.windows[w] = &window{layout: l, w: Width, h: Height, bounds: engine.Rect{X: 80, Y: 60, W: Width, H: Height}}
 	e.mu.Unlock()
 	if e.listener != nil {
 		e.Post(func() { e.reportWindow(w) })
@@ -226,9 +230,8 @@ func (e *Engine) Reload(id engine.TabID) {
 	}
 }
 
-// RequestWindow closes a window, which it then says closed, goes in or out of full
-// screen, and records every request. A mock window has nothing to minimise, zoom or
-// bring to the front.
+// RequestWindow does what the real window does with each request, as far as what it
+// reports goes, and records every request. Closing says the window closed.
 func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	e.mu.Lock()
 	e.requests = append(e.requests, r)
@@ -247,7 +250,32 @@ func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	case engine.WindowFullScreen:
 		e.windows[w].full = !e.windows[w].full
 		e.reportWindow(w)
+	case engine.WindowMinimise:
+		e.windows[w].minimised = true
+		e.reportWindow(w)
+	case engine.WindowZoom:
+		e.windows[w].zoomed = !e.windows[w].zoomed
+		e.reportWindow(w)
+	case engine.WindowFront:
+		e.windows[w].minimised = false
+		e.reportWindow(w)
 	}
+}
+
+// SetWindowMode puts the window into a mode, as the real one does, and reports it.
+func (e *Engine) SetWindowMode(w engine.WindowID, m engine.WindowMode) {
+	e.mu.Lock()
+	e.modes = append(e.modes, m)
+	e.mu.Unlock()
+	win := e.windows[w]
+	win.full, win.minimised, win.zoomed = m == engine.ModeFullScreen, m == engine.ModeMinimised, m == engine.ModeZoomed
+	e.reportWindow(w)
+}
+
+// SetWindowBounds moves and sizes the window, as the real one does, and reports it.
+func (e *Engine) SetWindowBounds(w engine.WindowID, r engine.Rect) {
+	e.windows[w].bounds = r
+	e.reportWindow(w)
 }
 
 // The real window puts each visible tab's view where the layout says, and tells a tab
@@ -329,6 +357,13 @@ func (e *Engine) Requests() []engine.WindowRequest {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return append([]engine.WindowRequest(nil), e.requests...)
+}
+
+// Modes are the modes the app asked windows into, in order.
+func (e *Engine) Modes() []engine.WindowMode {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]engine.WindowMode(nil), e.modes...)
 }
 
 // ShownColor is the colour the first window painted when it went on screen.

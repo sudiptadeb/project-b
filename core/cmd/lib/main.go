@@ -12,6 +12,8 @@ package main
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, layout, regions, count, tabs, tab_count); }
+static inline void call_set_window_bounds(const PBEngineCalls* c, int64_t window, double x, double y, double w, double h) { c->set_window_bounds(window, x, y, w, h); }
+static inline void call_set_window_mode(const PBEngineCalls* c, int64_t window, int32_t mode) { c->set_window_mode(window, mode); }
 static inline void call_request_window(const PBEngineCalls* c, int64_t window, int32_t request) { c->request_window(window, request); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
@@ -138,6 +140,14 @@ func (e *nativeEngine) SetMenu(m engine.Menu) {
 }
 
 func (e *nativeEngine) AppCommand(c engine.AppCommand) { C.call_app_command(e.calls, C.int32_t(c)) }
+
+func (e *nativeEngine) SetWindowBounds(w engine.WindowID, r engine.Rect) {
+	C.call_set_window_bounds(e.calls, C.int64_t(w), C.double(r.X), C.double(r.Y), C.double(r.W), C.double(r.H))
+}
+
+func (e *nativeEngine) SetWindowMode(w engine.WindowID, m engine.WindowMode) {
+	C.call_set_window_mode(e.calls, C.int64_t(w), C.int32_t(m))
+}
 
 func (e *nativeEngine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
 	e.withLayout(l, func(layout *C.PBWindowLayout, regions *C.PBRegion, count C.size_t, tabs *C.PBVisibleTab, tabCount C.size_t) {

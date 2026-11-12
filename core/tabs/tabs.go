@@ -59,6 +59,8 @@ type Manager struct {
 	onTitle    []func(Tab)
 	onList     []func()
 	onEmpty    []func(engine.WindowID)
+	onFront    []func(engine.WindowID)
+	onMoved    []func(tab engine.TabID, from engine.WindowID, fromIndex int, to engine.WindowID)
 }
 
 // window is one window's tabs: their order, the active one, and recent use.
@@ -95,10 +97,33 @@ func (m *Manager) OnListChanged(f func()) { m.onList = append(m.onList, f) }
 // OnEmpty subscribes to a window's last tab closing.
 func (m *Manager) OnEmpty(f func(engine.WindowID)) { m.onEmpty = append(m.onEmpty, f) }
 
+// OnFrontChanged subscribes to another window coming to the front.
+func (m *Manager) OnFrontChanged(f func(engine.WindowID)) { m.onFront = append(m.onFront, f) }
+
+// OnMoved subscribes to a tab moving from its place in one window to another window.
+func (m *Manager) OnMoved(f func(tab engine.TabID, from engine.WindowID, fromIndex int, to engine.WindowID)) {
+	m.onMoved = append(m.onMoved, f)
+}
+
 // AddWindow adds a window with no tabs. It is the window in front.
 func (m *Manager) AddWindow(w engine.WindowID) {
 	m.windows[w] = &window{}
-	m.used = slices.Insert(m.used, 0, w)
+	m.toFront(w)
+}
+
+// toFront puts a window first in the order of use, and says so when it wasn't.
+func (m *Manager) toFront(w engine.WindowID) {
+	was := m.Front()
+	m.used = slices.Insert(slices.DeleteFunc(m.used, func(u engine.WindowID) bool { return u == w }), 0, w)
+	m.frontMaybeChanged(was)
+}
+
+func (m *Manager) frontMaybeChanged(was engine.WindowID) {
+	if now := m.Front(); now != was && now != 0 {
+		for _, f := range m.onFront {
+			f(now)
+		}
+	}
 }
 
 // RemoveWindow closes a window's tabs and forgets it. The window used before it is in
@@ -110,14 +135,16 @@ func (m *Manager) RemoveWindow(w engine.WindowID) {
 		m.eng.CloseTab(id)
 	}
 	delete(m.windows, w)
+	was := m.Front()
 	m.used = slices.DeleteFunc(m.used, func(u engine.WindowID) bool { return u == w })
 	m.listChanged()
+	m.frontMaybeChanged(was)
 }
 
 // Focus says a window came to the front.
 func (m *Manager) Focus(w engine.WindowID) {
-	if i := slices.Index(m.used, w); i > 0 {
-		m.used = slices.Insert(slices.Delete(m.used, i, i+1), 0, w)
+	if m.windows[w] != nil {
+		m.toFront(w)
 	}
 }
 
@@ -285,6 +312,9 @@ func (m *Manager) Move(id engine.TabID, w engine.WindowID, index int) {
 	win.recent = append(win.recent, id)
 	win.active = id
 	win.touch(id)
+	for _, f := range m.onMoved {
+		f(id, from, i, w)
+	}
 	m.left(from, id, i)
 }
 

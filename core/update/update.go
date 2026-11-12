@@ -140,7 +140,7 @@ func (m *Manager) Start() {
 	os.RemoveAll(m.stageDir())
 	os.RemoveAll(m.downloadDir())
 	m.started = true
-	timeline.Infof("update: %s %s, %s", m.cfg.Project, m.cfg.Version, m.cfg.Releases)
+	timeline.Infof("update: %s %s", m.cfg.Project, m.cfg.Version)
 	if m.auto {
 		m.startTimer()
 	}

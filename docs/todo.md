@@ -65,6 +65,17 @@ Take an item off when it lands or is dropped.
   keymap; and trying Bitwarden, Okta, 1Password (needs `nativeMessaging`) and Grammarly
   (needs `identity`) past their install.
 - A comparison of JS frameworks for the shell, and the final language decision.
+- **The mock as a small desktop.** A desktop with one Project B icon that launches the app;
+  the mock OS moves the window from the drag regions Go reports, resizes it from its edges
+  and corners (each size a WindowChanged, so live resize is testable without a VM), and
+  its close, minimise, zoom and full screen buttons send the window requests the real
+  window does.
+- **The mock as close to the real engine as it can be.** The mock stands in only for
+  Chromium and the native window; the Go app and the pages run unchanged. Known gaps: keys
+  come from the mock page's buttons, not through the window's browser-or-page-first
+  routing; focus requests are ignored; the mock page is buttons, not a site, and runs no
+  extension pages. Contract tests, the same scenarios run against the mock and the real
+  engine, are how a gap gets found and closed.
 
 ## Small fixes
 

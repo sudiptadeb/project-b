@@ -207,6 +207,9 @@
           "action": "tab.duplicate"
         },
         {
+          "action": "tab.moveToNewWindow"
+        },
+        {
           "separator": true
         },
         {

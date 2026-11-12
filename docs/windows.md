@@ -29,8 +29,8 @@ behind it is `project-b-research/windows-survey.md`.
   its id and its page goes on running: the engine moves its view when the other window's
   layout lists it, and tells it nothing hidden. The window it arrives in makes it active;
   the one it left goes on as if it had closed there, and closes if it was its last tab.
-  Both shells hear it in their tab lists. Nothing in the app asks for a move yet; the
-  driver and DevTools do, through `ProjectB.moveTab`.
+  Both shells hear it in their tab lists. Tab, Move Tab to New Window moves the active tab
+  of the window in front; the driver and DevTools ask through `ProjectB.moveTab`.
 
 ## What changes
 

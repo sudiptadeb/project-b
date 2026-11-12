@@ -357,7 +357,7 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
 - **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
 - **Tab**: Select Next Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*; Select
   Previous Tab, the mirror keys*; Select Recent Tab, Ctrl+Tab*; Select Recent Tab
-  Backward, Ctrl+Shift+Tab*; Duplicate Tab; Select Tab (hidden): Tab 1 to 8,
+  Backward, Ctrl+Shift+Tab*; Duplicate Tab; Move Tab to New Window; Select Tab (hidden): Tab 1 to 8,
   Cmd+1 to 8, and Last Tab, Cmd+9.
 - **Window** (locked): Minimize, Cmd+M; Zoom; Bring All to Front; macOS adds the window
   list.

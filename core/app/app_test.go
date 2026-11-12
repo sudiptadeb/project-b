@@ -725,3 +725,22 @@ func TestMovingATabToAnotherWindow(t *testing.T) {
 		t.Fatalf("NewWindow answered %v %v; its tabs %+v", w, tab, in)
 	}
 }
+
+// Tab, Move Tab to New Window moves the active tab of the window in front into a window
+// of its own.
+func TestMoveTabToNewWindowFromTheMenu(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"newTab"}`)
+	r.waitFor(isTabs(2))
+	second, stop := r.e.Feeds(2).Shell.Subscribe()
+	t.Cleanup(stop)
+	r.e.Post(func() { r.a.MenuChosen("tab.moveToNewWindow") })
+	r.e.Settle()
+	r.e.Post(func() { r.a.ShellMessage(2, []byte(`{"t":"ready"}`)) })
+	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if tabs := snap["tabs"].([]any); len(tabs) != 1 || snap["active"] != float64(2) {
+		t.Fatalf("window 2: %v active %v", tabs, snap["active"])
+	}
+	r.waitFor(isTabs(1))
+}

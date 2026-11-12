@@ -99,6 +99,7 @@ func (a *App) registerActions(e engine.Engine) {
 	add("tab.recentNext", "Select Recent Tab", func() { a.Tabs.CycleRecent(false) }).Release = a.Tabs.EndCycle
 	add("tab.recentPrevious", "Select Recent Tab Backward", func() { a.Tabs.CycleRecent(true) }).Release = a.Tabs.EndCycle
 	add("tab.duplicate", "Duplicate Tab", a.Tabs.Duplicate).Enabled = active
+	add("tab.moveToNewWindow", "Move Tab to New Window", func() { a.NewWindowWith(a.Tabs.ActiveID()) }).Enabled = active
 	for i := range 8 {
 		add(fmt.Sprintf("tab.select%d", i+1), fmt.Sprintf("Tab %d", i+1), func() { a.Tabs.ActivateAt(i) })
 	}

@@ -5,6 +5,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/thread_pool.h"
 #include "extensions/common/extension.h"
@@ -15,6 +16,8 @@ namespace project_b {
 
 namespace {
 
+constexpr char kPNG[] = "data:image/png;base64,";
+
 // Finding the file touches the disk, as reading it does, so this runs off the main
 // thread.
 std::string ReadAsDataURL(const extensions::ExtensionResource& resource) {
@@ -22,15 +25,22 @@ std::string ReadAsDataURL(const extensions::ExtensionResource& resource) {
   if (!base::ReadFileToString(resource.GetFilePath(), &bytes)) {
     return std::string();
   }
-  return base::StrCat({"data:image/png;base64,", base::Base64Encode(bytes)});
+  return base::StrCat({kPNG, base::Base64Encode(bytes)});
 }
 
 }  // namespace
 
 // details.path is one path or a table of them by size; the biggest is read.
+// details.icon is a picture the extension drew.
 ExtensionFunction::ResponseAction ActionSetIconFunction::Run() {
   const base::DictValue* details =
       args().empty() ? nullptr : args()[0].GetIfDict();
+  // A picture the extension drew comes as a PNG already (renderer/action_hooks.cc).
+  if (const std::string* icon = details ? details->FindString("icon") : nullptr) {
+    return RespondNow(base::StartsWith(*icon, kPNG)
+                          ? Ask(args())
+                          : Error("The icon is not a PNG."));
+  }
   std::string path;
   if (details) {
     if (const std::string* one = details->FindString("path")) {

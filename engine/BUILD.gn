@@ -66,6 +66,8 @@ source_set("common") {
     sources += [
       "extensions/common/extensions_client.cc",
       "extensions/common/extensions_client.h",
+      "extensions/renderer/action_hooks.cc",
+      "extensions/renderer/action_hooks.h",
       "extensions/renderer/api_provider.cc",
       "extensions/renderer/api_provider.h",
       "extensions/renderer/content_renderer_client.cc",
@@ -88,6 +90,7 @@ source_set("common") {
       "//extensions/renderer",
       "//mojo/public/cpp/bindings",
       "//third_party/blink/public:blink",
+      "//ui/gfx/codec",
     ]
   }
 }

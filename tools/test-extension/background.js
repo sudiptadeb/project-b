@@ -21,6 +21,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     return true;
   }
   if (message.type === 'state') {
+    // A popup opened: the icon becomes one drawn here, a green square.
+    const canvas = new OffscreenCanvas(16, 16);
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#0a0';
+    context.fillRect(0, 0, 16, 16);
+    chrome.action.setIcon({ imageData: context.getImageData(0, 0, 16, 16) });
     Promise.all([count(), chrome.tabs.query({})]).then(([pages, tabs]) => {
       respond({ pages, tabs: tabs.map((t) => ({ id: t.id, url: t.url, active: t.active })) });
     });

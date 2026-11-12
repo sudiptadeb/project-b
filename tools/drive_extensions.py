@@ -243,6 +243,8 @@ def extension_checks():
     check("the button shows the badge its service worker set", int(app.js("document.querySelector('.pbx-action .pbx-badge').textContent")) >= 1)
 
     # The popup: a view of its own under the button, running the extension's page.
+    icon = "document.querySelector('.pbx-action img')?.src"
+    first_icon = app.js(icon)
     x, y, w, h = open_popup(app)
     bx, by, bw, bh = app.js("(()=>{const r=document.querySelector('.pbx-action').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()")
     check("the popup opens under its button", w >= 240 and h > 25 and abs((x + w) - (bx + bw)) <= 1 and y >= by + bh, (x, y, w, h, bx, by, bw, bh))
@@ -253,6 +255,8 @@ def extension_checks():
         time.sleep(0.1)
     tabs = json.loads(app.cmd("evalpopup", "[...document.querySelectorAll('li')].map(e=>e.textContent)"))
     check("the popup's page reads storage and chrome.tabs.query", int(pages) >= 1 and any(PAGE in t for t in tabs), (pages, tabs))
+    app.wait(f"{icon}!=={json.dumps(first_icon)}&&{icon}.startsWith('data:image/png')", 20)
+    check("the icon it draws on a canvas becomes its button's, by action.setIcon with imageData", True)
     check("the shell marks the button whose popup is open", app.js("!!document.querySelector('.pbx-action.pbx-open')"))
 
     # A second press on the button closes the popup, and it stays closed.

@@ -136,12 +136,13 @@ What Go answers today:
 |---|---|
 | `tabs` | `get`, `getCurrent`, `query` (not by `url` or `title`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove` |
 | `windows` | `get`, `getCurrent`, `getLastFocused`, `getAll`, `create` (its pages open as tabs), `update` (answers, changes nothing) |
-| `action` | `setTitle`, `getTitle`, `setBadgeText`, `getBadgeText`, `setBadgeBackgroundColor`, `getBadgeBackgroundColor`, `setBadgeTextColor`, `getBadgeTextColor`, `setPopup`, `getPopup`, `setIcon` (by path), `enable`, `disable`, `isEnabled`, `getUserSettings` |
+| `action` | `setTitle`, `getTitle`, `setBadgeText`, `getBadgeText`, `setBadgeBackgroundColor`, `getBadgeBackgroundColor`, `setBadgeTextColor`, `getBadgeTextColor`, `setPopup`, `getPopup`, `setIcon` (by `path` or `imageData`), `enable`, `disable`, `isEnabled`, `getUserSettings` |
 | `commands` | `getAll` |
 
 Two things cross differently, because only C++ can do them. `action.setIcon` names a file inside
 the extension, so the engine reads it and gives Go the picture as a data: URL (an engine
-function, below). And the tab a
+function, below); or it passes a picture drawn on a canvas, which only the renderer can read,
+so `engine/extensions/renderer/action_hooks.cc` makes it a PNG there. And the tab a
 message's sender is in (`sender.tab`) is asked of Go by the engine itself, as `tabs.get` with no
 extension.
 
@@ -313,7 +314,8 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   section's switch and Relaunch turn it on. Started with the mock store as
   its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
   sees the content script run and an ad host blocked, pins and unpins, opens the popup and
-  clicks in it, has its service worker message the tab, restarts, turns one off and removes it.
+  clicks in it, has its service worker message the tab, restarts, turns one off and removes it. The popup's opening has the worker draw
+  its icon on a canvas, and the button shows it.
   Fonts Ninja, installed the same way, opens its panel on the page when its button is pressed. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
@@ -371,7 +373,6 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 ## Open for the owner
 
-- **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`.
 - **Extension commands have no keys.** `commands.getAll` lists them without shortcuts, and
   nothing fires `commands.onCommand`. They belong in the keymap, with the menus work.
 - **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom, `captureVisibleTab`,

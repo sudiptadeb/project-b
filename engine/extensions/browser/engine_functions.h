@@ -11,7 +11,8 @@ namespace project_b {
 // listed in go_function.cc's kEngineFunctions.
 
 // action.setIcon: an icon named by a file inside the extension is read here, and Go
-// gets the picture as a data: URL under "icon".
+// gets the picture as a data: URL under "icon". One the extension drew comes from the
+// renderer as that already.
 class ActionSetIconFunction : public GoFunction {
  private:
   ~ActionSetIconFunction() override = default;

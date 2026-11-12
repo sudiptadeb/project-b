@@ -312,6 +312,18 @@ func TestTabsAPI(t *testing.T) {
 	if len(all) != 1 || engine.TabID(all[0]["id"].(float64)) != first {
 		t.Fatalf("the active tab: %v", all)
 	}
+	for query, want := range map[string]int{
+		`[{"url":"*://*.example.org/*"}]`:                   1,
+		`[{"url":["https://example.com/*","*://*.org/*"]}]`: 2,
+		`[{"url":"http://*/*"}]`:                            0,
+		`[{"title":"*"}]`:                                   2,
+		`[{"title":"no such title"}]`:                       0,
+	} {
+		json.Unmarshal(r.call("tabs.query", query, 0).Result, &all)
+		if len(all) != want {
+			t.Fatalf("tabs.query %s: %v", query, all)
+		}
+	}
 
 	// A page inside the extension is named by its path.
 	json.Unmarshal(r.call("tabs.create", `[{"url":"popup.html"}]`, 0).Result, &made)

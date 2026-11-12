@@ -134,7 +134,7 @@ What Go answers today:
 
 | API | Functions |
 |---|---|
-| `tabs` | `get`, `getCurrent`, `query` (not by `url` or `title`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove`, `captureVisibleTab` |
+| `tabs` | `get`, `getCurrent`, `query` (`url` by match pattern, `title` by `*` and `?`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove`, `captureVisibleTab` |
 | `windows` | `get`, `getCurrent`, `getLastFocused`, `getAll`, `create` (its pages open as tabs), `update` (answers, changes nothing) |
 | `action` | `setTitle`, `getTitle`, `setBadgeText`, `getBadgeText`, `setBadgeBackgroundColor`, `getBadgeBackgroundColor`, `setBadgeTextColor`, `getBadgeTextColor`, `setPopup`, `getPopup`, `setIcon` (by `path` or `imageData`), `enable`, `disable`, `isEnabled`, `getUserSettings` |
 | `commands` | `getAll` |
@@ -310,7 +310,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 41 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
-- `tools/test.sh app`: `tools/drive_extensions.py`, 46 checks on the real app
+- `tools/test.sh app`: `tools/drive_extensions.py`, 53 checks on the real app
   (`PB_BIN`, or `chromium/src/out/pb/project_b`), in profiles with the Extensions flag on, and
   one with it off, where no button shows, the store's page has no store API, and the Flags
   section's switch and Relaunch turn it on. Started with the mock store as
@@ -323,6 +323,9 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
   Its first wait, 30 s for the store's tab, has run out once with the store answering; the
   rerun passed. Rerun once before taking that as a failure.
+  `tools/drive_extensions.py fonts_ninja` runs one part. A real extension's known limit is
+  written with `limit()`: reported on a `known` line until it works, and then a failure, so
+  it becomes a check.
 - `WITHOUT=extensions tools/test.sh app` runs `tools/check_no_extensions.py`: the library
   has no symbol of namespace `extensions`, and the main binary none of Go's extension packages.
 
@@ -377,8 +380,7 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 - **Extension commands have no keys.** `commands.getAll` lists them without shortcuts, and
   nothing fires `commands.onCommand`. They belong in the keymap, with the menus work.
-- **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom,
-  groups** and the other functions not in the table above answer "not available".
+- **`action.openPopup`, `tabs.move`, zoom, groups** and the other functions not in the table above answer "not available".
 - **Updates.** The store answers `/update`, and the installer accepts a newer package, but
   nothing checks on a timer. Chromium's own updater stays off: it would follow each manifest's
   `update_url` to Google.

@@ -120,10 +120,17 @@ func init() {
 		}
 		c.arg(0, &q)
 		e := a.caller(c)
-		// Patterns over addresses and titles need matching rules this package doesn't
-		// have yet, so such a query is refused rather than answered wrongly.
-		if q.URL != nil || q.Title != nil {
-			return nil, fmt.Errorf("tabs.query by url or title is not available in Project B")
+		// url is one match pattern or a list of them.
+		var urls []string
+		switch v := q.URL.(type) {
+		case string:
+			urls = []string{v}
+		case []any:
+			for _, p := range v {
+				if p, ok := p.(string); ok {
+					urls = append(urls, p)
+				}
+			}
 		}
 		out := []tab{}
 		for i, t := range a.tabs.All() {
@@ -136,6 +143,12 @@ func init() {
 				q.Status != nil && *q.Status != status(t) ||
 				q.WindowID != nil && *q.WindowID != windowID && *q.WindowID != currentWindow ||
 				q.Index != nil && *q.Index != i {
+				continue
+			}
+			// An extension that can't see a tab's address and title can't find it by them.
+			if (q.URL != nil || q.Title != nil) && !seesTabs(e) ||
+				q.URL != nil && !slices.ContainsFunc(urls, func(p string) bool { return matchURL(p, t.URL) }) ||
+				q.Title != nil && !matchTitle(*q.Title, t.Title) {
 				continue
 			}
 			out = append(out, a.tabFor(e, t))

@@ -140,8 +140,9 @@ func (e *Engine) DispatchExtensionEvent(id, event, args string) {
 
 func (e *Engine) OpenExtensionPopup(id, url string, anchor engine.Rect) {
 	e.extensions.mu.Lock()
-	defer e.extensions.mu.Unlock()
 	e.extensions.popup = &Popup{id, url, anchor}
+	e.extensions.mu.Unlock()
+	e.Window.Publish(e.WindowState())
 }
 
 func (e *Engine) CloseExtensionPopup() {
@@ -150,8 +151,20 @@ func (e *Engine) CloseExtensionPopup() {
 	e.extensions.popup = nil
 	e.extensions.mu.Unlock()
 	if open {
+		e.Window.Publish(e.WindowState())
 		e.extensions.listener.ExtensionPopupClosed()
 	}
+}
+
+// openPopup is the extension popup the app has open, or nil. Any goroutine.
+func (e *Engine) openPopup() any {
+	e.extensions.mu.Lock()
+	defer e.extensions.mu.Unlock()
+	if e.extensions.popup == nil {
+		return nil
+	}
+	p := *e.extensions.popup
+	return p
 }
 
 // ChoosePath answers with what the test said the user would pick.

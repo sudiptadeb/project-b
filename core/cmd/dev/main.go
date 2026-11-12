@@ -119,6 +119,10 @@ func main() {
 		w.Write(b)
 	})
 	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Page) })
+	// What the dev window draws over the shell: the state now, then each change.
+	mux.HandleFunc("GET /mock/window/events", func(w http.ResponseWriter, r *http.Request) {
+		stream(w, r, &e.Window, e.WindowState)
+	})
 	mux.HandleFunc("POST /mock/fire", func(w http.ResponseWriter, r *http.Request) {
 		e.Fire(r.FormValue("kind"), r.FormValue("value"))
 	})
@@ -149,8 +153,9 @@ func main() {
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
-// stream sends a feed to the browser as server-sent events.
-func stream(w http.ResponseWriter, r *http.Request, f *mockengine.Feed) {
+// stream sends a feed to the browser as server-sent events, after now's message if it is
+// given: it is read once subscribed, so no change falls between it and the feed.
+func stream(w http.ResponseWriter, r *http.Request, f *mockengine.Feed, now ...func() []byte) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "no streaming", http.StatusInternalServerError)
@@ -161,6 +166,9 @@ func stream(w http.ResponseWriter, r *http.Request, f *mockengine.Feed) {
 	msgs, stop := f.Subscribe()
 	defer stop()
 	fmt.Fprint(w, ": connected\n\n")
+	for _, msg := range now {
+		fmt.Fprintf(w, "data: %s\n\n", msg())
+	}
 	flusher.Flush()
 	for {
 		select {

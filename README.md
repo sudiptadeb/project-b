@@ -42,7 +42,11 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
 
     (cd shell && npm run build)
     (cd core && go run ./cmd/dev -shell ../shell/dist)    # then open http://127.0.0.1:8765
-                                                          # settings: http://127.0.0.1:8765/settings/
+
+What the real window draws over the shell, the mock draws in the browser: the gear opens the
+settings page over the shell, and an extension's button its popup, a card naming the page
+(`shell/src/apps/shell/mockwindow.js`). The settings page also opens alone at
+http://127.0.0.1:8765/settings/.
 
 ## Test it
 

@@ -307,7 +307,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
 
 - `tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
   tests: the prompt in both pages, a package, load unpacked, pins, the popup, and the `tabs` and
-  `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 41 checks: the same
+  `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 42 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
 - `tools/test.sh app`: `tools/drive_extensions.py`, 53 checks on the real app

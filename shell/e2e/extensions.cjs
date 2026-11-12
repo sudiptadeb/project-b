@@ -103,8 +103,9 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   await shell.goto(base + '/');
   await shell.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
 
-  // The mock has no window to put the settings page over, so the test opens /settings
-  // itself once Go has asked for it.
+  // The dev window draws the settings page over the shell once Go asks for it, as the real
+  // window does (mockwindow.js). The test drives a page of its own at /settings, which talks
+  // to Go the same way, and stays usable once Go has closed the one over the shell.
   const open = async () => {
     const p = await browser.newPage({ viewport: { width: 1100, height: 800 } });
     watch(p);
@@ -169,6 +170,10 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   await rows.nth(1).getByRole('button', { name: `Remove ${name}` }).click();
   check('Remove takes the unpacked one away', await until(async () => (await rows.count()) === 1));
 
+  // The settings page covers the toolbar, as in the real window, so it closes before the
+  // toolbar's checks; the test's own copy of it still turns the extension off and on.
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await until(async () => (await regions()).settingsOpen === false);
   const enabled = rows.first().getByRole('switch');
   await enabled.click();
   check('the switch turns it off', await until(async () => !(await enabled.isChecked())));
@@ -205,9 +210,12 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
     return p && p.extension === id && same(p.anchor, anchor);
   }), JSON.stringify((await runtime()).popup) + ' vs ' + JSON.stringify(anchor));
   check('and it looks pressed while the popup is open', await until(async () => (await button.getAttribute('class')).includes('pbx-open')));
+  const card = shell.locator('.mock-popup');
+  check('the dev window draws the popup under the button', await until(async () => (await card.isVisible()) && (await rectOf(card)).y >= anchor.y + anchor.h), JSON.stringify(await card.count() && await rectOf(card)));
   await shell.screenshot({ path: path.join(out, 'extensions-toolbar.png') });
-  await fire('closePopup', '', '');
-  check('closing the popup lets the button go', await until(async () => !(await button.getAttribute('class')).includes('pbx-open') && (await runtime()).popup === null));
+  // A click outside the popup closes it, as in the real window.
+  await shell.mouse.click(20, 650);
+  check('a click outside the popup closes it and lets the button go', await until(async () => !(await button.getAttribute('class')).includes('pbx-open') && (await runtime()).popup === null));
 
   // An unpinned extension's popup opens under the puzzle piece.
   await puzzle.click();
@@ -238,13 +246,15 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   const nav = (label) => page.getByRole('navigation').getByRole('button', { name: label });
   check('at its Extensions section', (await nav('Extensions').getAttribute('aria-current')) === 'page' && await page.getByRole('region', { name: 'Installed' }).isVisible());
   await nav('General').click();
-  await puzzle.click();
-  await menu.getByRole('button', { name: 'Manage extensions' }).click();
+  // With the settings page over the toolbar, a person can't reach the menu; the test
+  // presses its buttons without the mouse.
+  await puzzle.dispatchEvent('click');
+  await menu.getByRole('button', { name: 'Manage extensions' }).dispatchEvent('click');
   check('and goes back there when it is already open', await until(async () => (await nav('Extensions').getAttribute('aria-current')) === 'page'));
 
   await page.getByRole('region', { name: 'Installed' }).getByRole('button', { name: `Remove ${name}` }).click();
   check('Remove takes it away', await until(async () => await page.getByRole('region', { name: 'Installed' }).getByText('No extensions installed').isVisible()));
-  await puzzle.click();
+  await puzzle.dispatchEvent('click');
   check('and from the menu', await until(async () => (await menu.textContent()).includes('No extensions installed')));
 
   // With the flag off, the build's extensions don't start. The server's restart cuts the

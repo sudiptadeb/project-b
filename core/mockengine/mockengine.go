@@ -82,6 +82,10 @@ type Engine struct {
 
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
+
+	// What the dev window draws over the shell, where the real window has views of its
+	// own: the settings page and an extension's popup. Each message is WindowState's.
+	Window Feed
 }
 
 // New returns an engine. Call Run to start its main thread.
@@ -259,12 +263,13 @@ func (e *Engine) Edits() []engine.EditCommand {
 	return append([]engine.EditCommand(nil), e.edits...)
 }
 
-// The mock has no page to put over the window: it records whether the settings page is
-// open, and the dev server serves that page on its own.
+// The real window puts the settings page in a view over everything. The mock says so on
+// its Window feed, and the dev window draws the page there.
 func (e *Engine) OpenSettings() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.settings = true
+	e.mu.Unlock()
+	e.Window.Publish(e.WindowState())
 }
 
 func (e *Engine) CloseSettings() {
@@ -272,6 +277,17 @@ func (e *Engine) CloseSettings() {
 	e.settings = false
 	e.mu.Unlock()
 	e.Settings.Publish([]byte(`{"t":"closed"}`))
+	e.Window.Publish(e.WindowState())
+}
+
+// WindowState is what goes over the shell now, as the Window feed sends it:
+// {"t":"window","settings":open,"popup":the extension popup or null}. Any goroutine.
+func (e *Engine) WindowState() []byte {
+	e.mu.Lock()
+	settings := e.settings
+	e.mu.Unlock()
+	b, _ := json.Marshal(map[string]any{"t": "window", "settings": settings, "popup": e.openPopup()})
+	return b
 }
 
 // SettingsOpen says whether the app has the settings page open.

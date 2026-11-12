@@ -4,6 +4,7 @@ import App from './App.vue';
 import { vDrag, vShell } from './regions.js';
 import { connect, phone } from './state.js';
 import { firstPaint, inputs, mark } from '@/bridge.js';
+import { mockWindow } from './mockwindow.js';
 
 mark('shell.script');
 firstPaint();
@@ -14,3 +15,4 @@ document.documentElement.classList.toggle('touch', phone);
 createApp(App).directive('shell', vShell).directive('drag', vDrag).mount('#app');
 mark('shell.mounted');
 connect();
+mockWindow();

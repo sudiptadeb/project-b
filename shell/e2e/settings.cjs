@@ -1,6 +1,7 @@
 // The settings page on the mock engine, in a real browser: the gear opens it, what it
-// shows, that its changes go through Go, and the keyboard section. The mock has no window
-// to put the page over, so the test opens /settings itself once Go has asked for it.
+// shows, that its changes go through Go, and the keyboard section. The dev window draws the
+// page over the shell once Go asks for it, as the real window does (mockwindow.js); the test
+// drives a page of its own at /settings, which talks to Go the same way.
 // Run: node shell/e2e/settings.cjs   (from the repo root, after `npm run build` in shell/)
 
 const { spawn, execFileSync } = require('child_process');
@@ -111,6 +112,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('settings starts closed', (await regions()).settingsOpen === false);
   await shell.getByRole('button', { name: 'Settings', exact: true }).click();
   check('the gear opens the settings page', await until(async () => (await regions()).settingsOpen === true));
+  check('and the dev window shows it over the shell', await until(() => shell.locator('iframe.mock-settings').isVisible()));
 
   const open = async () => {
     const p = await browser.newPage({ viewport: { width: 1100, height: 700 } });
@@ -138,7 +140,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
 
   await radio('Horizontal').check();
   check('choosing Horizontal switches the shell and is saved', await until(async () => (await shell.locator('.strip').count()) > 0 && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
-  await shell.getByRole('button', { name: 'Tabs on the side' }).click();
+  // The settings page covers the toolbar, as in the real window, so the button is pressed
+  // without the mouse, as its menu command would.
+  await shell.getByRole('button', { name: 'Tabs on the side' }).dispatchEvent('click');
   check('a change from the toolbar reaches the settings page', await until(async () => await radio('Vertical').isChecked()));
 
   // The update manager checks by itself two seconds after it starts. Let that one land
@@ -235,6 +239,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
 
   await page.keyboard.press('Escape');
   check('Escape closes it', await until(async () => (await regions()).settingsOpen === false));
+  check('and the dev window takes it off the shell', await until(async () => (await shell.locator('iframe.mock-settings').count()) === 0));
   await shell.getByRole('button', { name: 'Settings', exact: true }).click();
   await until(async () => (await regions()).settingsOpen === true);
   await page.close();

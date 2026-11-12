@@ -47,6 +47,7 @@ func TestSpansPairAndIgnoreStrays(t *testing.T) {
 
 func TestPageEntriesLandOnThePagesOrigin(t *testing.T) {
 	m := New(nil)
+	m.origin = m.origin.Add(-10 * time.Second) // The page's entries are in the past.
 	m.PageOrigin("shell", 2_000_000_000)
 	m.FromPage("shell", []byte(`{"t":"timeline","kind":"mark","name":"shell.mounted","at":41.5}`))
 	entries, _ := m.Since(0)
@@ -55,6 +56,19 @@ func TestPageEntriesLandOnThePagesOrigin(t *testing.T) {
 	}
 	if e := entries[1]; e.Src != "shell" || e.Name != "shell.mounted" || e.T != 2_041_500_000 {
 		t.Fatalf("41.5 ms after an origin at 2 s is %+v", e)
+	}
+}
+
+func TestPageEntryIsNoLaterThanItsArrival(t *testing.T) {
+	m := New(nil)
+	m.PageOrigin("shell", m.Now())
+	// An origin a little late: the page's click lands after Go's first mark of the span.
+	m.FromPage("shell", []byte(`{"kind":"begin","name":"tab.new","at":5}`))
+	m.Record(KindMark, SrcGo, "tab.new.go", "", Now)
+	entries, _ := m.Since(0)
+	begin, mark := entries[1], entries[2]
+	if begin.Kind != KindBegin || mark.Name != "tab.new.go" || begin.T > mark.T {
+		t.Fatalf("the begin at %d is after the mark at %d, which it came before", begin.T, mark.T)
 	}
 }
 

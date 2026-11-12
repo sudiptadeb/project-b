@@ -185,7 +185,9 @@ type pageEntry struct {
 
 // FromPage records an entry one of our pages sent. Its time is the page's own, placed on
 // the timeline by the page's origin. A page whose origin nobody gave, as on the mock
-// engine, is stamped as it arrives.
+// engine, is stamped as it arrives. No entry is later than its arrival: the origin is a few
+// microseconds off at times, and a span the shell began at a click then began after Go's
+// first mark of it, which was then left out of the span's stages.
 func (m *Manager) FromPage(page string, msg []byte) {
 	var p pageEntry
 	if err := json.Unmarshal(msg, &p); err != nil {
@@ -203,7 +205,7 @@ func (m *Manager) FromPage(page string, msg []byte) {
 	m.mu.Unlock()
 	t := Now
 	if known {
-		t = origin + int64(p.At*1e6)
+		t = min(origin+int64(p.At*1e6), m.Now())
 	}
 	m.Record(p.Kind, page, p.Name, p.Text, t)
 }

@@ -50,6 +50,9 @@ typedef enum PBEvent {
                                         // reply's body, {"result": ...} or {"error": ...}.
                                         // Only ProjectB.* methods; no answer leaves the
                                         // command to content
+  PB_EVENT_WINDOW_CLOSED = 13,          // i: window; it closed, asked by Go or by its own
+                                        // close button, and its pages went with it
+  PB_EVENT_WINDOW_FOCUSED = 14,         // i: window; it became the key window
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.
@@ -77,6 +80,7 @@ typedef enum PBAppCommand {
   PB_APP_HIDE_OTHERS = 3,
   PB_APP_SHOW_ALL = 4,
   PB_APP_BRING_ALL_TO_FRONT = 5,
+  PB_APP_QUIT = 6,  // ends the app, every window at once
 } PBAppCommand;
 
 // What a press inside a region does. Matches engine.Area in core/engine/engine.go.
@@ -150,6 +154,16 @@ typedef struct PBEngineCalls {
   int64_t (*duplicate_tab)(int64_t tab);
   // Runs a PBEditCommand in whichever of our pages has the keyboard.
   void (*edit)(int32_t command);
+  // Makes a window and its shell page, and puts it on screen with its first layout, a
+  // little down and right of window near, or where a first window goes when near is 0.
+  // Its first state follows once this call has returned.
+  void (*create_window)(int64_t window,
+                        int64_t near,
+                        const PBWindowLayout* layout,
+                        const PBRegion* regions,
+                        size_t region_count,
+                        const PBVisibleTab* tabs,
+                        size_t tab_count);
   void (*request_window)(int64_t window, int32_t request);  // PBWindowRequest
   // regions are in order: the first that holds a point decides. None holds it: the page
   // there. tabs are the tabs the window shows; every other tab is hidden.

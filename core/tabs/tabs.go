@@ -1,10 +1,13 @@
-// Package tabs owns the tabs: which exist, in what order, which one is active, and
-// each one's state. Tab state changes only through this manager. The active tab is the
-// one the user acts on: the shell shows it and gives it the keyboard, and says where it
-// put it in its layout, which shows it.
+// Package tabs owns the windows and the tabs: which windows exist, which is in front,
+// each one's tabs in order and which of them is active, and each tab's state. Tab state
+// changes only through this manager. A window's active tab is the one the user acts on
+// there: its shell shows it and gives it the keyboard, and says where it put it in its
+// layout, which shows it. Commands act on the active tab of the window in front. A tab
+// keeps its id for its life.
 package tabs
 
 import (
+	"maps"
 	"net/url"
 	"slices"
 	"strings"
@@ -42,8 +45,24 @@ const BlankURL = "about:blank"
 
 // Manager owns the tabs.
 type Manager struct {
-	eng    engine.Engine
-	tabs   map[engine.TabID]*Tab
+	eng      engine.Engine
+	tabs     map[engine.TabID]*Tab
+	windowOf map[engine.TabID]engine.WindowID
+	windows  map[engine.WindowID]*window
+	// used is every window, the one in front first, then in the order they were last in
+	// front.
+	used []engine.WindowID
+
+	gates      []Gate
+	onChanged  []func(Tab)
+	onFinished []func(Tab)
+	onTitle    []func(Tab)
+	onList     []func()
+	onEmpty    []func(engine.WindowID)
+}
+
+// window is one window's tabs: their order, the active one, and recent use.
+type window struct {
 	order  []engine.TabID
 	active engine.TabID
 	// recent is every tab, the most recently shown first. While a cycle through it runs,
@@ -51,18 +70,11 @@ type Manager struct {
 	recent []engine.TabID
 	cycle  []engine.TabID
 	at     int
-
-	gates      []Gate
-	onChanged  []func(Tab)
-	onFinished []func(Tab)
-	onTitle    []func(Tab)
-	onList     []func()
-	onEmpty    []func()
 }
 
-// New returns an empty manager.
+// New returns a manager with no windows.
 func New(eng engine.Engine) *Manager {
-	return &Manager{eng: eng, tabs: map[engine.TabID]*Tab{}}
+	return &Manager{eng: eng, tabs: map[engine.TabID]*Tab{}, windowOf: map[engine.TabID]engine.WindowID{}, windows: map[engine.WindowID]*window{}}
 }
 
 // AddGate adds a gate. Gates run in the order they were added.
@@ -77,16 +89,63 @@ func (m *Manager) OnNavigationFinished(f func(Tab)) { m.onFinished = append(m.on
 // OnTitleChanged subscribes to title changes.
 func (m *Manager) OnTitleChanged(f func(Tab)) { m.onTitle = append(m.onTitle, f) }
 
-// OnListChanged subscribes to a tab opening or closing, or the active tab changing.
+// OnListChanged subscribes to a tab opening or closing, or a window's active tab changing.
 func (m *Manager) OnListChanged(f func()) { m.onList = append(m.onList, f) }
 
-// OnEmpty subscribes to the last tab closing.
-func (m *Manager) OnEmpty(f func()) { m.onEmpty = append(m.onEmpty, f) }
+// OnEmpty subscribes to a window's last tab closing.
+func (m *Manager) OnEmpty(f func(engine.WindowID)) { m.onEmpty = append(m.onEmpty, f) }
 
-// Create opens a new tab at the end, on the blank page, and makes it active.
-func (m *Manager) Create() engine.TabID {
+// AddWindow adds a window with no tabs. It is the window in front.
+func (m *Manager) AddWindow(w engine.WindowID) {
+	m.windows[w] = &window{}
+	m.used = slices.Insert(m.used, 0, w)
+}
+
+// RemoveWindow closes a window's tabs and forgets it. The window used before it is in
+// front now.
+func (m *Manager) RemoveWindow(w engine.WindowID) {
+	for _, id := range m.windows[w].order {
+		delete(m.tabs, id)
+		delete(m.windowOf, id)
+		m.eng.CloseTab(id)
+	}
+	delete(m.windows, w)
+	m.used = slices.DeleteFunc(m.used, func(u engine.WindowID) bool { return u == w })
+	m.listChanged()
+}
+
+// Focus says a window came to the front.
+func (m *Manager) Focus(w engine.WindowID) {
+	if i := slices.Index(m.used, w); i > 0 {
+		m.used = slices.Insert(slices.Delete(m.used, i, i+1), 0, w)
+	}
+}
+
+// Front is the window in front, the one used last, or 0 when there is none.
+func (m *Manager) Front() engine.WindowID {
+	if len(m.used) == 0 {
+		return 0
+	}
+	return m.used[0]
+}
+
+// Windows returns the windows, the one in front first.
+func (m *Manager) Windows() []engine.WindowID { return slices.Clone(m.used) }
+
+// WindowOf is the window a tab is in, or 0 for no tab.
+func (m *Manager) WindowOf(id engine.TabID) engine.WindowID { return m.windowOf[id] }
+
+// front is the window in front's tabs.
+func (m *Manager) front() *window { return m.windows[m.Front()] }
+
+// Create opens a new tab at the end of the window in front, on the blank page, and makes
+// it active.
+func (m *Manager) Create() engine.TabID { return m.CreateIn(m.Front()) }
+
+// CreateIn opens a new tab at the end of window w, on the blank page, and makes it active.
+func (m *Manager) CreateIn(w engine.WindowID) engine.TabID {
 	id := m.eng.CreateTab()
-	m.add(id)
+	m.add(id, w)
 	m.eng.LoadURL(id, BlankURL)
 	m.Activate(id)
 	return id
@@ -100,80 +159,97 @@ func address(u string) string {
 	return u
 }
 
-func (m *Manager) add(id engine.TabID) *Tab {
+func (m *Manager) add(id engine.TabID, w engine.WindowID) *Tab {
 	t := &Tab{ID: id}
 	m.tabs[id] = t
-	m.order = append(m.order, id)
-	m.recent = append(m.recent, id)
+	m.windowOf[id] = w
+	win := m.windows[w]
+	win.order = append(win.order, id)
+	win.recent = append(win.recent, id)
 	return t
 }
 
-// Activate makes a tab the active one.
+// Activate makes a tab the active one in its window.
 func (m *Manager) Activate(id engine.TabID) {
-	if m.tabs[id] == nil || id == m.active {
+	if m.tabs[id] == nil {
 		return
 	}
-	m.active = id
-	if m.cycle == nil {
-		m.touch(id)
+	win := m.windows[m.windowOf[id]]
+	if id == win.active {
+		return
+	}
+	win.active = id
+	if win.cycle == nil {
+		win.touch(id)
 	}
 	m.listChanged()
 }
 
 // touch makes a tab the most recent.
-func (m *Manager) touch(id engine.TabID) {
-	if i := slices.Index(m.recent, id); i >= 0 {
-		m.recent = slices.Delete(m.recent, i, i+1)
+func (win *window) touch(id engine.TabID) {
+	if i := slices.Index(win.recent, id); i >= 0 {
+		win.recent = slices.Delete(win.recent, i, i+1)
 	}
-	m.recent = slices.Insert(m.recent, 0, id)
+	win.recent = slices.Insert(win.recent, 0, id)
 }
 
-// CycleRecent shows the next tab back in recent order, as the OS's app switcher does
-// while its key is held: each press goes one further, past the oldest it comes round to
-// the newest, and the order stays as it was until EndCycle. Reverse goes the other way.
+// CycleRecent shows the next tab back in recent order in the window in front, as the
+// OS's app switcher does while its key is held: each press goes one further, past the
+// oldest it comes round to the newest, and the order stays as it was until EndCycle.
+// Reverse goes the other way.
 func (m *Manager) CycleRecent(reverse bool) {
-	if len(m.recent) < 2 {
+	win := m.front()
+	if len(win.recent) < 2 {
 		return
 	}
-	if m.cycle == nil {
-		m.cycle = slices.Clone(m.recent)
-		m.at = 0
+	if win.cycle == nil {
+		win.cycle = slices.Clone(win.recent)
+		win.at = 0
 	}
-	n := len(m.cycle)
+	n := len(win.cycle)
 	if reverse {
-		m.at = (m.at + n - 1) % n
+		win.at = (win.at + n - 1) % n
 	} else {
-		m.at = (m.at + 1) % n
+		win.at = (win.at + 1) % n
 	}
-	m.Activate(m.cycle[m.at])
+	m.Activate(win.cycle[win.at])
 }
 
 // EndCycle ends a cycle through recent tabs: the tab it stopped on becomes the most recent.
 func (m *Manager) EndCycle() {
-	if m.cycle == nil {
+	for _, win := range m.windows {
+		win.endCycle()
+	}
+}
+
+func (win *window) endCycle() {
+	if win.cycle == nil {
 		return
 	}
-	m.cycle = nil
-	m.touch(m.active)
+	win.cycle = nil
+	win.touch(win.active)
 }
 
-// ActivateAt shows the tab at a position, counting from zero. Out of range does nothing.
+// ActivateAt shows the tab at a position in the window in front, counting from zero. Out
+// of range does nothing.
 func (m *Manager) ActivateAt(i int) {
-	if i >= 0 && i < len(m.order) {
-		m.Activate(m.order[i])
+	if win := m.front(); i >= 0 && i < len(win.order) {
+		m.Activate(win.order[i])
 	}
 }
 
-// ActivateLast shows the last tab.
-func (m *Manager) ActivateLast() { m.ActivateAt(len(m.order) - 1) }
+// ActivateLast shows the last tab of the window in front.
+func (m *Manager) ActivateLast() { m.ActivateAt(len(m.front().order) - 1) }
 
-// ActivateNext shows the tab after the active one, or before it, wrapping around.
+// ActivateNext shows the tab after the active one in the window in front, or before it,
+// wrapping around.
 func (m *Manager) ActivateNext(reverse bool) {
-	n := len(m.order)
+	win := m.front()
+	n := len(win.order)
 	if n < 2 {
 		return
 	}
-	i := slices.Index(m.order, m.active)
+	i := slices.Index(win.order, win.active)
 	if reverse {
 		m.ActivateAt((i + n - 1) % n)
 	} else {
@@ -182,53 +258,76 @@ func (m *Manager) ActivateNext(reverse bool) {
 }
 
 // Close closes a tab. Closing the active one activates its right neighbour, or the
-// left one at the end. Closing the last tab leaves no tabs and fires OnEmpty.
+// left one at the end. Closing a window's last tab leaves it no tabs and fires OnEmpty.
 func (m *Manager) Close(id engine.TabID) {
 	if m.tabs[id] == nil {
 		return
 	}
-	m.EndCycle()
-	i := slices.Index(m.order, id)
+	w := m.windowOf[id]
+	win := m.windows[w]
+	win.endCycle()
+	i := slices.Index(win.order, id)
 	delete(m.tabs, id)
-	m.order = slices.Delete(m.order, i, i+1)
-	if j := slices.Index(m.recent, id); j >= 0 {
-		m.recent = slices.Delete(m.recent, j, j+1)
+	delete(m.windowOf, id)
+	win.order = slices.Delete(win.order, i, i+1)
+	if j := slices.Index(win.recent, id); j >= 0 {
+		win.recent = slices.Delete(win.recent, j, j+1)
 	}
 	m.eng.CloseTab(id)
-	if len(m.order) == 0 {
-		m.active = 0
+	if len(win.order) == 0 {
+		win.active = 0
 		m.listChanged()
 		for _, f := range m.onEmpty {
-			f()
+			f(w)
 		}
 		return
 	}
-	if id == m.active {
-		m.active = 0
-		m.ActivateAt(min(i, len(m.order)-1))
+	if id == win.active {
+		win.active = 0
+		m.Activate(win.order[min(i, len(win.order)-1)])
 		return
 	}
 	m.listChanged()
 }
 
-// CloseActive closes the active tab.
-func (m *Manager) CloseActive() { m.Close(m.active) }
+// CloseActive closes the active tab of the window in front.
+func (m *Manager) CloseActive() { m.Close(m.ActiveID()) }
 
-// All returns copies of the tabs, in order.
+// All returns copies of every tab, window by window in the order they were opened, each
+// window's in order.
 func (m *Manager) All() []Tab {
-	out := make([]Tab, len(m.order))
-	for i, id := range m.order {
+	ids := slices.Sorted(maps.Keys(m.windows))
+	var out []Tab
+	for _, w := range ids {
+		out = append(out, m.AllIn(w)...)
+	}
+	return out
+}
+
+// AllIn returns copies of window w's tabs, in order.
+func (m *Manager) AllIn(w engine.WindowID) []Tab {
+	order := m.windows[w].order
+	out := make([]Tab, len(order))
+	for i, id := range order {
 		out[i] = *m.tabs[id]
 	}
 	return out
 }
 
-// ActiveID returns the active tab's id, or zero when there is none.
-func (m *Manager) ActiveID() engine.TabID { return m.active }
+// ActiveID returns the active tab of the window in front, or zero when there is none.
+func (m *Manager) ActiveID() engine.TabID {
+	if win := m.front(); win != nil {
+		return win.active
+	}
+	return 0
+}
 
-// Active returns a copy of the active tab.
+// ActiveIn returns window w's active tab, or zero when it has none.
+func (m *Manager) ActiveIn(w engine.WindowID) engine.TabID { return m.windows[w].active }
+
+// Active returns a copy of the active tab of the window in front.
 func (m *Manager) Active() Tab {
-	if t, ok := m.tabs[m.active]; ok {
+	if t, ok := m.tabs[m.ActiveID()]; ok {
 		return *t
 	}
 	return Tab{}
@@ -237,63 +336,64 @@ func (m *Manager) Active() Tab {
 // Navigate turns what the user typed into a URL and loads it in the active tab.
 func (m *Manager) Navigate(text string) {
 	u := NormalizeInput(text)
-	if u == "" || m.tabs[m.active] == nil {
+	if u == "" || m.tabs[m.ActiveID()] == nil {
 		return
 	}
-	m.eng.LoadURL(m.active, u)
+	m.eng.LoadURL(m.ActiveID(), u)
 }
 
 // Back moves the active tab back in its history.
 func (m *Manager) Back() {
-	if t := m.tabs[m.active]; t != nil && t.CanGoBack {
-		m.eng.GoBack(m.active)
+	if t := m.tabs[m.ActiveID()]; t != nil && t.CanGoBack {
+		m.eng.GoBack(m.ActiveID())
 	}
 }
 
 // Forward moves the active tab forward in its history.
 func (m *Manager) Forward() {
-	if t := m.tabs[m.active]; t != nil && t.CanGoForward {
-		m.eng.GoForward(m.active)
+	if t := m.tabs[m.ActiveID()]; t != nil && t.CanGoForward {
+		m.eng.GoForward(m.ActiveID())
 	}
 }
 
 // Reload reloads the active tab.
 func (m *Manager) Reload() {
-	if t := m.tabs[m.active]; t != nil && t.URL != "" {
-		m.eng.Reload(m.active)
+	if t := m.tabs[m.ActiveID()]; t != nil && t.URL != "" {
+		m.eng.Reload(m.ActiveID())
 	}
 }
 
 // ReloadBypassingCache reloads the active tab without the cache.
 func (m *Manager) ReloadBypassingCache() {
-	if t := m.tabs[m.active]; t != nil && t.URL != "" {
-		m.eng.ReloadBypassingCache(m.active)
+	if t := m.tabs[m.ActiveID()]; t != nil && t.URL != "" {
+		m.eng.ReloadBypassingCache(m.ActiveID())
 	}
 }
 
 // Stop stops the active tab loading.
 func (m *Manager) Stop() {
-	if t := m.tabs[m.active]; t != nil && t.Loading {
-		m.eng.Stop(m.active)
+	if t := m.tabs[m.ActiveID()]; t != nil && t.Loading {
+		m.eng.Stop(m.ActiveID())
 	}
 }
 
 // Duplicate opens a copy of the active tab, history and all, as the last tab, and shows it.
 func (m *Manager) Duplicate() {
-	t := m.tabs[m.active]
+	t := m.tabs[m.ActiveID()]
 	if t == nil {
 		return
 	}
-	m.HandleTabOpened(m.active, m.eng.DuplicateTab(m.active), t.URL, true)
+	m.HandleTabOpened(m.ActiveID(), m.eng.DuplicateTab(m.ActiveID()), t.URL, true)
 }
 
-// Open opens a URL in a new last tab and shows it.
+// Open opens a URL in a new last tab of the window in front and shows it.
 func (m *Manager) Open(u string) { m.OpenIn(u, true) }
 
-// OpenIn opens a URL in a new last tab, shown or behind the active one.
+// OpenIn opens a URL in a new last tab of the window in front, shown or behind the
+// active one.
 func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
 	id := m.eng.CreateTab()
-	m.HandleTabOpened(m.active, id, u, foreground)
+	m.HandleTabOpened(m.ActiveID(), id, u, foreground)
 	m.eng.LoadURL(id, u)
 	return id
 }
@@ -335,10 +435,10 @@ func (m *Manager) ZoomOut()   { m.zoomStep(-1) }
 func (m *Manager) ZoomReset() { m.zoomTo(1) }
 
 func (m *Manager) zoomStep(dir int) {
-	if m.tabs[m.active] == nil {
+	if m.tabs[m.ActiveID()] == nil {
 		return
 	}
-	now := m.eng.ZoomOf(m.active)
+	now := m.eng.ZoomOf(m.ActiveID())
 	const near = 0.001
 	if dir > 0 {
 		for _, f := range zoomFactors {
@@ -358,15 +458,19 @@ func (m *Manager) zoomStep(dir int) {
 }
 
 func (m *Manager) zoomTo(f float64) {
-	if m.tabs[m.active] != nil {
-		m.eng.Zoom(m.active, f)
+	if m.tabs[m.ActiveID()] != nil {
+		m.eng.Zoom(m.ActiveID(), f)
 	}
 }
 
-// HandleTabOpened records a tab a page opened, and shows it if the page asked for the
-// foreground.
+// HandleTabOpened records a tab a page opened, in the opener's window, or in the window
+// in front when no tab opened it, and shows it if the page asked for the foreground.
 func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground bool) {
-	t := m.add(id)
+	w := m.windowOf[opener]
+	if w == 0 {
+		w = m.Front()
+	}
+	t := m.add(id, w)
 	t.URL = address(u)
 	if foreground {
 		m.Activate(id)

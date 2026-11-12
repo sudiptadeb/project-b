@@ -97,6 +97,9 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Each window is an OS window page of its own, at /?window=<id>, window 1 at plain /.
+	// It passes its id on to every page and feed it holds, and every route below takes it
+	// the same way, 1 when it names none.
 	mux := http.NewServeMux()
 	// The OS window, at / and at a path npm run dev's server sends on to this one.
 	mux.HandleFunc("GET /{$}", serve("window.html", "text/html; charset=utf-8"))
@@ -109,7 +112,7 @@ func main() {
 			http.Error(w, "w and h are numbers", http.StatusBadRequest)
 			return
 		}
-		e.Resize(width, height)
+		e.Resize(windowOf(r), width, height)
 	})
 	// When a page's own clock started, its performance.timeOrigin in ms of wall time, which
 	// the real engine gives the timeline as the page's document starts.
@@ -122,37 +125,50 @@ func main() {
 		timeline.PageOrigin(r.FormValue("page"), timeline.FromWall(time.UnixMicro(int64(ms*1000))))
 	})
 	mux.Handle("GET /shell/", http.StripPrefix("/shell/", webUI(filepath.Join(*shellDir, "shell"))))
-	mux.HandleFunc("GET /shell/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Shell) })
+	mux.HandleFunc("GET /shell/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Shell) })
 	mux.HandleFunc("POST /shell/send", func(w http.ResponseWriter, r *http.Request) {
 		msg, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		e.Post(func() { a.ShellMessage(1, msg) })
+		win := windowOf(r)
+		e.Post(func() {
+			// As in the real engine, a page whose window closed speaks to no one.
+			if e.Open(win) {
+				a.ShellMessage(win, msg)
+			}
+		})
 	})
 	// The settings page, an app of its own as in the real app, with its own channel.
 	mux.Handle("GET /settings/", http.StripPrefix("/settings/", webUI(filepath.Join(*shellDir, "settings"))))
-	mux.HandleFunc("GET /settings/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Settings) })
+	mux.HandleFunc("GET /settings/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Settings) })
 	mux.HandleFunc("POST /settings/send", func(w http.ResponseWriter, r *http.Request) {
 		msg, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		e.Post(func() { a.SettingsMessage(1, msg) })
+		win := windowOf(r)
+		e.Post(func() {
+			if e.Open(win) {
+				a.SettingsMessage(win, msg)
+			}
+		})
 	})
 	mux.HandleFunc("GET /mock/page", serve("mock_page.html", "text/html; charset=utf-8"))
-	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Page) })
+	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Page) })
 	// What the window page holds and how it hit-tests: the state now, then each change.
 	mux.HandleFunc("GET /mock/window/events", func(w http.ResponseWriter, r *http.Request) {
-		stream(w, r, &e.Window, e.WindowState)
+		win := windowOf(r)
+		stream(w, r, &e.Feeds(win).Window, func() []byte { return e.WindowState(win) })
 	})
 	mux.HandleFunc("POST /mock/fire", func(w http.ResponseWriter, r *http.Request) {
-		e.Fire(r.FormValue("kind"), r.FormValue("value"))
+		e.Fire(windowOf(r), r.FormValue("kind"), r.FormValue("value"))
 	})
 	mux.HandleFunc("GET /mock/regions", func(w http.ResponseWriter, r *http.Request) {
-		l := e.Layout()
+		win := windowOf(r)
+		l := e.Layout(win)
 		shell, drag := []engine.Rect{}, []engine.Rect{}
 		for _, g := range l.Regions {
 			if g.Area == engine.AreaDrag {
@@ -161,7 +177,7 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported()}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)
@@ -206,6 +222,14 @@ func webUI(dir string) http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(b)
 	})
+}
+
+// windowOf is the window a request is for: its window parameter, or 1.
+func windowOf(r *http.Request) engine.WindowID {
+	if w, err := strconv.ParseInt(r.URL.Query().Get("window"), 10, 64); err == nil {
+		return engine.WindowID(w)
+	}
+	return 1
 }
 
 // stream sends a feed to the browser as server-sent events, after now's message if it is

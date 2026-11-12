@@ -37,6 +37,26 @@
         }
       ]
     },
+    "window.new": {
+      "mac": [
+        {
+          "keys": "Cmd+N",
+          "reserve": "windowed"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+N",
+          "reserve": "windowed"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+N",
+          "reserve": "windowed"
+        }
+      ]
+    },
     "address.focus": {
       "mac": [
         {

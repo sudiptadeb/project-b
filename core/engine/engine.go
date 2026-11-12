@@ -104,6 +104,7 @@ const (
 	AppHideOthers
 	AppShowAll
 	AppBringAllToFront
+	AppQuit // Ends the app, every window at once.
 )
 
 // Engine is what the app can ask a browser engine to do.
@@ -130,8 +131,13 @@ type Engine interface {
 	// Edit runs a text-editing command in whichever page has the keyboard.
 	Edit(c EditCommand)
 
-	// RequestWindow asks a native window to close, which ends the app, minimise,
-	// zoom, go in or out of full screen, or come to the front. What follows arrives as
+	// CreateWindow makes window w, with its shell page, and puts it on screen with its
+	// first layout, a little down and right of window near, or where a first window goes
+	// when near is 0. It tells WindowChanged once this call has returned.
+	CreateWindow(w, near WindowID, l WindowLayout)
+
+	// RequestWindow asks a native window to close, minimise, zoom, go in or out of full
+	// screen, or come to the front. What follows arrives as WindowClosed or
 	// WindowChanged.
 	RequestWindow(w WindowID, r WindowRequest)
 
@@ -210,6 +216,12 @@ type Listener interface {
 
 	// SettingsMessage is one message from a window's settings page.
 	SettingsMessage(w WindowID, msg []byte)
+
+	// WindowClosed says a window closed, asked by the app or by its own close button.
+	// Its shell and settings pages are gone with it; its tabs are still there.
+	WindowClosed(w WindowID)
+	// WindowFocused says a window became the one in front, the one keys go to.
+	WindowFocused(w WindowID)
 
 	// WindowChanged says what a native window is now. It fires after start, on
 	// resize and on entering or leaving full screen.

@@ -68,22 +68,20 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 #endif
   RegisterShellWebUI(browser_context_.get());
 
-  engine_ = std::make_unique<Engine>(browser_context_.get());
-  engine_->OpenWindow(1, base::BindOnce(
-                             [](base::OnceClosure* quit) {
-                               content::GetUIThreadTaskRunner({})->PostTask(
-                                   FROM_HERE, std::move(*quit));
-                             },
-                             &quit_));
+  // Quitting ends the run loop on a later task, so whatever asked for it returns first.
+  engine_ = std::make_unique<Engine>(
+      browser_context_.get(), base::BindRepeating(
+                                  [](base::RepeatingClosure* quit) {
+                                    content::GetUIThreadTaskRunner({})->PostTask(
+                                        FROM_HERE, *quit);
+                                  },
+                                  &quit_));
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
   WatchOSKeyBindings();
   child_processes_ = std::make_unique<ChildProcesses>();
-  // Go has given the window its first layout, frame included, so its first frame on
-  // screen is already the frame colour. It still shows before any renderer has drawn.
-  engine_->ShowWindow(1);
   StartRemoteDebugging();
 
   if (command_line->HasSwitch("pb-driver")) {

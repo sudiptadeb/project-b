@@ -1,6 +1,7 @@
 #!/bin/bash
 # Runs the VM checks on one DMG from start to end, with nobody watching:
 #   tools/vm/run.sh <path or URL of a DMG>
+#   tools/vm/run.sh <path or URL of a DMG> windows    # only the checks of several windows
 #
 # It takes the VM's lock, starts the VM if it isn't running, readies it (prepare.py), installs
 # the DMG, runs check.py,
@@ -61,7 +62,7 @@ echo "== install $DMG"
 
 echo "== the checks"
 SINCE=$("$TART" exec "$VM" /bin/date +%s)
-PB_VM_SHOTS="$OUT" "$PY" "$HERE/check.py"
+PB_VM_SHOTS="$OUT" "$PY" "$HERE/check.py" "${@:2}"
 CODE=$?
 
 # The app's crash reports since the checks began, for whoever reads the run later.

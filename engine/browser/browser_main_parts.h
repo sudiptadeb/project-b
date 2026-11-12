@@ -51,7 +51,7 @@ class BrowserMainParts : public content::BrowserMainParts {
 #endif
   std::unique_ptr<Engine> engine_;
   std::unique_ptr<ChildProcesses> child_processes_;
-  base::OnceClosure quit_;
+  base::RepeatingClosure quit_;
 };
 
 }  // namespace project_b

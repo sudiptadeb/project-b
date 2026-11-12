@@ -1,6 +1,6 @@
 # The first app
 
-One window with tabs. A 44px top row holds the sidebar toggle, back, forward, reload and
+Windows with tabs. A 44px top row holds the sidebar toggle, back, forward, reload and
 the address bar after the space for the native window controls; tabs sit in a sidebar
 on the left, or in a strip on top when the user switches, and the page sits beside or
 below them. The address bar's suggestion box, fed by real history, extends over the page.
@@ -103,11 +103,29 @@ white over all of it, as it does any view it has no frame for yet. A new tab loa
 the start. The tab still reads as new: no address, titled New Tab, and `about:blank`
 stays out of history. A crashed page has no view, so the frame colour shows there.
 
+## Several windows
+
+Go owns which windows exist and makes them: `CreateWindow` with Go's id for it, 1 for the
+first, the window in front to open near, and its first layout. Each window has its own
+shell page and its own settings page, and every call and event about a window names it.
+Go keeps each window's tabs in order with its own active tab, and the window in front:
+the last one the engine reported as the key window (`WindowFocused`), or the one Go made
+last. Keys, menu items and commands act on the active tab of the window in front, and
+the menu shows its state. File, New Window (Cmd+N) opens a window with one new tab, a
+little down and right of the window in front, the same size. Closing a window's last tab
+closes the window; its own close button closes it and its tabs; closing the last window
+quits, and Quit ends the app with every window at once. A tab a page opens goes in its
+opener's window, and one nothing opened, from DevTools or an extension, in the window in
+front. A minimised window's tabs are told they are hidden. On the mock engine each window
+is an OS window page of its own, `/?window=<id>` on the dev server, window 1 at `/`, and
+the id goes on to its shell, its settings page, its mock page and its feeds. The design
+and what is still to come: [windows.md](windows.md).
+
 ## Our own page
 
 The engine knows exactly one page of ours, `chrome://shell/`, built from `shell/` and served
 from the app's `Resources/shell` (`out/pb/shell` in the build folder, which ninja builds with
-vite through `engine/build_shell.py`). It gets its bridge only in the shell's own WebContents;
+vite through `engine/build_shell.py`). It gets its bridge only in a window's own shell WebContents;
 anywhere else its WebUI controller gives it no bindings and drops whatever it sends, and
 the policy gate refuses it in every tab, however it is reached. No other page has
 `chrome.send`, and Chromium itself refuses a web page's link to a `chrome://` page or a
@@ -135,8 +153,8 @@ fills the colour itself, faint.
 
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
 started on the same `--user-data-dir` or `--profile` writes nothing there: it hands the URLs
-on its command line to the running copy, which comes to the front and opens each in a new
-tab, and exits 0.
+on its command line to the running copy, whose window used last comes to the front and
+opens each in a new tab, and exits 0.
 
 ## Logs and timing
 
@@ -194,8 +212,8 @@ dev server and start it again on the same `--profile`.
 - Gates answer immediately; holding a navigation for a prompt isn't built.
 - A back or forward restored from the back-forward cache skips the gates, because content
   runs no navigation start for it. A page allowed earlier stays reachable that way.
-- No popup blocking: every `window.open` becomes a tab. No window features (size,
-  position) are honoured, because there is one window.
+- No popup blocking: every `window.open` becomes a tab, in the opener's window. No window
+  features (size, position) are honoured.
 - No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
   are not saved; the prefs, the tab layout, automatic updates and the frame colour, are, in
   `prefs.json` in the profile.

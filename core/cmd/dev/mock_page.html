@@ -28,18 +28,20 @@
   <form data-kind="key"><input value="focusAddressBar" aria-label="Key name"><button>Key</button></form>
   <form data-kind="fullscreen"><button>Full screen</button></form>
 <script>
+  // The window this page is in, as its address names it.
+  const win = new URLSearchParams(location.search).get('window') || '1';
   const label = {empty: 'Empty', loading: 'Loading', loaded: 'Loaded', blocked: 'Blocked', crashed: 'Crashed', none: 'No tab', closed: 'Window closed'};
   for (const form of document.querySelectorAll('form')) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const input = form.querySelector('input');
-      fetch('/mock/fire', {
+      fetch(`/mock/fire?window=${win}`, {
         method: 'POST',
         body: new URLSearchParams({kind: form.dataset.kind, value: input ? input.value : ''}),
       });
     });
   }
-  new EventSource('/mock/events').onmessage = (e) => {
+  new EventSource(`/mock/events?window=${win}`).onmessage = (e) => {
     const m = JSON.parse(e.data);
     document.getElementById('state').textContent = label[m.state] || m.state;
     document.getElementById('tab').textContent = m.tab ? 'tab ' + m.tab : '';

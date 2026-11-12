@@ -345,8 +345,8 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
 - **Project B** (locked): About Project B; Settings…, Cmd+, (locked); Check for Updates…;
   Services; Hide Project B, Cmd+H; Hide Others, Option+Cmd+H; Show All; Quit Project B,
   Cmd+Q (locked).
-- **File**: New Tab, Cmd+T*; Open Location…, Cmd+L; Close Window, Shift+Cmd+W*; Close
-  Tab, Cmd+W*.
+- **File**: New Tab, Cmd+T*; New Window, Cmd+N*; Open Location…, Cmd+L; Close Window,
+  Shift+Cmd+W*; Close Tab, Cmd+W*.
 - **Edit** (locked): Undo, Cmd+Z; Redo, Shift+Cmd+Z; Cut, Copy, Paste; Paste and Match
   Style, Shift+Cmd+V and Option+Shift+Cmd+V; Delete; Select All, Cmd+A.
 - **View**: Tabs on Side, Tabs on Top (checked); Stop, Cmd+.; Reload This Page, Cmd+R;
@@ -362,7 +362,7 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
 - **Window** (locked): Minimize, Cmd+M; Zoom; Bring All to Front; macOS adds the window
   list.
 
-Later, each with its feature: New Window, Reopen Closed Tab, Open File, Save Page, Email
+Later, each with its feature: Reopen Closed Tab, Open File, Save Page, Email
 Link, the find bar, Pin and Mute Tab, Search Tabs, Move Tab, Developer Tools, Home, Show
 Full History, a Help menu.
 

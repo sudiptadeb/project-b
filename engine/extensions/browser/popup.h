@@ -5,6 +5,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "extensions/browser/extension_host.h"
+#include "project_b/engine/browser/engine.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -44,8 +45,11 @@ class ExtensionPopup : public extensions::ExtensionHost {
   void OnWebContentsLostFocus(
       content::RenderWidgetHost* render_widget_host) override;
 
-  // Go's id for the window the popup is over. The windows close before the extensions
-  // do at shutdown, so it may be gone.
+  // The window the popup is over, or null once it has closed: by its own button, or
+  // before the extensions at shutdown.
+  Engine::AppWindow* window() const;
+
+  // Go's id for the window the popup is over.
   const int64_t window_;
   const gfx::RectF anchor_;
   gfx::Size size_;

@@ -106,7 +106,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   watch(shell);
   // The window page, which holds the shell in a frame: see first-app.cjs.
   const ui = shell.frameLocator('iframe.shell');
-  const shellFrame = () => shell.frame({ url: /\/shell\/$/ });
+  const shellFrame = () => shell.frame({ url: /\/shell\/\?window=1$/ });
   await shell.goto(base + '/');
   await shell.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   await settle(shell);

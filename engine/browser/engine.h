@@ -9,6 +9,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "project_b/engine/abi/pb_abi.h"
+#include "project_b/engine/browser/window.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "url/gurl.h"
 
@@ -22,7 +23,6 @@ namespace project_b {
 class PageTab;
 class SettingsPage;
 class ShellPage;
-class Window;
 
 // What the Go core calls. It owns the tabs and the windows, and is the one place every
 // call from Go comes through, so it's also where the main-thread rule is checked.
@@ -49,7 +49,8 @@ class Engine {
     int64_t focused_tab = 0;
   };
 
-  explicit Engine(content::BrowserContext* browser_context);
+  // quit ends the app.
+  Engine(content::BrowserContext* browser_context, base::RepeatingClosure quit);
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
   ~Engine();
@@ -81,12 +82,14 @@ class Engine {
   void TabFocused(PageTab* tab);
   void TabTitleChanged(PageTab* tab);
 
-  // Makes window id, with its shell page loading on it, off screen. on_close runs when
-  // the native window closes.
-  void OpenWindow(int64_t id, base::OnceClosure on_close);
-  // Puts window id on screen, once Go has given it its first layout, and from then on
-  // tells Go its state.
-  void ShowWindow(int64_t id);
+  // Makes window id with its shell page and puts it on screen with its first layout, a
+  // little down and right of window near, or where a first window goes for 0.
+  void CreateWindow(int64_t id,
+                    int64_t near,
+                    Window::Layout layout,
+                    std::vector<VisibleTab> tabs);
+  // Ends the app, every window at once.
+  void Quit();
 
   // Tab moves the keyboard out of a tab's page into its window's shell, and out of a
   // shell into its window's page.
@@ -124,8 +127,16 @@ class Engine {
   // Whichever of our pages has the keyboard: a settings page, a shell or a tab's.
   content::WebContents* FocusedContents() const;
   void UpdateTitle(AppWindow* window);
+  // The native window closed: Go hears, and the window's pages go with it.
+  void WindowClosed(int64_t id);
+  // Tells Go a window's state, now and whenever it changes.
+  void ListenToWindow(int64_t id);
+  // A minimised window's tabs are told they are hidden, and shown again when it comes
+  // back.
+  void WindowMinimised(int64_t id, bool minimised);
 
   const raw_ptr<content::BrowserContext> browser_context_;
+  const base::RepeatingClosure quit_;
   std::map<int64_t, std::unique_ptr<AppWindow>> windows_;
 
   std::map<int64_t, std::unique_ptr<PageTab>> tabs_;

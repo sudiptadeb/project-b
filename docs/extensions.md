@@ -98,7 +98,10 @@ profile with no incognito, kiosk, guest or policy side, most answers are one lin
 | `browser/web_contents_observer.cc` | Per page: which extension a frame belongs to, and `chrome.scripting` in a tab |
 | `browser/popup.cc` | The popup: a page of the extension that sizes itself, in a view over the shell |
 
-The tab ids `//extensions` sees are the engine's own, which are Go's. There is one window, id 1.
+The tab ids `//extensions` sees are the engine's own, which are Go's. Every tab is still reported
+in one window, id 1, and `chrome.windows` knows one window; what an extension asks of "the
+current window" is answered for the window in front. Real window ids are step 6 of
+[windows.md](windows.md).
 
 **What `//extensions` insisted on.** It would not start, or its installer
 would not run, without each of these, so each exists with nothing behind it:

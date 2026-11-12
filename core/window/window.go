@@ -46,14 +46,18 @@ func New(eng engine.Engine, color string, theme engine.Theme) *Manager {
 	return &Manager{eng: eng, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}}
 }
 
-// Open gives window id its first layout, which carries the frame. The engine reports its
-// state after it starts.
-func (m *Manager) Open(id engine.WindowID) {
+// Open makes window id, a little down and right of window near, or where a first window
+// goes when near is 0. Its first layout carries the frame. The engine reports its state
+// after it starts.
+func (m *Manager) Open(id, near engine.WindowID) {
 	w := &window{}
 	m.windows[id] = w
 	w.sent = m.layout(w)
-	m.eng.SetWindowLayout(id, w.sent)
+	m.eng.CreateWindow(id, near, w.sent)
 }
+
+// Close forgets a window that closed.
+func (m *Manager) Close(id engine.WindowID) { delete(m.windows, id) }
 
 // Windows returns the open windows, in the order they were opened.
 func (m *Manager) Windows() []engine.WindowID {
@@ -132,8 +136,12 @@ func (m *Manager) HandleWindowChanged(id engine.WindowID, s engine.WindowState) 
 	}
 }
 
-// FullScreen says whether a window is in full screen.
-func (m *Manager) FullScreen(id engine.WindowID) bool { return m.windows[id].state.FullScreen }
+// FullScreen says whether a window is in full screen. No window, as after the last one
+// closed, is not.
+func (m *Manager) FullScreen(id engine.WindowID) bool {
+	w := m.windows[id]
+	return w != nil && w.state.FullScreen
+}
 
 // Request asks a window to close, minimise, zoom, or go in or out of full screen.
 // The engine reports what came of it.

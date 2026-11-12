@@ -12,6 +12,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py timeline   # only the timeline
     python3 tools/drive_first_app.py cookies    # only cookies kept across a restart
     python3 tools/drive_first_app.py visible    # only the tabs a window shows
+    python3 tools/drive_first_app.py windows    # only several windows
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -283,8 +284,8 @@ def version_checks():
 
 # The start-up milestones, in the order they must come. The shell's first paint and the
 # first tab's commit race the rest, so they are checked apart.
-STARTUP = ["process.start", "main.entered", "content.ready", "window.created", "shell.created",
-           "shell.navigation_start", "go.starting", "go.started", "window.shown", "shell.committed",
+STARTUP = ["process.start", "main.entered", "content.ready", "go.starting", "window.created", "shell.created",
+           "shell.navigation_start", "window.shown", "go.started", "shell.committed",
            "shell.script", "shell.mounted", "shell.ready", "shell.snapshot"]
 
 
@@ -1052,6 +1053,76 @@ def visible_tabs_checks():
     app.close()
 
 
+def window_checks():
+    """Several windows: Cmd+N makes a second window with one new tab and its own shell, a
+    little down and right of the first; a command acts on the window in front; a second
+    start's URL opens in the window used last; closing a window's last tab closes it, and
+    closing the last window quits. The driver makes a window the key window, as a click
+    on it would on a real desktop."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    windows = lambda: json.loads(app.cmd("windows"))
+    first = windows()[0]
+    app.cmd("key", "cmd+n")
+    deadline = time.time() + 10
+    while len(windows()) < 2 and time.time() < deadline:
+        time.sleep(0.05)
+    both = windows()
+    check("Cmd+N makes a second window", [w["id"] for w in both] == [1, 2], both)
+    second = both[-1]
+    fx, fy, fw, fh = first["frame"]
+    sx, sy, sw, sh = second["frame"]
+    check("it opens a little down and right of the first, the same size",
+          0 < sx - fx <= 60 and 0 < sy - fy <= 60 and (sw, sh) == (fw, fh), (first["frame"], second["frame"]))
+    file = next(m for m in json.loads(app.cmd("menu")) if m["title"] == "File")
+    check("the File menu has New Window on Cmd+N", {"title": "New Window", "key": "@n"} in
+          [{"title": i["title"], "key": i["key"]} for i in file["items"] if i != "-"], file["items"])
+
+    app.cmd("window", 2)
+    app.wait("!!document.querySelector('input')", 30)
+    app.wait(f"{ROWS}===1")
+    check("the second window has a shell of its own, with one new tab", app.js(f"{ROWS}===1&&{VALUE}===''"))
+    deadline = time.time() + 10
+    while not windows()[1]["tabs"] and time.time() < deadline:
+        time.sleep(0.05)
+    check("each window shows its own tab", [w["tabs"] for w in windows()] == [[1], [2]], windows())
+
+    # A command acts on the window in front.
+    app.cmd("key", "cmd+t")
+    app.wait(f"{ROWS}===2")
+    app.cmd("window", 1)
+    check("Cmd+T in the second window added a tab there, not in the first", app.js(f"{ROWS}") == 1)
+
+    # The first window is the one used last now: a second start's URL opens there.
+    started = subprocess.run([BIN, f"--profile={profile}", PAGES + "clicks"], timeout=60, capture_output=True)
+    check("a second start on the profile hands over and exits", started.returncode == 0, started.returncode)
+    app.wait(f"{ROWS}===2&&{VALUE}==={json.dumps(PAGES + 'clicks')}", 20)
+    check("its URL opens in a new tab in the window used last", True)
+    app.cmd("window", 2)
+    check("and not in the other window", app.js(f"{ROWS}") == 2)
+
+    # Closing the second window's last tab closes it; the app goes on.
+    app.cmd("key", "cmd+w")
+    app.wait(f"{ROWS}===1")
+    app.cmd("key", "cmd+w")
+    deadline = time.time() + 10
+    while len(windows()) > 1 and time.time() < deadline:
+        time.sleep(0.05)
+    check("closing a window's last tab closes the window", [w["id"] for w in windows()] == [1], windows())
+    app.cmd("window", 1)
+    check("the other window goes on with its tabs", app.js(f"{ROWS}") == 2)
+
+    # Closing the last window quits.
+    app.cmd("key", "cmd+shift+w")
+    try:
+        code = app.proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        code = None
+    check("closing the last window quits, cleanly", code == 0, code)
+    App.running.remove(app)
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1070,5 +1141,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, cookie_checks]))

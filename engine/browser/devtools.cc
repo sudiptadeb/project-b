@@ -114,12 +114,12 @@ void StartRemoteDebugging() {
   }
 }
 
-// Chrome's ChromeDevToolsManagerDelegate::CloseBrowserSoon, with our one window.
+// Chrome's ChromeDevToolsManagerDelegate::CloseBrowserSoon: the app quits.
 void CloseBrowserSoon() {
   content::GetUIThreadTaskRunner({})->PostTask(
       FROM_HERE, base::BindOnce([] {
         if (Engine* engine = Engine::Get()) {
-          engine->CloseWindow(1);
+          engine->Quit();
         }
       }));
 }

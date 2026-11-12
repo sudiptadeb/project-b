@@ -67,11 +67,18 @@ class Window {
     bool full_screen;
   };
 
-  explicit Window(base::OnceClosure on_close);
+  // on_close runs when the window closes, on_key when it becomes the key window, and
+  // on_minimised when it is minimised or comes back.
+  Window(base::OnceClosure on_close,
+         base::RepeatingClosure on_key,
+         base::RepeatingCallback<void(bool)> on_minimised);
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
   ~Window();
 
+  // Puts the window, the same size as another, a little down and right of it. Call it
+  // before Show.
+  void PlaceNear(Window* other);
   // Puts the window on screen. Call it once SetLayout has been called.
   void Show();
   void Close();
@@ -154,7 +161,8 @@ class Window {
 
   gfx::NativeWindow native_window() const;
   // Development only, for the driver.
-  void ForceKeyForDriver();
+  // Makes the window say it is the key window, or stop saying so.
+  void ForceKeyForDriver(bool key);
   size_t ignored_stale_bounds() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;

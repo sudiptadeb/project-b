@@ -5,6 +5,7 @@ package mockengine
 
 import (
 	"encoding/json"
+	"maps"
 	"net/url"
 	"slices"
 	"sync"
@@ -23,7 +24,7 @@ var Controls = engine.Rect{X: 19, Y: 19, W: 60, H: 14}
 // CornerRadius is what macOS 26 rounds that window's corners with. Full screen has none.
 const CornerRadius = 26.0
 
-// Width and Height are the mock window's content size until the dev window reports its
+// Width and Height are a mock window's content size until its dev window reports its
 // own, as the real window's first size.
 const (
 	Width  = 1100.0
@@ -34,6 +35,7 @@ const (
 var Keys = map[string]engine.Key{
 	"focusAddressBar": {Code: 'L', Mods: engine.ModCmd},
 	"newTab":          {Code: 'T', Mods: engine.ModCmd},
+	"newWindow":       {Code: 'N', Mods: engine.ModCmd},
 	"closeTab":        {Code: 'W', Mods: engine.ModCmd},
 	"nextTab":         {Code: 0xDD, Mods: engine.ModCmd | engine.ModShift},
 	"previousTab":     {Code: 0xDB, Mods: engine.ModCmd | engine.ModShift},
@@ -57,46 +59,57 @@ type tab struct {
 }
 
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
-// as it does with real content. It has one window, 1, which the dev server shows.
+// as it does with real content. Each window the app makes is a dev window of its own, the
+// shell at /?window=<id> on the dev server.
 type Engine struct {
 	queue    chan func()
 	listener engine.Listener
 	nextTab  engine.TabID
 	tabs     map[engine.TabID]*tab
-	// visible are the tabs the layout shows; the mock page shows the first, shown.
-	visible []engine.TabID
-	shown   engine.TabID
-	full    bool    // Full screen, so there are no window controls.
-	w, h    float64 // The window's content size.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu         sync.Mutex
-	layout     engine.WindowLayout
-	window     engine.WindowState // The last one reported.
+	windows    map[engine.WindowID]*window
+	feeds      map[engine.WindowID]*Feeds
 	requests   []engine.WindowRequest
-	closed     bool
-	hidden     []engine.TabID // Tabs told they are hidden by the last layout.
+	closed     []engine.WindowID
+	quit       bool
 	shownColor string
-	settings   bool
 	menu       engine.Menu
 	edits      []engine.EditCommand
 
 	// The fake extension runtime, in a build with extensions.
 	extensions extensionRuntime
+}
 
+// window is one mock window.
+type window struct {
+	layout engine.WindowLayout
+	// visible are the tabs the layout shows; the mock page shows the first, shown.
+	visible  []engine.TabID
+	shown    engine.TabID
+	hidden   []engine.TabID // Tabs told they are hidden by the last layout.
+	full     bool           // Full screen, so there are no window controls.
+	w, h     float64        // The window's content size.
+	settings bool
+	reported engine.WindowState // The last one reported.
+}
+
+// Feeds are what one window's dev window hears.
+type Feeds struct {
+	Shell    Feed // Messages to the shell page.
 	Settings Feed // Messages to the settings page.
-
-	Shell Feed // Messages to the shell page.
-	Page  Feed // State for the mock page.
-
-	// What the dev window holds besides the shell, as the real window holds it in views
-	// of its own, and how it hit-tests. Each message is WindowState's.
+	Page     Feed // State for the mock page.
+	// What the dev window draws with the shell, where the real window has views of its
+	// own: the page, the settings page and an extension's popup. Each message is
+	// WindowState's.
 	Window Feed
 }
 
 // New returns an engine. Call Run to start its main thread.
 func New() *Engine {
-	return &Engine{queue: make(chan func(), 4096), tabs: map[engine.TabID]*tab{}, w: Width, h: Height}
+	return &Engine{queue: make(chan func(), 4096), tabs: map[engine.TabID]*tab{},
+		windows: map[engine.WindowID]*window{}, feeds: map[engine.WindowID]*Feeds{}}
 }
 
 // Run is the main loop. It never returns.
@@ -106,44 +119,75 @@ func (e *Engine) Run() {
 	}
 }
 
-// SetListener sets who hears the engine's events, and reports the window to it, as the
-// real engine does right after it starts. That is also when the real engine puts its
-// window on screen, so the colour the window has now is its first frame's.
-func (e *Engine) SetListener(l engine.Listener) {
+// Feeds are window w's feeds, whether or not the window exists yet. Any goroutine.
+func (e *Engine) Feeds(w engine.WindowID) *Feeds {
 	e.mu.Lock()
-	e.shownColor = e.layout.FrameColor
-	e.mu.Unlock()
-	e.listener = l
-	e.reportWindow()
+	defer e.mu.Unlock()
+	if e.feeds[w] == nil {
+		e.feeds[w] = &Feeds{}
+	}
+	return e.feeds[w]
 }
 
-func (e *Engine) reportWindow() {
-	s := engine.WindowState{W: e.w, H: e.h, FullScreen: e.full}
-	if !e.full {
+// SetListener sets who hears the engine's events, and reports the windows the app has
+// made so far to it, as the real engine does once the call that made each has returned.
+func (e *Engine) SetListener(l engine.Listener) {
+	e.listener = l
+	for _, w := range slices.Sorted(maps.Keys(e.windows)) {
+		e.reportWindow(w)
+	}
+}
+
+func (e *Engine) reportWindow(w engine.WindowID) {
+	win := e.windows[w]
+	if win == nil {
+		return
+	}
+	s := engine.WindowState{W: win.w, H: win.h, FullScreen: win.full}
+	if !win.full {
 		s.Controls = Controls
 		s.CornerRadius = CornerRadius
 	}
 	e.mu.Lock()
-	e.window = s
+	win.reported = s
 	e.mu.Unlock()
-	e.listener.WindowChanged(1, s)
-	e.Window.Publish(e.WindowState())
+	e.listener.WindowChanged(w, s)
+	e.Feeds(w).Window.Publish(e.WindowState(w))
 }
 
-// Resize is the dev window reporting its content size, as the real window reports a
-// resize. Any goroutine.
-func (e *Engine) Resize(w, h float64) {
+// Resize is window w's dev window reporting its content size, as the real window reports
+// a resize. One whose window closed reports to no one. Any goroutine.
+func (e *Engine) Resize(w engine.WindowID, width, height float64) {
 	e.Post(func() {
-		e.w, e.h = w, h
-		e.reportWindow()
+		if win := e.windows[w]; win != nil {
+			win.w, win.h = width, height
+			e.reportWindow(w)
+		}
 	})
 }
 
-// Reported is the state the window last reported.
-func (e *Engine) Reported() engine.WindowState {
+// Reported is the state window w last reported.
+func (e *Engine) Reported(w engine.WindowID) engine.WindowState {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.window
+	if win := e.windows[w]; win != nil {
+		return win.reported
+	}
+	return engine.WindowState{}
+}
+
+// CreateWindow makes a window. The first one's colour is what the real window paints
+// when it first goes on screen.
+func (e *Engine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
+	e.mu.Lock()
+	if len(e.windows) == 0 && e.shownColor == "" {
+		e.shownColor = l.FrameColor
+	}
+	e.windows[w] = &window{layout: l, w: Width, h: Height}
+	e.mu.Unlock()
+	if e.listener != nil {
+		e.Post(func() { e.reportWindow(w) })
+	}
 }
 
 func (e *Engine) CreateTab() engine.TabID {
@@ -154,9 +198,11 @@ func (e *Engine) CreateTab() engine.TabID {
 
 func (e *Engine) CloseTab(id engine.TabID) {
 	delete(e.tabs, id)
-	if e.shown == id {
-		e.shown = 0
-		e.publishPage(0, "none", "")
+	for w, win := range e.windows {
+		if win.shown == id {
+			win.shown = 0
+			e.publishPage(w, 0, "none", "")
+		}
 	}
 }
 
@@ -180,26 +226,35 @@ func (e *Engine) Reload(id engine.TabID) {
 	}
 }
 
-// RequestWindow closes the window, goes in or out of full screen, and records every
-// request. A mock window has nothing to minimise, zoom or bring to the front.
+// RequestWindow closes a window, which it then says closed, goes in or out of full
+// screen, and records every request. A mock window has nothing to minimise, zoom or
+// bring to the front.
 func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	e.mu.Lock()
 	e.requests = append(e.requests, r)
-	e.closed = e.closed || r == engine.WindowClose
 	e.mu.Unlock()
 	switch r {
 	case engine.WindowClose:
-		e.publishPage(0, "closed", "")
+		// Like the real one, it closes on a later turn, after the call that asked.
+		e.Post(func() {
+			e.mu.Lock()
+			delete(e.windows, w)
+			e.closed = append(e.closed, w)
+			e.mu.Unlock()
+			e.publishPage(w, 0, "closed", "")
+			e.listener.WindowClosed(w)
+		})
 	case engine.WindowFullScreen:
-		e.full = !e.full
-		e.reportWindow()
+		e.windows[w].full = !e.windows[w].full
+		e.reportWindow(w)
 	}
 }
 
-// The real window puts each visible tab's view where the layout says, tells a tab that
-// leaves the list it is hidden, and hit-tests with the regions. The mock shows the first
-// tab's page, says where on its Window feed, and the dev window does the same.
+// The real window puts each visible tab's view where the layout says, and tells a tab
+// that leaves the list it is hidden. The mock shows the first one's page, says where on
+// the window's Window feed, and its dev window moves the mock page there.
 func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
+	win := e.windows[w]
 	var visible []engine.TabID
 	for _, v := range l.Tabs {
 		if e.tabs[v.Tab] != nil {
@@ -207,24 +262,24 @@ func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 		}
 	}
 	e.mu.Lock()
-	e.layout = l
-	e.hidden = e.hidden[:0]
-	for _, id := range e.visible {
+	win.layout = l
+	win.hidden = win.hidden[:0]
+	for _, id := range win.visible {
 		if !slices.Contains(visible, id) && e.tabs[id] != nil {
-			e.hidden = append(e.hidden, id)
+			win.hidden = append(win.hidden, id)
 		}
 	}
 	e.mu.Unlock()
-	e.visible = visible
-	e.Window.Publish(e.WindowState())
+	win.visible = visible
+	e.Feeds(w).Window.Publish(e.WindowState(w))
 	shown := engine.TabID(0)
 	if len(visible) > 0 {
 		shown = visible[0]
 	}
-	if shown != e.shown {
-		e.shown = shown
+	if shown != win.shown {
+		win.shown = shown
 		if t := e.tabs[shown]; t != nil {
-			e.publishPage(shown, t.state, t.current)
+			e.publishPage(w, shown, t.state, t.current)
 		}
 	}
 }
@@ -238,11 +293,24 @@ func Page(l engine.WindowLayout) engine.Rect {
 	return l.Tabs[0].Rect
 }
 
-// Layout is the last layout the app gave the window.
-func (e *Engine) Layout() engine.WindowLayout {
+// Layout is the last layout the app gave window w, or none once it closed.
+func (e *Engine) Layout(w engine.WindowID) engine.WindowLayout {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.layout
+	if win := e.windows[w]; win != nil {
+		return win.layout
+	}
+	return engine.WindowLayout{}
+}
+
+// Open says whether window w is open. Main thread.
+func (e *Engine) Open(w engine.WindowID) bool { return e.windows[w] != nil }
+
+// Windows are the windows open now.
+func (e *Engine) Windows() []engine.WindowID {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Sorted(maps.Keys(e.windows))
 }
 
 // Requests are the window requests the app made, in order.
@@ -252,7 +320,7 @@ func (e *Engine) Requests() []engine.WindowRequest {
 	return append([]engine.WindowRequest(nil), e.requests...)
 }
 
-// ShownColor is the colour the window painted when it went on screen.
+// ShownColor is the colour the first window painted when it went on screen.
 func (e *Engine) ShownColor() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -307,66 +375,72 @@ func (e *Engine) Edits() []engine.EditCommand {
 }
 
 // The real window puts the settings page in a view over everything. The mock says so on
-// its Window feed, and the dev window draws it there.
+// the window's Window feed, and its dev window draws it there.
 func (e *Engine) OpenSettings(w engine.WindowID) {
 	e.mu.Lock()
-	e.settings = true
+	e.windows[w].settings = true
 	e.mu.Unlock()
-	e.Window.Publish(e.WindowState())
+	e.Feeds(w).Window.Publish(e.WindowState(w))
 }
 
 func (e *Engine) CloseSettings(w engine.WindowID) {
 	e.mu.Lock()
-	e.settings = false
+	e.windows[w].settings = false
 	e.mu.Unlock()
-	e.Settings.Publish([]byte(`{"t":"closed"}`))
-	e.Window.Publish(e.WindowState())
+	e.Feeds(w).Settings.Publish([]byte(`{"t":"closed"}`))
+	e.Feeds(w).Window.Publish(e.WindowState(w))
 }
 
-// WindowState is what the window holds besides the shell, and how it draws and hit-tests,
-// as the Window feed sends it:
+// WindowState is what window w holds besides the shell, and how it draws and hit-tests,
+// as its Window feed sends it:
 //
 //	{"t":"window", "page":where the mock page goes, "regions":[{x,y,w,h,"area":"drag"|"shell"}],
 //	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
 //	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
 //
-// The mock shows one page, the first visible tab's, so "page" is where the layout puts
-// that. The rectangles are the layout's, in the shell's coordinates, which on the mock
-// are the dev window's. The regions are in order: the first that holds a point decides.
-// Any goroutine.
-func (e *Engine) WindowState() []byte {
+// The mock shows one page per window, the first visible tab's, so "page" is where the
+// layout puts that. The rectangles are the layout's, in the shell's coordinates, which on
+// the mock are the dev window's. The regions are in order: the first that holds a point
+// decides. A window that closed holds nothing. Any goroutine.
+func (e *Engine) WindowState(w engine.WindowID) []byte {
 	type region struct {
 		engine.Rect
 		Area string `json:"area"`
 	}
 	e.mu.Lock()
-	l, w, settings := e.layout, e.window, e.settings
+	var l engine.WindowLayout
+	var s engine.WindowState
+	settings := false
+	if win := e.windows[w]; win != nil {
+		l, s, settings = win.layout, win.reported, win.settings
+	}
 	e.mu.Unlock()
 	regions := []region{}
 	for _, r := range l.Regions {
 		regions = append(regions, region{r.Rect, AreaNames[r.Area]})
 	}
 	var controls *engine.Rect
-	if w.Controls != (engine.Rect{}) {
-		controls = &w.Controls
+	if s.Controls != (engine.Rect{}) {
+		controls = &s.Controls
 	}
 	b, _ := json.Marshal(map[string]any{"t": "window", "page": Page(l), "regions": regions,
-		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": w.CornerRadius,
-		"settings": settings, "popup": e.openPopup()})
+		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": s.CornerRadius,
+		"settings": settings, "popup": e.openPopup(w)})
 	return b
 }
 
 // AreaNames are what the dev window and its tests call each area.
 var AreaNames = [...]string{engine.AreaPage: "page", engine.AreaShell: "shell", engine.AreaDrag: "drag"}
 
-// SettingsOpen says whether the app has the settings page open.
-func (e *Engine) SettingsOpen() bool {
+// SettingsOpen says whether window w has its settings page open.
+func (e *Engine) SettingsOpen(w engine.WindowID) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.settings
+	win := e.windows[w]
+	return win != nil && win.settings
 }
 
-func (e *Engine) SendToSettings(w engine.WindowID, msg []byte) { e.Settings.Publish(msg) }
+func (e *Engine) SendToSettings(w engine.WindowID, msg []byte) { e.Feeds(w).Settings.Publish(msg) }
 
 func (e *Engine) SetMenu(m engine.Menu) {
 	e.mu.Lock()
@@ -381,13 +455,20 @@ func (e *Engine) Menu() engine.Menu {
 	return e.menu
 }
 
-func (e *Engine) AppCommand(engine.AppCommand) {}
+// AppCommand records a quit; the rest are the OS's.
+func (e *Engine) AppCommand(c engine.AppCommand) {
+	if c == engine.AppQuit {
+		e.mu.Lock()
+		e.quit = true
+		e.mu.Unlock()
+	}
+}
 
 func (e *Engine) FocusTab(engine.TabID) {}
 
 func (e *Engine) FocusShell(engine.WindowID) {}
 
-func (e *Engine) SendToShell(w engine.WindowID, msg []byte) { e.Shell.Publish(msg) }
+func (e *Engine) SendToShell(w engine.WindowID, msg []byte) { e.Feeds(w).Shell.Publish(msg) }
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
 
@@ -407,50 +488,65 @@ func (e *Engine) Settle() {
 	<-done
 }
 
-// Closed reports whether the app closed its window.
-func (e *Engine) Closed() bool {
+// Closed reports whether window w closed.
+func (e *Engine) Closed(w engine.WindowID) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.closed
+	return slices.Contains(e.closed, w)
 }
 
-// Hidden returns the tabs told they are hidden by the last layout.
-func (e *Engine) Hidden() []engine.TabID {
+// Quit reports whether the app quit.
+func (e *Engine) Quit() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return append([]engine.TabID(nil), e.hidden...)
+	return e.quit
 }
 
-// Fire makes the engine do what a button on the mock page says, to the shown tab. Any
-// goroutine.
-func (e *Engine) Fire(kind, value string) {
+// Hidden returns the tabs in window w told they are hidden by its last layout.
+func (e *Engine) Hidden(w engine.WindowID) []engine.TabID {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if win := e.windows[w]; win != nil {
+		return append([]engine.TabID(nil), win.hidden...)
+	}
+	return nil
+}
+
+// Fire makes the engine do what a button on window w's mock page says, to the tab it
+// shows. Any goroutine.
+func (e *Engine) Fire(w engine.WindowID, kind, value string) {
 	e.Post(func() {
-		t := e.tabs[e.shown]
+		win := e.windows[w]
+		if win == nil {
+			return
+		}
+		shown := win.shown
+		t := e.tabs[shown]
 		switch kind {
 		case "navigate":
-			e.navigate(e.shown, value)
+			e.navigate(shown, value)
 		case "title":
-			e.listener.TitleChanged(e.shown, value)
+			e.listener.TitleChanged(shown, value)
 		case "fail":
 			if t != nil {
 				t.navSeq++
-				e.listener.LoadingChanged(e.shown, false)
-				e.listener.NavigationFailed(e.shown, t.current, value)
+				e.listener.LoadingChanged(shown, false)
+				e.listener.NavigationFailed(shown, t.current, value)
 			}
 		case "crash":
 			if t != nil {
 				t.navSeq++
 				t.state = "crashed"
-				e.listener.PageCrashed(e.shown)
-				e.publishPage(e.shown, t.state, t.current)
+				e.listener.PageCrashed(shown)
+				e.publishPage(w, shown, t.state, t.current)
 			}
 		case "favicon":
-			e.listener.FaviconChanged(e.shown, value)
+			e.listener.FaviconChanged(shown, value)
 		case "open":
 			// What a page's target=_blank or window.open does: the engine makes the
 			// tab, tells the app, then loads it.
 			id := e.CreateTab()
-			e.listener.TabOpened(e.shown, id, value, true)
+			e.listener.TabOpened(shown, id, value, true)
 			e.navigate(id, value)
 		case "key":
 			// A key pressed in the page, which uses none of them.
@@ -462,8 +558,18 @@ func (e *Engine) Fire(kind, value string) {
 			e.listener.ModsChanged(0)
 		case "fullscreen":
 			// The system's own button, which asks no one.
-			e.full = !e.full
-			e.reportWindow()
+			win.full = !win.full
+			e.reportWindow(w)
+		case "focus":
+			// The window comes to the front, as a click on it does.
+			e.listener.WindowFocused(w)
+		case "close":
+			// Its own close button, which asks no one.
+			e.mu.Lock()
+			delete(e.windows, w)
+			e.closed = append(e.closed, w)
+			e.mu.Unlock()
+			e.listener.WindowClosed(w)
 		}
 	})
 }
@@ -497,13 +603,13 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 	seq := t.navSeq
 	if !e.listener.NavigationStarting(id, u) {
 		t.state = "blocked"
-		e.publishPage(id, t.state, u)
+		e.showPage(id, t.state, u)
 		return
 	}
 	e.listener.LoadingChanged(id, true)
 	e.listener.LoadProgressChanged(id, 0.5)
 	t.state = "loading"
-	e.publishPage(id, t.state, u)
+	e.showPage(id, t.state, u)
 	time.AfterFunc(loadDelay, func() {
 		e.Post(func() {
 			if e.tabs[id] != t || seq != t.navSeq {
@@ -517,18 +623,24 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 			e.listener.TitleChanged(id, titleOf(u))
 			e.listener.LoadProgressChanged(id, 1)
 			e.listener.LoadingChanged(id, false)
-			e.publishPage(id, t.state, u)
+			e.showPage(id, t.state, u)
 		})
 	})
 }
 
-// publishPage tells the mock page what to show. The page shows the shown tab only.
-func (e *Engine) publishPage(id engine.TabID, state, u string) {
-	if id != e.shown && id != 0 {
-		return
-	}
+// publishPage tells window w's mock page what to show: a tab, or 0 for none.
+func (e *Engine) publishPage(w engine.WindowID, id engine.TabID, state, u string) {
 	b, _ := json.Marshal(map[string]any{"tab": id, "state": state, "url": u})
-	e.Page.Publish(b)
+	e.Feeds(w).Page.Publish(b)
+}
+
+// showPage tells the mock page of whichever window shows a tab what it shows now.
+func (e *Engine) showPage(id engine.TabID, state, u string) {
+	for w, win := range e.windows {
+		if win.shown == id {
+			e.publishPage(w, id, state, u)
+		}
+	}
 }
 
 // titleOf is a mock page's title. The blank page has none, so content titles it with

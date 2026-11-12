@@ -11,6 +11,7 @@ package main
 
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
+static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, layout, regions, count, tabs, tab_count); }
 static inline void call_request_window(const PBEngineCalls* c, int64_t window, int32_t request) { c->request_window(window, request); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
@@ -138,7 +139,20 @@ func (e *nativeEngine) SetMenu(m engine.Menu) {
 
 func (e *nativeEngine) AppCommand(c engine.AppCommand) { C.call_app_command(e.calls, C.int32_t(c)) }
 
+func (e *nativeEngine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
+	e.withLayout(l, func(layout *C.PBWindowLayout, regions *C.PBRegion, count C.size_t, tabs *C.PBVisibleTab, tabCount C.size_t) {
+		C.call_create_window(e.calls, C.int64_t(w), C.int64_t(near), layout, regions, count, tabs, tabCount)
+	})
+}
+
 func (e *nativeEngine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
+	e.withLayout(l, func(layout *C.PBWindowLayout, regions *C.PBRegion, count C.size_t, tabs *C.PBVisibleTab, tabCount C.size_t) {
+		C.call_set_window_layout(e.calls, C.int64_t(w), layout, regions, count, tabs, tabCount)
+	})
+}
+
+// withLayout hands call a layout as the C side has it.
+func (e *nativeEngine) withLayout(l engine.WindowLayout, call func(*C.PBWindowLayout, *C.PBRegion, C.size_t, *C.PBVisibleTab, C.size_t)) {
 	rgb, err := strconv.ParseInt(strings.TrimPrefix(l.FrameColor, "#"), 16, 32)
 	if err != nil {
 		timeline.Errorf("window colour %q is not #rrggbb", l.FrameColor)
@@ -165,7 +179,7 @@ func (e *nativeEngine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout)
 		frame_rgb: C.int32_t(rgb), frame_width: C.double(l.FrameWidth),
 		theme: C.int32_t(l.Theme),
 	}
-	C.call_set_window_layout(e.calls, C.int64_t(w), &layout, first, C.size_t(len(regions)), firstTab, C.size_t(len(tabs)))
+	call(&layout, first, C.size_t(len(regions)), firstTab, C.size_t(len(tabs)))
 }
 
 func (e *nativeEngine) FocusTab(tab engine.TabID) { C.call_focus_tab(e.calls, C.int64_t(tab)) }

@@ -71,9 +71,23 @@ void Reply(const std::string& id, const std::string& text) {
   fflush(stdout);
 }
 
-// The window the driver acts on.
+// Go's id for the window the driver acts on: the first, until "window" picks another.
+int64_t g_window = 1;
+
 Engine::AppWindow* Current() {
-  return Engine::Get()->window(1);
+  return Engine::Get()->window(g_window);
+}
+
+// Makes a window the one the driver acts on, and the key window, as a click on it would.
+// A session with no display has no key window of its own.
+void UseWindow(int64_t id) {
+  for (const auto& [other, w] : Engine::Get()->windows()) {
+    if (other != id) {
+      w->window->ForceKeyForDriver(false);
+    }
+  }
+  g_window = id;
+  Current()->window->ForceKeyForDriver(true);
 }
 
 NSWindow* TheWindow() {
@@ -362,7 +376,39 @@ void Run(const std::string& line) {
         std::vector<std::string>(parts.begin() + i, parts.end()), " ");
   };
 
-  if (cmd == "move") {
+  if (cmd == "window") {
+    // "window <id>" acts on that window from now on, and makes it the key window.
+    if (Engine::Get()->window(number(2))) {
+      UseWindow(number(2));
+      Reply(id, "ok");
+    } else {
+      Reply(id, "ERR no window");
+    }
+  } else if (cmd == "windows") {
+    // Every window: Go's id, its frame on screen, y down from the top of the main
+    // screen, its title, whether it is the key window, and the tabs it shows.
+    base::ListValue out;
+    for (const auto& [wid, w] : Engine::Get()->windows()) {
+      NSWindow* window = w->window->native_window().GetNativeNSWindow();
+      const gfx::Rect frame = w->window->GetBounds();
+      base::ListValue tabs;
+      for (const Engine::VisibleTab& v : w->visible) {
+        tabs.Append(static_cast<int>(v.tab));
+      }
+      out.Append(base::DictValue()
+                     .Set("id", static_cast<int>(wid))
+                     .Set("frame", base::ListValue()
+                                       .Append(frame.x())
+                                       .Append(frame.y())
+                                       .Append(frame.width())
+                                       .Append(frame.height()))
+                     .Set("title", base::SysNSStringToUTF8(window.title))
+                     .Set("key", static_cast<bool>(window.isKeyWindow))
+                     .Set("visible", static_cast<bool>(window.visible))
+                     .Set("tabs", std::move(tabs)));
+    }
+    Reply(id, base::WriteJson(out).value_or("[]"));
+  } else if (cmd == "move") {
     Reply(id, SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0));
   } else if (cmd == "click") {
     SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0);
@@ -745,7 +791,7 @@ void Capture(const std::string& id, const std::string& path) {
 }  // namespace
 
 void StartDriver(const base::FilePath& fifo) {
-  Current()->window->ForceKeyForDriver();
+  UseWindow(g_window);
   const std::string path = fifo.value();
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     // Opened read-write so it doesn't see end-of-file between writers.

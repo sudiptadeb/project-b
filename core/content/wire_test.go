@@ -100,8 +100,10 @@ func (r *recorder) SettingsMessage(w engine.WindowID, msg []byte) {
 func (r *recorder) WindowChanged(w engine.WindowID, s engine.WindowState) {
 	r.note(fmt.Sprintf("window %d %gx%g r=%g full=%v", w, s.W, s.H, s.CornerRadius, s.FullScreen))
 }
-func (r *recorder) TabFocused(tab engine.TabID)    { r.note(fmt.Sprint("focused ", tab)) }
-func (r *recorder) ShellCrashed(w engine.WindowID) { r.note(fmt.Sprintf("shell %d crashed", w)) }
+func (r *recorder) TabFocused(tab engine.TabID)     { r.note(fmt.Sprint("focused ", tab)) }
+func (r *recorder) WindowClosed(w engine.WindowID)  { r.note(fmt.Sprintf("window %d closed", w)) }
+func (r *recorder) WindowFocused(w engine.WindowID) { r.note(fmt.Sprintf("window %d focused", w)) }
+func (r *recorder) ShellCrashed(w engine.WindowID)  { r.note(fmt.Sprintf("shell %d crashed", w)) }
 func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
 	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))
 }
@@ -248,8 +250,10 @@ func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h.Dispatch(eventShellCrashed, []Value{{I: 2}})
 	h.Dispatch(eventShellMessage, []Value{{I: 2}, {S: `{"t":"ready"}`}})
 	h.Dispatch(eventSettingsMsg, []Value{{I: 2}, {S: `{"t":"close"}`}})
+	h.Dispatch(eventWindowFocused, []Value{{I: 2}})
+	h.Dispatch(eventWindowClosed, []Value{{I: 2}})
 	h.Dispatch(eventProcessCrashed, []Value{{S: "renderer"}, {I: int64(TerminationStatusProcessCrashed)}, {I: 11}, {I: 42}, {S: "https://p.test/"}})
-	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 2 1100x700 r=20 full=true", "shell 2 crashed", `shell 2 {"t":"ready"}`, `settings 2 {"t":"close"}`, "renderer crashed 11 42 https://p.test/"}) {
+	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 2 1100x700 r=20 full=true", "shell 2 crashed", `shell 2 {"t":"ready"}`, `settings 2 {"t":"close"}`, "window 2 focused", "window 2 closed", "renderer crashed 11 42 https://p.test/"}) {
 		t.Fatalf("got %v", r.got)
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {

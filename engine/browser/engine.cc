@@ -133,6 +133,10 @@ void CallSetMenu(const char* json, size_t length) {
 
 void CallAppCommand(int32_t command) {
   CheckMainThread();
+  if (command == PB_APP_QUIT) {
+    g_engine->Quit();
+    return;
+  }
 #if !BUILDFLAG(IS_ANDROID)
   RunAppCommand(command);
 #endif
@@ -166,13 +170,10 @@ void CallRequestWindow(int64_t window, int32_t request) {
   }
 }
 
-void CallSetWindowLayout(int64_t window,
-                         const PBWindowLayout* l,
-                         const PBRegion* regions,
-                         size_t region_count,
-                         const PBVisibleTab* tabs,
-                         size_t tab_count) {
-  CheckMainThread();
+// A layout from Go as the window and the engine take it.
+Window::Layout LayoutOf(const PBWindowLayout* l,
+                        const PBRegion* regions,
+                        size_t region_count) {
   Window::Layout layout = {
       .viewport = gfx::SizeF(l->view_w, l->view_h),
       .frame_rgb = static_cast<uint32_t>(l->frame_rgb),
@@ -185,16 +186,42 @@ void CallSetWindowLayout(int64_t window,
     layout.regions.push_back({gfx::RectF(r.x, r.y, r.w, r.h),
                               static_cast<Window::Area>(r.area)});
   }
-  if (!NativeWindow(window)->SetLayout(std::move(layout))) {
-    return;
-  }
+  return layout;
+}
+
+std::vector<Engine::VisibleTab> TabsOf(const PBVisibleTab* tabs,
+                                       size_t tab_count) {
   std::vector<Engine::VisibleTab> visible;
   visible.reserve(tab_count);
   for (size_t i = 0; i < tab_count; i++) {
     const PBVisibleTab& t = UNSAFE_BUFFERS(tabs[i]);
     visible.push_back({t.tab, gfx::RectF(t.x, t.y, t.w, t.h)});
   }
-  g_engine->ShowTabs(g_engine->window(window), std::move(visible));
+  return visible;
+}
+
+void CallCreateWindow(int64_t window,
+                      int64_t near,
+                      const PBWindowLayout* l,
+                      const PBRegion* regions,
+                      size_t region_count,
+                      const PBVisibleTab* tabs,
+                      size_t tab_count) {
+  CheckMainThread();
+  g_engine->CreateWindow(window, near, LayoutOf(l, regions, region_count),
+                         TabsOf(tabs, tab_count));
+}
+
+void CallSetWindowLayout(int64_t window,
+                         const PBWindowLayout* l,
+                         const PBRegion* regions,
+                         size_t region_count,
+                         const PBVisibleTab* tabs,
+                         size_t tab_count) {
+  CheckMainThread();
+  if (NativeWindow(window)->SetLayout(LayoutOf(l, regions, region_count))) {
+    g_engine->ShowTabs(g_engine->window(window), TabsOf(tabs, tab_count));
+  }
 }
 
 void CallFocusTab(int64_t tab) {
@@ -236,8 +263,9 @@ void CallPostWakeup() {
 Engine::AppWindow::AppWindow(int64_t id) : id(id) {}
 Engine::AppWindow::~AppWindow() = default;
 
-Engine::Engine(content::BrowserContext* browser_context)
-    : browser_context_(browser_context) {
+Engine::Engine(content::BrowserContext* browser_context,
+               base::RepeatingClosure quit)
+    : browser_context_(browser_context), quit_(std::move(quit)) {
   CHECK(!g_engine);
   g_engine = this;
 }
@@ -276,6 +304,7 @@ const PBEngineCalls* Engine::Calls() {
       .get_zoom = CallGetZoom,
       .duplicate_tab = CallDuplicateTab,
       .edit = CallEdit,
+      .create_window = CallCreateWindow,
       .request_window = CallRequestWindow,
       .set_window_layout = CallSetWindowLayout,
       .focus_tab = CallFocusTab,
@@ -374,10 +403,26 @@ void Engine::UpdateTitle(AppWindow* window) {
   }
 }
 
-void Engine::OpenWindow(int64_t id, base::OnceClosure on_close) {
+void Engine::CreateWindow(int64_t id,
+                          int64_t near,
+                          Window::Layout layout,
+                          std::vector<VisibleTab> tabs) {
   auto w = std::make_unique<AppWindow>(id);
-  w->window = std::make_unique<Window>(std::move(on_close));
+  w->window = std::make_unique<Window>(
+      base::BindOnce(&Engine::WindowClosed, base::Unretained(this), id),
+      base::BindRepeating(
+          [](int64_t id) {
+            hooks::Args args;
+            args.Int(id);
+            hooks::Fire(PB_EVENT_WINDOW_FOCUSED, args);
+          },
+          id),
+      base::BindRepeating(&Engine::WindowMinimised, base::Unretained(this),
+                          id));
   timeline::Mark("window.created");
+  if (AppWindow* other = window(near)) {
+    w->window->PlaceNear(other->window.get());
+  }
   w->shell = std::make_unique<ShellPage>(browser_context_, id);
   timeline::Mark("shell.created");
 #if BUILDFLAG(IS_ANDROID)
@@ -385,16 +430,28 @@ void Engine::OpenWindow(int64_t id, base::OnceClosure on_close) {
 #else
   w->window->SetShellView(w->shell->contents()->GetNativeView());
 #endif
-  ShellPage* shell = w->shell.get();
+  AppWindow* raw = w.get();
   windows_[id] = std::move(w);
-  shell->Load();
+  raw->shell->Load();
+  // The frame is in the first layout, so even the window's first frame on screen is the
+  // frame colour. It still shows before any renderer has drawn.
+  if (raw->window->SetLayout(std::move(layout))) {
+    ShowTabs(raw, std::move(tabs));
+  }
+  raw->window->Show();
+  timeline::Mark("window.shown");
+  // Go hears about the window once the call that made it has returned.
+  content::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE,
+      base::BindOnce(&Engine::ListenToWindow, base::Unretained(this), id));
 }
 
-void Engine::ShowWindow(int64_t id) {
-  Window* native = window(id)->window.get();
-  native->Show();
-  timeline::Mark("window.shown");
-  native->ListenForState(base::BindRepeating(
+void Engine::ListenToWindow(int64_t id) {
+  AppWindow* w = window(id);
+  if (!w) {
+    return;
+  }
+  w->window->ListenForState(base::BindRepeating(
       [](int64_t id, const Window::State& s) {
         hooks::Args args;
         args.Int(id);
@@ -409,6 +466,34 @@ void Engine::ShowWindow(int64_t id) {
         hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
       },
       id));
+}
+
+// The native window is in the middle of closing, so the window and its pages die on a
+// later task. It is posted before Go hears, so it runs before anything Go asks for in turn:
+// a quit, when this was the last window, would otherwise end the app with the window's
+// pages still alive. Go closes the window's tabs as it hears.
+void Engine::WindowClosed(int64_t id) {
+  auto it = windows_.find(id);
+  content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
+                                                 std::move(it->second));
+  windows_.erase(it);
+  hooks::Args args;
+  args.Int(id);
+  hooks::Fire(PB_EVENT_WINDOW_CLOSED, args);
+}
+
+void Engine::WindowMinimised(int64_t id, bool minimised) {
+  for (const VisibleTab& v : window(id)->visible) {
+    if (minimised) {
+      tab(v.tab)->contents()->WasHidden();
+    } else {
+      tab(v.tab)->contents()->WasShown();
+    }
+  }
+}
+
+void Engine::Quit() {
+  quit_.Run();
 }
 
 void Engine::FocusShellForTraversal(int64_t from_tab, bool reverse) {
@@ -650,11 +735,17 @@ void Engine::SendToSettings(int64_t window, const char* json, size_t length) {
   }
 }
 
-// Same reason as CloseTab: the request can arrive inside a view's own event.
+// Same reason as CloseTab: the request can arrive inside a view's own event. The window
+// may have closed by then, by its own button or an earlier request.
 void Engine::CloseWindow(int64_t window) {
   content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE, base::BindOnce(&Window::Close,
-                                base::Unretained(this->window(window)->window.get())));
+      FROM_HERE, base::BindOnce(
+                     [](Engine* engine, int64_t window) {
+                       if (AppWindow* w = engine->window(window)) {
+                         w->window->Close();
+                       }
+                     },
+                     base::Unretained(this), window));
 }
 
 // While a window's settings page is open it keeps the keyboard: a focus request from

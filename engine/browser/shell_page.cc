@@ -106,6 +106,10 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
       LOG(WARNING) << "dropped a malformed message from " << name_;
       return;
     }
+    // One sent just before its window closed arrives with the window gone.
+    if (!Engine::Get()->window(window_)) {
+      return;
+    }
     hooks::Args hook_args;
     hook_args.Int(window_);
     hook_args.Str(args[0].GetString());

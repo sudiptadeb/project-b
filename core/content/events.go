@@ -23,6 +23,8 @@ const (
 	eventModsChanged    Hook = 10
 	eventProcessCrashed Hook = 11
 	eventDevTools       Hook = 12
+	eventWindowClosed   Hook = 13
+	eventWindowFocused  Hook = 14
 )
 
 var eventNames = map[Hook]string{
@@ -38,6 +40,8 @@ var eventNames = map[Hook]string{
 	eventModsChanged:    "engine.ModsChanged",
 	eventProcessCrashed: "engine.ProcessCrashed",
 	eventDevTools:       "engine.DevToolsCommand",
+	eventWindowClosed:   "engine.WindowClosed",
+	eventWindowFocused:  "engine.WindowFocused",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -58,6 +62,8 @@ type Events struct {
 	OnFaviconChanged  func(tab engine.TabID, dataURL string)
 	OnWindowChanged   func(w engine.WindowID, s engine.WindowState)
 	OnShellCrashed    func(w engine.WindowID)
+	OnWindowClosed    func(w engine.WindowID)
+	OnWindowFocused   func(w engine.WindowID)
 	OnSettingsMessage func(w engine.WindowID, msg []byte)
 	OnMenuChosen      func(action string)
 	OnOSBindings      func(byTitle map[string]engine.Key)
@@ -96,6 +102,14 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	case eventShellCrashed:
 		if e.OnShellCrashed != nil {
 			e.OnShellCrashed(engine.WindowID(r.int()))
+		}
+	case eventWindowClosed:
+		if e.OnWindowClosed != nil {
+			e.OnWindowClosed(engine.WindowID(r.int()))
+		}
+	case eventWindowFocused:
+		if e.OnWindowFocused != nil {
+			e.OnWindowFocused(engine.WindowID(r.int()))
 		}
 	case eventSettingsMsg:
 		if e.OnSettingsMessage != nil {

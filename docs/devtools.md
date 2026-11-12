@@ -33,8 +33,8 @@ it either, below).
   its own WebUI browser the same way, under the type `browser_ui`.
 - **New targets**: `Target.createTarget` and `/json/new` open a tab the way a link with
   `target=_blank` does: the adapter makes it, Go hears of it before its first navigation
-  (so the URL gate applies), shows it, and it loads. There is one window, so
-  `newWindow: true` also opens a tab. `background` is ignored and the tab comes to the
+  (so the URL gate applies), shows it, and it loads. It opens in the window in front,
+  and `newWindow: true` also opens a tab there. `background` is ignored and the tab comes to the
   front, as in content_shell; Chrome handles `background` in its own `Target` handler.
 - **Close and activate**: `Target.closeTarget` runs the page's unload and then asks the
   tab's delegate to close it; `Target.activateTarget` asks it to show the tab (Chrome's
@@ -51,10 +51,10 @@ Chrome's `chrome/browser/devtools/protocol/browser_handler.cc` answers them, in
 
 | Command | Answer |
 |---|---|
-| `Browser.getWindowForTarget` | window id `1` and its bounds, for a tab |
+| `Browser.getWindowForTarget` | the id Go gave the window the tab shows in, and its bounds; none for a tab no window has shown yet |
 | `Browser.getWindowBounds` | the frame in screen points, y down from the top of the main screen, and `normal`, `minimized`, `maximized` (AppKit's zoomed) or `fullscreen` |
 | `Browser.setWindowBounds` | Chrome's rules: a state can't be combined with a rectangle, and `normal` first leaves full screen, the Dock or zoom |
-| `Browser.close` | closes the window on a later task, which ends the app |
+| `Browser.close` | quits the app on a later task, every window at once |
 
 ## Our own commands
 
@@ -77,8 +77,8 @@ of it can already drive the whole browser and crash it (`Browser.crash`).
 
 ## Not here
 
-- Separate browser contexts (`Target.createBrowserContext`, Playwright's normal launch)
-  and more than one window.
+- Separate browser contexts (`Target.createBrowserContext`, Playwright's normal launch),
+  and a new window: `newWindow` opens a tab ([windows.md](windows.md), step 6).
 - `Browser.setContentsSize`, `setDockTile`, `executeBrowserCommand`.
 - A page's own full screen (`requestFullscreen`), which ChromeDriver's Fullscreen Window
   uses on a non-headless Chrome: no tab hook takes the window to full screen yet.

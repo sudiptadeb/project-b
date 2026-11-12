@@ -59,6 +59,9 @@
           "action": "tab.new"
         },
         {
+          "action": "window.new"
+        },
+        {
           "action": "address.focus"
         },
         {

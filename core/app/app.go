@@ -47,10 +47,10 @@ type App struct {
 	actions []*commands.Action
 	// keyIn is which page had the keyboard at the last key press.
 	keyIn engine.Surface
+	// lastWindow is the id of the window made last; Go numbers them from 1.
+	lastWindow engine.WindowID
+	quit       func()
 }
-
-// theWindow is the one window, until there are more.
-const theWindow engine.WindowID = 1
 
 // starters are what a build tag adds to Start. A tagged file appends one when it loads,
 // so nothing here names it; each builds its managers and wires them to the rest.
@@ -68,22 +68,23 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
 	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()))
-	a.Window.Open(theWindow)
-	closeWindow := func() { a.Window.Request(theWindow, engine.WindowClose) }
-	a.Update = update.New(cfg.Update, e.Post, closeWindow)
+	first := a.openWindow()
+	a.quit = func() { e.AppCommand(engine.AppQuit) }
+	a.Update = update.New(cfg.Update, e.Post, a.quit)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
-	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(theWindow) })
+	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
-	a.Settings.OnRelaunch(func() { relaunch.Self(); closeWindow() })
-	a.registerActions(e, closeWindow)
+	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
+	a.registerActions(e)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
 	a.Tabs.OnNavigationFinished(func(t tabs.Tab) { a.History.AddVisit(t.URL, t.Title) })
 	a.Tabs.OnTitleChanged(func(t tabs.Tab) { a.History.UpdateTitle(t.URL, t.Title) })
 	a.Tabs.OnChanged(a.Shell.TabChanged)
 	a.Tabs.OnListChanged(a.Shell.TabsChanged)
-	a.Tabs.OnEmpty(closeWindow)
+	// Closing a window's last tab closes the window.
+	a.Tabs.OnEmpty(func(w engine.WindowID) { a.Window.Request(w, engine.WindowClose) })
 	a.Window.OnControlsChanged(a.Shell.WindowControlsChanged)
 	a.Window.OnControlsChanged(a.Settings.WindowControlsChanged)
 	a.Window.OnColorChanged(a.Shell.WindowColorChanged)
@@ -101,8 +102,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Commands.OnChanged(a.Settings.KeyboardChanged)
 	a.Flags.OnChanged(a.Settings.FlagsChanged)
 	a.Commands.OnChanged(a.Shell.KeysChanged)
-	// What the menu shows enabled or checked follows the active tab, the layout and full
-	// screen.
+	// What the menu shows enabled or checked follows the window in front: its active tab
+	// and full screen, and the layout.
 	a.Tabs.OnChanged(func(tabs.Tab) { a.Commands.RefreshMenu() })
 	a.Tabs.OnListChanged(a.Commands.RefreshMenu)
 	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
@@ -113,9 +114,25 @@ func Start(e engine.Engine, cfg Config) *App {
 	}
 
 	a.History.Load(nil)
-	a.Tabs.Create()
+	a.Tabs.CreateIn(first)
 	a.Update.Start()
 	return a
+}
+
+// openWindow makes a window with no tabs, a little down and right of the window in
+// front, and puts it in front.
+func (a *App) openWindow() engine.WindowID {
+	near := a.Tabs.Front()
+	a.lastWindow++
+	w := a.lastWindow
+	a.Tabs.AddWindow(w)
+	a.Window.Open(w, near)
+	return w
+}
+
+// NewWindow opens a window with one new tab.
+func (a *App) NewWindow() {
+	a.Tabs.CreateIn(a.openWindow())
 }
 
 // Stop flushes what's pending and says the run ended cleanly. Call it on the way out.
@@ -170,9 +187,9 @@ func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
 
 // Handover is the request of a copy started on this profile while this one runs: the
-// window comes to the front, and each URL opens in a new tab in front.
+// window used last comes to the front, and each URL opens in a new tab there.
 func (a *App) Handover(urls []string) {
-	a.Window.Request(theWindow, engine.WindowFront)
+	a.Window.Request(a.Tabs.Front(), engine.WindowFront)
 	for _, u := range urls {
 		a.Tabs.Open(u)
 	}
@@ -211,7 +228,26 @@ func (a *App) WindowChanged(w engine.WindowID, s engine.WindowState) {
 
 func (a *App) ShellCrashed(w engine.WindowID) {
 	a.Window.HandleShellCrashed(w)
-	a.Shell.HandleShellCrashed()
+	a.Shell.HandleShellCrashed(w)
+}
+
+// WindowClosed forgets the window and closes its tabs. Closing the last window quits.
+func (a *App) WindowClosed(w engine.WindowID) {
+	a.Settings.WindowClosed(w)
+	a.Shell.WindowClosed(w)
+	a.Window.Close(w)
+	a.Tabs.RemoveWindow(w)
+	if len(a.Tabs.Windows()) == 0 {
+		a.quit()
+		return
+	}
+	a.Commands.RefreshMenu()
+}
+
+// WindowFocused puts the window in front: commands and the menu follow it.
+func (a *App) WindowFocused(w engine.WindowID) {
+	a.Tabs.Focus(w)
+	a.Commands.RefreshMenu()
 }
 
 func (a *App) ProcessCrashed(p engine.ProcessCrash) { a.Crash.ProcessCrashed(p) }

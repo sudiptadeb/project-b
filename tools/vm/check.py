@@ -56,9 +56,11 @@ PAGES = "/Users/admin/pb-pages"
 PORT = 8765
 ALPHA = f"http://127.0.0.1:{PORT}/alpha.html"
 BRAVO = f"http://127.0.0.1:{PORT}/bravo.html"
+CHARLIE = f"http://127.0.0.1:{PORT}/charlie.html"
 PAGE_HTML = {
     "alpha.html": "<title>Alpha</title><body style='margin:0;background:#2b6cb0;color:#fff;font:64px sans-serif'><p>Alpha</p>",
     "bravo.html": "<title>Bravo</title><body style='margin:0;background:#dd6b20;color:#fff;font:64px sans-serif'><p>Bravo</p>",
+    "charlie.html": "<title>Charlie</title><body style='margin:0;background:#2f855a;color:#fff;font:64px sans-serif'><p>Charlie</p>",
 }
 PROFILE = "/Users/admin/.project-b/default"
 # Every launch starts from a fresh profile with automatic update checks off, so no update
@@ -531,6 +533,99 @@ def missing():
     return None
 
 
+def until(get, ok, limit=PAGE_LOAD + 5):
+    """get() once ok() holds of it, or as it is after the limit. Checks of whether something
+    works wait for their result this way, so a slow step fails only its own "within" check:
+    only the checks named "within" time things.
+    Waiting also keeps a late input from landing on the step after its own."""
+    end = time.time() + limit
+    now = get()
+    while not ok(now) and time.time() < end:
+        time.sleep(0.2)
+        now = get()
+    return now
+
+
+def windows():
+    """Every window of the app, as (x, y, w, h), in the window server's order, front first."""
+    found = json.loads(guest("/usr/bin/osascript", "-l", "JavaScript", "-e", WINDOWS) or "[]")
+    return [(w["X"], w["Y"], w["Width"], w["Height"]) for w in found]
+
+
+def titles():
+    """The windows' titles, front first, as System Events reads them: each is its shown tab's."""
+    names = guest("/usr/bin/osascript", "-e",
+                  f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
+                  "to get name of every window")
+    return [n.strip() for n in names.split(",")] if names else []
+
+
+def go_to(url):
+    """Cmd+L in the window in front, then the address."""
+    desk.key("cmd+l")
+    time.sleep(0.4)
+    desk.type(url)
+    desk.key("return")
+
+
+def window_checks():
+    """Several windows, with the real keyboard and mouse: Cmd+N, keys and commands going to the
+    window clicked, a second start's URL in the window used last, a window closing with its
+    last tab, and the app quitting with its last window. Which window shows what is read from
+    the windows' titles, each its shown tab's."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    time.sleep(1)
+    launch()
+    time.sleep(1.5)
+    first = window_or_stop("the app starts with one window")
+    desk.key("cmd+n")
+    both = until(windows, lambda w: len(w) == 2)
+    check("Cmd+N makes a second window", len(both) == 2, str(both))
+    if len(both) != 2:
+        return
+    second = next(w for w in both if w != first)
+    check("the second window opens a little down and right of the first, the same size",
+          0 < second[0] - first[0] <= 60 and 0 < second[1] - first[1] <= 60 and second[2:] == first[2:],
+          f"first {first}, second {second}")
+    # Where each window shows whichever is in front: the left edge of the first, which the
+    # second never covers, and the right edge of the second, which the first never does.
+    step = second[0] - first[0]
+    in_first = (first[0] + step / 2, first[1] + first[3] / 2)
+    in_second = (second[0] + second[2] - step / 2, second[1] + second[3] / 2)
+
+    desk.click(*in_first)
+    time.sleep(0.4)
+    go_to(ALPHA)
+    until(titles, lambda t: "Alpha" in t)
+    desk.click(*in_second)
+    time.sleep(0.4)
+    go_to(BRAVO)
+    now = until(titles, lambda t: sorted(t) == ["Alpha", "Bravo"])
+    check("Cmd+L and typing go to the window clicked", sorted(now) == ["Alpha", "Bravo"], str(now))
+    shot("two-windows")
+
+    desk.click(*in_first)
+    until(titles, lambda t: t[:1] == ["Alpha"])
+    guest("/usr/bin/open", "-n", APP, "--args", CHARLIE)
+    now = until(titles, lambda t: sorted(t) == ["Bravo", "Charlie"], 15)
+    check("a second start's URL opens in a new tab in the window used last, in front", now[:1] == ["Charlie"] and
+          sorted(now) == ["Bravo", "Charlie"], str(now))
+    shot("handed-over")
+
+    desk.click(*in_second)
+    until(titles, lambda t: t[:1] == ["Bravo"])
+    desk.key("cmd+w")
+    now = until(windows, lambda w: len(w) == 1)
+    check("closing a window's last tab closes the window", len(now) == 1 and until(titles, lambda t: t == ["Charlie"]) == ["Charlie"],
+          f"{now} {titles()}")
+    desk.key("cmd+shift+w")
+    gone = until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10) == ""
+    check("closing the last window quits", gone)
+    if not gone:
+        guest("/usr/bin/killall", "project_b")
+
+
 if why := missing():
     screen.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
 os.makedirs(SHOTS, exist_ok=True)
@@ -553,6 +648,12 @@ shot("desktop")
 # right, over the window's right end. deskrig closes such banners.
 desk.dismiss_notifications()
 time.sleep(1)
+
+# "check.py windows" runs only the checks of several windows.
+if sys.argv[1:] == ["windows"]:
+    window_checks()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
 
 # First paint: the first launch of an install, then three more.
 paints = []
@@ -630,19 +731,6 @@ def address():
     the page has drawn: a first visit can wait seconds on fonts for some of its languages."""
     desk.move(*NEUTRAL, 0.3)
     return crop(desk.image(), PX + V["field"][0] + 8, PY + TOP - 7, 400, 14)
-
-
-def until(get, ok, limit=PAGE_LOAD + 5):
-    """get() once ok() holds of it, or as it is after the limit. Checks of whether something
-    works wait for their result this way, so a slow step fails only its own "within" check:
-    only the checks named "within" time things.
-    Waiting also keeps a late input from landing on the step after its own."""
-    end = time.time() + limit
-    now = get()
-    while not ok(now) and time.time() < end:
-        time.sleep(0.2)
-        now = get()
-    return now
 
 
 def field_focused():
@@ -1021,5 +1109,6 @@ img = desk.image()
 check("the layout button brings the tabs back to the side", float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR))) > 0.9)
 
 check("Cmd+Q ends the app", quit_app())
+window_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

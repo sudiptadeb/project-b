@@ -11,11 +11,18 @@ import (
 type recorder struct {
 	engine.Engine
 	layouts  []engine.WindowLayout
+	to       []engine.WindowID // The window each layout went to.
+	created  []engine.WindowID // Each window made, and the one it was put near.
 	requests []engine.WindowRequest
 }
 
+func (r *recorder) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
+	r.created = append(r.created, w, near)
+	r.SetWindowLayout(w, l)
+}
 func (r *recorder) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 	r.layouts = append(r.layouts, l)
+	r.to = append(r.to, w)
 }
 func (r *recorder) RequestWindow(w engine.WindowID, q engine.WindowRequest) {
 	r.requests = append(r.requests, q)
@@ -25,7 +32,7 @@ func (r *recorder) last() engine.WindowLayout { return r.layouts[len(r.layouts)-
 // one is a manager with window 1 open.
 func one(e *recorder) *Manager {
 	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.Open(1)
+	m.Open(1, 0)
 	return m
 }
 
@@ -183,5 +190,36 @@ func TestRequestsGoToTheEngine(t *testing.T) {
 	want := []engine.WindowRequest{engine.WindowFullScreen, engine.WindowZoom, engine.WindowMinimise, engine.WindowClose}
 	if !reflect.DeepEqual(e.requests, want) {
 		t.Fatalf("requests %v", e.requests)
+	}
+}
+
+// Each window has its own layout, made from its own shell's report and its own state; the
+// frame colour is every window's.
+func TestEachWindowHasItsOwnLayout(t *testing.T) {
+	e := &recorder{}
+	m := one(e)
+	m.HandleShellLayout(1, report)
+	m.Open(2, 1)
+	m.HandleWindowChanged(2, engine.WindowState{W: 1440, H: 900, FullScreen: true})
+	m.HandleShellLayout(2, ShellLayout{Shell: report.Shell, Drag: report.Drag, ViewW: 1440, ViewH: 900})
+	if !reflect.DeepEqual(e.created, []engine.WindowID{1, 0, 2, 1}) {
+		t.Fatalf("created %v", e.created)
+	}
+	if e.to[len(e.to)-1] != 2 || len(e.last().Tabs) != 0 || e.last().At(100, 20) != engine.AreaShell {
+		t.Fatalf("window 2's layout %+v", e.last())
+	}
+	if m.FullScreen(1) || !m.FullScreen(2) || m.Windows()[0] != 1 || len(m.Windows()) != 2 {
+		t.Fatalf("full screen %v %v, windows %v", m.FullScreen(1), m.FullScreen(2), m.Windows())
+	}
+	sent := len(e.layouts)
+	m.SetColor("#3470d0")
+	if !reflect.DeepEqual(e.to[sent:], []engine.WindowID{1, 2}) {
+		t.Fatalf("the colour went to %v", e.to[sent:])
+	}
+	m.Close(2)
+	sent = len(e.layouts)
+	m.SetColor("#4f9e9e")
+	if !reflect.DeepEqual(e.to[sent:], []engine.WindowID{1}) || !reflect.DeepEqual(m.Windows(), []engine.WindowID{1}) {
+		t.Fatalf("after window 2 closed the colour went to %v", e.to[sent:])
 	}
 }

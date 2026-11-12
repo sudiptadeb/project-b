@@ -51,10 +51,13 @@ ExtensionPopup::ExtensionPopup(const extensions::Extension* extension,
 }
 
 ExtensionPopup::~ExtensionPopup() {
-  Engine::AppWindow* window = Engine::Get()->window(window_);
-  if (shown_ && window) {
-    window->window->RemovePopupView(host_contents()->GetNativeView());
+  if (shown_ && window()) {
+    window()->window->RemovePopupView(host_contents()->GetNativeView());
   }
+}
+
+Engine::AppWindow* ExtensionPopup::window() const {
+  return Engine::Get() ? Engine::Get()->window(window_) : nullptr;
 }
 
 // The popup may be asking from inside one of its own events, so it goes on a later task.
@@ -67,9 +70,13 @@ void ExtensionPopup::AskToClose() {
 
 // The view goes up once the page has loaded and laid out, so it is never seen empty.
 void ExtensionPopup::OnDidStopFirstLoad() {
+  if (!window()) {
+    AskToClose();
+    return;
+  }
   shown_ = true;
-  Engine::Get()->window(window_)->window->SetPopupView(
-      host_contents()->GetNativeView(), anchor_, size_);
+  window()->window->SetPopupView(host_contents()->GetNativeView(), anchor_,
+                                 size_);
   host_contents()->Focus();
 }
 
@@ -88,9 +95,9 @@ void ExtensionPopup::RenderFrameCreated(content::RenderFrameHost* frame_host) {
 void ExtensionPopup::ResizeDueToAutoResize(content::WebContents* web_contents,
                                            const gfx::Size& new_size) {
   size_ = new_size;
-  if (shown_) {
-    Engine::Get()->window(window_)->window->SetPopupView(
-        host_contents()->GetNativeView(), anchor_, size_);
+  if (shown_ && window()) {
+    window()->window->SetPopupView(host_contents()->GetNativeView(), anchor_,
+                                   size_);
   }
 }
 
@@ -116,11 +123,8 @@ void ExtensionPopup::OnWebContentsLostFocus(
 }
 
 void ExtensionPopup::CloseUnlessShellHasFocus() {
-  if (!Engine::Get()
-           ->window(window_)
-           ->shell->contents()
-           ->GetRenderWidgetHostView()
-           ->HasFocus()) {
+  if (!window() ||
+      !window()->shell->contents()->GetRenderWidgetHostView()->HasFocus()) {
     AskToClose();
   }
 }

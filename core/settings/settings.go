@@ -104,6 +104,14 @@ func (m *Manager) Close(w engine.WindowID) {
 	m.eng.CloseSettings(w)
 }
 
+// WindowClosed forgets the settings page of a window that closed: it went with the window.
+func (m *Manager) WindowClosed(w engine.WindowID) {
+	if _, ok := m.open[w]; ok {
+		delete(m.open, w)
+		m.commands.SetRecording(false)
+	}
+}
+
 // IsOpen says whether window w's settings page is showing.
 func (m *Manager) IsOpen(w engine.WindowID) bool {
 	_, ok := m.open[w]

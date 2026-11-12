@@ -54,12 +54,11 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 }
 
 void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
-  engine_ = std::make_unique<Engine>(browser_context_.get());
-  engine_->OpenWindow(1, base::DoNothing());
+  // Android ends the app itself, with the activity.
+  engine_ = std::make_unique<Engine>(browser_context_.get(), base::DoNothing());
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              blocked_hosts.c_str(), hooks::kTableHash);
   child_processes_ = std::make_unique<ChildProcesses>();
-  engine_->ShowWindow(1);
 }
 
 void BrowserMainParts::WillRunMainMessageLoop(

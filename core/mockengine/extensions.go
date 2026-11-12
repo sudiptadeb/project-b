@@ -37,7 +37,9 @@ type extensionRuntime struct {
 	mu     sync.Mutex
 	events []Event
 	popup  *Popup
-	choose string
+	// popupOver is the window the popup is over.
+	popupOver engine.WindowID
+	choose    string
 }
 
 type install struct {
@@ -141,26 +143,27 @@ func (e *Engine) DispatchExtensionEvent(id, event, args string) {
 func (e *Engine) OpenExtensionPopup(w engine.WindowID, id, url string, anchor engine.Rect) {
 	e.extensions.mu.Lock()
 	e.extensions.popup = &Popup{id, url, anchor}
+	e.extensions.popupOver = w
 	e.extensions.mu.Unlock()
-	e.Window.Publish(e.WindowState())
+	e.Feeds(w).Window.Publish(e.WindowState(w))
 }
 
 func (e *Engine) CloseExtensionPopup() {
 	e.extensions.mu.Lock()
-	open := e.extensions.popup != nil
+	open, w := e.extensions.popup != nil, e.extensions.popupOver
 	e.extensions.popup = nil
 	e.extensions.mu.Unlock()
 	if open {
-		e.Window.Publish(e.WindowState())
+		e.Feeds(w).Window.Publish(e.WindowState(w))
 		e.extensions.listener.ExtensionPopupClosed()
 	}
 }
 
-// openPopup is the extension popup the app has open, or nil. Any goroutine.
-func (e *Engine) openPopup() any {
+// openPopup is the extension popup the app has open over window w, or nil. Any goroutine.
+func (e *Engine) openPopup(w engine.WindowID) any {
 	e.extensions.mu.Lock()
 	defer e.extensions.mu.Unlock()
-	if e.extensions.popup == nil {
+	if e.extensions.popup == nil || e.extensions.popupOver != w {
 		return nil
 	}
 	p := *e.extensions.popup
@@ -192,7 +195,7 @@ func (e *Engine) Call(extension, name, args string, tab engine.TabID) Answer {
 //
 //	choose      the next ChoosePath picks value
 //	closePopup  the user clicked outside the popup
-//	blocked     extension's rules have blocked value requests in the shown tab
+//	blocked     extension's rules have blocked value requests in the tab window 1 shows
 func (e *Engine) FireExtension(kind, extension, value string) {
 	switch kind {
 	case "choose":
@@ -205,7 +208,7 @@ func (e *Engine) FireExtension(kind, extension, value string) {
 		e.Post(func() {
 			var n int
 			fmt.Sscan(value, &n)
-			e.extensions.listener.ExtensionBlockedCount(extension, e.shown, n)
+			e.extensions.listener.ExtensionBlockedCount(extension, e.windows[1].shown, n)
 		})
 	}
 }

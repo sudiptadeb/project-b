@@ -44,9 +44,10 @@ type Manager struct {
 	keys    func() map[string]string
 	os      string
 	parts   []Part
-	// Whether the shell page has said it's ready. Until then nothing reaches it: its
-	// script isn't there to take a message, and the snapshot it asks for has it all.
-	heard bool
+	// The windows whose shell page has said it's ready. Until then nothing reaches it:
+	// its script isn't there to take a message, and the snapshot it asks for has it all,
+	// a new window's first tab included.
+	heard map[engine.WindowID]bool
 	// moving is the span waiting for a shell's next layout report, or "".
 	moving string
 }
@@ -65,7 +66,7 @@ func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
 // New returns a manager. run runs an action by id, as a menu item would; keys says the key
 // each action shows, on platform os, for the shell's hints.
 func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager, run func(action string), keys func() map[string]string, os string) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os}
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os, heard: map[engine.WindowID]bool{}}
 }
 
 // Interaction runs what one thing the user asked for in window w does, as a span on the
@@ -102,11 +103,11 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	}
 	switch c.T {
 	case "ready":
-		m.heard = true
+		m.heard[w] = true
 		snapshot := map[string]any{
 			"t":            "snapshot",
-			"tabs":         m.tabs.All(),
-			"active":       m.tabs.ActiveID(),
+			"tabs":         m.tabs.AllIn(w),
+			"active":       m.tabs.ActiveIn(w),
 			"windowColor":  m.window.Color(),
 			"frameWidth":   m.window.FrameWidth(),
 			"controls":     m.window.Controls(w),
@@ -136,7 +137,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "reload":
 		m.tabs.Reload()
 	case "newTab":
-		m.Interaction(w, "tab.new", func() { m.tabs.Create() })
+		m.Interaction(w, "tab.new", func() { m.tabs.CreateIn(w) })
 	case "closeTab":
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":
@@ -184,14 +185,16 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	}
 }
 
-// TabChanged tells the shells a tab's state changed.
+// TabChanged tells the shell of a tab's window that its state changed.
 func (m *Manager) TabChanged(t tabs.Tab) {
-	m.sendAll(map[string]any{"t": "tab", "tab": t})
+	m.send(m.tabs.WindowOf(t.ID), map[string]any{"t": "tab", "tab": t})
 }
 
-// TabsChanged tells the shells which tabs exist now and which is active.
+// TabsChanged tells each window's shell which tabs it has now and which is active.
 func (m *Manager) TabsChanged() {
-	m.sendAll(map[string]any{"t": "tabs", "tabs": m.tabs.All(), "active": m.tabs.ActiveID()})
+	for _, w := range m.window.Windows() {
+		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w)})
+	}
 }
 
 // ThemeChanged tells the shells to be light, dark or as the system is.
@@ -245,7 +248,7 @@ func (m *Manager) sendAll(v any) {
 
 // send sends to window w's shell, once it has said it's ready.
 func (m *Manager) send(w engine.WindowID, v any) {
-	if !m.heard {
+	if !m.heard[w] {
 		return
 	}
 	b, err := json.Marshal(v)
@@ -256,5 +259,9 @@ func (m *Manager) send(w engine.WindowID, v any) {
 	m.eng.SendToShell(w, b)
 }
 
-// HandleShellCrashed waits for the reloaded shell to say it's ready, as the first did.
-func (m *Manager) HandleShellCrashed() { m.heard = false }
+// HandleShellCrashed waits for window w's reloaded shell to say it's ready, as the first
+// did. Every other window's shell goes on hearing.
+func (m *Manager) HandleShellCrashed(w engine.WindowID) { delete(m.heard, w) }
+
+// WindowClosed forgets the shell of a window that closed: it went with the window.
+func (m *Manager) WindowClosed(w engine.WindowID) { delete(m.heard, w) }

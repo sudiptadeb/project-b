@@ -6,17 +6,22 @@ behind it is `project-b-research/windows-survey.md`.
 
 ## Today
 
-- The engine has one window, one shell page and one settings page, and its close is the
-  app's quit.
+- Go makes the windows (`CreateWindow`), each with its own shell page and settings page,
+  and keeps each one's tabs and active tab, and the window in front, which the engine
+  reports (`WindowFocused`). Commands and the menu follow the window in front. File, New
+  Window (Cmd+N) opens one. A window's close button, or its last tab closing, closes it
+  (`WindowClosed`); closing the last one quits, and Quit (`AppQuit`) ends every window
+  at once. A second start's URLs open in the window used last.
 - The window's layout lists the tabs it shows, each with a rectangle; the shell lists one,
   the active tab. The engine places each listed tab's view, tells a tab that joins or
   leaves the list that it is shown or hidden, and says when a click moves the keyboard
   into a visible page. `FocusTab` gives a tab's page the keyboard.
-- Every call about the window and every event from it carries Go's id for it, 1: the
-  layout, a window request, a message to or from the shell or settings, a change of size.
-  The shell is still "page 0" to the hooks, so a key doesn't say which window it came
-  from; keys go to the window in front.
-- Go's tabs have one list and one active tab. Commands, menus and the extension API read it.
+- Every call about a window and every event from one carries Go's id for it, 1 for the
+  first: the layout, a window request, a message to or from the shell or settings, a
+  change of size. The shell is still "page 0" to the hooks, so a key doesn't say which
+  window it came from; keys go to the window in front.
+- Extensions see one window, id 1, and "the current window" is the window in front;
+  DevTools' `newWindow` opens a tab. Moving a tab to another window isn't built.
 
 ## What changes
 

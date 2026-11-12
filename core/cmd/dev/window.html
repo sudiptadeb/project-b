@@ -6,7 +6,9 @@
 <title>Project B</title>
 <!--
   The mock's OS window. On the mock engine the browser tab is the window, and this page
-  holds what the real window holds in native views, bottom to top:
+  holds what the real window holds in native views, bottom to top. It is one of Go's
+  windows, by the id in its address, /?window=<id>, window 1 at plain /, and it passes
+  that id on to every page it holds and every feed it reads:
 
     page      the mock page, where the layout puts the shown tab's page; hidden while
               that is empty.
@@ -54,12 +56,14 @@
 </head>
 <body>
 <div id="window">
-  <iframe class="mock-page" title="Mock page" src="/mock/page"></iframe>
-  <iframe class="shell" title="Shell" src="/shell/"></iframe>
+  <iframe class="mock-page" title="Mock page"></iframe>
+  <iframe class="shell" title="Shell"></iframe>
   <div class="band"></div>
   <div class="controls"><i></i><i></i><i></i></div>
 </div>
 <script>
+  // Which of Go's windows this is.
+  const id = new URLSearchParams(location.search).get('window') || '1';
   const win = document.getElementById('window');
   const page = win.querySelector('.mock-page');
   const shell = win.querySelector('.shell');
@@ -69,6 +73,8 @@
   let pointer = null;
   let settings = null;
   let popup = null;
+  page.src = `/mock/page?window=${id}`;
+  shell.src = `/shell/?window=${id}`;
 
   // What a press at x, y does, as engine.WindowLayout.At decides it: the first region
   // that holds the point, which lists the drag areas before the shell's.
@@ -129,7 +135,7 @@
       settings = document.createElement('iframe');
       settings.className = 'mock-settings';
       settings.title = 'Settings';
-      settings.src = '/settings/';
+      settings.src = `/settings/?window=${id}`;
       // The real overlay takes the keyboard as it opens, and gives it back as it closes.
       settings.addEventListener('load', () => settings?.contentWindow?.focus());
       win.append(settings);
@@ -161,7 +167,7 @@
     win.append(popup);
   }
 
-  new EventSource('/mock/window/events').onmessage = (e) => {
+  new EventSource(`/mock/window/events?window=${id}`).onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.t !== 'window') return;
     state = msg;
@@ -174,7 +180,7 @@
 
   // The window's size, which Go hears as the real window reports its own.
   function reportSize() {
-    fetch('/mock/window/size', { method: 'POST', body: new URLSearchParams({ w: innerWidth, h: innerHeight }) });
+    fetch(`/mock/window/size?window=${id}`, { method: 'POST', body: new URLSearchParams({ w: innerWidth, h: innerHeight }) });
   }
   addEventListener('resize', reportSize);
   reportSize();

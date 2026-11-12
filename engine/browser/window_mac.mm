@@ -183,24 +183,44 @@
 
 @interface PBWindowDelegate : NSObject <NSWindowDelegate>
 @property(nonatomic) base::RepeatingClosure onStateMayHaveChanged;
-- (instancetype)initWithOnClose:(base::OnceClosure)onClose;
+- (instancetype)initWithOnClose:(base::OnceClosure)onClose
+                          onKey:(base::RepeatingClosure)onKey
+                    onMinimised:(base::RepeatingCallback<void(bool)>)onMinimised;
 @end
 
 @implementation PBWindowDelegate {
   base::OnceClosure _onClose;
+  base::RepeatingClosure _onKey;
+  base::RepeatingCallback<void(bool)> _onMinimised;
 }
 
 @synthesize onStateMayHaveChanged = _onStateMayHaveChanged;
 
-- (instancetype)initWithOnClose:(base::OnceClosure)onClose {
+- (instancetype)initWithOnClose:(base::OnceClosure)onClose
+                          onKey:(base::RepeatingClosure)onKey
+                    onMinimised:(base::RepeatingCallback<void(bool)>)onMinimised {
   if ((self = [super init])) {
     _onClose = std::move(onClose);
+    _onKey = std::move(onKey);
+    _onMinimised = std::move(onMinimised);
   }
   return self;
 }
 
 - (void)windowWillClose:(NSNotification*)notification {
   std::move(_onClose).Run();
+}
+
+- (void)windowDidBecomeKey:(NSNotification*)notification {
+  _onKey.Run();
+}
+
+- (void)windowDidMiniaturize:(NSNotification*)notification {
+  _onMinimised.Run(true);
+}
+
+- (void)windowDidDeminiaturize:(NSNotification*)notification {
+  _onMinimised.Run(false);
 }
 
 - (void)windowDidResize:(NSNotification*)notification {
@@ -319,7 +339,10 @@ struct Window::Impl {
   }
 };
 
-Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
+Window::Window(base::OnceClosure on_close,
+               base::RepeatingClosure on_key,
+               base::RepeatingCallback<void(bool)> on_minimised)
+    : impl_(std::make_unique<Impl>()) {
   impl_->window = [[PBNSWindow alloc]
       initWithContentRect:NSMakeRect(80, 120, 1280, 720)
                 styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
@@ -338,7 +361,10 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->window.toolbar = [[NSToolbar alloc] initWithIdentifier:@"project-b"];
   impl_->window.toolbarStyle = NSWindowToolbarStyleUnified;
   impl_->window.acceptsMouseMovedEvents = YES;
-  impl_->delegate = [[PBWindowDelegate alloc] initWithOnClose:std::move(on_close)];
+  impl_->delegate =
+      [[PBWindowDelegate alloc] initWithOnClose:std::move(on_close)
+                                          onKey:std::move(on_key)
+                                    onMinimised:std::move(on_minimised)];
   impl_->window.delegate = impl_->delegate;
 
   impl_->container = [[PBContainerView alloc]
@@ -356,6 +382,17 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
 
 Window::~Window() {
   impl_->window.delegate = nil;
+}
+
+// AppKit's cascade: the top left of the other window, then one step down and right of it.
+void Window::PlaceNear(Window* other) {
+  NSWindow* near = other->impl_->window;
+  [impl_->window setFrame:near.frame display:NO];
+  [impl_->window
+      cascadeTopLeftFromPoint:[impl_->window
+                                  cascadeTopLeftFromPoint:NSMakePoint(
+                                                              NSMinX(near.frame),
+                                                              NSMaxY(near.frame))]];
 }
 
 void Window::Show() {
@@ -606,11 +643,11 @@ void Window::Restore() {
   }
 }
 
-void Window::ForceKeyForDriver() {
-  if (impl_->window.isKeyWindow) {
+void Window::ForceKeyForDriver(bool key) {
+  impl_->window.forceKeyForDriver = key;
+  if (!key) {
     return;
   }
-  impl_->window.forceKeyForDriver = YES;
   NSNotificationCenter* center = NSNotificationCenter.defaultCenter;
   [center postNotificationName:NSWindowDidBecomeMainNotification
                         object:impl_->window];

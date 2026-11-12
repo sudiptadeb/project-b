@@ -99,6 +99,9 @@ On the mock engine the dev server plays the engine: the page's `performance.time
 its navigation start in wall time, goes to Go before anything the page sends
 (`core/cmd/dev/webui.js`), and Go places it on the timeline (`timeline.FromWall`).
 
+Every window's shell is the page `shell` on the timeline, and every settings page the page
+`settings`, so with several windows the one that started last sets that page's clock.
+
 Entries are numbered in the order they were recorded. A page's entries arrive a little
 after they happened, so sort by time when reading.
 
@@ -126,11 +129,12 @@ In the order they happen on a Mac:
 | `process.start` | | Time zero |
 | `main.entered` | C++ | `ProjectBMain` runs: the binary and the library are loaded, Go's runtime is up |
 | `content.ready` | C++ | Content is initialised and calls our `PreMainMessageLoopRun` |
-| `window.created` | C++ | The native window exists |
-| `shell.created` | C++ | The shell's `WebContents` exists |
+| `go.starting` | Go | Go's managers are being built |
+| `window.created` | C++ | Go asked for its first window, and the native window exists |
+| `shell.created` | C++ | The window's shell `WebContents` exists |
 | `shell.navigation_start` | C++ | Its load of `chrome://shell/` began: the page's time zero |
-| `go.starting`, `go.started` | Go | Go's managers are being built; they are built and the first tab is asked for |
 | `window.shown` | C++ | The window is on screen, in the frame colour |
+| `go.started` | Go | Go's managers are built and the first tab is asked for |
 | `shell.committed` | C++ | The shell's renderer has the document |
 | `shell.script` | JS | The shell's script runs |
 | `shell.mounted` | JS | Vue has mounted the app |

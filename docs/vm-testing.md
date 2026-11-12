@@ -160,7 +160,7 @@ didn't show, so the entry can go once the bug is fixed. Exit 1 is a new failure,
 stopped early (the app quit or crashed). Exit 2 is that it couldn't run: no DMG, another run
 holds the lock, or the VM didn't start.
 
-Nothing the checks open comes from the internet: `check.py` writes two one-colour pages into
+Nothing the checks open comes from the internet: `check.py` writes three one-colour pages into
 the VM and serves them there on `127.0.0.1:8765`. Every launch starts from a fresh profile with
 automatic update checks off, so no update notice comes up over a page.
 
@@ -170,6 +170,20 @@ Sharing's pictures, five runs in a row on 0.2.24 all passed with three or four k
 each, from bugs 2, 5 and 7. On 2026-11-12, with the pictures from the VM's window, three runs in
 a row on 0.2.27 passed 64 of 65, every "within" check in time; the one known failure is the live
 resize (bug 7).
+
+### Several windows
+
+The last checks, after Cmd+Q, are of several windows ([windows.md](windows.md)), on a fresh
+app with real keys and clicks: Cmd+N makes a second window, a little down and right of the
+first and the same size; Cmd+L and typing go to the window clicked; a second start of the app
+with a URL opens it in a new tab in the window used last, which comes to the front; Cmd+W on
+a window's last tab closes that window; and Shift+Cmd+W on the last window quits the app.
+Which window shows what is read from the windows' titles, each its shown tab's, through
+System Events in the VM, and the windows' frames from the window server. They run alone with
+
+    tools/vm/run.sh <DMG path or URL> windows
+
+On 2026-11-13 the six passed on this branch's build.
 
 By hand, a step at a time:
 

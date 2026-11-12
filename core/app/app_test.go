@@ -27,9 +27,9 @@ type rig struct {
 func start(t *testing.T, dir string, blocked ...string) *rig {
 	t.Helper()
 	e := mockengine.New()
-	got, stop := e.Shell.Subscribe()
+	got, stop := e.Feeds(1).Shell.Subscribe()
 	t.Cleanup(stop)
-	pages, stopPages := e.Page.Subscribe()
+	pages, stopPages := e.Feeds(1).Page.Subscribe()
 	t.Cleanup(stopPages)
 	r := &rig{t: t, e: e, got: got, pages: pages}
 	ready := make(chan struct{})
@@ -212,7 +212,7 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"tabs":[{"tab":1,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`)
 	r.e.Settle()
 
-	l := r.e.Layout()
+	l := r.e.Layout(1)
 	if !slices.Equal(l.Tabs, []engine.VisibleTab{{Tab: 1, Rect: engine.Rect{X: 0, Y: 48, W: 800, H: 552}}}) || l.FrameColor == "" {
 		t.Fatalf("layout %+v", l)
 	}
@@ -232,21 +232,21 @@ func TestShellWindowRequestsReachTheEngine(t *testing.T) {
 	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"tabs":[{"tab":1,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`)
 	r.shell(`{"t":"window","text":"fullScreen"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" && m["cornerRadius"] == float64(0) })
-	if got := r.e.Layout().At(400, 10); got != engine.AreaShell {
+	if got := r.e.Layout(1).At(400, 10); got != engine.AreaShell {
 		t.Fatalf("in full screen the empty top row is %v", got)
 	}
 	r.shell(`{"t":"window","text":"fullScreen"}`)
 	r.waitFor(func(m map[string]any) bool {
 		return m["t"] == "controls" && m["cornerRadius"] == mockengine.CornerRadius
 	})
-	if got := r.e.Layout().At(400, 10); got != engine.AreaDrag {
+	if got := r.e.Layout(1).At(400, 10); got != engine.AreaDrag {
 		t.Fatalf("back from full screen the empty top row is %v", got)
 	}
 	r.shell(`{"t":"window","text":"zoom"}`)
 	r.shell(`{"t":"window","text":"minimise"}`)
 	r.shell(`{"t":"window","text":"close"}`)
 	deadline := time.Now().Add(time.Second)
-	for !r.e.Closed() {
+	for !r.e.Closed(1) {
 		if time.Now().After(deadline) {
 			t.Fatal("window never closed")
 		}
@@ -273,35 +273,35 @@ func TestTabsThroughTheShellAndKeys(t *testing.T) {
 	r.show(1)
 	r.show(second)
 	r.e.Settle()
-	if hidden := r.e.Hidden(); !slices.Equal(hidden, []engine.TabID{1}) {
+	if hidden := r.e.Hidden(1); !slices.Equal(hidden, []engine.TabID{1}) {
 		t.Fatalf("the first tab should have been told it is hidden: %v", hidden)
 	}
 	r.visit("https://b.test/")
 
 	// The page opens a tab: the engine made it, Go put it in the list and showed it.
-	r.e.Fire("open", "https://c.test/")
+	r.e.Fire(1, "open", "https://c.test/")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 3 })
 	if m["active"].(float64) == second {
 		t.Fatalf("opened tab should be active: %v", m)
 	}
 	r.waitForTab(func(tab map[string]any) bool { return tab["url"] == "https://c.test/" && tab["loading"] == false })
 
-	r.e.Fire("key", "tab1")
+	r.e.Fire(1, "key", "tab1")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == float64(1) })
-	r.e.Fire("key", "nextTab")
+	r.e.Fire(1, "key", "nextTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == second })
-	r.e.Fire("key", "closeTab")
+	r.e.Fire(1, "key", "closeTab")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
 	if m["active"] == second {
 		t.Fatalf("closed tab still active: %v", m)
 	}
 
 	// Closing the rest closes the window.
-	r.e.Fire("key", "closeTab")
-	r.e.Fire("key", "closeTab")
+	r.e.Fire(1, "key", "closeTab")
+	r.e.Fire(1, "key", "closeTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 0 })
 	deadline := time.Now().Add(time.Second)
-	for !r.e.Closed() {
+	for !r.e.Closed(1) {
 		if time.Now().After(deadline) {
 			t.Fatal("window never closed")
 		}
@@ -337,11 +337,11 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if m["cornerRadius"] != mockengine.CornerRadius {
 		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
 	}
-	if m["windowColor"] != "#4f9e9e" || r.e.Layout().FrameColor != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.Layout().FrameWidth != 4 {
-		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.Layout().FrameColor, r.e.Layout().FrameWidth)
+	if m["windowColor"] != "#4f9e9e" || r.e.Layout(1).FrameColor != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.Layout(1).FrameWidth != 4 {
+		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.Layout(1).FrameColor, r.e.Layout(1).FrameWidth)
 	}
 
-	r.e.Fire("fullscreen", "")
+	r.e.Fire(1, "fullscreen", "")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" })
 	if m["controls"].(map[string]any)["w"] != float64(0) || m["cornerRadius"] != float64(0) {
 		t.Fatalf("full screen should report no controls and square corners: %v", m)
@@ -353,11 +353,11 @@ var _ engine.Listener = (*app.App)(nil)
 // openSettings opens the settings page from the shell's gear and reads its snapshot.
 func (r *rig) openSettings() (<-chan []byte, map[string]any) {
 	r.t.Helper()
-	got, stop := r.e.Settings.Subscribe()
+	got, stop := r.e.Feeds(1).Settings.Subscribe()
 	r.t.Cleanup(stop)
 	r.shell(`{"t":"run","text":"app.settings"}`)
 	deadline := time.Now().Add(5 * time.Second)
-	for !r.e.SettingsOpen() {
+	for !r.e.SettingsOpen(1) {
 		if time.Now().After(deadline) {
 			r.t.Fatal("settings never opened")
 		}
@@ -405,13 +405,13 @@ func TestTheSettingsPageReadsAndSetsTheSettings(t *testing.T) {
 		t.Fatalf("prefs.json = %s", b)
 	}
 	// The theme: saved, the shell told, the window's own parts dark.
-	if snap["theme"] != "system" || r.e.Layout().Theme != engine.ThemeSystem {
-		t.Fatalf("theme starts as %v, window %v", snap["theme"], r.e.Layout().Theme)
+	if snap["theme"] != "system" || r.e.Layout(1).Theme != engine.ThemeSystem {
+		t.Fatalf("theme starts as %v, window %v", snap["theme"], r.e.Layout(1).Theme)
 	}
 	r.settings(`{"t":"setTheme","text":"dark"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "theme" && m["theme"] == "dark" })
-	if r.e.Layout().Theme != engine.ThemeDark {
-		t.Fatalf("window theme = %v", r.e.Layout().Theme)
+	if r.e.Layout(1).Theme != engine.ThemeDark {
+		t.Fatalf("window theme = %v", r.e.Layout(1).Theme)
 	}
 	b, _ = os.ReadFile(filepath.Join(dir, "prefs.json"))
 	if !strings.Contains(string(b), `"theme":"dark"`) {
@@ -429,8 +429,8 @@ func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	r.openSettings()
 	r.settings(`{"t":"setFrameColor","text":"#3470d0"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#3470d0" })
-	if r.e.Layout().FrameColor != "#3470d0" {
-		t.Fatalf("window = %v", r.e.Layout().FrameColor)
+	if r.e.Layout(1).FrameColor != "#3470d0" {
+		t.Fatalf("window = %v", r.e.Layout(1).FrameColor)
 	}
 	r.stop()
 
@@ -438,8 +438,8 @@ func TestTheFrameColorChangesTheWindowAndTheShellLive(t *testing.T) {
 	defer r.stop()
 	r.shell(`{"t":"ready"}`)
 	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if m["windowColor"] != "#3470d0" || r.e.Layout().FrameColor != "#3470d0" || r.e.ShownColor() != "#3470d0" {
-		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.Layout().FrameColor, r.e.ShownColor())
+	if m["windowColor"] != "#3470d0" || r.e.Layout(1).FrameColor != "#3470d0" || r.e.ShownColor() != "#3470d0" {
+		t.Fatalf("after restart: shell %v, window %v, shown %v", m["windowColor"], r.e.Layout(1).FrameColor, r.e.ShownColor())
 	}
 }
 
@@ -457,9 +457,9 @@ func TestAKeyAddedInSettingsRunsItsAction(t *testing.T) {
 		t.Fatalf("keymap.json = %s", b)
 	}
 
-	r.e.Fire("key", "closeTab")
+	r.e.Fire(1, "key", "closeTab")
 	deadline := time.Now().Add(5 * time.Second)
-	for r.e.SettingsOpen() {
+	for r.e.SettingsOpen(1) {
 		if time.Now().After(deadline) {
 			t.Fatal("Cmd+W didn't close settings")
 		}
@@ -485,20 +485,20 @@ func TestCtrlTabCyclesRecentTabs(t *testing.T) {
 		r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == id })
 	}
 	// Recent: 3, 2, 1.
-	r.e.Fire("key", "recentTab")
+	r.e.Fire(1, "key", "recentTab")
 	active(2)
-	r.e.Fire("key", "recentTab")
+	r.e.Fire(1, "key", "recentTab")
 	active(1)
-	r.e.Fire("release", "")
+	r.e.Fire(1, "release", "")
 	// Recent: 1, 3, 2.
-	r.e.Fire("key", "recentTab")
+	r.e.Fire(1, "key", "recentTab")
 	active(3)
-	r.e.Fire("release", "")
+	r.e.Fire(1, "release", "")
 	// Recent: 3, 1, 2. Backward from the newest comes round to the oldest.
-	r.e.Fire("key", "recentTabBack")
+	r.e.Fire(1, "key", "recentTabBack")
 	active(2)
-	r.e.Fire("release", "")
-	r.e.Fire("key", "recentTab")
+	r.e.Fire(1, "release", "")
+	r.e.Fire(1, "key", "recentTab")
 	active(3)
 }
 
@@ -532,5 +532,125 @@ func TestTheMenuComesFromTheTree(t *testing.T) {
 	}
 	if find(tab.Items, "Select Tab") != nil {
 		t.Fatal("the hidden Select Tab submenu is in the menu")
+	}
+}
+
+// isTabs matches a tabs message with n tabs.
+func isTabs(n int) func(map[string]any) bool {
+	return func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == n }
+}
+
+// openSecondWindow presses Cmd+N in window 1 and waits for window 2's shell to start.
+func (r *rig) openSecondWindow() <-chan []byte {
+	r.t.Helper()
+	second, stop := r.e.Feeds(2).Shell.Subscribe()
+	r.t.Cleanup(stop)
+	r.e.Fire(1, "key", "newWindow")
+	r.e.Settle()
+	if w := r.e.Windows(); !slices.Equal(w, []engine.WindowID{1, 2}) {
+		r.t.Fatalf("windows after Cmd+N: %v", w)
+	}
+	// A new window's shell hears nothing until it says it's ready.
+	select {
+	case b := <-second:
+		r.t.Fatalf("window 2's shell heard %s before it was ready", b)
+	default:
+	}
+	r.e.Post(func() { r.a.ShellMessage(2, []byte(`{"t":"ready"}`)) })
+	return second
+}
+
+// Cmd+N opens a second window with one new tab of its own and its own shell, in front.
+// Commands act on the window in front, settings opens over the window it was asked in,
+// closing a window's last tab closes it, and closing the last window quits.
+func TestASecondWindow(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	second := r.openSecondWindow()
+	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	tabs := snap["tabs"].([]any)
+	if len(tabs) != 1 || tabs[0].(map[string]any)["id"] != snap["active"] || snap["active"] == float64(1) {
+		t.Fatalf("window 2 starts with one new tab of its own: %v active %v", tabs, snap["active"])
+	}
+
+	// Cmd+T acts on the window in front, window 2.
+	r.e.Fire(2, "key", "newTab")
+	r.waitOn(second, isTabs(2))
+	// Window 1 comes to the front, and Cmd+T acts on it.
+	r.e.Fire(1, "focus", "")
+	r.e.Fire(1, "key", "newTab")
+	r.waitFor(isTabs(2))
+
+	// Settings opens over the window it was asked in.
+	r.e.Fire(2, "focus", "")
+	r.e.Post(func() { r.a.ShellMessage(2, []byte(`{"t":"run","text":"app.settings"}`)) })
+	r.e.Settle()
+	if !r.e.SettingsOpen(2) || r.e.SettingsOpen(1) {
+		t.Fatalf("settings open: window 1 %v, window 2 %v", r.e.SettingsOpen(1), r.e.SettingsOpen(2))
+	}
+
+	// Closing window 2's tabs closes window 2: its settings page goes first, then a tab
+	// at a time. The app goes on with window 1.
+	for range 3 {
+		r.e.Fire(2, "key", "closeTab")
+	}
+	r.e.Settle()
+	if !r.e.Closed(2) || !slices.Equal(r.e.Windows(), []engine.WindowID{1}) || r.e.Quit() {
+		t.Fatalf("after window 2's last tab: closed %v, windows %v, quit %v", r.e.Closed(2), r.e.Windows(), r.e.Quit())
+	}
+
+	// Window 1's own close button closes it, the last window, which quits.
+	r.e.Fire(1, "close", "")
+	r.e.Settle()
+	if !r.e.Quit() {
+		t.Fatal("closing the last window didn't quit")
+	}
+}
+
+// A second start's URLs open as new tabs in the window used last, which comes to the
+// front.
+func TestAHandoverOpensInTheWindowUsedLast(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	second := r.openSecondWindow()
+	r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	r.e.Fire(1, "focus", "")
+	r.e.Post(func() { r.a.Handover([]string{"https://h.test/"}) })
+	m := r.waitFor(isTabs(2))
+	if url := m["tabs"].([]any)[1].(map[string]any)["url"]; url != "https://h.test/" {
+		t.Fatalf("window 1's new tab is at %v", url)
+	}
+	r.waitForTab(func(tab map[string]any) bool { return tab["title"] == "Mock h.test" && tab["loading"] == false })
+	var inSecond int
+	done := make(chan struct{})
+	r.e.Post(func() { inSecond = len(r.a.Tabs.AllIn(2)); close(done) })
+	<-done
+	if req := r.e.Requests(); inSecond != 1 || req[len(req)-1] != engine.WindowFront {
+		t.Fatalf("window 2 has %d tabs; requests %v", inSecond, req)
+	}
+}
+
+// A crashed shell waits to say it's ready again, and only its own window's does: the other
+// window's shell goes on hearing.
+func TestAShellCrashResetsOnlyItsWindow(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	second := r.openSecondWindow()
+	r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	r.e.Post(func() { r.a.ShellCrashed(2) })
+	r.e.Fire(2, "key", "newTab")
+	r.e.Settle()
+	select {
+	case b := <-second:
+		t.Fatalf("window 2's crashed shell heard %s", b)
+	default:
+	}
+	// Window 1's shell still hears what every shell hears.
+	r.e.Post(func() { r.a.Prefs.SetTheme("dark") })
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "theme" })
+	r.e.Post(func() { r.a.ShellMessage(2, []byte(`{"t":"ready"}`)) })
+	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if len(snap["tabs"].([]any)) != 2 {
+		t.Fatalf("the reloaded shell's snapshot: %v", snap["tabs"])
 	}
 }

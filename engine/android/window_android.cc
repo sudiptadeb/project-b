@@ -220,11 +220,18 @@ struct Window::Impl {
   raw_ptr<content::WebContents> shown = nullptr;
 };
 
-Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
+// A phone's one window never closes, nor stops being the one in front, nor is minimised.
+Window::Window(base::OnceClosure on_close,
+               base::RepeatingClosure on_key,
+               base::RepeatingCallback<void(bool)> on_minimised)
+    : impl_(std::make_unique<Impl>()) {
   CHECK(g_browser_window);
 }
 
 Window::~Window() = default;
+
+// A phone has one window, so there is never another to place it near.
+void Window::PlaceNear(Window* other) {}
 
 // Android put the activity's window on screen before content started.
 void Window::Show() {}

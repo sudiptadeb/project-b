@@ -31,7 +31,7 @@ func startExtensions(a *App, e engine.Engine, cfg Config) {
 	}
 	eng := e.(engine.Extensions)
 	m := extensions.New(eng, cfg.ProfileDir, a.Tabs.ActiveID)
-	api := chromeapi.New(eng, a.Tabs, m, func() bool { return a.Window.FullScreen(theWindow) })
+	api := chromeapi.New(eng, a.Tabs, m, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
 	extensionManagers[a] = m
 	eng.SetExtensionsListener(&extensionEvents{m, api})
 

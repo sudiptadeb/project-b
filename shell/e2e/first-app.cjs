@@ -71,7 +71,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   // survive it loading again; keyboard, mouse and screenshots are the window's.
   await page.goto(base + '/');
   const ui = page.frameLocator('iframe.shell');
-  const shellFrame = () => page.frame({ url: /\/shell\/$/ });
+  const shellFrame = () => page.frame({ url: /\/shell\/\?window=1$/ });
   // A person's pointer arrives in many moves. The window gives the shell the pointer on
   // the first move into its region, so the shell's hover begins with the next; Playwright's
   // hover is one move, so this makes two.
@@ -468,7 +468,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await phoneUi.getByRole('option').first().waitFor();
   await settle(phone);
   await phone.screenshot({ path: path.join(out, '3-phone.png') });
-  const scroll = await phone.frame({ url: /\/shell\/$/ }).evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  const scroll = await phone.frame({ url: /\/shell\/\?window=1$/ }).evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   check('no horizontal scroll on a phone', scroll);
   // The mock engine keeps one layout, the last any page sent. Left open, this page sends its
   // own again when the server restarts below, and now and then it lands after the other's.

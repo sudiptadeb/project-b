@@ -49,6 +49,18 @@ Project B bugs, worst first:
    on a busy thread. Clicks wait the same way: on 2026-11-11, in 0.2.22 and in 0.2.23 alike, a
    click on the layout button right after the tabs moved, or right after a page loaded, took
    effect 1.5 to 3 s later or was lost, and keys typed after it were partly lost.
+
+   **On 2026-11-12 this turned out to be the pictures, not the app.** The app's timeline on
+   0.2.27 in the VM had every click in the window within 3 ms and drawn within 30 ms. Typing into
+   Terminal in the VM, each letter was in Terminal within 0.2 to 1.1 s (as read through
+   accessibility), in the VM's window on this Mac within one capture, and in Screen Sharing's
+   picture 0.2 to 14 s later, or not within 15 s. Asking Screen Sharing for whole frames every
+   0.1 s, or giving the VM a display, didn't change that. So the checks now take their pictures
+   from the VM's window ([Pictures](#pictures)); with them every letter showed in 0.17 to 0.33 s,
+   and every timed click and shortcut check passed. The late clicks of bug 2 and the stale
+   pictures of bug 7 after a resize or a layout change didn't show either, so at least part of
+   those was the same lag; the live resize of bug 7 still runs past the frame in 2 to 4 of 30
+   frames.
 6. **The empty sidebar doesn't drag the window**, though double-clicking it zooms. Since then
    this is the design: only the empty spaces in the top row drag, and the sidebar is shell, so it
    neither drags nor zooms ([window-manager.md](window-manager.md)). `check.py` expects that.
@@ -158,11 +170,11 @@ the VM and serves them there on `127.0.0.1:8765`. Every launch starts from a fre
 automatic update checks off, so no update notice comes up over a page.
 
 A check of whether something works waits up to several seconds for its result, and fails only
-if it never comes: the app can take a click seconds late (bug 5) and keep an old picture on
-screen for a second or two (bug 7), so a fixed wait failed a different check in most runs. Only
-the checks named "within" time things, and those that bugs 2, 5 and 7 can slow are known. On
-2026-11-11, five runs in a row on 0.2.24, each from a stopped VM, all passed, with three or four
-known failures each.
+if it never comes. Only the checks named "within" time things. On 2026-11-11, with Screen
+Sharing's pictures, five runs in a row on 0.2.24 all passed with three or four known failures
+each, from bugs 2, 5 and 7. On 2026-11-12, with the pictures from the VM's window, three runs in
+a row on 0.2.27 passed 64 of 65, every "within" check in time; the one known failure is the live
+resize (bug 7).
 
 By hand, a step at a time:
 
@@ -191,6 +203,10 @@ What the checks need, and what they say when it's missing:
   numpy, pillow and cryptography. The system's Python has none of them, and `check.py` and
   `rfb.py` say so under it. `tools/test.sh vm` uses the right one.
 - **The VM running**, by `start.sh`, which needs the desktop login below once per boot.
+- **This Mac's desktop unlocked, and deskctl allowed to record the screen**, for the VM's pictures
+  ([Pictures](#pictures)). `start.sh` asks `desk status` first and says what's missing.
+- **`~/PW_TOOLS/macos-vm/frame-<VM>.bin`**, the VM's latest frame, which `start.sh` has `desk
+  watch` keep current. `rfb.py` refuses to run without it.
 - **`~/PW_TOOLS/macos-vm/vnc-url-<VM>`**, the VM's Screen Sharing address. `start.sh` writes it
   when the desktop is up and `stop.sh` removes it. If the VM runs and the file is gone,
   run `start.sh` again: it leaves a running VM alone and only writes the address.
@@ -205,6 +221,22 @@ To drive it by hand, with coordinates in points:
 
 Run those with the VM's Python, with `PB_VM` set for a VM other than `pb-test`. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
 runs a command inside the VM with no password and no network.
+
+## Pictures
+
+The VM runs in a window on this Mac's desktop, and `desk watch` (`tools/deskctl`) keeps that
+window's latest frame in `~/PW_TOOLS/macos-vm/frame-<VM>.bin`, through ScreenCaptureKit, which
+sends a frame whenever the window changes, up to 60 a second. `rfb.py` reads it and cuts off the
+window's title bar; `wait_frame` waits for the next one. Screen Sharing still carries the mouse
+and keys, and is asked for one frame only, at login.
+
+The window shows the VM's screen when it changes; Screen Sharing's picture of it came 0.2 to 14 s
+late, which looked like the app taking clicks late (bug 5). The cost: the window sits on the
+desktop while the VM runs, and the desktop has to stay logged in and unlocked. The capture works
+with other windows over it, but not with it minimised.
+
+`desk watch` ends by itself when the VM's process does. `start.sh` starts it again on a VM that's
+already running, replacing the old one; its errors go to `frame-<VM>.bin.log`.
 
 ## Decisions
 
@@ -221,6 +253,8 @@ runs a command inside the VM with no password and no network.
   the VM instead of the virtual display and keyboard. The image already grants Screen Sharing the
   permissions; it asked for nothing. If this doesn't work out, `rfb.py` also has the login
   for the other server, but using that one needs the owner's OK.
+- **Pictures from the VM's window, not Screen Sharing** ([Pictures](#pictures)). Tart's own
+  VNC would read the display directly too, but it listens on every interface (below).
 - **1440x900 points.** The guest draws them at 1x, so a shot has one pixel per point.
 - **The DMG goes in through a read-only shared folder**, so it has no quarantine flag. Gatekeeper
   and the signing profile aren't tested here.

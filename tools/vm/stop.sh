@@ -5,5 +5,5 @@ set -eu
 
 # The amarit unit stays, exited, for start.sh to restart.
 "$TART" stop "$VM" --timeout 60 || true
-rm -f "$VNC_URL_FILE"
+rm -f "$VNC_URL_FILE" "$FRAME_FILE"  # The window's watch ended with the VM.
 "$TART" list

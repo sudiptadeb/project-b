@@ -16,6 +16,9 @@ DISPLAY_SIZE=1440x900pt
 UNIT=macos-vm-$VM
 VNC_URL_FILE="$VM_HOME/vnc-url-$VM"
 SHARE="$VM_HOME/share-$VM"
+# The VM's screen as its window on this Mac shows it, kept current by `desk watch` (start.sh).
+# rfb.py reads the pictures from here; Screen Sharing's own lag seconds behind (docs/vm-testing.md).
+FRAME_FILE="$VM_HOME/frame-$VM.bin"
 MIN_FREE_GB=100
 
 export TART_HOME="$VM_HOME/tart-home"
@@ -23,4 +26,6 @@ export TART_HOME="$VM_HOME/tart-home"
 # own units, cron).
 export PATH="$PATH:$HOME/go/bin"
 export PB_VM="$VM"  # For check.py and rfb.py, which the scripts start.
+# deskctl, which sees this Mac's desktop (tools/deskctl/README.md).
+DESK=${DESK:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.tools/desk/desk}
 GUEST_LOGIN=admin:admin   # The base image's public default.

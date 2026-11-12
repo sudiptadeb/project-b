@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""A small VNC client for the VM's desktop: real frames in, real mouse and keys out.
+"""The VM's desktop: real frames in, real mouse and keys out.
 
-It talks to macOS's own Screen Sharing inside the VM, on the VM's private address, so
-nothing listens on this Mac's network. Coordinates are points; shots are pixels.
+Input goes through a small VNC client to macOS's own Screen Sharing inside the VM, on the
+VM's private address, so nothing listens on this Mac's network. The frames come from the VM's
+window on this Mac, which `desk watch` keeps in $FRAME_FILE (start.sh): Screen Sharing sends
+its pictures up to seconds late, while the window shows the VM's screen as it is
+(docs/vm-testing.md). Coordinates are points; shots are pixels.
 
 As a tool, one action per run:
     rfb.py shot out.png | click X Y | dbl X Y | move X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
@@ -12,6 +15,7 @@ with numpy, pillow and cryptography. The VM's address comes from the file start.
 """
 
 import hashlib
+import mmap
 import os
 import socket
 import struct
@@ -23,6 +27,7 @@ from urllib.parse import urlparse
 VM_HOME = os.path.expanduser("~/PW_TOOLS/macos-vm")
 VM = os.environ.get("PB_VM", "pb-test")  # vars.sh says which VM; start.sh writes its address.
 URL_FILE = f"{VM_HOME}/vnc-url-{VM}"
+FRAME_FILE = f"{VM_HOME}/frame-{VM}.bin"
 
 
 def refuse(message):
@@ -55,6 +60,49 @@ def keysym(name):
     return KEYS[name] if name in KEYS else ord(name)
 
 
+class Window:
+    """The VM's window on this Mac, as `desk watch` keeps it: a header, then BGRA rows
+    (tools/deskctl/deskctl.swift). The window's title bar sits above the VM's screen."""
+
+    def __init__(self, width, height):
+        if not os.path.exists(FRAME_FILE):
+            refuse(f"{FRAME_FILE} is missing: it holds the VM's latest frame. Run tools/vm/start.sh, "
+                   "which starts the watch on the VM's window once its desktop is up.")
+        self.width, self.height = width, height  # The VM's screen in pixels, as Screen Sharing has it.
+        self.file = open(FRAME_FILE, "rb")
+        self.map = None
+
+    def _header(self):
+        if self.map is None or self.map.size() != os.fstat(self.file.fileno()).st_size:
+            self.map = mmap.mmap(self.file.fileno(), 0, prot=mmap.PROT_READ)
+        return struct.unpack_from("<8sQIII4xd", self.map, 0)
+
+    def count(self):
+        return self._header()[1]
+
+    def image(self):
+        while True:
+            magic, count, w, h, stride, _ = self._header()
+            if magic != b"DESKWAT1":
+                raise RuntimeError(f"{FRAME_FILE} isn't a desk watch frame")
+            if count % 2 == 0:
+                rows = np.frombuffer(self.map, np.uint8, h * stride, 40).reshape(h, stride)[:, :w * 4]
+                img = rows.reshape(h, w, 4)[:, :, 2::-1].copy()
+                if self._header()[1] == count:
+                    break
+            time.sleep(0.001)
+        # The VM's screen is the bottom of the window, below the title bar, at the window's scale.
+        screen = img[h - round(self.height * w / self.width):]
+        if w != self.width:
+            screen = np.asarray(Image.fromarray(screen).resize((self.width, self.height), Image.BILINEAR))
+        return screen
+
+    def wait(self, timeout):
+        seen, end = self.count(), time.time() + timeout
+        while self.count() == seen and time.time() < end:
+            time.sleep(0.002)
+
+
 class Vnc:
     def __init__(self):
         if not os.path.exists(URL_FILE):
@@ -67,7 +115,6 @@ class Vnc:
         self._login(url.username or "", url.password or "")
         self.cond = threading.Condition()
         self.frames = 0
-        self.frame_time = 0.0
         self.closed = False
         self.buttons = 0
         self.x = self.y = 0
@@ -75,7 +122,9 @@ class Vnc:
         self.sock.sendall(struct.pack(">BxHii", 2, 2, 0, -223))
         self._request(False)
         threading.Thread(target=self._read, daemon=True).start()
-        self.wait_frame()
+        with self.cond:
+            self.cond.wait_for(lambda: self.frames or self.closed, 20)
+        self.window = Window(self.width, self.height)
         time.sleep(INPUT_SETTLE)
 
     def _login(self, user, password):
@@ -145,9 +194,7 @@ class Vnc:
                             raise RuntimeError(f"unexpected encoding {enc}")
                     with self.cond:
                         self.frames += 1
-                        self.frame_time = time.time()
                         self.cond.notify_all()
-                    self._request(True)
                 elif kind == 2:
                     pass
                 elif kind == 3:
@@ -161,13 +208,12 @@ class Vnc:
                 self.cond.notify_all()
 
     def wait_frame(self, timeout=20):
-        with self.cond:
-            seen = self.frames
-            self.cond.wait_for(lambda: self.frames > seen or self.closed, timeout)
+        """Until the VM's screen changes, or timeout seconds."""
+        self.window.wait(timeout)
 
     def image(self):
-        """The current frame as an array of RGB, row then column, in pixels."""
-        return self.fb[:, :, :3].copy()
+        """The VM's screen now, from its window, as an array of RGB, row then column, in pixels."""
+        return self.window.image()
 
     def shot(self, path):
         Image.fromarray(self.image()).save(path)

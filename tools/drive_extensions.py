@@ -23,6 +23,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 
 import drive_first_app
 from drive_first_app import App, check, click, run_parts, visit
@@ -385,6 +386,18 @@ def web_store_checks():
     check("uBlock Origin Lite from the Chrome Web Store has its button", buttons(app) == [UBOL_NAME], buttons(app))
     visit(app, PAGE)
     check("and blocks a known ad host", fetch_ad(app) == "blocked")
+
+    # Its own popup, which asks its service worker about the page in the tab.
+    x, y, w, h = open_popup(app)
+    check("its popup opens", w >= 200 and h > 25, (x, y, w, h))
+    host = urllib.parse.urlsplit(PAGE).hostname
+    deadline = time.time() + 20
+    text = ""
+    while host not in text and time.time() < deadline:
+        text = json.loads(app.cmd("evalpopup", "document.body.innerText") or '""')
+        time.sleep(0.2)
+    check("and shows the page's host, from its service worker", host in text, text[:200])
+    click(app, ".pbx-action")
 
     # Its "Remove from Chrome" asks first; Cancel keeps it.
     visit(app, f"{WEB_STORE}detail/ublock-origin-lite/{UBOL_ID}")

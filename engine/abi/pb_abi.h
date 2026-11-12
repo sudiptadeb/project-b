@@ -32,7 +32,8 @@ typedef struct PBValue {
 // beside each. Matches core/content/events.go.
 typedef enum PBEvent {
   PB_EVENT_SHELL_MESSAGE = 1,           // i: window, s: json
-  PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground
+  PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground,
+                                        // i: in a new window of its own
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
   PB_EVENT_WINDOW_CHANGED = 4,          // i: window; d: w, d: h, the content area; d: x,
                                         // d: y, d: w, d: h, the window buttons; d: corner

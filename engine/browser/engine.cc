@@ -295,12 +295,17 @@ Engine* Engine::Get() {
 }
 
 // static
-void Engine::TabOpened(int64_t opener, int64_t tab, const GURL& url, bool foreground) {
+void Engine::TabOpened(int64_t opener,
+                       int64_t tab,
+                       const GURL& url,
+                       bool foreground,
+                       bool new_window) {
   hooks::Args args;
   args.Int(opener);
   args.Int(tab);
   args.Str(url.spec());
   args.Bool(foreground);
+  args.Bool(new_window);
   hooks::Fire(PB_EVENT_TAB_OPENED, args);
 }
 

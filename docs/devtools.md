@@ -33,11 +33,11 @@ it either, below).
   its own WebUI browser the same way, under the type `browser_ui`.
 - **New targets**: `Target.createTarget` and `/json/new` open a tab the way a link with
   `target=_blank` does: the adapter makes it, Go hears of it before its first navigation
-  (so the URL gate applies), shows it, and it loads. It opens in the window in front,
-  and `newWindow: true` also opens a tab there. `background` is ignored and the tab comes to the
+  (so the URL gate applies), shows it, and it loads. It opens in the window in front, and
+  with `newWindow: true` in a window of its own, as Chrome's does. `background` is ignored and the tab comes to the
   front, as in content_shell; Chrome handles `background` in its own `Target` handler.
 - **Close and activate**: `Target.closeTarget` runs the page's unload and then asks the
-  tab's delegate to close it; `Target.activateTarget` asks it to show the tab (Chrome's
+  tab's delegate to close it; `Target.activateTarget` asks it to show the tab, whose window comes to the front (Chrome's
   `ChromeDevToolsManagerDelegate::Activate`). Both cross to Go's tab manager
   (`core/content/wire.go`), which decides. A page's own `window.close()` takes the same
   path, which closes the tab where Chrome would.
@@ -80,8 +80,7 @@ of it can already drive the whole browser and crash it (`Browser.crash`).
 
 ## Not here
 
-- Separate browser contexts (`Target.createBrowserContext`, Playwright's normal launch),
-  and a new window: `newWindow` opens a tab ([windows.md](windows.md), step 6).
+- Separate browser contexts (`Target.createBrowserContext`, Playwright's normal launch).
 - `Browser.setContentsSize`, `setDockTile`, `executeBrowserCommand`.
 - A page's own full screen (`requestFullscreen`), which ChromeDriver's Fullscreen Window
   uses on a non-headless Chrome: no tab hook takes the window to full screen yet.

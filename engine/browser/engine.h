@@ -56,8 +56,13 @@ class Engine {
   ~Engine();
 
   static Engine* Get();
-  // Tells Go a page opened a tab, which the adapter already made.
-  static void TabOpened(int64_t opener, int64_t tab, const GURL& url, bool foreground);
+  // Tells Go a page or a client opened a tab, which the adapter already made, in a window
+  // of its own when new_window.
+  static void TabOpened(int64_t opener,
+                        int64_t tab,
+                        const GURL& url,
+                        bool foreground,
+                        bool new_window);
 
   // The table handed to Go. Lives as long as the process.
   static const PBEngineCalls* Calls();

@@ -357,20 +357,28 @@ def session(fixture, extra_args=(), full=True):
     check("Go starts with one tab", driver.js(ROWS) == 1)
     new = wd_call("POST", "/window/new", {"type": "window"})
     check("new window gives a new handle", isinstance(new, dict) and new.get("handle") not in (None, first), new)
-    check("new window is a new tab in Go", driver.wait(ROWS, 2) == 2)
+    go_windows = lambda: json.loads(driver.cmd("projectb", "getWindows", "{}"))["result"]["windows"]
+    check("new window is a window of its own in Go", len(go_windows()) == 2 and driver.js(ROWS) == 1, go_windows())
     handles = wd_call("GET", "/window/handles")
     check("two window handles", len(handles) == 2, handles)
     wd_call("POST", "/window", {"handle": new["handle"]})
     wd_call("POST", "/url", {"url": fixture + "/two"})
     check("the new tab navigates", wd_call("GET", "/title") == "Second")
-    check("Go shows the new tab", driver.wait(ACTIVE_ROW_TITLE, "Second") == "Second")
+    driver.cmd("window", 2)
+    check("Go shows the new tab, in the new window", driver.wait(ACTIVE_ROW_TITLE, "Second") == "Second")
+    driver.cmd("window", 1)
+    rect = wd_call("GET", "/window/rect")
+    check("the new window's rect is its own", (rect.get("x"), rect.get("y")) != (want["x"], want["y"]), rect)
     wd_call("POST", "/window", {"handle": first})
     check("switch to the first window", wd_call("GET", "/title") == "Fixture")
     check("Go shows the first tab again", driver.wait(ACTIVE_ROW_TITLE, "Fixture") == "Fixture")
     wd_call("POST", "/window", {"handle": new["handle"]})
     left = wd_call("DELETE", "/window")
     check("close window leaves one handle", left == [first], left)
-    check("Go closed the tab", driver.wait(ROWS, 1) == 1)
+    deadline = time.time() + 15
+    while len(go_windows()) > 1 and time.time() < deadline:
+        time.sleep(0.1)
+    check("Go closed the tab, and the window it was alone in", len(go_windows()) == 1 and driver.js(ROWS) == 1, go_windows())
     wd_call("POST", "/window", {"handle": first})
 
     # The shell, seen from a DevTools client of our own.

@@ -85,7 +85,7 @@ class ExtensionHostDelegate : public extensions::ExtensionHostDelegate {
                  const blink::mojom::WindowFeatures& window_features,
                  bool user_gesture) override {
     PageTab* tab = Engine::Get()->AdoptTab(std::move(web_contents));
-    Engine::TabOpened(0, tab->id(), target_url, true);
+    Engine::TabOpened(0, tab->id(), target_url, true, false);
   }
   // There is no camera or microphone prompt yet, so no page of an extension gets either.
   void ProcessMediaAccessRequest(content::WebContents* web_contents,

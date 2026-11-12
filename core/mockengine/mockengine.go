@@ -592,7 +592,7 @@ func (e *Engine) Fire(w engine.WindowID, kind, value string) {
 			// What a page's target=_blank or window.open does: the engine makes the
 			// tab, tells the app, then loads it.
 			id := e.CreateTab()
-			e.listener.TabOpened(shown, id, value, true)
+			e.listener.TabOpened(shown, id, value, true, false)
 			e.navigate(id, value)
 		case "key":
 			// A key pressed in the page, which uses none of them.

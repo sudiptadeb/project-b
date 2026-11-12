@@ -82,8 +82,8 @@ func (r *recorder) LoadProgressChanged(tab engine.TabID, progress float64) {
 }
 func (r *recorder) PageCrashed(tab engine.TabID)                    { r.note("crashed") }
 func (r *recorder) FaviconChanged(tab engine.TabID, dataURL string) { r.note("favicon " + dataURL) }
-func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
-	r.note("opened " + url)
+func (r *recorder) TabOpened(opener, tab engine.TabID, url string, foreground, newWindow bool) {
+	r.note(fmt.Sprint("opened ", url, " new window ", newWindow))
 }
 func (r *recorder) CloseRequested(tab engine.TabID)    { r.note(fmt.Sprintf("close %d", tab)) }
 func (r *recorder) ActivateRequested(tab engine.TabID) { r.note(fmt.Sprintf("activate %d", tab)) }
@@ -245,7 +245,7 @@ func TestLoadProgressReachesTheListener(t *testing.T) {
 
 func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h, r, _ := wired(t)
-	h.Dispatch(eventTabOpened, []Value{{I: 1}, {I: 2}, {S: "https://p.test/"}, {I: 1}})
+	h.Dispatch(eventTabOpened, []Value{{I: 0}, {I: 2}, {S: "https://p.test/"}, {I: 1}, {I: 1}})
 	h.Dispatch(eventWindowChanged, []Value{{I: 2}, {D: 1100}, {D: 700}, {D: 1}, {D: 2}, {D: 3}, {D: 4}, {D: 20}, {I: 1}})
 	h.Dispatch(eventShellCrashed, []Value{{I: 2}})
 	h.Dispatch(eventShellMessage, []Value{{I: 2}, {S: `{"t":"ready"}`}})
@@ -253,7 +253,7 @@ func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h.Dispatch(eventWindowFocused, []Value{{I: 2}})
 	h.Dispatch(eventWindowClosed, []Value{{I: 2}})
 	h.Dispatch(eventProcessCrashed, []Value{{S: "renderer"}, {I: int64(TerminationStatusProcessCrashed)}, {I: 11}, {I: 42}, {S: "https://p.test/"}})
-	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 2 1100x700 r=20 full=true", "shell 2 crashed", `shell 2 {"t":"ready"}`, `settings 2 {"t":"close"}`, "window 2 focused", "window 2 closed", "renderer crashed 11 42 https://p.test/"}) {
+	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/ new window true", "window 2 1100x700 r=20 full=true", "shell 2 crashed", `shell 2 {"t":"ready"}`, `settings 2 {"t":"close"}`, "window 2 focused", "window 2 closed", "renderer crashed 11 42 https://p.test/"}) {
 		t.Fatalf("got %v", r.got)
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {

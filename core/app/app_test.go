@@ -794,3 +794,29 @@ func TestWindowsAsAnotherManagerSeesThem(t *testing.T) {
 		t.Fatalf("events %+v", events)
 	}
 }
+
+// A DevTools client's new target with newWindow opens in a window of its own, and asking
+// to show a tab brings its window to the front.
+func TestADevToolsTargetInANewWindow(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var tab engine.TabID
+	r.e.Post(func() {
+		tab = r.e.CreateTab()
+		r.a.TabOpened(0, tab, "https://n.test/", true, true)
+	})
+	r.e.Settle()
+	var inSecond []tabs.Tab
+	var front engine.WindowID
+	r.e.Post(func() { inSecond, front = r.a.Tabs.AllIn(2), r.a.Tabs.Front() })
+	r.e.Settle()
+	if len(inSecond) != 1 || inSecond[0].ID != tab || front != 2 {
+		t.Fatalf("window 2 %+v, in front %v", inSecond, front)
+	}
+	before := len(r.e.Requests())
+	r.e.Post(func() { r.a.ActivateRequested(1) })
+	r.e.Settle()
+	if req := r.e.Requests()[before:]; !slices.Equal(req, []engine.WindowRequest{engine.WindowFront}) {
+		t.Fatalf("requests %v", req)
+	}
+}

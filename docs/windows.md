@@ -22,8 +22,10 @@ behind it is `project-b-research/windows-survey.md`.
   first: the layout, a window request, a message to or from the shell or settings, a
   change of size. The shell is still "page 0" to the hooks, so a key doesn't say which
   window it came from; keys go to the window in front.
-- Extensions see one window, id 1, and "the current window" is the window in front;
-  DevTools' `newWindow` opens a tab.
+- Extensions see one window, id 1, and "the current window" is the window in front.
+  DevTools works with the real windows: `Target.createTarget` with `newWindow` opens one,
+  showing a target brings its window to the front, and `Browser`'s window calls answer
+  from and act on the target's window.
 - The engine reports each window's frame on screen and whether it is minimised, zoomed or
   in full screen with the rest of its state (`WindowChanged`), and puts a window's frame
   where Go asks (`SetWindowBounds`), and puts it into normal, minimised, zoomed or full
@@ -91,4 +93,5 @@ Each commit builds and leaves a working app.
 4. Done. What macOS expects of an app with several windows: the Window menu's list and
    Cmd+`.
 5. Done. Moving a tab to another window.
-6. Extensions' `chrome.windows` and DevTools' window calls with real windows.
+6. Extensions' `chrome.windows` and DevTools' window calls with real windows. DevTools'
+   are done, and Go's side of what extensions need; the extension side is its own work.

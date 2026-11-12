@@ -58,7 +58,7 @@ var terminationNames = map[TerminationStatus]string{
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
 type Events struct {
 	OnShellMessage    func(w engine.WindowID, msg []byte)
-	OnTabOpened       func(opener, tab engine.TabID, url string, foreground bool)
+	OnTabOpened       func(opener, tab engine.TabID, url string, foreground, newWindow bool)
 	OnFaviconChanged  func(tab engine.TabID, dataURL string)
 	OnWindowChanged   func(w engine.WindowID, s engine.WindowState)
 	OnShellCrashed    func(w engine.WindowID)
@@ -83,7 +83,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 	case eventTabOpened:
 		if e.OnTabOpened != nil {
-			e.OnTabOpened(engine.TabID(r.int()), engine.TabID(r.int()), r.str(), r.bool())
+			e.OnTabOpened(engine.TabID(r.int()), engine.TabID(r.int()), r.str(), r.bool(), r.bool())
 		}
 	case eventFaviconChanged:
 		if e.OnFaviconChanged != nil {

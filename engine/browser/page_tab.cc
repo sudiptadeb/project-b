@@ -144,7 +144,8 @@ content::WebContents* PageTab::OpenURLFromTab(
     PageTab* tab = Engine::Get()->AdoptTab(content::WebContents::Create(
         content::WebContents::CreateParams(source->GetBrowserContext())));
     Engine::TabOpened(id_, tab->id(), params.url,
-                      params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+                      params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB,
+                      /*new_window=*/false);
     target = tab->contents();
   }
   base::WeakPtr<content::NavigationHandle> handle =
@@ -168,7 +169,8 @@ content::WebContents* PageTab::AddNewContents(
     bool* was_blocked) {
   PageTab* tab = Engine::Get()->AdoptTab(std::move(new_contents));
   Engine::TabOpened(id_, tab->id(), target_url,
-                    disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB);
+                    disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB,
+                    /*new_window=*/false);
   return tab->contents();
 }
 

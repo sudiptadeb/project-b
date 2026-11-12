@@ -196,7 +196,11 @@ func (a *App) FaviconChanged(tab engine.TabID, dataURL string) {
 	a.Tabs.HandleFaviconChanged(tab, dataURL)
 }
 
-func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
+func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground, newWindow bool) {
+	// A tab nothing opened goes in the window in front, which a new one is.
+	if newWindow {
+		a.openWindow()
+	}
 	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
 }
 
@@ -204,7 +208,11 @@ func (a *App) TabFocused(tab engine.TabID) { a.Tabs.HandleTabFocused(tab) }
 
 func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 
-func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
+// ActivateRequested shows a tab in its window, and brings the window to the front.
+func (a *App) ActivateRequested(tab engine.TabID) {
+	a.Tabs.Activate(tab)
+	a.Window.Request(a.Tabs.WindowOf(tab), engine.WindowFront)
+}
 
 // Handover is the request of a copy started on this profile while this one runs: the
 // window used last comes to the front, and each URL opens in a new tab there.

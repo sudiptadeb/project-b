@@ -233,7 +233,7 @@ char* CopyForGo(const std::string& s) {
 void OpenTab(const GURL& url) {
   Engine* engine = Engine::Get();
   const int64_t tab = engine->CreateTab();
-  Engine::TabOpened(0, tab, url, true);
+  Engine::TabOpened(0, tab, url, true, false);
   engine->LoadURL(tab, url.spec().c_str());
 }
 

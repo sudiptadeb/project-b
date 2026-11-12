@@ -196,7 +196,9 @@ type Listener interface {
 
 	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
 	// has already created it, hidden; the app decides whether to show it.
-	TabOpened(opener, tab TabID, url string, foreground bool)
+	// A client of the debugging port can ask for it in a window of its own, newWindow;
+	// a page's never does, so its tab goes in its window.
+	TabOpened(opener, tab TabID, url string, foreground, newWindow bool)
 
 	// TabFocused says the keyboard went into a visible tab's page: a click, Tab from the
 	// shell, or FocusTab.

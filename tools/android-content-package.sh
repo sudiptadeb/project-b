@@ -14,7 +14,9 @@ OUT=$ROOT/build/android
 APK=$OUT/project-b-content.apk
 
 SECRETS=$HOME/PW_TOOLS/lab-secrets.env
-KEYSTORE=$HOME/PW_TOOLS/project-b-signing/android.keystore
+. "$ROOT/tools/keys.sh"
+need_key android.keystore
+KEYSTORE=$KEYS/android.keystore
 KEY_ALIAS=project-b
 
 mkdir -p "$OUT"

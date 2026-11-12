@@ -45,6 +45,6 @@ Known traps
   .tools/chromedriver or .tools/desk to that folder, or set CHROMEDRIVER / DESK.
 - deskctl's permissions are tied to its path and its signing key (.tools/desk/signing.pem).
   Rebuild with install.sh, which keeps both; deleting the key means allowing it again.
-- Packaging and releases need the signing key, which isn't on a fresh machine. Not part of
-  this setup.
+- Packaging and releases need the signing keys, which aren't on a fresh machine. They're
+  read from $KEYKOSH_ROOT/project-b, else .keys/ (tools/keys.sh). Not part of this setup.
 - Don't edit Chromium's source; the project builds it unpatched.

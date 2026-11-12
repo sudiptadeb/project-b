@@ -307,8 +307,8 @@ it to go. A user won't force-stop and relaunch inside a few seconds, but it's wo
 
 ## Signing
 
-The APK is signed with `~/PW_TOOLS/project-b-signing/android.keystore`, made once by `tools/android-signing-setup.sh`,
-password in `~/PW_TOOLS/lab-secrets.env` as `PROJECT_B_ANDROID_KEYSTORE_PASSWORD`. Losing the key forces every phone to
+The APK is signed with `android.keystore` in the key folder (`tools/keys.sh`: `$KEYKOSH_ROOT/project-b`, else
+`.keys/`), made once by `tools/android-signing-setup.sh`, password in `~/PW_TOOLS/lab-secrets.env` as `PROJECT_B_ANDROID_KEYSTORE_PASSWORD`. Losing the key forces every phone to
 uninstall before it can update.
 
 ## The shell on a phone

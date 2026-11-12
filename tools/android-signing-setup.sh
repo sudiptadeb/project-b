@@ -1,13 +1,16 @@
 #!/bin/bash
 # Makes the one stable Android signing key, once. Losing it forces every phone to uninstall
 # before it can update. The password goes into lab-secrets.env and nowhere else.
+# With keykosh it never makes one: the key is in the kosh, and a locked kosh stops here.
 set -euo pipefail
 
+. "$(dirname "$0")/keys.sh"
 SECRETS=$HOME/PW_TOOLS/lab-secrets.env
-KEYSTORE=$HOME/PW_TOOLS/project-b-signing/android.keystore
+KEYSTORE=$KEYS/android.keystore
 KEY_ALIAS=project-b
 
 [ ! -e "$KEYSTORE" ] || { echo "$KEYSTORE already exists, leaving it alone"; exit 0; }
+[ -z "${KEYKOSH_ROOT:-}" ] || need_key android.keystore
 
 mkdir -p "$(dirname "$KEYSTORE")"
 PROJECT_B_ANDROID_KEYSTORE_PASSWORD=$(openssl rand -hex 24)

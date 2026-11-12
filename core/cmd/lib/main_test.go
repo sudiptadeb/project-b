@@ -26,10 +26,14 @@ func TestReleaseConstantsMatchTheRepo(t *testing.T) {
 		t.Fatalf("amarit.json says %s %s; the binary says %s %s", cfg.Project, cfg.Releases, releaseProject, releaseManifest)
 	}
 
-	home, _ := os.UserHomeDir()
-	sha1, err := os.ReadFile(filepath.Join(home, "PW_TOOLS", "project-b-signing", "identity.sha1"))
+	// The key folder, as tools/keys.sh finds it.
+	keys := filepath.Join("..", "..", "..", ".keys")
+	if kosh := os.Getenv("KEYKOSH_ROOT"); kosh != "" {
+		keys = filepath.Join(kosh, "project-b")
+	}
+	sha1, err := os.ReadFile(filepath.Join(keys, "identity.sha1"))
 	if err != nil {
-		t.Skip("not the build Mac")
+		t.Skip("no signing key here")
 	}
 	if got := strings.TrimSpace(string(sha1)); got != signingLeafSHA1 {
 		t.Fatalf("the signing key is %s; the binary pins %s", got, signingLeafSHA1)

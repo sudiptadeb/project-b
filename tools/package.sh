@@ -13,7 +13,9 @@ MACOS=$APP/Contents/MacOS
 RESOURCES=$APP/Contents/Resources
 LIBRARIES=$APP/Contents/Libraries
 FRAMEWORKS=$APP/Contents/Frameworks
-SIGNING=$HOME/PW_TOOLS/project-b-signing     # tools/signing-setup.sh makes it
+. "$ROOT/tools/keys.sh"                       # the signing key, from tools/signing-setup.sh
+need_key identity.p12
+RCODESIGN=$HOME/PW_TOOLS/project-b-signing/rcodesign   # tools/signing-setup.sh fetches it
 VERSION=$(tr -d '[:space:]' < "$ROOT/VERSION")   # what the installed app says it is, and compares releases against
 
 rm -rf "$STAGE" "$DMG"
@@ -53,15 +55,15 @@ for binary in "$MACOS/project_b" "$MACOS/project_b_helper" "$FRAMEWORKS"/*.dylib
     codesign --remove-signature "$binary"
     strip -x "$binary" 2>/dev/null
 done
-"$SIGNING/rcodesign" sign \
-    --p12-file "$SIGNING/identity.p12" \
+"$RCODESIGN" sign \
+    --p12-file "$KEYS/identity.p12" \
     --p12-password-file <(grep '^PROJECT_B_SIGNING_P12_PASSWORD=' "$HOME/PW_TOOLS/lab-secrets.env" | cut -d= -f2- | tr -d '\n') \
     --timestamp-url none \
     --exclude "Contents/Libraries/**" \
     --binary-identifier "Contents/MacOS/project_b_helper:dev.projectb.helper" \
     "$APP"
 codesign --verify --deep --strict "$APP"
-codesign --verify -R="certificate leaf = H\"$(cat "$SIGNING/identity.sha1")\"" "$APP"
+codesign --verify -R="certificate leaf = H\"$(cat "$KEYS/identity.sha1")\"" "$APP"
 
 ln -s /Applications "$STAGE/Applications"
 # hdiutil create -srcfolder gives up with "Resource busy" when its temporary volume is slow

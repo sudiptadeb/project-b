@@ -3,7 +3,8 @@
 # writes the profile a Mac installs once to let builds signed by that key open. It never
 # replaces an existing key, because a new key means every Mac needs a new profile.
 #
-# The key stays on this Mac, in identity.p12. Its password is PROJECT_B_SIGNING_P12_PASSWORD
+# The key is identity.p12 in the key folder (tools/keys.sh). With keykosh it never makes
+# one: the key is in the kosh, and a locked kosh stops here. Its password is PROJECT_B_SIGNING_P12_PASSWORD
 # in lab-secrets.env. The certificate is only ever compared by hash: it isn't a CA, and
 # nothing asks a Mac to trust it for anything else.
 #
@@ -11,7 +12,9 @@
 # that trust needs a password prompt, which a headless Mac can't show.
 set -euo pipefail
 
-DIR=$HOME/PW_TOOLS/project-b-signing
+. "$(dirname "$0")/keys.sh"
+DIR=$KEYS
+RCODESIGN=$HOME/PW_TOOLS/project-b-signing/rcodesign  # A tool, not a key: it stays out of the key folder.
 SECRETS=$HOME/PW_TOOLS/lab-secrets.env
 PROFILE=$DIR/project-b-trust.mobileconfig
 OPENSSL=/usr/bin/openssl
@@ -24,6 +27,8 @@ umask 077
 
 if [ -e "$DIR/identity.p12" ]; then
     echo "Keeping the existing key in $DIR"
+elif [ -n "${KEYKOSH_ROOT:-}" ]; then
+    need_key identity.p12
 else
     if ! grep -q '^PROJECT_B_SIGNING_P12_PASSWORD=' "$SECRETS"; then
         {
@@ -57,13 +62,14 @@ fi
 $OPENSSL x509 -in "$DIR/cert.pem" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d : | tr 'A-F' 'a-f' > "$DIR/identity.sha1"
 SHA1=$(cat "$DIR/identity.sha1")
 
-if [ ! -x "$DIR/rcodesign" ]; then
+if [ ! -x "$RCODESIGN" ]; then
     T=$(mktemp -d)
     curl -fsSL -o "$T/r.tar.gz" "$RCODESIGN_URL"
     curl -fsSL -o "$T/r.sha256" "$RCODESIGN_URL.sha256"
     [ "$(shasum -a 256 "$T/r.tar.gz" | cut -d' ' -f1)" = "$(cut -d' ' -f1 "$T/r.sha256")" ]
     tar xzf "$T/r.tar.gz" -C "$T"
-    install -m 700 "$(find "$T" -type f -name rcodesign | head -1)" "$DIR/rcodesign"
+    mkdir -p "$(dirname "$RCODESIGN")"
+    install -m 700 "$(find "$T" -type f -name rcodesign | head -1)" "$RCODESIGN"
     rm -rf "$T"
 fi
 

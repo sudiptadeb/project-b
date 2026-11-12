@@ -242,6 +242,13 @@ def extension_checks():
     app.wait("!!document.querySelector('.pbx-action .pbx-badge')", 20)
     check("the button shows the badge its service worker set", int(app.js("document.querySelector('.pbx-action .pbx-badge').textContent")) >= 1)
 
+    # A picture of the tab the page is in.
+    visit(app, PAGE + "?capture")
+    app.wait("!!document.documentElement.dataset.pbCapture", 20, page=True)
+    shot = json.loads(app.js("document.documentElement.dataset.pbCapture", page=True))
+    check("tabs.captureVisibleTab takes a picture of the tab", shot.get("url") == "data:image/png;base64," and shot["length"] > 1000, shot)
+    visit(app, PAGE)
+
     # The popup: a view of its own under the button, running the extension's page.
     icon = "document.querySelector('.pbx-action img')?.src"
     first_icon = app.js(icon)

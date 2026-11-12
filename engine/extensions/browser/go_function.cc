@@ -33,6 +33,7 @@ scoped_refptr<ExtensionFunction> New() {
 constexpr auto kEngineFunctions =
     base::MakeFixedFlatMap<std::string_view, ExtensionFunctionFactory>({
         {"action.setIcon", &New<ActionSetIconFunction>},
+        {"tabs.captureVisibleTab", &New<TabsCaptureVisibleTabFunction>},
     });
 
 }  // namespace
@@ -44,9 +45,13 @@ ExtensionFunction::ResponseAction GoFunction::Run() {
   return RespondNow(Ask(args()));
 }
 
-ExtensionFunction::ResponseValue GoFunction::Ask(const base::ListValue& args) {
-  GoAnswer answer = AskGo(extension_id(), name(), args,
+GoAnswer GoFunction::AskGo(const base::ListValue& args) {
+  return project_b::AskGo(extension_id(), name(), args,
                           hooks::TabOf(GetSenderWebContents()));
+}
+
+ExtensionFunction::ResponseValue GoFunction::Ask(const base::ListValue& args) {
+  GoAnswer answer = AskGo(args);
   if (!answer.error.empty()) {
     return Error(std::move(answer.error));
   }

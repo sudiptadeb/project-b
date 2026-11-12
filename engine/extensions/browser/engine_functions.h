@@ -1,8 +1,11 @@
 #ifndef PROJECT_B_ENGINE_EXTENSIONS_BROWSER_ENGINE_FUNCTIONS_H_
 #define PROJECT_B_ENGINE_EXTENSIONS_BROWSER_ENGINE_FUNCTIONS_H_
 
+#include <optional>
 #include <string>
 
+#include "base/task/task_runner.h"
+#include "extensions/browser/api/web_contents_capture_client.h"
 #include "project_b/engine/extensions/browser/go_function.h"
 
 namespace project_b {
@@ -18,6 +21,27 @@ class ActionSetIconFunction : public GoFunction {
   ~ActionSetIconFunction() override = default;
   ResponseAction Run() override;
   void OnIconRead(std::string data_url);
+};
+
+// tabs.captureVisibleTab: Go says which tab is visible, and the engine takes its
+// picture, if the extension may see that page. As Chrome's, in
+// chrome/browser/extensions/api/tabs/tabs_api.cc.
+class TabsCaptureVisibleTabFunction
+    : public GoFunction,
+      public extensions::WebContentsCaptureClient {
+ private:
+  ~TabsCaptureVisibleTabFunction() override = default;
+  ResponseAction Run() override;
+
+  base::expected<void, extensions::ScreenshotAccessError> GetScreenshotAccess(
+      content::WebContents* web_contents) const override;
+  bool ClientAllowsTransparency() override;
+  void OnCaptureSuccess(const SkBitmap& bitmap) override;
+  void OnCaptureFailure(CaptureResult result) override;
+  std::optional<std::string> Encode(const SkBitmap& bitmap) {
+    return EncodeBitmap(bitmap);
+  }
+  void OnEncoded(std::optional<std::string> data_url);
 };
 
 }  // namespace project_b

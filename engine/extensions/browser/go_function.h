@@ -28,7 +28,8 @@ GoAnswer AskGo(const std::string& extension_id,
 // A function of an API Go answers. As it is, it has no logic: the function's name and
 // arguments go to Go as they came, and Go's answer goes back. A function that needs
 // the engine first, such as reading a file or taking a picture, is a subclass, listed
-// in go_function.cc's kEngineFunctions.
+// in go_function.cc's kEngineFunctions. It does the engine's part before or after
+// asking Go, so the decision stays in Go.
 class GoFunction : public ExtensionFunction {
  public:
   GoFunction();
@@ -38,7 +39,9 @@ class GoFunction : public ExtensionFunction {
 
   ResponseAction Run() override;
 
-  // Asks Go this function with these arguments, from this caller.
+  // Asks Go this function with these arguments, from this caller: Go's answer, and
+  // the same as a response.
+  GoAnswer AskGo(const base::ListValue& args);
   ResponseValue Ask(const base::ListValue& args);
 };
 

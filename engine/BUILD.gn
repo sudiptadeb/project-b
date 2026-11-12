@@ -262,6 +262,7 @@ source_set("browser") {
       "extensions/browser/extensions_browser_client.h",
       "extensions/browser/go_function.cc",
       "extensions/browser/go_function.h",
+      "extensions/browser/tabs_functions.cc",
       "extensions/browser/management_delegate.cc",
       "extensions/browser/management_delegate.h",
       "extensions/browser/popup.cc",

@@ -344,7 +344,7 @@ func TestTabsAPI(t *testing.T) {
 	if a := r.x.Call(testExtensionID, "tabs.get", `[`+itoa(second)+`]`, 0); !strings.Contains(a.Error, "No tab with id") {
 		t.Fatalf("tabs.get of a closed tab: %+v", a)
 	}
-	if a := r.x.Call(testExtensionID, "tabs.captureVisibleTab", `[]`, 0); !strings.Contains(a.Error, "not available") {
+	if a := r.x.Call(testExtensionID, "tabs.move", `[1, {"index": 0}]`, 0); !strings.Contains(a.Error, "not available") {
 		t.Fatalf("a function Go doesn't have: %+v", a)
 	}
 

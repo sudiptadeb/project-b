@@ -20,6 +20,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     });
     return true;
   }
+  if (message.type === 'capture') {
+    chrome.tabs.captureVisibleTab({ format: 'png' }).then(
+      (url) => respond({ url: url.slice(0, 22), length: url.length }),
+      (error) => respond({ error: error.message }),
+    );
+    return true;
+  }
   if (message.type === 'state') {
     // A popup opened: the icon becomes one drawn here, a green square.
     const canvas = new OffscreenCanvas(16, 16);

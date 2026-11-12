@@ -134,7 +134,7 @@ What Go answers today:
 
 | API | Functions |
 |---|---|
-| `tabs` | `get`, `getCurrent`, `query` (not by `url` or `title`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove` |
+| `tabs` | `get`, `getCurrent`, `query` (not by `url` or `title`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove`, `captureVisibleTab` |
 | `windows` | `get`, `getCurrent`, `getLastFocused`, `getAll`, `create` (its pages open as tabs), `update` (answers, changes nothing) |
 | `action` | `setTitle`, `getTitle`, `setBadgeText`, `getBadgeText`, `setBadgeBackgroundColor`, `getBadgeBackgroundColor`, `setBadgeTextColor`, `getBadgeTextColor`, `setPopup`, `getPopup`, `setIcon` (by `path` or `imageData`), `enable`, `disable`, `isEnabled`, `getUserSettings` |
 | `commands` | `getAll` |
@@ -142,7 +142,9 @@ What Go answers today:
 Two things cross differently, because only C++ can do them. `action.setIcon` names a file inside
 the extension, so the engine reads it and gives Go the picture as a data: URL (an engine
 function, below); or it passes a picture drawn on a canvas, which only the renderer can read,
-so `engine/extensions/renderer/action_hooks.cc` makes it a PNG there. And the tab a
+so `engine/extensions/renderer/action_hooks.cc` makes it a PNG there. `tabs.captureVisibleTab`
+asks Go which tab is showing, and the engine takes its picture if the extension may see the
+page (all hosts, as `activeTab` is never granted). And the tab a
 message's sender is in (`sender.tab`) is asked of Go by the engine itself, as `tabs.get` with no
 extension.
 
@@ -166,7 +168,7 @@ Adding a function to an API that is there is only step 3.
 the extension, taking a picture of a tab. Such a function is a subclass of `GoFunction`, in
 `engine/extensions/browser/<api>_functions.cc`, declared in `engine_functions.h` and listed
 in `kEngineFunctions` in `go_function.cc`. It does the engine's part and then calls `Ask`
-with the arguments Go should see, so the decision stays in Go. `action.setIcon` is one.
+with the arguments Go should see, so the decision stays in Go. `action.setIcon` and `tabs.captureVisibleTab` are two.
 
 **A function that runs in the page.** A few never reach the browser as a function call:
 Chrome answers them in the renderer, with a hooks delegate. Ours are in
@@ -315,7 +317,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
   sees the content script run and an ad host blocked, pins and unpins, opens the popup and
   clicks in it, has its service worker message the tab, restarts, turns one off and removes it. The popup's opening has the worker draw
-  its icon on a canvas, and the button shows it.
+  its icon on a canvas, and the button shows it; and it takes a picture of the tab.
   Fonts Ninja, installed the same way, opens its panel on the page when its button is pressed. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
@@ -375,7 +377,7 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 - **Extension commands have no keys.** `commands.getAll` lists them without shortcuts, and
   nothing fires `commands.onCommand`. They belong in the keymap, with the menus work.
-- **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom, `captureVisibleTab`,
+- **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom,
   groups** and the other functions not in the table above answer "not available".
 - **Updates.** The store answers `/update`, and the installer accepts a newer package, but
   nothing checks on a timer. Chromium's own updater stays off: it would follow each manifest's

@@ -94,6 +94,17 @@ func init() {
 		}
 		return a.tabFor(a.caller(c), t), nil
 	}
+	// The engine takes the picture of the tab named here, if the caller may see its page.
+	functions["tabs.captureVisibleTab"] = func(a *API, c call) (any, error) {
+		var window int
+		if c.arg(0, &window) && window != windowID && window != currentWindow {
+			return nil, fmt.Errorf("No window with id: %d.", window)
+		}
+		if _, ok := a.tabs.Get(a.tabs.ActiveID()); !ok {
+			return nil, fmt.Errorf("No active web contents to capture")
+		}
+		return map[string]engine.TabID{"tab": a.tabs.ActiveID()}, nil
+	}
 	functions["tabs.query"] = func(a *API, c call) (any, error) {
 		var q struct {
 			Active            *bool   `json:"active"`

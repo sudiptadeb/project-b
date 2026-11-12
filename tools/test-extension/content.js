@@ -16,3 +16,10 @@ chrome.runtime.onConnect.addListener((port) => {
   });
   port.postMessage({ href: location.href });
 });
+
+// On a page asking for it, a picture of the tab, as captureVisibleTab takes it.
+if (location.search === '?capture') {
+  chrome.runtime.sendMessage({ type: 'capture' }).then((answer) => {
+    document.documentElement.dataset.pbCapture = JSON.stringify(answer);
+  });
+}

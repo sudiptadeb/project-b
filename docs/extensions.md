@@ -272,7 +272,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
 
 - `tools/test.sh mock`: Go's tests with the tag (`core/app/extensions_test.go`, 8
   tests: the prompt in both pages, a package, load unpacked, pins, the popup, and the `tabs` and
-  `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 38 checks: the same
+  `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 41 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
 - `tools/test.sh app`: `tools/drive_extensions.py`, 46 checks on the real app
@@ -284,6 +284,8 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   clicks in it, restarts, turns one off and removes it. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
+  Its first wait, 30 s for the store's tab, has run out once with the store answering; the
+  rerun passed. Rerun once before taking that as a failure.
 - `WITHOUT=extensions tools/test.sh app` runs `tools/check_no_extensions.py`: the library
   has no symbol of namespace `extensions`, and the main binary none of Go's extension packages.
 

@@ -57,13 +57,13 @@ ChromeDriver, pinned to the Chromium we build:
     curl -LO https://storage.googleapis.com/chrome-for-testing-public/155.0.8059.41/mac-arm64/chromedriver-mac-arm64.zip
     unzip chromedriver-mac-arm64.zip && cd ../..
 
-The tests come in five groups, by what each needs. One command runs a group, and a group
+The tests come in six groups, by what each needs. One command runs a group, and a group
 that lacks what it needs says so and stops before running anything:
 
 | Group | What it runs | What it needs |
 |---|---|---|
 | `tools/test.sh mock` | Go's tests, and the shell and the settings page in a browser on the mock engine | Go, `npm install`, Playwright's browser. No Chromium build; runs anywhere |
-| `tools/test.sh app` | The real app through its own driver, and through Google's ChromeDriver | The build, and ChromeDriver. No display: it runs from ssh or an agent session |
+| `tools/test.sh app` | The real app through its own driver, and through Google's ChromeDriver | The build, and ChromeDriver; with extensions in, Go, the mock store (`tools/fetch-extensions.sh`, then `tools/pack-test-extension.py`) and the network. No display: it runs from ssh or an agent session |
 | `tools/test.sh basics` | One check per area of the whole-browser checklist on the real app; most fail today, as a map of what isn't built | As for `app`, and the network for the Safe Browsing check |
 | `tools/test.sh screen` | The real app in a person's desktop session: full screen, copy and paste, and the first page's paint in the real window | **A person logged in at this Mac's screen**, with it unlocked, and `desk` (below) |
 | `tools/test.sh vm` | Real clicks, drags and keys in a macOS VM | **A person to have logged in at this Mac's desktop once since it booted**, then the VM: [docs/vm-testing.md](docs/vm-testing.md) |

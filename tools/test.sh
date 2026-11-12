@@ -70,12 +70,17 @@ need_store() {
     [ -f .tools/extensions/catalogue.json ] || cannot "$1" "no mock store in .tools/extensions. Run tools/fetch-extensions.sh and tools/pack-test-extension.py."
 }
 
+need_go() {
+    command -v go >/dev/null || cannot "$1" "go is not on PATH. Install it from go.dev/dl, or add /usr/local/go/bin to PATH."
+}
+
 need_app() {
     [ -x "$BIN" ] || cannot "$1" "no app at $BIN. Build it with tools/build.sh, or point PB_BIN at a project_b binary."
 }
 
 mock() {
     [ -d shell/node_modules ] || cannot mock "run \`npm install\` in shell/ first."
+    need_go mock
     run "Go managers" go -C core test ./...
     [ -n "$BUILT" ] && run "Go managers, with $BUILT" go -C core test -tags "$BUILT" ./...
     run "build the shell" npm --prefix shell run build
@@ -88,7 +93,7 @@ mock() {
 
 app() {
     need_app app
-    built extensions && need_store app
+    built extensions && need_store app && need_go app
     run "the real app through its driver" python3 tools/drive_first_app.py
     run "the real app through ChromeDriver" python3 tools/drive_chromedriver.py
     if built extensions; then

@@ -1,0 +1,152 @@
+// From bb-deployments' bare/config/storage.jsonnet (7cd419f, 2026-11-06). Every port is on localhost, and the CAS holds 64 GB instead of 32.
+local common = import 'common.libsonnet';
+
+{
+  grpcServers: [{
+    listenAddresses: ['127.0.0.1:8981'],
+    authenticationPolicy: { allow: {} },
+  }],
+  maximumMessageSizeBytes: common.maximumMessageSizeBytes,
+  global: common.globalWithDiagnosticsHttpServer('127.0.0.1:9981'),
+  supportedCompressors: ['ZSTD'],
+  contentAddressableStorageServer: {
+    contentAddressableStorage: {
+      chunkStorage: {
+        'local': {
+          keyLocationMap: {
+            onBlockDevice: {
+              file: {
+                path: 'storage-cs/key_location_map',
+                sizeBytes: 400 * 1024 * 1024,
+              },
+            },
+            maximumGetAttempts: 16,
+            maximumPutAttempts: 64,
+          },
+          oldBlocks: 8,
+          currentBlocks: 24,
+          newBlocks: 3,
+          blocksOnBlockDevice: {
+            source: {
+              file: {
+                path: 'storage-cs/blocks',
+                sizeBytes: 64 * 1024 * 1024 * 1024,
+              },
+            },
+            spareBlocks: 3,
+          },
+          persistent: {
+            stateDirectoryPath: 'storage-cs/persistent_state',
+            minimumEpochInterval: '300s',
+          },
+          chunkingParameters: {
+            minChunkSizeBytes: 256 * 1024,
+            horizonSizeBytes: 8 * 256 * 1024,
+          },
+        },
+      },
+      chunkMappingStorage: {
+        'local': {
+          keyLocationMap: {
+            onBlockDevice: {
+              file: {
+                path: 'storage-cms/key_location_map',
+                sizeBytes: 1024 * 1024,
+              },
+            },
+            maximumGetAttempts: 16,
+            maximumPutAttempts: 64,
+          },
+          oldBlocks: 8,
+          currentBlocks: 24,
+          newBlocks: 1,
+          blocksOnBlockDevice: {
+            source: {
+              file: {
+                path: 'storage-cms/blocks',
+                sizeBytes: 20 * 1024 * 1024,
+              },
+            },
+            spareBlocks: 3,
+          },
+          persistent: {
+            stateDirectoryPath: 'storage-cms/persistent_state',
+            minimumEpochInterval: '300s',
+          },
+        },
+      },
+    },
+    getAuthorizer: { allow: {} },
+    putAuthorizer: { allow: {} },
+    findMissingAuthorizer: { allow: {} },
+    maximumChunkCount: 100000,
+  },
+  actionCache: {
+    backend: {
+      'local': {
+        keyLocationMap: {
+          onBlockDevice: {
+            file: {
+              path: 'storage-ac/key_location_map',
+              sizeBytes: 1024 * 1024,
+            },
+          },
+          maximumGetAttempts: 16,
+          maximumPutAttempts: 64,
+        },
+        oldBlocks: 8,
+        currentBlocks: 24,
+        newBlocks: 1,
+        blocksOnBlockDevice: {
+          source: {
+            file: {
+              path: 'storage-ac/blocks',
+              sizeBytes: 20 * 1024 * 1024,
+            },
+          },
+          spareBlocks: 3,
+        },
+        persistent: {
+          stateDirectoryPath: 'storage-ac/persistent_state',
+          minimumEpochInterval: '300s',
+        },
+      },
+    },
+    getAuthorizer: { allow: {} },
+    putAuthorizer: { allow: {} },
+  },
+  fileSystemAccessCache: {
+    backend: {
+      'local': {
+        keyLocationMap: {
+          onBlockDevice: {
+            file: {
+              path: 'storage-fsac/key_location_map',
+              sizeBytes: 1024 * 1024,
+            },
+          },
+          maximumGetAttempts: 16,
+          maximumPutAttempts: 64,
+        },
+        oldBlocks: 8,
+        currentBlocks: 24,
+        newBlocks: 1,
+        blocksOnBlockDevice: {
+          source: {
+            file: {
+              path: 'storage-fsac/blocks',
+              sizeBytes: 20 * 1024 * 1024,
+            },
+          },
+          spareBlocks: 3,
+        },
+        persistent: {
+          stateDirectoryPath: 'storage-fsac/persistent_state',
+          minimumEpochInterval: '300s',
+        },
+      },
+    },
+    getAuthorizer: { allow: {} },
+    putAuthorizer: { allow: {} },
+  },
+}

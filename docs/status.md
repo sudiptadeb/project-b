@@ -13,6 +13,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.
 - [devtools.md](devtools.md): the DevTools endpoint, as Chrome opens it, for ChromeDriver and CDP.
 - [menus-shortcuts.md](menus-shortcuts.md): the design for actions, menus and key bindings, not built yet; Chrome's full list is in [chrome-shortcuts.md](chrome-shortcuts.md).
+- [remote-build.md](remote-build.md): compiles on a build Mac's Buildbarn, which `tools/build.sh` uses whenever it answers, and why its config is as it is.
 - [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
 - [android.md](android.md): the same shell and managers on Android's content layer, built in a Linux VM on this Mac.
 - [extensions.md](extensions.md): Chrome extensions, in every build and run only with their flag on: the layers, the mock store, the build flag, and the checks left out on purpose.

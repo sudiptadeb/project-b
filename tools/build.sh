@@ -6,6 +6,9 @@
 # WITHOUT=extensions tools/build.sh. GN, Go's build tags and the shell all read it from
 # there (docs/flags.md). Keep such a build in a folder of its own (OUT=out/noext), so
 # switching doesn't rebuild either.
+# Compiles go to a remote build server when one answers at PB_REMOTE (default
+# localhost:8980), and the build is local otherwise; PB_REMOTE=off keeps it local. The
+# commands are the same either way. Setting a server up: docs/remote-build.md.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -14,6 +17,10 @@ OUT=${OUT:-out/pb}
 RELEASE=${RELEASE:-0}
 export WITHOUT=${WITHOUT:-}
 TARGETS=${TARGETS:-project_b project_b_helper}
+PB_REMOTE=${PB_REMOTE:-localhost:8980}
+# How many compiles wait at the server at once. Siso's own default suits a fleet of
+# thousands of workers; against one Mac, steps at the back of the queue time out.
+PB_REMOTE_JOBS=${PB_REMOTE_JOBS:-60}
 
 # depot_tools goes in front of the caller's PATH; everything else (npm, go...) stays.
 export PATH=$ROOT/depot_tools:$PATH
@@ -33,7 +40,9 @@ go: command not found|gn cannot find Go: check project_b_go in out/pb/args.gn
 no such file or directory: '"'"'/opt/homebrew/bin/go|gn is using the default Go path: re-run tools/build.sh so it writes project_b_go
 requires go >=|Go is older than core/go.mod asks for: install a newer Go from go.dev/dl
 hook table is|hook tables differ: python3 tools/gen_hooks.py, then rebuild
-Too many open files|raise the file limit: ulimit -n 10240, then re-run'
+Too many open files|raise the file limit: ulimit -n 10240, then re-run
+/Users/Shared/pb-rbe/toolchains|the remote build server lacks this checkout'"'"'s clang: tools/remote/toolchain.sh
+remote exec timeout|remote compiles waited too long at the server: lower PB_REMOTE_JOBS, or PB_REMOTE=off'
 
 # explain FILE prints the fix for each known failure found in FILE.
 explain() {
@@ -149,10 +158,27 @@ echo "=== $(date '+%F %T') gn gen"
 gn gen "$OUT" 2>&1 | tee "$OUT/gn.log"
 [ "${PIPESTATUS[0]}" -eq 0 ] || { explain "$OUT/gn.log"; echo "RESULT=failed gn"; exit 1; }
 
-echo "=== $(date '+%F %T') build $TARGETS"
-START=$(date +%s)
-autoninja -C "$OUT" -k 0 $TARGETS
-RC=$?
+REMOTE_HOST=${PB_REMOTE%:*}
+REMOTE_PORT=${PB_REMOTE##*:}
+if [ "$PB_REMOTE" != off ] && nc -z -G 3 "$REMOTE_HOST" "$REMOTE_PORT" 2>/dev/null; then
+  # Siso directly, not autoninja: args.gn keeps use_remoteexec off, so the compile
+  # commands match a local build exactly, and tools/remote/siso/main.star chooses what
+  # runs remotely (only compiles). autoninja would force offline mode for such a build.
+  echo "=== $(date '+%F %T') build $TARGETS, compiles on the remote build server at $PB_REMOTE"
+  START=$(date +%s)
+  "$SRC/third_party/siso/cipd/siso" ninja -C "$OUT" -k 0 \
+    -load "$ROOT/tools/remote/siso/main.star" \
+    -reapi_address "$PB_REMOTE" -reapi_insecure -reapi_instance default_instance -project "" \
+    -remote_jobs "$PB_REMOTE_JOBS" \
+    $TARGETS
+  RC=$?
+else
+  [ "$PB_REMOTE" = off ] || echo "  (no remote build server answers at $PB_REMOTE; building here)"
+  echo "=== $(date '+%F %T') build $TARGETS"
+  START=$(date +%s)
+  autoninja -C "$OUT" -k 0 $TARGETS
+  RC=$?
+fi
 echo "=== $(date '+%F %T') build rc=$RC in $(( $(date +%s) - START ))s"
 if [ "$RC" -ne 0 ]; then
   # siso keeps every failed step's output here, so the build's own output stays as it is.

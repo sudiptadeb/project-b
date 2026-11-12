@@ -65,7 +65,7 @@ that lacks what it needs says so and stops before running anything:
 | `tools/test.sh mock` | Go's tests, and the shell and the settings page in a browser on the mock engine | Go, `npm install`, Playwright's browser. No Chromium build; runs anywhere |
 | `tools/test.sh app` | The real app through its own driver, and through Google's ChromeDriver | The build, and ChromeDriver; with extensions in, Go, the mock store (`tools/fetch-extensions.sh`, then `tools/pack-test-extension.py`) and the network. No display: it runs from ssh or an agent session |
 | `tools/test.sh basics` | One check per area of the whole-browser checklist on the real app; most fail today, as a map of what isn't built | As for `app`, and the network for the Safe Browsing check |
-| `tools/test.sh screen` | The real app in a person's desktop session: full screen, copy and paste, and the first page's paint in the real window | **A person logged in at this Mac's screen**, with it unlocked, and `desk` (below) |
+| `tools/test.sh screen` | The real app in a person's desktop session: full screen, copy and paste, and the first page's paint in the real window | **A person logged in at this Mac's screen**, with it unlocked, and `deskrig` (below) |
 | `tools/test.sh vm` | Real clicks, drags and keys in a macOS VM | **A person to have logged in at this Mac's desktop once since it booted**, then the VM: [docs/vm-testing.md](docs/vm-testing.md) |
 | `tools/test.sh android` | The Android app on an emulator | The emulator running, and the APK: [docs/android.md](docs/android.md) |
 
@@ -95,15 +95,15 @@ The app's window shows on that person's screen while the group runs, and takes a
 for a few seconds; the copy and paste check replaces what they had copied. Logging in
 over Screen Sharing counts.
 
-First paint looks at the real window through `deskctl`, a small tool in `tools/deskctl/`
-that takes window captures and gives real clicks and keys from any session:
+First paint looks at the real window through [deskrig](https://github.com/sudiptadeb/deskrig),
+which takes window captures and gives real clicks and keys from any session, on this Mac or
+in the VM. Install it and allow it once:
 
-    tools/deskctl/install.sh          # builds .tools/desk/desk, signed with a local key
+    deskrig setup permissions         # after installing it, as its README says
 
-Then allow `.tools/desk/deskctl` once in System Settings, Privacy & Security, under both
-Screen & System Audio Recording and Accessibility. `.tools/desk/desk status` says what's
-missing. `DESK` and `CHROMEDRIVER` point the tests at other copies; a machine that already
-has these tools elsewhere can also link `.tools/desk` and `.tools/chromedriver` to them.
+`deskrig --target local status` says what's missing. `DESKRIG` and `CHROMEDRIVER` point the
+tests at other copies; a machine that already has ChromeDriver elsewhere can link
+`.tools/chromedriver` to it.
 
 The `vm` group needs the login for another reason: macOS only starts a macOS VM after
 someone has logged in at the desktop since the last boot. Nobody has to stay at the screen.

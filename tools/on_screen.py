@@ -6,7 +6,7 @@ NEEDS A PERSON LOGGED IN at this Mac's screen, with the screen unlocked.
 Agent, ssh and amarit sessions on a Mac live in a Background session. An app started from
 one can't enter full screen and its window may never reach the screen, so the tests that
 look at the real window start through here: the command runs as a one-shot launchd job in
-the desktop's gui domain, the way tools/deskctl/desk runs deskctl.
+the desktop's gui domain.
 
     tools/on_screen.py                              # says who is at the screen, exit 0 if someone is
     tools/on_screen.py python3 tools/check_full_screen.py

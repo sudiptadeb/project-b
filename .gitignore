@@ -7,7 +7,7 @@
 /shell/dist/
 .DS_Store
 __pycache__/
-# Tools fetched or built for this machine: ChromeDriver, deskctl and its signing key.
+# Tools fetched or built for this machine: ChromeDriver.
 /.tools/
 # Signing keys of someone without keykosh (tools/keys.sh).
 /.keys/

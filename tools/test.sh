@@ -11,7 +11,7 @@
 #   tools/test.sh screen    The real app in a person's desktop session: full screen, copy and
 #                           paste, and first paint in the real window.
 #                           NEEDS A PERSON LOGGED IN at this Mac's screen, with it unlocked,
-#                           and desk allowed to record the screen.
+#                           and deskrig allowed to record the screen.
 #   tools/test.sh vm        Real clicks, drags and keys in the macOS VM, on build/project-b.dmg
 #                           or PB_DMG (a path or URL): tools/vm/run.sh starts the VM, installs
 #                           it, checks and stops the VM again. Known bugs don't fail it.

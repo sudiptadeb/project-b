@@ -4,17 +4,17 @@
 ChromeDriver navigates within a second of the app starting. The shell's view, layered
 over the page, used to stay white there until the shell next painted, so a static page
 stayed hidden though it had rendered. This loads a static page in a solid colour that
-way and checks a capture of the real window, taken with desk, for that colour. The
+way and checks a capture of the real window, taken with deskrig, for that colour. The
 app's own captures read the page's surface and would pass anyway.
 
-NEEDS A PERSON LOGGED IN at this Mac's screen, and desk allowed to record it
-(tools/deskctl/README.md). The app has to start inside the desktop session for its
+NEEDS A PERSON LOGGED IN at this Mac's screen, and deskrig allowed to record it
+(github.com/sudiptadeb/deskrig; `deskrig setup permissions`). The app has to start inside the desktop session for its
 window to be on the screen, so start it through on_screen.py:
 
     tools/test.sh screen                                     # with the other real-screen checks
     tools/on_screen.py python3 tools/check_first_paint.py    # alone
 
-PB_BIN picks another binary, CHROMEDRIVER another ChromeDriver, DESK another desk. The
+PB_BIN picks another binary, CHROMEDRIVER another ChromeDriver, DESKRIG another deskrig. The
 capture goes to build/first-paint/.
 """
 
@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
 CHROMEDRIVER = os.environ.get("CHROMEDRIVER") or os.path.join(
     ROOT, ".tools/chromedriver/chromedriver-mac-arm64/chromedriver")
-DESK = os.environ.get("DESK") or os.path.join(ROOT, ".tools/desk/desk")
+DESKRIG = [os.environ.get("DESKRIG") or "deskrig", "--target", "local"]
 OUT = os.path.join(ROOT, "build/first-paint")
 
 COLOUR = (31, 122, 77)
@@ -65,7 +65,7 @@ def page_colour_share(shot, app):
     """How much of the app's window, captured now, is the page's colour."""
     if os.path.exists(shot):
         os.remove(shot)
-    taken = subprocess.run([DESK, "shot", shot, str(app)], capture_output=True, text=True)
+    taken = subprocess.run(DESKRIG + ["shot", shot, str(app)], capture_output=True, text=True)
     if not os.path.exists(shot):
         return 0, taken.stderr.strip()
     image = Image.open(shot).convert("RGB")
@@ -74,10 +74,13 @@ def page_colour_share(shot, app):
 
 
 def main():
-    status = subprocess.run([DESK, "status"], capture_output=True, text=True).stdout if os.path.exists(DESK) else ""
-    if "on console: 1" not in status or "screen locked: no" not in status or "screen recording: true" not in status:
-        print("NEEDS A PERSON AT THE SCREEN: desk has to capture the real window, which takes someone logged in, "
-              f"the screen unlocked, and Screen Recording allowed for deskctl (tools/deskctl/README.md). {DESK} status says:")
+    try:
+        status = subprocess.run(DESKRIG + ["status"], capture_output=True, text=True).stdout
+    except FileNotFoundError:
+        status = ""
+    if "on console: true" not in status or "screen locked: false" not in status or "screen recording: true" not in status:
+        print("NEEDS A PERSON AT THE SCREEN: deskrig has to capture the real window, which takes someone logged in, "
+              "the screen unlocked, and Screen Recording allowed for deskrig (deskrig setup permissions). deskrig status says:")
         print(status.strip() or "nothing: it isn't installed")
         return 2
 

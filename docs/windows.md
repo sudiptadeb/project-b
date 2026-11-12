@@ -11,7 +11,9 @@ behind it is `project-b-research/windows-survey.md`.
   reports (`WindowFocused`). Commands and the menu follow the window in front. File, New
   Window (Cmd+N) opens one. A window's close button, or its last tab closing, closes it
   (`WindowClosed`); closing the last one quits, and Quit (`AppQuit`) ends every window
-  at once. A second start's URLs open in the window used last.
+  at once. A second start's URLs open in the window used last. The Window menu lists the
+  windows by title and Cmd+` cycles them: AppKit does both by itself, and the window it
+  brings forward reports itself to Go as any key window does.
 - The window's layout lists the tabs it shows, each with a rectangle; the shell lists one,
   the active tab. The engine places each listed tab's view, tells a tab that joins or
   leaves the list that it is shown or hidden, and says when a click moves the keyboard

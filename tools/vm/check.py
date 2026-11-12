@@ -560,6 +560,14 @@ def titles():
     return [n.strip() for n in names.split(",")] if names else []
 
 
+def window_menu():
+    """The items of the app's Window menu, by title."""
+    names = guest("/usr/bin/osascript", "-e",
+                  f'tell application "System Events" to tell (first process whose bundle identifier is "{BUNDLE_ID}") '
+                  'to get name of every menu item of menu "Window" of menu bar 1')
+    return [n.strip() for n in names.split(",")] if names else []
+
+
 def go_to(url):
     """Cmd+L in the window in front, then the address."""
     desk.key("cmd+l")
@@ -570,8 +578,8 @@ def go_to(url):
 
 def window_checks():
     """Several windows, with the real keyboard and mouse: Cmd+N, keys and commands going to the
-    window clicked, a second start's URL in the window used last, a window closing with its
-    last tab, and the app quitting with its last window. Which window shows what is read from
+    window clicked, a second start's URL in the window used last, the Window menu's list and
+    Cmd+`, a window closing with its last tab, and the app quitting with its last window. Which window shows what is read from
     the windows' titles, each its shown tab's."""
     guest("/usr/bin/killall", "project_b")
     fresh_profile()
@@ -612,6 +620,13 @@ def window_checks():
     check("a second start's URL opens in a new tab in the window used last, in front", now[:1] == ["Charlie"] and
           sorted(now) == ["Bravo", "Charlie"], str(now))
     shot("handed-over")
+
+    # What macOS gives an app with several windows: the Window menu's list, and Cmd+`.
+    menu = window_menu()
+    check("the Window menu lists both windows", "Charlie" in menu and "Bravo" in menu, str(menu))
+    desk.key("cmd+`")
+    now = until(titles, lambda t: t[:1] == ["Bravo"])
+    check("Cmd+` brings the other window to the front", now[:1] == ["Bravo"], str(now))
 
     desk.click(*in_second)
     until(titles, lambda t: t[:1] == ["Bravo"])

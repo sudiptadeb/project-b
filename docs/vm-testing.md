@@ -176,14 +176,17 @@ resize (bug 7).
 The last checks, after Cmd+Q, are of several windows ([windows.md](windows.md)), on a fresh
 app with real keys and clicks: Cmd+N makes a second window, a little down and right of the
 first and the same size; Cmd+L and typing go to the window clicked; a second start of the app
-with a URL opens it in a new tab in the window used last, which comes to the front; Cmd+W on
+with a URL opens it in a new tab in the window used last, which comes to the front; the Window
+menu lists both windows, and Cmd+` brings the other one to the front; Cmd+W on
 a window's last tab closes that window; and Shift+Cmd+W on the last window quits the app.
 Which window shows what is read from the windows' titles, each its shown tab's, through
 System Events in the VM, and the windows' frames from the window server. They run alone with
 
     tools/vm/run.sh <DMG path or URL> windows
 
-On 2026-11-13 the six passed on this branch's build.
+On 2026-11-13 all eight passed on this branch's build. The Window menu's list and Cmd+` are
+AppKit's own, with nothing of ours: the list follows the windows' titles, and Cmd+` makes
+another window key, which the engine reports to Go like any other.
 
 By hand, a step at a time:
 

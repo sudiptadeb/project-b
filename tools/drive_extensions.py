@@ -39,6 +39,8 @@ TEST_ID = "oepjjojhhaclfhmopocgmdfbeiffpheh"
 TEST_NAME = "Project B test extension"
 UBOL_ID = "ddkjiahejlhfcafbddmgiahcphecmpfh"
 UBOL_NAME = "uBlock Origin Lite"
+FN_ID = "eljapbgkmlngdpckoiiibecpemleclhh"
+FN_NAME = "Fonts Ninja"
 # An address every ad blocker's default lists block outright.
 AD_URL = "https://ad.doubleclick.net/ddm/ad/pb"
 
@@ -414,6 +416,39 @@ def web_store_checks():
     app.close()
 
 
+def limit(name, works, detail=""):
+    """A limitation we know of: reported, and not a failure, until it works. Then it fails, so
+    the test is turned into a check and docs/extensions.md is brought up to date."""
+    if works:
+        check(name + " (listed as not working: make this a check)", False)
+    else:
+        print("known " + name + ("" if detail == "" else " -> " + str(detail)), flush=True)
+
+
+# Whether a page holds an extension's frame, looking inside shadow roots too.
+EXTENSION_FRAME = """(()=>{const all=r=>[...r.querySelectorAll('*')].flatMap(e=>[e,...(e.shadowRoot?all(e.shadowRoot):[])]);
+return all(document).some(e=>e.tagName==='IFRAME'&&e.src.startsWith('chrome-extension://'))})()"""
+
+
+def limit_checks():
+    """Real extensions that need what isn't built yet. Each limit is listed in
+    docs/extensions.md, under "Open for the owner"."""
+    app = App(new_profile(), MOCK_STORE)
+    app.wait("!!document.querySelector('input')", 30)
+    install_from_store(app, FN_ID)
+    pin(app, FN_NAME, True)
+    visit(app, PAGE)
+    time.sleep(2)  # its content script runs at document_idle
+    # Its button has no popup: the service worker sends the page "fn-activate" with
+    # tabs.sendMessage, and the content script opens its panel.
+    click(app, f"[aria-label={json.dumps(FN_NAME)}]")
+    deadline = time.time() + 10
+    while not app.js(EXTENSION_FRAME, page=True) and time.time() < deadline:
+        time.sleep(0.2)
+    limit("Fonts Ninja opens its panel on the page: needs tabs.sendMessage to a tab", app.js(EXTENSION_FRAME, page=True))
+    app.close()
+
+
 def store_button(kind):
     """The Chrome Web Store's Add or Remove button, found by the words it was written with."""
     words = "add to chrome" if kind == "add" else "remove from chrome"
@@ -445,6 +480,6 @@ if __name__ == "__main__":
     subprocess.check_call(["go", "build", "-o", store_bin, "./cmd/extstore"], cwd=os.path.join(ROOT, "core"))
     store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", STORE.split("//")[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        run_parts([extension_checks, flag_off_checks, web_store_checks])
+        run_parts([extension_checks, flag_off_checks, limit_checks, web_store_checks])
     finally:
         store.terminate()

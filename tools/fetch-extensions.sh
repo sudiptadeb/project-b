@@ -13,6 +13,7 @@ nngceckbapebfimnlniiiahkandclblb Bitwarden
 glnpjglilkicbckjpbgcfkogebgllemb Okta Browser Plugin
 aeblfdkhhhdcdjpifhhbdiojplfjncoa 1Password
 kbfnbcaeplbcioakkpcpgfkobkghlhen Grammarly
+eljapbgkmlngdpckoiiibecpemleclhh Fonts Ninja
 "
 
 mkdir -p "$OUT/crx" "$OUT/icon"

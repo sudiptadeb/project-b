@@ -341,6 +341,8 @@ Every check below was left out on purpose, to be discussed and then built or dro
 - **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`. So are
   `tabs.sendMessage` and `tabs.connect` from the extension to a tab: Chrome implements both in
   `//chrome`'s renderer code. Messages from a content script to its extension work.
+  Fonts Ninja shows it: its button sends the page a message, so pressing it does nothing.
+  `tools/drive_extensions.py` reports it on a `known` line, and fails once it works.
 - **Extension commands have no keys.** `commands.getAll` lists them without shortcuts, and
   nothing fires `commands.onCommand`. They belong in the keymap, with the menus work.
 - **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom, `captureVisibleTab`,

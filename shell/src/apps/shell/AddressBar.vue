@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { send } from '@/bridge.js';
-import { activeTab, setHandlers, state } from './state.js';
+import { activeTab, focusPage, setHandlers, state } from './state.js';
 
 const input = ref(null);
 const focused = ref(false);
@@ -73,7 +73,7 @@ function onKeydown(e) {
       } else {
         text.value = activeTab.value.url;
         input.value.blur();
-        send({ t: 'focusPage' });
+        focusPage();
       }
       break;
   }
@@ -86,7 +86,7 @@ function go(target) {
   close();
   send({ t: 'navigate', text: value });
   input.value.blur();
-  send({ t: 'focusPage' });
+  focusPage();
 }
 
 // Focusing the bar selects everything. When a click did the focusing, its mouse up
@@ -152,7 +152,7 @@ watch(
       focusBar();
     } else {
       input.value.blur();
-      send({ t: 'focusPage' });
+      focusPage();
     }
   },
 );

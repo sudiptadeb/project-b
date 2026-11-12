@@ -158,7 +158,7 @@ class BrowserWindow : public content::CompositorClient {
       hooks::Fire(PB_EVENT_SETTINGS_MESSAGE, args);
       return true;
     }
-    PageTab* tab = Engine::Get()->active_tab();
+    PageTab* tab = Engine::Get()->FocusedTab(Engine::Get()->window(1));
     if (!tab || !tab->contents()->GetController().CanGoBack()) {
       return false;
     }
@@ -215,6 +215,9 @@ struct Window::Impl {
   uint32_t frame_rgb = 0;
   bool has_frame = false;
   int theme = -1;
+  // The last layout, which SetPages hands Java with the page.
+  Layout layout;
+  raw_ptr<content::WebContents> shown = nullptr;
 };
 
 Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
@@ -244,12 +247,6 @@ void Window::AddPageContents(content::WebContents* contents) {
                              contents->GetJavaWebContents());
 }
 
-void Window::ShowPageContents(content::WebContents* contents) {
-  g_browser_window->ShowPage(contents);
-  Java_BrowserWindow_showPage(AttachCurrentThread(), g_browser_window->java(),
-                              contents->GetJavaWebContents());
-}
-
 void Window::SetOverlayContents(content::WebContents* contents) {
   g_browser_window->SetOverlay(contents);
   Java_BrowserWindow_setOverlay(AttachCurrentThread(), g_browser_window->java(),
@@ -262,6 +259,9 @@ void Window::RemoveOverlayContents(content::WebContents* contents) {
 }
 
 void Window::RemovePageContents(content::WebContents* contents) {
+  if (impl_->shown == contents) {
+    impl_->shown = nullptr;
+  }
   g_browser_window->RemovePage(contents);
   Java_BrowserWindow_removePage(AttachCurrentThread(), g_browser_window->java(),
                                 contents->GetJavaWebContents());
@@ -269,7 +269,8 @@ void Window::RemovePageContents(content::WebContents* contents) {
 
 // The frame's band is the shell's own edge strips here: with square corners there is no curve
 // for the window to draw over the page.
-void Window::SetLayout(Layout layout) {
+// Java places the page and ignores a stale one itself, so the pages always follow.
+bool Window::SetLayout(Layout layout) {
   JNIEnv* env = AttachCurrentThread();
   if (!impl_->has_frame || layout.frame_rgb != impl_->frame_rgb) {
     impl_->has_frame = true;
@@ -283,6 +284,20 @@ void Window::SetLayout(Layout layout) {
     Java_BrowserWindow_setTheme(env, g_browser_window->java(), layout.theme);
   }
 
+  impl_->layout = std::move(layout);
+  return true;
+}
+
+// A phone shows one page at a time: the first the layout lists.
+void Window::SetPages(const std::vector<Page>& pages) {
+  JNIEnv* env = AttachCurrentThread();
+  const Layout& layout = impl_->layout;
+  if (!pages.empty() && pages.front().contents != impl_->shown) {
+    impl_->shown = pages.front().contents;
+    g_browser_window->ShowPage(impl_->shown);
+    Java_BrowserWindow_showPage(env, g_browser_window->java(),
+                                impl_->shown->GetJavaWebContents());
+  }
   std::vector<double> flat;
   flat.reserve(layout.regions.size() * 5);
   for (const Region& r : layout.regions) {
@@ -292,7 +307,7 @@ void Window::SetLayout(Layout layout) {
     flat.push_back(r.rect.height());
     flat.push_back(static_cast<double>(r.area));
   }
-  const gfx::RectF& page = layout.page;
+  const gfx::RectF page = pages.empty() ? gfx::RectF() : pages.front().rect;
   Java_BrowserWindow_setLayout(env, g_browser_window->java(),
                                layout.viewport.width(), layout.viewport.height(),
                                page.x(), page.y(), page.width(), page.height(),

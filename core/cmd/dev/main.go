@@ -161,7 +161,7 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": l.Page, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported()}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(), "hidden": e.Hidden(), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported()}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)

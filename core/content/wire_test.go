@@ -100,6 +100,7 @@ func (r *recorder) SettingsMessage(w engine.WindowID, msg []byte) {
 func (r *recorder) WindowChanged(w engine.WindowID, s engine.WindowState) {
 	r.note(fmt.Sprintf("window %d %gx%g r=%g full=%v", w, s.W, s.H, s.CornerRadius, s.FullScreen))
 }
+func (r *recorder) TabFocused(tab engine.TabID)    { r.note(fmt.Sprint("focused ", tab)) }
 func (r *recorder) ShellCrashed(w engine.WindowID) { r.note(fmt.Sprintf("shell %d crashed", w)) }
 func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
 	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))

@@ -4,10 +4,12 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "project_b/engine/abi/pb_abi.h"
+#include "ui/gfx/geometry/rect_f.h"
 #include "url/gurl.h"
 
 namespace content {
@@ -26,8 +28,14 @@ class Window;
 // call from Go comes through, so it's also where the main-thread rule is checked.
 class Engine {
  public:
-  // One of Go's windows, by Go's id for it: the native window, the shell page on it, and
-  // the settings page over it while that is open.
+  // A tab a window's layout shows, and where, in shell coordinates.
+  struct VisibleTab {
+    int64_t tab;
+    gfx::RectF rect;
+  };
+
+  // One of Go's windows, by Go's id for it: the native window, the shell page on it, the
+  // settings page over it while that is open, and the tabs it shows.
   struct AppWindow {
     explicit AppWindow(int64_t id);
     ~AppWindow();
@@ -35,6 +43,10 @@ class Engine {
     std::unique_ptr<Window> window;
     std::unique_ptr<ShellPage> shell;
     std::unique_ptr<SettingsPage> settings;
+    std::vector<VisibleTab> visible;
+    // The visible tab whose page has, or last had, the keyboard here, or 0. The window
+    // is titled after it.
+    int64_t focused_tab = 0;
   };
 
   explicit Engine(content::BrowserContext* browser_context);
@@ -55,10 +67,19 @@ class Engine {
   const std::map<int64_t, std::unique_ptr<AppWindow>>& windows() const {
     return windows_;
   }
-  // The tab whose page is shown.
-  PageTab* active_tab() const;
-  // The window a tab is in.
+  // A tab by Go's id, or null.
+  PageTab* tab(int64_t id) const;
+  // The window whose layout last showed a tab, or null when none has.
   AppWindow* WindowOf(int64_t tab) const;
+  // A window's focused tab, or null when it shows none.
+  PageTab* FocusedTab(const AppWindow* window) const;
+
+  // Puts the tabs a window's layout lists in it, and tells each tab that comes or goes
+  // that it is shown or hidden.
+  void ShowTabs(AppWindow* window, std::vector<VisibleTab> tabs);
+  // A tab's page took the keyboard; a tab's title changed.
+  void TabFocused(PageTab* tab);
+  void TabTitleChanged(PageTab* tab);
 
   // Makes window id, with its shell page loading on it, off screen. on_close runs when
   // the native window closes.
@@ -70,14 +91,13 @@ class Engine {
   // Tab moves the keyboard out of a tab's page into its window's shell, and out of a
   // shell into its window's page.
   void FocusShellForTraversal(int64_t from_tab, bool reverse);
-  void FocusPageForTraversal(bool reverse);
+  void FocusPageForTraversal(int64_t window, bool reverse);
 
   int64_t CreateTab();
   // Takes a WebContents content made for a page's target=_blank or window.open and
   // makes it a hidden tab.
   PageTab* AdoptTab(std::unique_ptr<content::WebContents> contents);
   void CloseTab(int64_t tab);
-  void ShowTab(int64_t tab);
   void LoadURL(int64_t tab, const char* url);
   void GoBack(int64_t tab);
   void GoForward(int64_t tab);
@@ -92,7 +112,7 @@ class Engine {
   void CloseSettings(int64_t window);
   void SendToSettings(int64_t window, const char* json, size_t length);
   void CloseWindow(int64_t window);
-  void FocusPage();
+  void FocusTab(int64_t tab);
   void FocusShell(int64_t window);
   void SendToShell(int64_t window, const char* json, size_t length);
 
@@ -101,15 +121,15 @@ class Engine {
 
  private:
   PageTab* Add(std::unique_ptr<content::WebContents> contents);
-  // Whichever of our pages has the keyboard: a settings page, a shell or the tab.
+  // Whichever of our pages has the keyboard: a settings page, a shell or a tab's.
   content::WebContents* FocusedContents() const;
+  void UpdateTitle(AppWindow* window);
 
   const raw_ptr<content::BrowserContext> browser_context_;
   std::map<int64_t, std::unique_ptr<AppWindow>> windows_;
 
   std::map<int64_t, std::unique_ptr<PageTab>> tabs_;
   int64_t next_tab_ = 1;
-  int64_t active_tab_ = 0;
 };
 
 }  // namespace project_b

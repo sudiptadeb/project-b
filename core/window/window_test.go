@@ -34,7 +34,7 @@ var (
 	report = ShellLayout{
 		Shell: []engine.Rect{{X: 0, Y: 0, W: 1100, H: 48}, {X: 0, Y: 48, W: 220, H: 652}},
 		Drag:  []engine.Rect{{X: 80, Y: 4, W: 40, H: 40}, {X: 900, Y: 4, W: 196, H: 40}},
-		Page:  engine.Rect{X: 224, Y: 48, W: 872, H: 648},
+		Tabs:  []engine.VisibleTab{{Tab: 1, Rect: engine.Rect{X: 224, Y: 48, W: 872, H: 648}}},
 		ViewW: 1100,
 		ViewH: 700,
 	}
@@ -54,7 +54,7 @@ func TestWhatEachPointDoes(t *testing.T) {
 	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
 	m.HandleShellLayout(1, report)
 	l := e.last()
-	if l.Page != report.Page || l.ViewW != 1100 || l.ViewH != 700 {
+	if !reflect.DeepEqual(l.Tabs, report.Tabs) || l.ViewW != 1100 || l.ViewH != 700 {
 		t.Fatalf("layout %+v", l)
 	}
 	for _, c := range []struct {
@@ -70,6 +70,26 @@ func TestWhatEachPointDoes(t *testing.T) {
 		if got := l.At(c.x, c.y); got != c.want {
 			t.Errorf("At(%v, %v) = %v, want %v", c.x, c.y, got, c.want)
 		}
+	}
+}
+
+// The shell decides which tabs show and where; the layout carries every one of them, so
+// a shell that shows two tabs side by side gets both.
+func TestTheLayoutCarriesEveryVisibleTab(t *testing.T) {
+	e := &recorder{}
+	m := one(e)
+	split := report
+	split.Tabs = []engine.VisibleTab{
+		{Tab: 1, Rect: engine.Rect{X: 224, Y: 48, W: 436, H: 648}},
+		{Tab: 2, Rect: engine.Rect{X: 660, Y: 48, W: 436, H: 648}},
+	}
+	m.HandleShellLayout(1, split)
+	if !reflect.DeepEqual(e.last().Tabs, split.Tabs) {
+		t.Fatalf("tabs %+v", e.last().Tabs)
+	}
+	m.HandleShellLayout(1, report)
+	if !reflect.DeepEqual(e.last().Tabs, report.Tabs) {
+		t.Fatalf("back to one tab: %+v", e.last().Tabs)
 	}
 }
 
@@ -143,7 +163,7 @@ func TestAShellCrashGivesThePageEveryPress(t *testing.T) {
 	m := one(e)
 	m.HandleShellLayout(1, report)
 	m.HandleShellCrashed(1)
-	if l := e.last(); len(l.Regions) != 0 || l.Page != report.Page || l.At(300, 20) != engine.AreaPage {
+	if l := e.last(); len(l.Regions) != 0 || !reflect.DeepEqual(l.Tabs, report.Tabs) || l.At(300, 20) != engine.AreaPage {
 		t.Fatalf("after the crash %+v", l)
 	}
 	// The reloaded shell reports the same layout as before, and it goes out again.

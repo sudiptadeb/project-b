@@ -11,13 +11,11 @@ import (
 type fakeEngine struct {
 	engine.Engine
 	next   engine.TabID
-	shown  engine.TabID
 	closed []engine.TabID
 }
 
 func (f *fakeEngine) CreateTab() engine.TabID      { f.next++; return f.next }
 func (f *fakeEngine) CloseTab(id engine.TabID)     { f.closed = append(f.closed, id) }
-func (f *fakeEngine) ShowTab(id engine.TabID)      { f.shown = id }
 func (f *fakeEngine) LoadURL(engine.TabID, string) {}
 
 func ids(tabs []Tab) []engine.TabID {
@@ -35,13 +33,13 @@ func TestCreateCloseAndActivate(t *testing.T) {
 	m.OnListChanged(func() { lists++ })
 
 	a, b, c := m.Create(), m.Create(), m.Create()
-	if m.ActiveID() != c || e.shown != c || !slices.Equal(ids(m.All()), []engine.TabID{a, b, c}) {
-		t.Fatalf("after create: active %v shown %v all %v", m.ActiveID(), e.shown, ids(m.All()))
+	if m.ActiveID() != c || !slices.Equal(ids(m.All()), []engine.TabID{a, b, c}) {
+		t.Fatalf("after create: active %v all %v", m.ActiveID(), ids(m.All()))
 	}
 
 	m.Activate(a)
-	if m.ActiveID() != a || e.shown != a {
-		t.Fatalf("activate: active %v shown %v", m.ActiveID(), e.shown)
+	if m.ActiveID() != a {
+		t.Fatalf("activate: active %v", m.ActiveID())
 	}
 	m.ActivateNext(false)
 	m.ActivateNext(false)
@@ -93,8 +91,8 @@ func TestATabAPageOpensIsShownOnlyInTheForeground(t *testing.T) {
 		t.Fatalf("background open: active %v all %v", m.ActiveID(), m.All())
 	}
 	m.HandleTabOpened(a, 8, "https://c.test/", true)
-	if m.ActiveID() != 8 || e.shown != 8 {
-		t.Fatalf("foreground open: active %v shown %v", m.ActiveID(), e.shown)
+	if m.ActiveID() != 8 {
+		t.Fatalf("foreground open: active %v", m.ActiveID())
 	}
 }
 

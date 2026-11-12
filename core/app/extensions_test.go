@@ -413,6 +413,8 @@ func TestActionAPI(t *testing.T) {
 
 	// A count of blocked requests shows where the tab has no text of its own.
 	r.call("action.setBadgeText", `[{"text":null}]`, 0)
+	r.show(float64(tab))
+	r.x.Settle()
 	r.x.FireExtension("blocked", testExtensionID, "3")
 	r.until("the count", func() bool { return r.m.Buttons()[0].Badge == "3" })
 

@@ -6,6 +6,7 @@ package mockengine
 import (
 	"encoding/json"
 	"net/url"
+	"slices"
 	"sync"
 	"time"
 
@@ -62,9 +63,11 @@ type Engine struct {
 	listener engine.Listener
 	nextTab  engine.TabID
 	tabs     map[engine.TabID]*tab
-	shown    engine.TabID
-	full     bool    // Full screen, so there are no window controls.
-	w, h     float64 // The window's content size.
+	// visible are the tabs the layout shows; the mock page shows the first, shown.
+	visible []engine.TabID
+	shown   engine.TabID
+	full    bool    // Full screen, so there are no window controls.
+	w, h    float64 // The window's content size.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu         sync.Mutex
@@ -72,7 +75,7 @@ type Engine struct {
 	window     engine.WindowState // The last one reported.
 	requests   []engine.WindowRequest
 	closed     bool
-	hidden     []engine.TabID // Tabs told they are hidden since the last ShowTab.
+	hidden     []engine.TabID // Tabs told they are hidden by the last layout.
 	shownColor string
 	settings   bool
 	menu       engine.Menu
@@ -157,23 +160,6 @@ func (e *Engine) CloseTab(id engine.TabID) {
 	}
 }
 
-func (e *Engine) ShowTab(id engine.TabID) {
-	t := e.tabs[id]
-	if t == nil {
-		return
-	}
-	e.mu.Lock()
-	e.hidden = e.hidden[:0]
-	for other := range e.tabs {
-		if other != id {
-			e.hidden = append(e.hidden, other)
-		}
-	}
-	e.mu.Unlock()
-	e.shown = id
-	e.publishPage(id, t.state, t.current)
-}
-
 func (e *Engine) LoadURL(id engine.TabID, u string) { e.navigate(id, u) }
 
 func (e *Engine) GoBack(id engine.TabID) {
@@ -210,13 +196,46 @@ func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	}
 }
 
-// The real window moves the page's view to where the layout puts it, and hit-tests with
-// its regions. The mock says so on its Window feed, and the dev window does the same.
+// The real window puts each visible tab's view where the layout says, tells a tab that
+// leaves the list it is hidden, and hit-tests with the regions. The mock shows the first
+// tab's page, says where on its Window feed, and the dev window does the same.
 func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
+	var visible []engine.TabID
+	for _, v := range l.Tabs {
+		if e.tabs[v.Tab] != nil {
+			visible = append(visible, v.Tab)
+		}
+	}
 	e.mu.Lock()
 	e.layout = l
+	e.hidden = e.hidden[:0]
+	for _, id := range e.visible {
+		if !slices.Contains(visible, id) && e.tabs[id] != nil {
+			e.hidden = append(e.hidden, id)
+		}
+	}
 	e.mu.Unlock()
+	e.visible = visible
 	e.Window.Publish(e.WindowState())
+	shown := engine.TabID(0)
+	if len(visible) > 0 {
+		shown = visible[0]
+	}
+	if shown != e.shown {
+		e.shown = shown
+		if t := e.tabs[shown]; t != nil {
+			e.publishPage(shown, t.state, t.current)
+		}
+	}
+}
+
+// Page is where a layout puts the first visible tab's page, which the mock page shows,
+// or nothing.
+func Page(l engine.WindowLayout) engine.Rect {
+	if len(l.Tabs) == 0 {
+		return engine.Rect{}
+	}
+	return l.Tabs[0].Rect
 }
 
 // Layout is the last layout the app gave the window.
@@ -307,13 +326,14 @@ func (e *Engine) CloseSettings(w engine.WindowID) {
 // WindowState is what the window holds besides the shell, and how it draws and hit-tests,
 // as the Window feed sends it:
 //
-//	{"t":"window", "page":where the page goes, "regions":[{x,y,w,h,"area":"drag"|"shell"}],
+//	{"t":"window", "page":where the mock page goes, "regions":[{x,y,w,h,"area":"drag"|"shell"}],
 //	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
 //	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
 //
-// The rectangles are the layout's, in the shell's coordinates, which on the mock are the
-// dev window's. The regions are in order: the first that holds a point decides. Any
-// goroutine.
+// The mock shows one page, the first visible tab's, so "page" is where the layout puts
+// that. The rectangles are the layout's, in the shell's coordinates, which on the mock
+// are the dev window's. The regions are in order: the first that holds a point decides.
+// Any goroutine.
 func (e *Engine) WindowState() []byte {
 	type region struct {
 		engine.Rect
@@ -330,7 +350,7 @@ func (e *Engine) WindowState() []byte {
 	if w.Controls != (engine.Rect{}) {
 		controls = &w.Controls
 	}
-	b, _ := json.Marshal(map[string]any{"t": "window", "page": l.Page, "regions": regions,
+	b, _ := json.Marshal(map[string]any{"t": "window", "page": Page(l), "regions": regions,
 		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": w.CornerRadius,
 		"settings": settings, "popup": e.openPopup()})
 	return b
@@ -363,13 +383,29 @@ func (e *Engine) Menu() engine.Menu {
 
 func (e *Engine) AppCommand(engine.AppCommand) {}
 
-func (e *Engine) FocusPage() {}
+func (e *Engine) FocusTab(engine.TabID) {}
 
 func (e *Engine) FocusShell(engine.WindowID) {}
 
 func (e *Engine) SendToShell(w engine.WindowID, msg []byte) { e.Shell.Publish(msg) }
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
+
+// Settle returns once the engine has run everything posted to it so far, and everything
+// that posted in turn: the queue has drained. Any goroutine but the main thread.
+func (e *Engine) Settle() {
+	done := make(chan struct{})
+	var check func()
+	check = func() {
+		if len(e.queue) > 0 {
+			e.Post(check)
+			return
+		}
+		close(done)
+	}
+	e.Post(check)
+	<-done
+}
 
 // Closed reports whether the app closed its window.
 func (e *Engine) Closed() bool {
@@ -378,7 +414,7 @@ func (e *Engine) Closed() bool {
 	return e.closed
 }
 
-// Hidden returns the tabs told they are hidden by the last ShowTab.
+// Hidden returns the tabs told they are hidden by the last layout.
 func (e *Engine) Hidden() []engine.TabID {
 	e.mu.Lock()
 	defer e.mu.Unlock()

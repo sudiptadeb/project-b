@@ -11,9 +11,9 @@ research behind it is in `project-b-research/`: `ulaa-modes.md`,
 - One profile folder, `~/.project-b/default`, and one browser context made from it at start
   (`engine/browser/browser_main_parts.mm`). The shell, every tab, DevTools and settings use it.
 - One set of Go managers reading that folder (`core/app/app.go`).
-- One window with one page rectangle. Go calls `ShowTab`, and the engine puts that tab's view
-  in the rectangle and hides the rest (`engine/browser/engine.cc`). Which tab shows is
-  already our decision; content only renders.
+- One window. Its layout lists the tabs it shows, each with a rectangle, and the engine puts
+  each listed tab's view there and hides the rest (`engine/browser/engine.cc`). Which tabs
+  show is already our decision; content only renders.
 - Cookies and the cache are saved in the profile's `chromium/` folder (`Network/Cookies`,
   `Cache`), unencrypted, so a login survives a quit
   (`engine/browser/content_browser_client.cc`).

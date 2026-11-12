@@ -11,7 +11,6 @@ package main
 
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
-static inline void call_show_tab(const PBEngineCalls* c, int64_t tab) { c->show_tab(tab); }
 static inline void call_request_window(const PBEngineCalls* c, int64_t window, int32_t request) { c->request_window(window, request); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
@@ -28,8 +27,8 @@ static inline void call_close_settings(const PBEngineCalls* c, int64_t window) {
 static inline void call_send_to_settings(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_settings(window, json, length); }
 static inline void call_set_menu(const PBEngineCalls* c, const char* json, size_t length) { c->set_menu(json, length); }
 static inline void call_app_command(const PBEngineCalls* c, int32_t command) { c->app_command(command); }
-static inline void call_set_window_layout(const PBEngineCalls* c, int64_t window, const PBWindowLayout* layout, const PBRegion* regions, size_t count) { c->set_window_layout(window, layout, regions, count); }
-static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
+static inline void call_set_window_layout(const PBEngineCalls* c, int64_t window, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->set_window_layout(window, layout, regions, count, tabs, tab_count); }
+static inline void call_focus_tab(const PBEngineCalls* c, int64_t tab) { c->focus_tab(tab); }
 static inline void call_focus_shell(const PBEngineCalls* c, int64_t window) { c->focus_shell(window); }
 static inline void call_send_to_shell(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_shell(window, json, length); }
 static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
@@ -80,8 +79,6 @@ func (e *nativeEngine) CreateTab() engine.TabID {
 }
 
 func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.int64_t(tab)) }
-
-func (e *nativeEngine) ShowTab(tab engine.TabID) { C.call_show_tab(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	C.call_request_window(e.calls, C.int64_t(w), C.int32_t(r))
@@ -155,16 +152,23 @@ func (e *nativeEngine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout)
 	if len(regions) > 0 {
 		first = &regions[0]
 	}
+	tabs := make([]C.PBVisibleTab, len(l.Tabs))
+	for i, v := range l.Tabs {
+		tabs[i] = C.PBVisibleTab{tab: C.int64_t(v.Tab), x: C.double(v.Rect.X), y: C.double(v.Rect.Y), w: C.double(v.Rect.W), h: C.double(v.Rect.H)}
+	}
+	var firstTab *C.PBVisibleTab
+	if len(tabs) > 0 {
+		firstTab = &tabs[0]
+	}
 	layout := C.PBWindowLayout{
 		view_w: C.double(l.ViewW), view_h: C.double(l.ViewH),
-		page_x: C.double(l.Page.X), page_y: C.double(l.Page.Y), page_w: C.double(l.Page.W), page_h: C.double(l.Page.H),
 		frame_rgb: C.int32_t(rgb), frame_width: C.double(l.FrameWidth),
 		theme: C.int32_t(l.Theme),
 	}
-	C.call_set_window_layout(e.calls, C.int64_t(w), &layout, first, C.size_t(len(regions)))
+	C.call_set_window_layout(e.calls, C.int64_t(w), &layout, first, C.size_t(len(regions)), firstTab, C.size_t(len(tabs)))
 }
 
-func (e *nativeEngine) FocusPage() { C.call_focus_page(e.calls) }
+func (e *nativeEngine) FocusTab(tab engine.TabID) { C.call_focus_tab(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) FocusShell(w engine.WindowID) { C.call_focus_shell(e.calls, C.int64_t(w)) }
 

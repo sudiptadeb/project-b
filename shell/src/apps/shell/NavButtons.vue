@@ -1,10 +1,10 @@
 <script setup>
 import { send } from '@/bridge.js';
-import { activeTab } from './state.js';
+import { activeTab, focusPage } from './state.js';
 
 function act(t) {
   send({ t });
-  send({ t: 'focusPage' });
+  focusPage();
 }
 </script>
 

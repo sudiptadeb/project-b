@@ -40,11 +40,12 @@ So four engine calls, three senders, and nobody owns the whole answer.
 The window manager becomes the one owner of how the window behaves.
 
 - **From the shell** it takes one layout report: the shell's rectangles, the empty
-  spaces in the top row that drag the window, and the page rectangle.
+  spaces in the top row that drag the window, and the tabs it shows, each with its
+  rectangle ([windows.md](windows.md)).
 - **From the engine** it takes the window's size, where the controls are, the corner
   radius and whether it is in full screen.
 - **It decides, in one place,** which areas drag, which belong to the shell, where the
-  page goes, and the frame colour and width. In full screen it sends no drag areas,
+  pages go, and the frame colour and width. In full screen it sends no drag areas,
   because there is no window to move.
 - **It gives the engine one description** of the window, through one call that replaces
   the four.
@@ -56,7 +57,7 @@ The types, in `core/engine`:
 type Area int
 
 const (
-	AreaPage  Area = iota // No region holds the point: it goes to the shown page.
+	AreaPage  Area = iota // No region holds the point: it goes to the visible tab's page under it.
 	AreaShell             // It goes to the shell.
 	AreaDrag              // It moves the window.
 )
@@ -69,9 +70,9 @@ type Region struct {
 
 // WindowLayout is everything the engine needs to make the window behave.
 type WindowLayout struct {
-	ViewW, ViewH float64  // The window size this was made for; an engine ignores a stale one.
-	Page         Rect     // Where the shown tab's page goes.
-	Regions      []Region // In order. The first that holds a point decides.
+	ViewW, ViewH float64      // The window size this was made for; an engine ignores a stale one.
+	Tabs         []VisibleTab // The tabs whose pages show, and where. Every other tab is hidden.
+	Regions      []Region     // In order. The first that holds a point decides.
 	FrameColor   string   // "#rrggbb", painted under the shell and the page.
 	FrameWidth   float64  // The band drawn around the window's edge.
 }
@@ -139,13 +140,13 @@ walks the list, so none of them knows the rule.
   keep `v-drag`; the left, right and bottom edge strips in `App.vue` lose it, and so do
   the sidebar's empty part and, with the tabs on top, the bands beside the toolbar. The
   settings overlay is shell, so its rectangles are shell areas like any other.
-- **The native engine:** one C entry, `set_window_layout(layout, regions, count)`,
-  replaces the four in `engine/abi/pb_abi.h`: a `PBWindowLayout` with the view size,
-  the page rectangle and the frame, and beside it the `PBRegion` list (x, y, w, h and a
-  `PBArea`). `request_window` replaces
+- **The native engine:** one C entry, `set_window_layout(window, layout, regions,
+  count, tabs, tab_count)`, replaces the four in `engine/abi/pb_abi.h`: a
+  `PBWindowLayout` with the view size and the frame, and beside it the `PBRegion` list
+  (x, y, w, h and a `PBArea`) and the `PBVisibleTab` list (a tab, x, y, w, h). `request_window` replaces
   `close_window`. `PB_EVENT_WINDOW_CHANGED` carries the full `WindowState`, and
   `PB_EVENT_SHELL_CRASHED` says the shell's renderer died. The window applies the frame
-  only when it changed, and places the page only when the view size still matches.
+  only when it changed, and places the pages only when the view size still matches.
 - **The mock engine:** keeps the last `WindowLayout`. Its `Hit` becomes `At` on that
   layout, so the mock and the tests use the same rule the real engines mirror. Its
   full-screen button reports a `WindowState`.

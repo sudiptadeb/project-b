@@ -1,5 +1,5 @@
 // Package window owns how each native window behaves: which areas drag it, which belong
-// to its shell, where the page goes, its frame, and requests to close, minimise, zoom or
+// to its shell, which tabs it shows and where, its frame, and requests to close, minimise, zoom or
 // go full screen. It is the only manager that tells the engine about the windows.
 package window
 
@@ -11,14 +11,14 @@ import (
 )
 
 // ShellLayout is what the shell reports about itself: the rectangles its controls take,
-// the empty spaces in the top row that drag the window, where the page goes, and the
-// window size it measured against.
+// the empty spaces in the top row that drag the window, the tabs it shows and where,
+// and the window size it measured against.
 type ShellLayout struct {
-	Shell []engine.Rect `json:"shell"`
-	Drag  []engine.Rect `json:"drag"`
-	Page  engine.Rect   `json:"page"`
-	ViewW float64       `json:"viewW"`
-	ViewH float64       `json:"viewH"`
+	Shell []engine.Rect       `json:"shell"`
+	Drag  []engine.Rect       `json:"drag"`
+	Tabs  []engine.VisibleTab `json:"tabs"`
+	ViewW float64             `json:"viewW"`
+	ViewH float64             `json:"viewH"`
 }
 
 // Manager owns the windows.
@@ -62,13 +62,13 @@ func (m *Manager) Windows() []engine.WindowID {
 	return ids
 }
 
-// layout is the one decision: drag areas first, then the shell's, and the page under
+// layout is the one decision: drag areas first, then the shell's, and the pages under
 // everything else. In full screen there is no window to move, so nothing drags.
 func (m *Manager) layout(w *window) engine.WindowLayout {
 	l := engine.WindowLayout{
 		ViewW:      w.shell.ViewW,
 		ViewH:      w.shell.ViewH,
-		Page:       w.shell.Page,
+		Tabs:       w.shell.Tabs,
 		FrameColor: m.color,
 		FrameWidth: m.frameWidth,
 		Theme:      m.theme,
@@ -88,7 +88,7 @@ func (m *Manager) layout(w *window) engine.WindowLayout {
 func (m *Manager) update(id engine.WindowID) {
 	w := m.windows[id]
 	l := m.layout(w)
-	if l.ViewW == w.sent.ViewW && l.ViewH == w.sent.ViewH && l.Page == w.sent.Page &&
+	if l.ViewW == w.sent.ViewW && l.ViewH == w.sent.ViewH && slices.Equal(l.Tabs, w.sent.Tabs) &&
 		l.FrameColor == w.sent.FrameColor && l.FrameWidth == w.sent.FrameWidth && l.Theme == w.sent.Theme &&
 		slices.Equal(l.Regions, w.sent.Regions) {
 		return
@@ -110,8 +110,8 @@ func (m *Manager) HandleShellLayout(id engine.WindowID, l ShellLayout) {
 	m.update(id)
 }
 
-// HandleShellCrashed drops what the dead shell claimed, so the page takes every press
-// until the reloaded shell reports again. The page stays where it was.
+// HandleShellCrashed drops what the dead shell claimed, so the pages take every press
+// until the reloaded shell reports again. The pages stay where they were.
 func (m *Manager) HandleShellCrashed(id engine.WindowID) {
 	w := m.windows[id]
 	w.shell.Shell = nil

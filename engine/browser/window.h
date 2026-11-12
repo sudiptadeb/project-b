@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "project_b/engine/buildflags/buildflags.h"
@@ -26,8 +27,8 @@ struct NativeWebKeyboardEvent;
 
 namespace project_b {
 
-// A native window: the pages' views at the bottom, one shown at a time, the shell's
-// view on top covering everything. Go's window manager describes how it behaves in one
+// A native window: the views of the pages it shows at the bottom, each where the layout
+// says, the shell's view on top covering everything. Go's window manager describes how it behaves in one
 // Layout; the window only follows it, and reports its State back.
 class Window {
  public:
@@ -38,11 +39,10 @@ class Window {
     Area area;
   };
   struct Layout {
-    // The size the shell measured against. A page position measured for an older
-    // window size is ignored, and a fresher one follows because the resize made the
+    // The size the shell measured against. Page positions measured for an older
+    // window size are ignored, and fresher ones follow because the resize made the
     // shell measure again.
     gfx::SizeF viewport;
-    gfx::RectF page;  // Where the page goes, in shell coordinates.
     // In order: the first region that holds a point decides. None holds it: the page.
     std::vector<Region> regions;
     // The colour the window paints wherever nothing else does, before the shell's
@@ -54,6 +54,11 @@ class Window {
     // How the window's own parts are drawn: 0 as the system is, 1 light, 2 dark. Only
     // this window: pages keep following the system.
     int theme;
+  };
+  // A page the window shows, and where, in shell coordinates.
+  struct Page {
+    raw_ptr<content::WebContents> contents;
+    gfx::RectF rect;
   };
   struct State {
     gfx::SizeF size;  // The content area.
@@ -75,7 +80,6 @@ class Window {
   // Android's views need the Java WebContents, which a native view can't lead back to.
   void SetShellContents(content::WebContents* contents);
   void AddPageContents(content::WebContents* contents);
-  void ShowPageContents(content::WebContents* contents);
   void RemovePageContents(content::WebContents* contents);
 
   // The overlay covers the whole window, over the shell, and takes every touch while it
@@ -88,10 +92,7 @@ class Window {
 #else
   void SetShellView(gfx::NativeView view);
 
-  // Page views all sit where the layout's page says. AddPageView adds one hidden;
-  // ShowPageView shows it and hides the others.
-  void AddPageView(gfx::NativeView view);
-  void ShowPageView(gfx::NativeView view);
+  // A page view leaves the window when its tab closes.
   void RemovePageView(gfx::NativeView view);
 #endif
 
@@ -112,7 +113,11 @@ class Window {
   gfx::RectF popup_bounds() const;
 #endif
 
-  void SetLayout(Layout layout);
+  // Returns whether the layout was measured for the window's size now, so the pages
+  // can be placed.
+  bool SetLayout(Layout layout);
+  // Shows these pages, each where it says, and hides every other the window holds.
+  void SetPages(const std::vector<Page>& pages);
 
   // Reports the window's state now and whenever it changes.
   void ListenForState(base::RepeatingCallback<void(const State&)> on_change);
@@ -150,7 +155,6 @@ class Window {
   gfx::NativeWindow native_window() const;
   // Development only, for the driver.
   void ForceKeyForDriver();
-  gfx::RectF page_bounds() const;
   size_t ignored_stale_bounds() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;

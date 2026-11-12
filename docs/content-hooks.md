@@ -300,7 +300,7 @@ crossing the engine interface stays ours and generalised.
 | `WebContentsObserver` | `OnTrustTokensAccessed` | left: no copier for content::TrustTokenAccessDetails | `content/public/browser/web_contents_observer.h:542` |
 | `WebContentsObserver` | `OnVisibilityChanged` | carried | `WebContentsObserverHooks::OnVisibilityChanged` · `Hooks.Observer.OnVisibilityChanged` |
 | `WebContentsObserver` | `OnVisibilityWillChange` | carried | `WebContentsObserverHooks::OnVisibilityWillChange` · `Hooks.Observer.OnVisibilityWillChange` |
-| `WebContentsObserver` | `OnWebContentsFocused` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsFocused` · `Hooks.Observer.OnWebContentsFocused` |
+| `WebContentsObserver` | `OnWebContentsFocused` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsFocused` · `Hooks.Observer.OnWebContentsFocused` · used by `core/content/wire.go` |
 | `WebContentsObserver` | `OnWebContentsLostFocus` | carried, struct copy | `WebContentsObserverHooks::OnWebContentsLostFocus` · `Hooks.Observer.OnWebContentsLostFocus` |
 | `WebContentsObserver` | `PointerLockRequested` | carried | `WebContentsObserverHooks::PointerLockRequested` · `Hooks.Observer.OnPointerLockRequested` |
 | `WebContentsObserver` | `PrimaryMainDocumentElementAvailable` | carried | `WebContentsObserverHooks::PrimaryMainDocumentElementAvailable` · `Hooks.Observer.OnPrimaryMainDocumentElementAvailable` |

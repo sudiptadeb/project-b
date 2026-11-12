@@ -81,7 +81,7 @@ typedef enum PBAppCommand {
 
 // What a press inside a region does. Matches engine.Area in core/engine/engine.go.
 typedef enum PBArea {
-  PB_AREA_PAGE = 0,   // it goes to the shown page
+  PB_AREA_PAGE = 0,   // it goes to the visible tab's page under it
   PB_AREA_SHELL = 1,  // it goes to the shell
   PB_AREA_DRAG = 2,   // it moves the window
 } PBArea;
@@ -91,12 +91,18 @@ typedef struct PBRegion {
   int32_t area;  // PBArea
 } PBRegion;
 
-// Everything about how the window behaves, from Go's window manager, with its regions
-// passed beside it. Rectangles are in shell coordinates, y measured down from the top.
+// A tab whose page a window shows, and where.
+typedef struct PBVisibleTab {
+  int64_t tab;
+  double x, y, w, h;
+} PBVisibleTab;
+
+// Everything about how a window behaves, from Go's window manager, with its regions and
+// its visible tabs passed beside it. Rectangles are in shell coordinates, y measured
+// down from the top.
 typedef struct PBWindowLayout {
-  // The window size the shell measured; the page is placed only while it still fits.
+  // The window size the shell measured; the pages are placed only while it still fits.
   double view_w, view_h;
-  double page_x, page_y, page_w, page_h;
   // The frame: the colour the window paints under the page and the shell, 0xRRGGBB,
   // and the width of the band it draws around its edge, in points.
   int32_t frame_rgb;
@@ -128,10 +134,9 @@ typedef enum PBTimelineKind {
 // What Go can ask the adapter to do. Handed over once, at start. A window is named by
 // Go's id for it, 1 for the first.
 typedef struct PBEngineCalls {
-  // Makes a hidden tab. show_tab shows one tab and hides the rest.
+  // Makes a hidden tab. A window's layout shows it.
   int64_t (*create_tab)(void);
   void (*close_tab)(int64_t tab);
-  void (*show_tab)(int64_t tab);
   void (*load_url)(int64_t tab, const char* url);
   void (*go_back)(int64_t tab);
   void (*go_forward)(int64_t tab);
@@ -146,12 +151,16 @@ typedef struct PBEngineCalls {
   // Runs a PBEditCommand in whichever of our pages has the keyboard.
   void (*edit)(int32_t command);
   void (*request_window)(int64_t window, int32_t request);  // PBWindowRequest
-  // regions are in order: the first that holds a point decides. None holds it: the page.
+  // regions are in order: the first that holds a point decides. None holds it: the page
+  // there. tabs are the tabs the window shows; every other tab is hidden.
   void (*set_window_layout)(int64_t window,
                             const PBWindowLayout* layout,
                             const PBRegion* regions,
-                            size_t region_count);
-  void (*focus_page)(void);
+                            size_t region_count,
+                            const PBVisibleTab* tabs,
+                            size_t tab_count);
+  // Gives the keyboard to a visible tab's page.
+  void (*focus_tab)(int64_t tab);
   void (*focus_shell)(int64_t window);
   void (*send_to_shell)(int64_t window, const char* json, size_t length);
   // A window's settings page, over the whole window in its own page while open.

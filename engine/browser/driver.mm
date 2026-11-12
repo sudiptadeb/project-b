@@ -80,6 +80,21 @@ NSWindow* TheWindow() {
   return Current()->window->native_window().GetNativeNSWindow();
 }
 
+// The tab the driver's window has the keyboard in, which "page" commands act on.
+PageTab* Focused() {
+  return Engine::Get()->FocusedTab(Current());
+}
+
+// Where the layout put the focused tab's page, in shell coordinates, or nothing.
+gfx::RectF FocusedBounds() {
+  for (const Engine::VisibleTab& v : Current()->visible) {
+    if (v.tab == Current()->focused_tab) {
+      return v.rect;
+    }
+  }
+  return gfx::RectF();
+}
+
 NSTimeInterval Now() {
   return NSProcessInfo.processInfo.systemUptime;
 }
@@ -106,9 +121,14 @@ std::string Classify(NSView* hit) {
   if ([hit isDescendantOf:shell]) {
     return "shell";
   }
-  PageTab* tab = Engine::Get()->active_tab();
-  if (tab && [hit isDescendantOf:tab->contents()->GetNativeView().GetNativeNSView()]) {
-    return "page";
+  for (const Engine::VisibleTab& v : Current()->visible) {
+    if ([hit isDescendantOf:Engine::Get()
+                                ->tab(v.tab)
+                                ->contents()
+                                ->GetNativeView()
+                                .GetNativeNSView()]) {
+      return "page";
+    }
   }
   SettingsPage* settings = Current()->settings.get();
   if (settings &&
@@ -295,8 +315,7 @@ void Stats(const std::string& id) {
     Go().hook(PB_EVENT_PING, nullptr, 0, &unused);
   });
   // A generated hook nobody subscribed to: the check and content's own call.
-  PageTab* tab = Engine::Get()->active_tab();
-  WebContentsObserverHooks* observer = tab;
+  WebContentsObserverHooks* observer = Focused();
   const double hook_off_ns = PerCall([observer] {
     observer->DidChangeVisibleSecurityState();
   });
@@ -427,7 +446,47 @@ void Run(const std::string& line) {
   } else if (cmd == "eval") {
     Eval(id, Current()->shell->contents(), rest(2));
   } else if (cmd == "evalpage") {
-    Eval(id, Engine::Get()->active_tab()->contents(), rest(2));
+    Eval(id, Focused()->contents(), rest(2));
+  } else if (cmd == "evaltab") {
+    // In one tab's page, by Go's id for it.
+    if (PageTab* tab = Engine::Get()->tab(number(2))) {
+      Eval(id, tab->contents(), rest(3));
+    } else {
+      Reply(id, "ERR no tab");
+    }
+  } else if (cmd == "showtabs") {
+    // Shows these tabs in the window as a layout from Go would, without Go: "showtabs
+    // <tab> <x> <y> <w> <h> ..." in shell coordinates. Go's next layout replaces it.
+    std::vector<Engine::VisibleTab> tabs;
+    for (size_t i = 2; i + 4 < parts.size(); i += 5) {
+      tabs.push_back({static_cast<int64_t>(number(i)),
+                      gfx::RectF(number(i + 1), number(i + 2), number(i + 3),
+                                 number(i + 4))});
+    }
+    Engine::Get()->ShowTabs(Current(), std::move(tabs));
+    Reply(id, "ok");
+  } else if (cmd == "visible") {
+    // The tabs the window shows: each one's id, where its view is in shell
+    // coordinates, and whether content was told it is visible.
+    base::ListValue out;
+    const CGFloat height = TheWindow().contentView.bounds.size.height;
+    for (const Engine::VisibleTab& v : Current()->visible) {
+      content::WebContents* contents = Engine::Get()->tab(v.tab)->contents();
+      NSView* view = contents->GetNativeView().GetNativeNSView();
+      const NSRect f = [view.superview convertRect:view.frame
+                                            toView:TheWindow().contentView];
+      out.Append(base::DictValue()
+                     .Set("tab", static_cast<int>(v.tab))
+                     .Set("frame", base::ListValue()
+                                       .Append(f.origin.x)
+                                       .Append(height - NSMaxY(f))
+                                       .Append(f.size.width)
+                                       .Append(f.size.height))
+                     .Set("hidden", static_cast<bool>(view.hidden))
+                     .Set("shown", contents->GetVisibility() ==
+                                       content::Visibility::VISIBLE));
+    }
+    Reply(id, base::WriteJson(out).value_or("[]"));
   } else if (cmd == "evalsettings") {
     if (SettingsPage* settings = Current()->settings.get()) {
       Eval(id, settings->contents(), rest(2));
@@ -493,10 +552,9 @@ void Run(const std::string& line) {
   } else if (cmd == "title") {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {
-    gfx::RectF b = Current()->window->page_bounds();
-    // The shown page's frame in the window's content view, where the layout put it.
-    NSView* page_view =
-        Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
+    gfx::RectF b = FocusedBounds();
+    // The focused page's frame in the window's content view, where the layout put it.
+    NSView* page_view = Focused()->contents()->GetNativeView().GetNativeNSView();
     NSRect f = [page_view.superview convertRect:page_view.frame
                                          toView:TheWindow().contentView];
     NSSize c = TheWindow().contentView.bounds.size;
@@ -522,7 +580,7 @@ void Run(const std::string& line) {
     Reply(id, base::StringPrintf(
                   "{\"shell\":%d,\"page\":%d}",
                   Current()->shell->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid(),
-                  Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid()));
+                  Focused()->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid()));
   } else if (cmd == "gc") {
     const base::TimeTicks start = base::TimeTicks::Now();
     Go().force_gc();
@@ -543,7 +601,7 @@ void Run(const std::string& line) {
     // The colour in the middle of what the shown tab's page view draws, or "none"
     // when it draws nothing.
     content::RenderWidgetHostView* view =
-        Engine::Get()->active_tab()->contents()->GetRenderWidgetHostView();
+        Focused()->contents()->GetRenderWidgetHostView();
     if (!view) {
       Reply(id, "none");
       return;
@@ -569,7 +627,7 @@ void Run(const std::string& line) {
         content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
     AskStrayShell(id, 100);
   } else if (cmd == "crashpage") {
-    Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
+    Focused()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
     Reply(id, "ok");
   } else if (cmd == "crashshell") {
     Current()->shell->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
@@ -638,7 +696,7 @@ void Capture(const std::string& id, const std::string& path) {
   auto state = base::MakeRefCounted<CaptureState>();
   state->id = id;
   state->path = path;
-  state->bounds = Current()->window->page_bounds();
+  state->bounds = FocusedBounds();
 
   auto copy = [](content::WebContents* contents,
                  base::OnceCallback<void(const content::CopyFromSurfaceResult&)> done) {
@@ -669,7 +727,7 @@ void Capture(const std::string& id, const std::string& path) {
     state->page_done = true;
     return;
   }
-  copy(Engine::Get()->active_tab()->contents(),
+  copy(Focused()->contents(),
        base::BindOnce(
            [](scoped_refptr<CaptureState> state,
               const content::CopyFromSurfaceResult& result) {

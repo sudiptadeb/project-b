@@ -1,5 +1,6 @@
 #include "project_b/engine/browser/engine.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -56,11 +57,6 @@ int64_t CallCreateTab() {
 void CallCloseTab(int64_t tab) {
   CheckMainThread();
   g_engine->CloseTab(tab);
-}
-
-void CallShowTab(int64_t tab) {
-  CheckMainThread();
-  g_engine->ShowTab(tab);
 }
 
 void CallLoadURL(int64_t tab, const char* url) {
@@ -173,11 +169,12 @@ void CallRequestWindow(int64_t window, int32_t request) {
 void CallSetWindowLayout(int64_t window,
                          const PBWindowLayout* l,
                          const PBRegion* regions,
-                         size_t region_count) {
+                         size_t region_count,
+                         const PBVisibleTab* tabs,
+                         size_t tab_count) {
   CheckMainThread();
   Window::Layout layout = {
       .viewport = gfx::SizeF(l->view_w, l->view_h),
-      .page = gfx::RectF(l->page_x, l->page_y, l->page_w, l->page_h),
       .frame_rgb = static_cast<uint32_t>(l->frame_rgb),
       .frame_width = l->frame_width,
       .theme = l->theme,
@@ -188,12 +185,21 @@ void CallSetWindowLayout(int64_t window,
     layout.regions.push_back({gfx::RectF(r.x, r.y, r.w, r.h),
                               static_cast<Window::Area>(r.area)});
   }
-  NativeWindow(window)->SetLayout(std::move(layout));
+  if (!NativeWindow(window)->SetLayout(std::move(layout))) {
+    return;
+  }
+  std::vector<Engine::VisibleTab> visible;
+  visible.reserve(tab_count);
+  for (size_t i = 0; i < tab_count; i++) {
+    const PBVisibleTab& t = UNSAFE_BUFFERS(tabs[i]);
+    visible.push_back({t.tab, gfx::RectF(t.x, t.y, t.w, t.h)});
+  }
+  g_engine->ShowTabs(g_engine->window(window), std::move(visible));
 }
 
-void CallFocusPage() {
+void CallFocusTab(int64_t tab) {
   CheckMainThread();
-  g_engine->FocusPage();
+  g_engine->FocusTab(tab);
 }
 
 void CallFocusShell(int64_t window) {
@@ -260,7 +266,6 @@ const PBEngineCalls* Engine::Calls() {
   static const PBEngineCalls calls = {
       .create_tab = CallCreateTab,
       .close_tab = CallCloseTab,
-      .show_tab = CallShowTab,
       .load_url = CallLoadURL,
       .go_back = CallGoBack,
       .go_forward = CallGoForward,
@@ -273,7 +278,7 @@ const PBEngineCalls* Engine::Calls() {
       .edit = CallEdit,
       .request_window = CallRequestWindow,
       .set_window_layout = CallSetWindowLayout,
-      .focus_page = CallFocusPage,
+      .focus_tab = CallFocusTab,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,
       .open_settings = CallOpenSettings,
@@ -293,8 +298,8 @@ const PBEngineCalls* Engine::Calls() {
   return &calls;
 }
 
-PageTab* Engine::active_tab() const {
-  auto it = tabs_.find(active_tab_);
+PageTab* Engine::tab(int64_t id) const {
+  auto it = tabs_.find(id);
   return it == tabs_.end() ? nullptr : it->second.get();
 }
 
@@ -303,9 +308,70 @@ Engine::AppWindow* Engine::window(int64_t id) const {
   return it == windows_.end() ? nullptr : it->second.get();
 }
 
-// Until the layout says which window shows which tab, every tab is in window 1.
 Engine::AppWindow* Engine::WindowOf(int64_t tab) const {
-  return window(1);
+  PageTab* t = this->tab(tab);
+  return t ? window(t->window()) : nullptr;
+}
+
+PageTab* Engine::FocusedTab(const AppWindow* window) const {
+  return tab(window->focused_tab);
+}
+
+namespace {
+
+bool Lists(const std::vector<Engine::VisibleTab>& tabs, int64_t tab) {
+  return std::ranges::any_of(
+      tabs, [tab](const Engine::VisibleTab& v) { return v.tab == tab; });
+}
+
+}  // namespace
+
+// A tab that closed after Go sent the layout is left out. A tab another window shows now
+// has moved there, and is shown there.
+void Engine::ShowTabs(AppWindow* window, std::vector<VisibleTab> tabs) {
+  std::erase_if(tabs, [this](const VisibleTab& v) { return !tab(v.tab); });
+  std::vector<Window::Page> pages;
+  for (const VisibleTab& v : tabs) {
+    pages.push_back({tab(v.tab)->contents(), v.rect});
+  }
+  window->window->SetPages(pages);
+  for (const VisibleTab& v : window->visible) {
+    PageTab* t = tab(v.tab);
+    if (t && !Lists(tabs, v.tab) && t->window() == window->id) {
+      t->contents()->WasHidden();
+    }
+  }
+  for (const VisibleTab& v : tabs) {
+    if (!Lists(window->visible, v.tab)) {
+      tab(v.tab)->set_window(window->id);
+      tab(v.tab)->contents()->WasShown();
+    }
+  }
+  window->visible = std::move(tabs);
+  if (!Lists(window->visible, window->focused_tab)) {
+    window->focused_tab =
+        window->visible.empty() ? 0 : window->visible.front().tab;
+  }
+  UpdateTitle(window);
+}
+
+void Engine::TabFocused(PageTab* tab) {
+  if (AppWindow* w = WindowOf(tab->id())) {
+    w->focused_tab = tab->id();
+    UpdateTitle(w);
+  }
+}
+
+void Engine::TabTitleChanged(PageTab* tab) {
+  if (AppWindow* w = WindowOf(tab->id()); w && w->focused_tab == tab->id()) {
+    UpdateTitle(w);
+  }
+}
+
+void Engine::UpdateTitle(AppWindow* window) {
+  if (PageTab* t = FocusedTab(window)) {
+    window->window->SetTitle(t->contents()->GetTitle());
+  }
 }
 
 void Engine::OpenWindow(int64_t id, base::OnceClosure on_close) {
@@ -351,8 +417,8 @@ void Engine::FocusShellForTraversal(int64_t from_tab, bool reverse) {
   shell->FocusThroughTabTraversal(reverse);
 }
 
-void Engine::FocusPageForTraversal(bool reverse) {
-  if (PageTab* tab = active_tab()) {
+void Engine::FocusPageForTraversal(int64_t window, bool reverse) {
+  if (PageTab* tab = FocusedTab(this->window(window))) {
     tab->contents()->Focus();
     tab->contents()->FocusThroughTabTraversal(reverse);
   }
@@ -368,7 +434,8 @@ PageTab* Engine::AdoptTab(std::unique_ptr<content::WebContents> contents) {
   return Add(std::move(contents));
 }
 
-// A new tab starts hidden, whoever made it. ShowTab is the only way to the screen.
+// A new tab starts hidden, whoever made it. A window's layout is the only way to the
+// screen.
 PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   const int64_t id = next_tab_++;
   auto tab = std::make_unique<PageTab>(id, std::move(contents));
@@ -382,9 +449,8 @@ PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   }
 #endif
 #if BUILDFLAG(IS_ANDROID)
-  WindowOf(id)->window->AddPageContents(tab->contents());
-#else
-  WindowOf(id)->window->AddPageView(tab->contents()->GetNativeView());
+  // Android has one window, and every tab's view is in it from the start.
+  windows_.begin()->second->window->AddPageContents(raw->contents());
 #endif
   tabs_[id] = std::move(tab);
   return raw;
@@ -398,37 +464,20 @@ void Engine::CloseTab(int64_t tab) {
     return;
   }
 #if BUILDFLAG(IS_ANDROID)
-  WindowOf(tab)->window->RemovePageContents(it->second->contents());
-#else
-  WindowOf(tab)->window->RemovePageView(it->second->contents()->GetNativeView());
+  windows_.begin()->second->window->RemovePageContents(it->second->contents());
 #endif
-  if (active_tab_ == tab) {
-    active_tab_ = 0;
+  if (AppWindow* w = WindowOf(tab)) {
+#if !BUILDFLAG(IS_ANDROID)
+    w->window->RemovePageView(it->second->contents()->GetNativeView());
+#endif
+    std::erase_if(w->visible, [tab](const VisibleTab& v) { return v.tab == tab; });
+    if (w->focused_tab == tab) {
+      w->focused_tab = w->visible.empty() ? 0 : w->visible.front().tab;
+    }
   }
   content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
                                                  std::move(it->second));
   tabs_.erase(it);
-}
-
-void Engine::ShowTab(int64_t tab) {
-  auto it = tabs_.find(tab);
-  if (it == tabs_.end()) {
-    return;
-  }
-  active_tab_ = tab;
-  Window* native = WindowOf(tab)->window.get();
-#if BUILDFLAG(IS_ANDROID)
-  native->ShowPageContents(it->second->contents());
-#else
-  native->ShowPageView(it->second->contents()->GetNativeView());
-#endif
-  native->SetTitle(it->second->contents()->GetTitle());
-  it->second->contents()->WasShown();
-  for (const auto& [id, other] : tabs_) {
-    if (id != tab) {
-      other->contents()->WasHidden();
-    }
-  }
 }
 
 void Engine::LoadURL(int64_t tab, const char* url) {
@@ -510,17 +559,19 @@ int64_t Engine::DuplicateTab(int64_t tab) {
 
 content::WebContents* Engine::FocusedContents() const {
   for (const auto& [id, w] : windows_) {
-    for (content::WebContents* contents :
-         {w->settings ? w->settings->contents() : nullptr,
-          w->shell->contents()}) {
+    std::vector<content::WebContents*> pages = {
+        w->settings ? w->settings->contents() : nullptr, w->shell->contents()};
+    for (const VisibleTab& v : w->visible) {
+      pages.push_back(tab(v.tab)->contents());
+    }
+    for (content::WebContents* contents : pages) {
       if (contents && contents->GetRenderWidgetHostView() &&
           contents->GetRenderWidgetHostView()->HasFocus()) {
         return contents;
       }
     }
   }
-  PageTab* tab = active_tab();
-  return tab ? tab->contents() : nullptr;
+  return nullptr;
 }
 
 void Engine::Edit(int32_t command) {
@@ -587,7 +638,9 @@ void Engine::CloseSettings(int64_t window) {
 #endif
   content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
                                                  std::move(w->settings));
-  FocusPage();
+  if (PageTab* tab = FocusedTab(w)) {
+    tab->contents()->Focus();
+  }
 }
 
 void Engine::SendToSettings(int64_t window, const char* json, size_t length) {
@@ -607,10 +660,11 @@ void Engine::CloseWindow(int64_t window) {
 // While a window's settings page is open it keeps the keyboard: a focus request from
 // the shell or Go, such as one still on its way from before it opened, waits until it
 // closes.
-void Engine::FocusPage() {
-  PageTab* tab = active_tab();
-  if (tab && !WindowOf(tab->id())->settings) {
-    tab->contents()->Focus();
+void Engine::FocusTab(int64_t tab) {
+  PageTab* t = this->tab(tab);
+  AppWindow* w = WindowOf(tab);
+  if (t && w && !w->settings) {
+    t->contents()->Focus();
   }
 }
 

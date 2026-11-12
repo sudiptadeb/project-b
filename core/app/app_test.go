@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -45,6 +46,12 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 }
 
 func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage(1, []byte(cmd)) }) }
+
+// show reports a layout from the shell that shows one tab, as the shell does for the
+// active tab.
+func (r *rig) show(tab float64) {
+	r.shell(fmt.Sprintf(`{"t":"layout","tabs":[{"tab":%v,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`, tab))
+}
 
 // waitFor reads shell messages until one matches.
 func (r *rig) waitFor(match func(map[string]any) bool) map[string]any {
@@ -156,6 +163,7 @@ func TestBlockedURLNeverLoadsOrEntersHistory(t *testing.T) {
 func TestTheFirstTabHoldsTheBlankPage(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
+	r.show(1)
 	deadline := time.After(5 * time.Second)
 	for loaded := false; !loaded; {
 		select {
@@ -201,14 +209,11 @@ func TestStaleNavigationDoesNotCommit(t *testing.T) {
 func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
-	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"page":{"x":0,"y":48,"w":800,"h":552},"viewW":800,"viewH":600}`)
-	// Once the main thread has run what was posted before this, the layout is in.
-	done := make(chan struct{})
-	r.e.Post(func() { close(done) })
-	<-done
+	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48},{"x":100,"y":48,"w":400,"h":200}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"tabs":[{"tab":1,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`)
+	r.e.Settle()
 
 	l := r.e.Layout()
-	if l.Page != (engine.Rect{X: 0, Y: 48, W: 800, H: 552}) || l.FrameColor == "" {
+	if !slices.Equal(l.Tabs, []engine.VisibleTab{{Tab: 1, Rect: engine.Rect{X: 0, Y: 48, W: 800, H: 552}}}) || l.FrameColor == "" {
 		t.Fatalf("layout %+v", l)
 	}
 	for _, c := range []struct {
@@ -224,7 +229,7 @@ func TestShellRegionsDecideTheHitTest(t *testing.T) {
 func TestShellWindowRequestsReachTheEngine(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
-	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"page":{"x":0,"y":48,"w":800,"h":552},"viewW":800,"viewH":600}`)
+	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48}],"drag":[{"x":300,"y":0,"w":500,"h":32}],"tabs":[{"tab":1,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`)
 	r.shell(`{"t":"window","text":"fullScreen"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" && m["cornerRadius"] == float64(0) })
 	if got := r.e.Layout().At(400, 10); got != engine.AreaShell {
@@ -264,7 +269,11 @@ func TestTabsThroughTheShellAndKeys(t *testing.T) {
 	if second == 1 {
 		t.Fatalf("new tab should be active: %v", m)
 	}
-	if hidden := r.e.Hidden(); len(hidden) != 1 || hidden[0] != 1 {
+	// The shell shows the active tab, and its layout hides the one it showed before.
+	r.show(1)
+	r.show(second)
+	r.e.Settle()
+	if hidden := r.e.Hidden(); !slices.Equal(hidden, []engine.TabID{1}) {
 		t.Fatalf("the first tab should have been told it is hidden: %v", hidden)
 	}
 	r.visit("https://b.test/")

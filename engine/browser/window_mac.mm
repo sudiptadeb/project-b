@@ -11,6 +11,7 @@
 #include "base/strings/sys_string_conversions.h"
 #include "base/time/time.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/timeline.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/gfx/geometry/rect_conversions.h"
@@ -48,7 +49,8 @@
 // extension's popup.
 @property(nonatomic, strong) NSView* popupView;
 #endif
-// Holds every page view; the shown one is the only one not hidden.
+// Holds every page view the window has shown; those it shows now are the only ones not
+// hidden.
 @property(nonatomic, strong) NSView* pages;
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions;
 @end
@@ -132,7 +134,7 @@
     }
     break;
   }
-  // hitTest: skips hidden views, so this finds the shown page or nothing.
+  // hitTest: skips hidden views, so this finds the shown page there or nothing.
   NSView* page = [self.pages hitTest:p];
   return page && page != self.pages ? page : self;
 }
@@ -242,7 +244,6 @@ struct Window::Impl {
   PBNSWindow* __strong window;
   PBContainerView* __strong container;
   PBWindowDelegate* __strong delegate;
-  gfx::RectF page_bounds;
   size_t ignored_stale_bounds = 0;
   uint32_t shown_rgb = 0;
   // The frame last painted; none yet.
@@ -345,8 +346,9 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->container.wantsLayer = YES;
   impl_->window.contentView = impl_->container;
 
-  // Keeping its margins means the pages follow a window resize in the same frame,
-  // before the shell has had a chance to say anything.
+  // The holder covers the window, and each page in it keeps its margins, so a page
+  // follows a window resize in the same frame, before the shell has had a chance to say
+  // anything.
   impl_->container.pages = [[NSView alloc] initWithFrame:impl_->container.bounds];
   impl_->container.pages.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   [impl_->container addSubview:impl_->container.pages];
@@ -382,21 +384,29 @@ void Window::SetShellView(gfx::NativeView view) {
   [impl_->container addSubview:shell];
 }
 
-void Window::AddPageView(gfx::NativeView view) {
-  NSView* page = view.GetNativeNSView();
-  NSView* pages = impl_->container.pages;
-  page.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  page.frame = pages.bounds;
-  page.hidden = YES;
-  [pages addSubview:page];
-}
-
-void Window::ShowPageView(gfx::NativeView view) {
-  NSView* page = view.GetNativeNSView();
-  // The new one first, so the window is never empty between the two.
-  page.hidden = NO;
-  for (NSView* other in impl_->container.pages.subviews) {
-    if (other != page) {
+// A page's view joins the holder the first time the window shows it, and moves here
+// from another window's holder by the same addSubview:. Each keeps its four margins
+// through autoresizing, which is right for pages that each touch the window's edges;
+// pages split side by side would need their inner edges to be the flexible ones.
+void Window::SetPages(const std::vector<Page>& pages) {
+  NSView* holder = impl_->container.pages;
+  const CGFloat height = holder.bounds.size.height;
+  NSMutableSet<NSView*>* shown = [NSMutableSet set];
+  // The new ones first, so the window is never empty between the two.
+  for (const Page& p : pages) {
+    NSView* page = p.contents->GetNativeView().GetNativeNSView();
+    if (page.superview != holder) {
+      page.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+      [holder addSubview:page];
+    }
+    page.frame = NSMakeRect(std::round(p.rect.x()),
+                            std::round(height - p.rect.y() - p.rect.height()),
+                            std::round(p.rect.width()), std::round(p.rect.height()));
+    page.hidden = NO;
+    [shown addObject:page];
+  }
+  for (NSView* other in holder.subviews) {
+    if (![shown containsObject:other]) {
       other.hidden = YES;
     }
   }
@@ -481,7 +491,7 @@ void Window::RemoveOverlayView(gfx::NativeView view) {
   [overlay removeFromSuperview];
 }
 
-void Window::SetLayout(Layout layout) {
+bool Window::SetLayout(Layout layout) {
   [impl_->container setRegions:std::move(layout.regions)];
 
   if (layout.frame_rgb != impl_->frame_rgb ||
@@ -515,14 +525,9 @@ void Window::SetLayout(Layout layout) {
   if (std::round(layout.viewport.width()) != std::round(size.width) ||
       std::round(layout.viewport.height()) != std::round(size.height)) {
     impl_->ignored_stale_bounds++;
-    return;
+    return false;
   }
-  const gfx::RectF& page = layout.page;
-  impl_->page_bounds = page;
-  impl_->container.pages.frame =
-      NSMakeRect(std::round(page.x()),
-                 std::round(size.height - page.y() - page.height()),
-                 std::round(page.width()), std::round(page.height()));
+  return true;
 }
 
 void Window::ListenForState(
@@ -615,10 +620,6 @@ void Window::ForceKeyForDriver() {
 
 gfx::NativeWindow Window::native_window() const {
   return gfx::NativeWindow(impl_->window);
-}
-
-gfx::RectF Window::page_bounds() const {
-  return impl_->page_bounds;
 }
 
 size_t Window::ignored_stale_bounds() const {

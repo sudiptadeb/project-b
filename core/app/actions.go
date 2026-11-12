@@ -75,10 +75,10 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	source := add("dev.viewSource", "View Source", func() { a.Tabs.Open("view-source:" + a.Tabs.Active().URL) })
 	source.Enabled = func() bool { return a.Tabs.Active().URL != "" }
 
-	// F6 moves between the shell and the page, whichever had the keyboard.
+	// F6 moves between the shell and the active tab's page, whichever had the keyboard.
 	nextPane := func() {
 		if a.keyIn == engine.SurfaceShell {
-			e.FocusPage()
+			e.FocusTab(a.Tabs.ActiveID())
 		} else {
 			a.Shell.FocusAddressBar(theWindow)
 		}

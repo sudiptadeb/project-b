@@ -8,8 +8,10 @@ behind it is `project-b-research/windows-survey.md`.
 
 - The engine has one window, one shell page and one settings page, and its close is the
   app's quit.
-- Go says which tab shows with `ShowTab`, and the window's layout holds one page rectangle.
-  The engine puts that tab's view there and hides every other tab.
+- The window's layout lists the tabs it shows, each with a rectangle; the shell lists one,
+  the active tab. The engine places each listed tab's view, tells a tab that joins or
+  leaves the list that it is shown or hidden, and says when a click moves the keyboard
+  into a visible page. `FocusTab` gives a tab's page the keyboard.
 - Every call about the window and every event from it carries Go's id for it, 1: the
   layout, a window request, a message to or from the shell or settings, a change of size.
   The shell is still "page 0" to the hooks, so a key doesn't say which window it came

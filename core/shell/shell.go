@@ -170,8 +170,8 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		} else {
 			timeline.Warnf("shell: unknown window request %q", c.Text)
 		}
-	case "focusPage":
-		m.eng.FocusPage()
+	case "focusTab":
+		m.eng.FocusTab(engine.TabID(c.ID))
 	case "focusShell":
 		m.eng.FocusShell(w)
 	default:

@@ -11,6 +11,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
     python3 tools/drive_first_app.py timeline   # only the timeline
     python3 tools/drive_first_app.py cookies    # only cookies kept across a restart
+    python3 tools/drive_first_app.py visible    # only the tabs a window shows
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -656,7 +657,10 @@ def browsing_checks():
     app.wait(f"{VALUE}==='secret'")
     time.sleep(0.4)
     check("a blocked URL stays out of history", app.js(OPTIONS) == 0, app.js(OPTIONS))
-    app.cmd("key", "escape")
+    # With no suggestions open, Escape leaves the bar and the shell asks for the page's
+    # keyboard. A click on the bar before that request lands loses the keyboard to it, so
+    # wait for the page to have it.
+    leave_bar(app)
     focus_bar(app)
     app.cmd("type", "blank")
     app.wait(f"{VALUE}==='blank'")
@@ -1020,6 +1024,34 @@ def browsing_checks():
     app.close()
 
 
+def visible_tabs_checks():
+    """A window shows the tabs its layout lists, side by side if the layout says so: each
+    view where its rectangle is, each told it is shown, and one that leaves the list told
+    it is hidden. The shell lists one tab, so the driver gives the window the layout."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    app.wait("!!document.querySelector('input')", 30)
+    app.cmd("key", "cmd+t")
+    app.wait(f"{ROWS}===2")
+    deadline = time.time() + 10
+    while json.loads(app.cmd("visible"))[0]["tab"] != 2 and time.time() < deadline:
+        time.sleep(0.05)
+    check("the shell's layout lists the new tab, the one it shows", [v["tab"] for v in json.loads(app.cmd("visible"))] == [2])
+    app.cmd("showtabs", 1, 224, 48, 400, 600, 2, 624, 48, 400, 600)
+    visible = json.loads(app.cmd("visible"))
+    check("a layout of two tabs puts both views in the window, each at its rectangle",
+          [(v["tab"], v["frame"], v["hidden"]) for v in visible] == [(1, [224, 48, 400, 600], False), (2, [624, 48, 400, 600], False)], visible)
+    check("and tells both they are shown", all(v["shown"] for v in visible), visible)
+    check("both pages are visible to themselves",
+          [json.loads(app.cmd("evaltab", t, "document.visibilityState")) for t in (1, 2)] == ["visible", "visible"])
+    check("a press goes to the page under it", app.cmd("hit", 400, 300) == "page" and app.cmd("hit", 800, 300) == "page")
+    app.cmd("showtabs", 2, 224, 48, 800, 600)
+    deadline = time.time() + 10
+    while json.loads(app.cmd("evaltab", 1, "document.visibilityState")) != "hidden" and time.time() < deadline:
+        time.sleep(0.05)
+    check("a tab that leaves the list is told it is hidden", json.loads(app.cmd("evaltab", 1, "document.visibilityState")) == "hidden")
+    app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1038,5 +1070,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, cookie_checks]))

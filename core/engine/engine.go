@@ -108,12 +108,9 @@ const (
 
 // Engine is what the app can ask a browser engine to do.
 type Engine interface {
-	// CreateTab makes a hidden tab. ShowTab shows it.
+	// CreateTab makes a hidden tab. A window's layout shows it.
 	CreateTab() TabID
 	CloseTab(tab TabID)
-	// ShowTab shows this tab's page and hides every other one. Hidden pages are told
-	// they are hidden.
-	ShowTab(tab TabID)
 	LoadURL(tab TabID, url string)
 
 	// GoBack, GoForward and Reload move within the tab's own session history. What
@@ -139,11 +136,11 @@ type Engine interface {
 	RequestWindow(w WindowID, r WindowRequest)
 
 	// SetWindowLayout is everything about how a window behaves, from the window
-	// manager, whenever any of it changes.
+	// manager, whenever any of it changes: which tabs it shows, and where.
 	SetWindowLayout(w WindowID, l WindowLayout)
-	// FocusPage gives keyboard focus to the shown tab's page; FocusShell gives it to
-	// a window's shell page, which then places it inside itself.
-	FocusPage()
+	// FocusTab gives keyboard focus to a visible tab's page; FocusShell gives it to a
+	// window's shell page, which then places it inside itself.
+	FocusTab(tab TabID)
 	FocusShell(w WindowID)
 
 	// SendToShell delivers one message to a window's shell page.
@@ -188,6 +185,10 @@ type Listener interface {
 	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
 	// has already created it, hidden; the app decides whether to show it.
 	TabOpened(opener, tab TabID, url string, foreground bool)
+
+	// TabFocused says the keyboard went into a visible tab's page: a click, Tab from the
+	// shell, or FocusTab.
+	TabFocused(tab TabID)
 
 	// CloseRequested says something asked to close a tab: its page called
 	// window.close(), or a DevTools client closed its target. ActivateRequested asks
@@ -235,7 +236,7 @@ var ErrUnknownCommand = errors.New("unknown command")
 type Area int
 
 const (
-	AreaPage  Area = iota // No region holds the point: it goes to the shown page.
+	AreaPage  Area = iota // No region holds the point: it goes to the visible tab's page under it.
 	AreaShell             // It goes to the shell.
 	AreaDrag              // It moves the window.
 )
@@ -246,14 +247,20 @@ type Region struct {
 	Area Area
 }
 
-// WindowLayout is everything the engine needs to make the window behave.
+// VisibleTab is a tab whose page a window shows, and where.
+type VisibleTab struct {
+	Tab  TabID `json:"tab"`
+	Rect Rect  `json:"rect"`
+}
+
+// WindowLayout is everything the engine needs to make a window behave.
 type WindowLayout struct {
-	ViewW, ViewH float64  // The window size the shell measured; an engine places the page only when it still has that size.
-	Page         Rect     // Where the shown tab's page goes.
-	Regions      []Region // In order. The first that holds a point decides.
-	FrameColor   string   // "#rrggbb", painted under the shell and the page.
-	FrameWidth   float64  // The band drawn around the window's edge, over both.
-	Theme        Theme    // Light or dark for the window's own parts, or the system's.
+	ViewW, ViewH float64      // The window size the shell measured; an engine places the pages only when it still has that size.
+	Tabs         []VisibleTab // The tabs whose pages show, and where. Every other tab is hidden.
+	Regions      []Region     // In order. The first that holds a point decides.
+	FrameColor   string       // "#rrggbb", painted under the shell and the page.
+	FrameWidth   float64      // The band drawn around the window's edge, over both.
+	Theme        Theme        // Light or dark for the window's own parts, or the system's.
 }
 
 // Theme is how the window's own parts, its buttons and title bar, are drawn.

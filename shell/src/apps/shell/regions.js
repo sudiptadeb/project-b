@@ -1,6 +1,6 @@
 // Tells the window manager, in one layout message, which rectangles are shell, which
-// empty shell drags the window, and where the page goes. The manager decides what each
-// point does; this only measures.
+// empty shell drags the window, and which tabs show and where. The manager decides what
+// each point does; this only measures.
 //
 // A component marks itself with v-shell, and an empty space in the top row that should
 // move the window with v-drag. One batcher measures once per frame, and only when
@@ -14,6 +14,7 @@ const debug = new URLSearchParams(location.search).get('debug') === 'regions';
 const marked = new Set();
 const draggable = new Set();
 let pageEl = null;
+let pageTab = () => 0;
 let scheduled = false;
 let animations = 0;
 let last = '';
@@ -33,11 +34,12 @@ function schedule() {
 function measure() {
   scheduled = false;
 
+  const tab = pageTab();
   const layout = {
     t: 'layout',
     shell: [...marked].map(rectOf).filter((r) => r.w > 0 && r.h > 0),
     drag: [...draggable].map(rectOf).filter((r) => r.w > 0 && r.h > 0),
-    page: rectOf(pageEl),
+    tabs: tab ? [{ tab, rect: rectOf(pageEl) }] : [],
     viewW: window.innerWidth,
     viewH: window.innerHeight,
   };
@@ -86,9 +88,17 @@ export const vShell = directive(marked, '2px solid rgba(220, 38, 38, 0.8)');
 // v-drag: this empty space in the top row moves the window. Nothing inside it gets clicks.
 export const vDrag = directive(draggable, '2px dashed rgba(38, 99, 220, 0.8)');
 
-// setPageElement says where the page goes. It isn't shell, so it isn't marked.
-export function setPageElement(el) {
+// setPageElement says where a tab's page goes, and tab says which tab that is now. It
+// isn't shell, so it isn't marked.
+export function setPageElement(el, tab) {
   pageEl = el;
+  pageTab = tab;
   observer.observe(el);
   schedule();
+}
+
+// measureNow sends the layout at once, when it changed. Asking for a tab's keyboard goes
+// after it, so the tab is already showing when it gets it.
+export function measureNow() {
+  measure();
 }

@@ -163,6 +163,8 @@ func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground bool) {
 	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
 }
 
+func (a *App) TabFocused(tab engine.TabID) { a.Tabs.HandleTabFocused(tab) }
+
 func (a *App) CloseRequested(tab engine.TabID) { a.Tabs.Close(tab) }
 
 func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }

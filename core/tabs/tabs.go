@@ -1,5 +1,7 @@
 // Package tabs owns the tabs: which exist, in what order, which one is active, and
-// each one's state. Tab state changes only through this manager.
+// each one's state. Tab state changes only through this manager. The active tab is the
+// one the user acts on: the shell shows it and gives it the keyboard, and says where it
+// put it in its layout, which shows it.
 package tabs
 
 import (
@@ -106,13 +108,12 @@ func (m *Manager) add(id engine.TabID) *Tab {
 	return t
 }
 
-// Activate shows a tab.
+// Activate makes a tab the active one.
 func (m *Manager) Activate(id engine.TabID) {
 	if m.tabs[id] == nil || id == m.active {
 		return
 	}
 	m.active = id
-	m.eng.ShowTab(id)
 	if m.cycle == nil {
 		m.touch(id)
 	}
@@ -373,6 +374,9 @@ func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground 
 		m.listChanged()
 	}
 }
+
+// HandleTabFocused makes the tab whose page took the keyboard the active one.
+func (m *Manager) HandleTabFocused(id engine.TabID) { m.Activate(id) }
 
 // HandleNavigationStarting runs the gates and records the result.
 func (m *Manager) HandleNavigationStarting(id engine.TabID, u string) bool {

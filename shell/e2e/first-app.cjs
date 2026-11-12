@@ -343,6 +343,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('and reads as a new tab: no address, titled New Tab', (await bar.inputValue()) === '' && (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   r = await regions();
   check('the first tab was told it is hidden', JSON.stringify(r.hidden) === '[1]', JSON.stringify(r.hidden));
+  check('the layout lists the new tab as the one visible tab', r.visible.length === 1 && r.visible[0].tab === 2 && JSON.stringify(r.visible[0].rect) === pageBounds, JSON.stringify(r.visible));
   check('back and reload follow the new, empty tab', (await back.isDisabled()) && (await reload.isDisabled()));
   await visit('https://example.net/', 'https://example.net/');
   check('each tab keeps its own title', JSON.stringify(await rowTitles()) === JSON.stringify(['Mock example.org', 'Mock example.net']), JSON.stringify(await rowTitles()));
@@ -437,8 +438,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await shortcut('closeTab');
   await shortcut('closeTab');
   await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 0);
-  await mock.getByText('Window closed', { exact: true }).waitFor();
-  check('closing the last tab closes the window', (await regions()).closed === true);
+  check('closing the last tab closes the window', await until(async () => (await regions()).closed === true));
 
   // History survives a restart.
   await stopServer();

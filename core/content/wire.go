@@ -74,6 +74,11 @@ func Wire(h *Hooks, l engine.Listener) {
 			l.TitleChanged(engine.TabID(c.ID), c.Title)
 		}
 	})
+	h.Observer.OnWebContentsFocused(func(c WebContents, _ RenderWidgetHost) {
+		if c.ID > 0 {
+			l.TabFocused(engine.TabID(c.ID))
+		}
+	})
 	h.Observer.OnPrimaryMainFrameRenderProcessGone(func(c WebContents, status TerminationStatus) {
 		if c.ID > 0 {
 			l.PageCrashed(engine.TabID(c.ID))

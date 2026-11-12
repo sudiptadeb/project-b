@@ -23,12 +23,17 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
 
   int64_t id() const { return id_; }
   content::WebContents* contents() const { return contents_.get(); }
+  // Go's id for the window whose layout last showed this tab, 0 before any has.
+  int64_t window() const { return window_; }
+  void set_window(int64_t window) { window_ = window; }
 
  private:
   // content::WebContentsObserver:
   void DidFinishNavigation(content::NavigationHandle* handle) override;
   void DidFirstVisuallyNonEmptyPaint() override;
   void TitleWasSet(content::NavigationEntry* entry) override;
+  void OnWebContentsFocused(
+      content::RenderWidgetHost* render_widget_host) override;
   void DidUpdateFaviconURL(
       content::RenderFrameHost* render_frame_host,
       const std::vector<blink::mojom::FaviconURLPtr>& candidates,
@@ -63,6 +68,7 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
   const int64_t id_;
+  int64_t window_ = 0;
   std::unique_ptr<content::WebContents> contents_;
   // Counts favicon fetches, so a slow one for an earlier page is dropped.
   int favicon_request_ = 0;

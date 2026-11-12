@@ -54,10 +54,14 @@ void PageTab::DidFirstVisuallyNonEmptyPaint() {
 }
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {
-  if (Engine::Get()->active_tab() == this) {
-    Engine::Get()->WindowOf(id_)->window->SetTitle(contents_->GetTitle());
-  }
+  Engine::Get()->TabTitleChanged(this);
   WebContentsObserverHooks::TitleWasSet(entry);
+}
+
+void PageTab::OnWebContentsFocused(
+    content::RenderWidgetHost* render_widget_host) {
+  Engine::Get()->TabFocused(this);
+  WebContentsObserverHooks::OnWebContentsFocused(render_widget_host);
 }
 
 void PageTab::DidUpdateFaviconURL(

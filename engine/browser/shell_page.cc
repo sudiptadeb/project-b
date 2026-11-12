@@ -356,7 +356,7 @@ bool ShellPage::HandleKeyboardEvent(
 }
 
 bool ShellPage::TakeFocus(content::WebContents* source, bool reverse) {
-  Engine::Get()->FocusPageForTraversal(reverse);
+  Engine::Get()->FocusPageForTraversal(window_, reverse);
   return true;
 }
 

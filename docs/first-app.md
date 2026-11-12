@@ -49,28 +49,37 @@ content hook is a Go change only; see [content-hooks.md](content-hooks.md).
 
 ## The window
 
-Stacked views: every tab's page view at the bottom, inside one holder, with only the
-active one not hidden; a full-window transparent shell on top. Shell components mark
-themselves with `v-shell`, the empty spaces in the top row that move the window mark
-themselves with `v-drag`, and `<PageView>` says where the page goes; the shell sends
-all of it as one `layout` message. Go's window manager (`core/window`) owns the window:
-it takes that report and the engine's `WindowState` (size, buttons, corner radius, full
-screen), decides what each point does, and gives the engine one `WindowLayout` through
-`SetWindowLayout`: drag areas first, then shell areas, the page rectangle, and the
-frame. In full screen it sends no drag areas. Close, minimise, zoom and full screen
+Stacked views: the page views of the tabs the window shows at the bottom, inside one
+holder, each where the layout puts it, with every other page view the window holds
+hidden; a full-window transparent shell on top. Shell components mark themselves with
+`v-shell`, the empty spaces in the top row that move the window mark themselves with
+`v-drag`, and `<PageView>` says where the active tab's page goes; the shell sends all of
+it as one `layout` message, whose `tabs` list each visible tab with its rectangle. The
+shell shows one tab, so the list has one entry. Go's window manager (`core/window`)
+owns the window: it takes that report and the engine's `WindowState` (size, buttons,
+corner radius, full screen), decides what each point does, and gives the engine one
+`WindowLayout` through `SetWindowLayout`: drag areas first, then shell areas, the
+visible tabs, and the frame. The engine puts each listed tab's view at its rectangle,
+tells a tab that joins the list it is shown and one that leaves it that it is hidden,
+and titles the window after the visible tab that has the keyboard. In full screen it sends no drag areas. Close, minimise, zoom and full screen
 requests go through it too. The design: [window-manager.md](window-manager.md).
 
 `PBContainerView hitTest:` walks the layout's regions in order: a drag area answers nil,
 so the press falls through to AppKit's frame, which zooms on a double-click; a
-shell area answers the shell's view; anything else the page. Content's own views ask
+shell area answers the shell's view; anything else the page under it. Content's own views ask
 the same `hitTest:` before accepting a mouse event, so nothing routes events by hand.
 That is how Chrome does it too (`components/remote_cocoa/app_shim/bridged_content_view.mm`).
 The sidebar and the frame's left, right and bottom edges never drag; the resize edges
 are AppKit's.
 
-The page holder keeps its margins through autoresizing, so it follows a window resize
-in the same frame. A page position measured for an older window size is ignored,
-because a fresher one follows.
+Each page view keeps its margins through autoresizing, so it follows a window resize
+in the same frame. Page positions measured for an older window size are ignored,
+because fresher ones follow.
+
+Focus is its own call: the shell asks for a tab's page with `focusTab`, after sending
+its layout, so the tab is already showing, and Go calls `FocusTab`. When a click or Tab
+moves the keyboard into a visible page, content's `OnWebContentsFocused` hook tells Go
+which tab, and it becomes the active one.
 
 The shell's top row is 44px, centred on the window buttons of a unified toolbar, and
 the window uses `NSWindowStyleMaskFullSizeContentView` with a transparent title bar, so
@@ -270,7 +279,7 @@ the DMG passes the same 84.
 - **A popup's first navigation goes through the gate.** Content calls `AddNewContents`
   before it loads the new `WebContents`, so Go knows the tab when the throttle asks.
 - **Focus has a gap after a tab closes**: nothing has the keyboard until the shell hears
-  the new tab list and sends `focusPage` or `focusShell` back, one round trip. A second
+  the new tab list and sends `focusTab` or `focusShell` back, one round trip. A second
   Cmd+W inside that gap does nothing.
 - **Shell rectangles are a frame or two stale after a layout change**, plus the hop to the
   main process. A click 30 ms after Cmd+T hit the strip's old empty space and dragged

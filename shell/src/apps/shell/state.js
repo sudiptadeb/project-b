@@ -6,6 +6,7 @@ import { end, listen, mark, painted, send } from '@/bridge.js';
 import { extensionsMessage } from '@extensions';
 
 import { phone } from '@/phone.js';
+import { measureNow } from './regions.js';
 
 export { phone };
 
@@ -49,6 +50,13 @@ export const tabsOnTop = computed(() => !phone && state.tabLayout === 'horizonta
 
 // activeTab is the tab whose page is showing.
 export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
+
+// focusPage gives the keyboard to the active tab's page. The layout goes first, so the
+// window already shows the tab when it gets the keyboard.
+export function focusPage() {
+  measureNow();
+  send({ t: 'focusTab', id: state.active });
+}
 
 // tabLabel is what a tab's row or strip entry says: the title, else the host while the
 // page is on its way, else New Tab.

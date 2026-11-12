@@ -6,9 +6,12 @@
 
 namespace project_b {
 
+class Window;
+
 // Asks the user for a folder or an extension package (PBPathKind), in the system's own
 // panel on the window. done runs with the choice, or an empty path for none.
-void ShowPathChooser(int kind,
+void ShowPathChooser(Window* window,
+                     int kind,
                      base::OnceCallback<void(const base::FilePath&)> done);
 
 }  // namespace project_b

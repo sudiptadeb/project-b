@@ -23,7 +23,7 @@ namespace project_b {
 
 // One DevTools client's commands that content leaves to the embedder: Browser's window
 // commands, answered as Chrome answers them (chrome/browser/devtools/protocol/
-// browser_handler.cc) for our one window, whose id is 1, and our own ProjectB.*
+// browser_handler.cc) for our windows, by Go's ids for them, and our own ProjectB.*
 // commands, which Go answers. The rest fall through to content. Generated from Blink's protocol as content_shell's are; see
 // browser/protocol_config.json.
 class DevToolsSession : public protocol::FrontendChannel,

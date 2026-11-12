@@ -10,8 +10,10 @@ behind it is `project-b-research/windows-survey.md`.
   app's quit.
 - Go says which tab shows with `ShowTab`, and the window's layout holds one page rectangle.
   The engine puts that tab's view there and hides every other tab.
-- The shell is "page 0" to the hooks, so a key or a message can't say which window it came
-  from.
+- Every call about the window and every event from it carries Go's id for it, 1: the
+  layout, a window request, a message to or from the shell or settings, a change of size.
+  The shell is still "page 0" to the hooks, so a key doesn't say which window it came
+  from; keys go to the window in front.
 - Go's tabs have one list and one active tab. Commands, menus and the extension API read it.
 
 ## What changes

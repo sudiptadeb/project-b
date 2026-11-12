@@ -1,7 +1,8 @@
 // Package settings is the contract with the settings page: a page of its own, put over
-// the whole window while it is open, so the shell never carries it. Like the shell's
-// contract, it sends a snapshot when the page starts and events when things change, and
-// turns the user's changes into calls on the managers. It owns nothing else.
+// the whole of a window while it is open, so the shell never carries it. Each window has
+// its own. Like the shell's contract, it sends a snapshot when the page starts and events
+// when things change, and turns the user's changes into calls on the managers. It owns
+// nothing else.
 package settings
 
 import (
@@ -34,74 +35,83 @@ type Manager struct {
 	flags    *flags.Manager
 	update   *update.Manager
 	commands *commands.Manager
-	open     bool
-	// Whether the page opened last has said it's ready. Until then nothing reaches it:
-	// its script isn't there to take a message, and its snapshot has it all.
-	heard bool
-	// section is the section a caller asked the page to show, or "" for its first.
-	section string
-	parts   []Part
+	// open holds each window whose settings page is open, with what it was asked to show
+	// and whether it has said it's ready.
+	open  map[engine.WindowID]*page
+	parts []Part
 	// relaunch starts the app again, for the flags to take effect.
 	relaunch func()
 }
 
 // Part is what another manager adds to the settings page's contract: its state in the
-// snapshot, and commands of its own. Handle says whether the command was one of its.
+// snapshot, and commands of its own, from window w's page. Handle says whether the
+// command was one of its.
 type Part struct {
 	Snapshot func(into map[string]any)
-	Handle   func(t string, msg []byte) bool
+	Handle   func(w engine.WindowID, t string, msg []byte) bool
 }
 
 // AddPart adds a part.
 func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
 
-// OpenSection opens the settings page at one of its sections, by id.
-func (m *Manager) OpenSection(section string) {
-	m.section = section
-	if m.open {
-		m.send(map[string]any{"t": "section", "section": section})
+// page is one window's open settings page.
+type page struct {
+	// section is the section a caller asked the page to show, or "" for its first.
+	section string
+	// Whether the page has said it's ready. Until then nothing reaches it: its script
+	// isn't there to take a message, and its snapshot has it all.
+	heard bool
+}
+
+// OpenSection opens window w's settings page at one of its sections, by id.
+func (m *Manager) OpenSection(w engine.WindowID, section string) {
+	if p := m.open[w]; p != nil {
+		p.section = section
+		m.send(w, map[string]any{"t": "section", "section": section})
 		return
 	}
-	m.Open()
+	m.Open(w)
+	m.open[w].section = section
 }
 
 // New returns a manager.
 func New(eng engine.Engine, w *window.Manager, p *prefs.Manager, f *flags.Manager, u *update.Manager, c *commands.Manager) *Manager {
-	return &Manager{eng: eng, window: w, prefs: p, flags: f, update: u, commands: c}
+	return &Manager{eng: eng, window: w, prefs: p, flags: f, update: u, commands: c, open: map[engine.WindowID]*page{}}
 }
 
 // OnRelaunch names what the Flags section's Relaunch does.
 func (m *Manager) OnRelaunch(f func()) { m.relaunch = f }
 
-// Open puts the settings page over the window. It is one page: opening it again does
+// Open puts the settings page over window w. Each window has one: opening it again does
 // nothing.
-func (m *Manager) Open() {
-	if m.open {
+func (m *Manager) Open(w engine.WindowID) {
+	if _, ok := m.open[w]; ok {
 		return
 	}
-	m.open = true
-	m.heard = false
+	m.open[w] = &page{}
 	timeline.Begin("settings.open")
 	timeline.Mark("settings.open.go")
-	m.eng.OpenSettings()
+	m.eng.OpenSettings(w)
 }
 
-// Close takes the settings page away.
-func (m *Manager) Close() {
-	if !m.open {
+// Close takes window w's settings page away.
+func (m *Manager) Close(w engine.WindowID) {
+	if _, ok := m.open[w]; !ok {
 		return
 	}
-	m.open = false
-	m.section = ""
+	delete(m.open, w)
 	m.commands.SetRecording(false)
-	m.eng.CloseSettings()
+	m.eng.CloseSettings(w)
 }
 
-// IsOpen says whether the settings page is showing.
-func (m *Manager) IsOpen() bool { return m.open }
+// IsOpen says whether window w's settings page is showing.
+func (m *Manager) IsOpen(w engine.WindowID) bool {
+	_, ok := m.open[w]
+	return ok
+}
 
-// Handle takes one command from the settings page.
-func (m *Manager) Handle(msg []byte) {
+// Handle takes one command from window w's settings page.
+func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	var c command
 	if err := json.Unmarshal(msg, &c); err != nil {
 		timeline.Warnf("settings: bad message: %v", err)
@@ -109,13 +119,19 @@ func (m *Manager) Handle(msg []byte) {
 	}
 	switch c.T {
 	case "ready":
-		m.heard = true
+		// A page Go didn't open, or one closed a moment ago, still asks: it hears nothing
+		// more, as it isn't open.
+		section := ""
+		if p := m.open[w]; p != nil {
+			p.heard = true
+			section = p.section
+		}
 		snapshot := map[string]any{
 			"t":            "snapshot",
 			"windowColor":  m.window.Color(),
 			"frameWidth":   m.window.FrameWidth(),
-			"controls":     m.window.Controls(),
-			"cornerRadius": m.window.CornerRadius(),
+			"controls":     m.window.Controls(w),
+			"cornerRadius": m.window.CornerRadius(w),
 			"tabLayout":    m.prefs.TabLayout(),
 			"theme":        m.prefs.Theme(),
 			"autoUpdate":   m.prefs.AutoUpdate(),
@@ -124,16 +140,16 @@ func (m *Manager) Handle(msg []byte) {
 			"keyboard":     m.commands.View(),
 			"flags":        m.flags.View(),
 		}
-		snapshot["section"] = m.section
+		snapshot["section"] = section
 		for _, p := range m.parts {
 			p.Snapshot(snapshot)
 		}
-		m.send(snapshot)
+		m.send(w, snapshot)
 		timeline.Mark("settings.ready")
 	case "timeline":
 		timeline.FromPage("settings", msg)
 	case "close":
-		m.Close()
+		m.Close(w)
 	case "setTabLayout":
 		m.prefs.SetTabLayout(c.Text)
 	case "setTheme":
@@ -170,7 +186,7 @@ func (m *Manager) Handle(msg []byte) {
 		}
 	default:
 		for _, p := range m.parts {
-			if p.Handle(c.T, msg) {
+			if p.Handle(w, c.T, msg) {
 				return
 			}
 		}
@@ -178,47 +194,55 @@ func (m *Manager) Handle(msg []byte) {
 	}
 }
 
-// TabLayoutChanged, ThemeChanged, AutoUpdateChanged, UpdateChanged, WindowColorChanged and
-// WindowControlsChanged tell an open settings page what the managers now say.
+// TabLayoutChanged, ThemeChanged, AutoUpdateChanged, UpdateChanged and WindowColorChanged
+// tell every open settings page what the managers now say; WindowControlsChanged tells
+// window w's.
 func (m *Manager) TabLayoutChanged(layout string) {
-	m.send(map[string]any{"t": "tabLayout", "tabLayout": layout})
+	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
 func (m *Manager) ThemeChanged(theme string) {
-	m.send(map[string]any{"t": "theme", "theme": theme})
+	m.sendAll(map[string]any{"t": "theme", "theme": theme})
 }
 
 func (m *Manager) AutoUpdateChanged(on bool) {
-	m.send(map[string]any{"t": "autoUpdate", "autoUpdate": on})
+	m.sendAll(map[string]any{"t": "autoUpdate", "autoUpdate": on})
 }
 
 func (m *Manager) UpdateChanged(s update.State) {
-	m.send(map[string]any{"t": "update", "update": s})
+	m.sendAll(map[string]any{"t": "update", "update": s})
 }
 
 func (m *Manager) WindowColorChanged(color string) {
-	m.send(map[string]any{"t": "windowColor", "windowColor": color})
+	m.sendAll(map[string]any{"t": "windowColor", "windowColor": color})
 }
 
-func (m *Manager) WindowControlsChanged(r engine.Rect, cornerRadius float64) {
-	m.send(map[string]any{"t": "controls", "controls": r, "cornerRadius": cornerRadius})
+func (m *Manager) WindowControlsChanged(w engine.WindowID, r engine.Rect, cornerRadius float64) {
+	m.send(w, map[string]any{"t": "controls", "controls": r, "cornerRadius": cornerRadius})
 }
 
 // KeyboardChanged sends the keys again after any change to them.
 func (m *Manager) KeyboardChanged() {
-	m.send(map[string]any{"t": "keyboard", "keyboard": m.commands.View()})
+	m.sendAll(map[string]any{"t": "keyboard", "keyboard": m.commands.View()})
 }
 
 // FlagsChanged sends the flags again after one is saved.
 func (m *Manager) FlagsChanged() {
-	m.send(map[string]any{"t": "flags", "flags": m.flags.View()})
+	m.sendAll(map[string]any{"t": "flags", "flags": m.flags.View()})
 }
 
-// Send sends one message to the settings page while it is open, for a part.
-func (m *Manager) Send(v any) { m.send(v) }
+// Send sends one message to every open settings page, for a part.
+func (m *Manager) Send(v any) { m.sendAll(v) }
 
-func (m *Manager) send(v any) {
-	if !m.open || !m.heard {
+func (m *Manager) sendAll(v any) {
+	for _, w := range m.window.Windows() {
+		m.send(w, v)
+	}
+}
+
+// send sends to window w's settings page, if it is open and has said it's ready.
+func (m *Manager) send(w engine.WindowID, v any) {
+	if p := m.open[w]; p == nil || !p.heard {
 		return
 	}
 	b, err := json.Marshal(v)
@@ -226,5 +250,5 @@ func (m *Manager) send(v any) {
 		timeline.Errorf("settings: %v", err)
 		return
 	}
-	m.eng.SendToSettings(b)
+	m.eng.SendToSettings(w, b)
 }

@@ -542,6 +542,7 @@ void Window::ToggleFullScreen() {
   [impl_->window toggleFullScreen:nil];
 }
 
+// static
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
   NSEvent* ns_event = event.os_event.Get();
   if (ns_event.type != NSEventTypeKeyDown) {

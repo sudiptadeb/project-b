@@ -14,9 +14,20 @@ type recorder struct {
 	requests []engine.WindowRequest
 }
 
-func (r *recorder) SetWindowLayout(l engine.WindowLayout) { r.layouts = append(r.layouts, l) }
-func (r *recorder) RequestWindow(q engine.WindowRequest)  { r.requests = append(r.requests, q) }
-func (r *recorder) last() engine.WindowLayout             { return r.layouts[len(r.layouts)-1] }
+func (r *recorder) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
+	r.layouts = append(r.layouts, l)
+}
+func (r *recorder) RequestWindow(w engine.WindowID, q engine.WindowRequest) {
+	r.requests = append(r.requests, q)
+}
+func (r *recorder) last() engine.WindowLayout { return r.layouts[len(r.layouts)-1] }
+
+// one is a manager with window 1 open.
+func one(e *recorder) *Manager {
+	m := New(e, "#4f9e9e", engine.ThemeSystem)
+	m.Open(1)
+	return m
+}
 
 var (
 	mac    = engine.Rect{X: 9, Y: 9, W: 60, H: 14}
@@ -31,7 +42,7 @@ var (
 
 func TestTheFirstLayoutCarriesTheFrame(t *testing.T) {
 	e := &recorder{}
-	New(e, "#4f9e9e", engine.ThemeSystem)
+	one(e)
 	if len(e.layouts) != 1 || e.last().FrameColor != "#4f9e9e" || e.last().FrameWidth != 4 || len(e.last().Regions) != 0 {
 		t.Fatalf("layouts %+v", e.layouts)
 	}
@@ -39,9 +50,9 @@ func TestTheFirstLayoutCarriesTheFrame(t *testing.T) {
 
 func TestWhatEachPointDoes(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.HandleWindowChanged(engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
-	m.HandleShellLayout(report)
+	m := one(e)
+	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleShellLayout(1, report)
 	l := e.last()
 	if l.Page != report.Page || l.ViewW != 1100 || l.ViewH != 700 {
 		t.Fatalf("layout %+v", l)
@@ -64,9 +75,9 @@ func TestWhatEachPointDoes(t *testing.T) {
 
 func TestFullScreenSendsNoDragAreas(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.HandleShellLayout(report)
-	m.HandleWindowChanged(engine.WindowState{W: 1440, H: 900, FullScreen: true})
+	m := one(e)
+	m.HandleShellLayout(1, report)
+	m.HandleWindowChanged(1, engine.WindowState{W: 1440, H: 900, FullScreen: true})
 	if got := e.last().At(100, 20); got != engine.AreaShell {
 		t.Fatalf("in full screen the top row's empty space is %v", got)
 	}
@@ -75,7 +86,7 @@ func TestFullScreenSendsNoDragAreas(t *testing.T) {
 			t.Fatalf("a drag area in full screen: %+v", e.last().Regions)
 		}
 	}
-	m.HandleWindowChanged(engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
 	if got := e.last().At(100, 20); got != engine.AreaDrag {
 		t.Fatalf("back from full screen the top row's empty space is %v", got)
 	}
@@ -83,12 +94,12 @@ func TestFullScreenSendsNoDragAreas(t *testing.T) {
 
 func TestAnUnchangedLayoutIsNotSentTwice(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.HandleShellLayout(report)
-	m.HandleShellLayout(report)
+	m := one(e)
+	m.HandleShellLayout(1, report)
+	m.HandleShellLayout(1, report)
 	// A resize changes the window's size, but not what the shell last reported.
-	m.HandleWindowChanged(engine.WindowState{W: 1101, H: 700, Controls: mac, CornerRadius: 26})
-	m.HandleWindowChanged(engine.WindowState{W: 1102, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1101, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1102, H: 700, Controls: mac, CornerRadius: 26})
 	m.SetColor("#4f9e9e")
 	if len(e.layouts) != 2 {
 		t.Fatalf("sent %d layouts: %+v", len(e.layouts), e.layouts)
@@ -97,8 +108,8 @@ func TestAnUnchangedLayoutIsNotSentTwice(t *testing.T) {
 
 func TestColorRepaintsTheWindowAndTellsSubscribers(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.HandleShellLayout(report)
+	m := one(e)
+	m.HandleShellLayout(1, report)
 	var got []string
 	m.OnColorChanged(func(c string) { got = append(got, c) })
 	m.SetColor("#3470d0")
@@ -109,34 +120,34 @@ func TestColorRepaintsTheWindowAndTellsSubscribers(t *testing.T) {
 }
 
 func TestControlsChangeOnlyWhenDifferent(t *testing.T) {
-	m := New(&recorder{}, "#4f9e9e", engine.ThemeSystem)
+	m := one(&recorder{})
 	var got []engine.Rect
 	var radii []float64
-	m.OnControlsChanged(func(r engine.Rect, radius float64) {
+	m.OnControlsChanged(func(_ engine.WindowID, r engine.Rect, radius float64) {
 		got = append(got, r)
 		radii = append(radii, radius)
 	})
-	m.HandleWindowChanged(engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
-	m.HandleWindowChanged(engine.WindowState{W: 1200, H: 700, Controls: mac, CornerRadius: 26})
-	m.HandleWindowChanged(engine.WindowState{W: 1440, H: 900, FullScreen: true})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1200, H: 700, Controls: mac, CornerRadius: 26})
+	m.HandleWindowChanged(1, engine.WindowState{W: 1440, H: 900, FullScreen: true})
 	if !reflect.DeepEqual(got, []engine.Rect{mac, {}}) || !reflect.DeepEqual(radii, []float64{26, 0}) {
 		t.Fatalf("got %v radii %v", got, radii)
 	}
-	if m.Controls() != (engine.Rect{}) || m.CornerRadius() != 0 {
-		t.Fatalf("controls = %v radius = %v", m.Controls(), m.CornerRadius())
+	if m.Controls(1) != (engine.Rect{}) || m.CornerRadius(1) != 0 {
+		t.Fatalf("controls = %v radius = %v", m.Controls(1), m.CornerRadius(1))
 	}
 }
 
 func TestAShellCrashGivesThePageEveryPress(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.HandleShellLayout(report)
-	m.HandleShellCrashed()
+	m := one(e)
+	m.HandleShellLayout(1, report)
+	m.HandleShellCrashed(1)
 	if l := e.last(); len(l.Regions) != 0 || l.Page != report.Page || l.At(300, 20) != engine.AreaPage {
 		t.Fatalf("after the crash %+v", l)
 	}
 	// The reloaded shell reports the same layout as before, and it goes out again.
-	m.HandleShellLayout(report)
+	m.HandleShellLayout(1, report)
 	if got := e.last().At(300, 20); got != engine.AreaShell {
 		t.Fatalf("the reloaded shell's control is %v", got)
 	}
@@ -144,11 +155,11 @@ func TestAShellCrashGivesThePageEveryPress(t *testing.T) {
 
 func TestRequestsGoToTheEngine(t *testing.T) {
 	e := &recorder{}
-	m := New(e, "#4f9e9e", engine.ThemeSystem)
-	m.Request(engine.WindowFullScreen)
-	m.Request(engine.WindowZoom)
-	m.Request(engine.WindowMinimise)
-	m.Request(engine.WindowClose)
+	m := one(e)
+	m.Request(1, engine.WindowFullScreen)
+	m.Request(1, engine.WindowZoom)
+	m.Request(1, engine.WindowMinimise)
+	m.Request(1, engine.WindowClose)
 	want := []engine.WindowRequest{engine.WindowFullScreen, engine.WindowZoom, engine.WindowMinimise, engine.WindowClose}
 	if !reflect.DeepEqual(e.requests, want) {
 		t.Fatalf("requests %v", e.requests)

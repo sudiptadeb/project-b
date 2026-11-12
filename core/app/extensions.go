@@ -31,7 +31,7 @@ func startExtensions(a *App, e engine.Engine, cfg Config) {
 	}
 	eng := e.(engine.Extensions)
 	m := extensions.New(eng, cfg.ProfileDir, a.Tabs.ActiveID)
-	api := chromeapi.New(eng, a.Tabs, m, a.Window.FullScreen)
+	api := chromeapi.New(eng, a.Tabs, m, func() bool { return a.Window.FullScreen(theWindow) })
 	extensionManagers[a] = m
 	eng.SetExtensionsListener(&extensionEvents{m, api})
 
@@ -88,12 +88,12 @@ type extensionCommand struct {
 func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[string]any) shell.Part {
 	return shell.Part{
 		Snapshot: func(into map[string]any) { into["extensions"] = buttons() },
-		Handle: func(t string, msg []byte) bool {
+		Handle: func(w engine.WindowID, t string, msg []byte) bool {
 			var c extensionCommand
 			json.Unmarshal(msg, &c)
 			switch t {
 			case "extensionClick":
-				m.Click(c.ID, c.Rect)
+				m.Click(w, c.ID, c.Rect)
 			case "extensionAnswerPrompt":
 				m.AnswerPrompt(c.On)
 			case "extensionClosePopup":
@@ -101,7 +101,7 @@ func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[strin
 			case "extensionPin":
 				m.Pin(c.ID, c.On)
 			case "extensionsManage":
-				a.Settings.OpenSection("extensions")
+				a.Settings.OpenSection(w, "extensions")
 			default:
 				return false
 			}
@@ -114,21 +114,21 @@ func extensionsShellPart(a *App, m *extensions.Manager, buttons func() map[strin
 func extensionsSettingsPart(a *App, m *extensions.Manager) settings.Part {
 	return settings.Part{
 		Snapshot: func(into map[string]any) { into["extensions"] = m.View() },
-		Handle: func(t string, msg []byte) bool {
+		Handle: func(w engine.WindowID, t string, msg []byte) bool {
 			var c extensionCommand
 			json.Unmarshal(msg, &c)
 			switch t {
 			case "extensionOpenStore":
 				// The store is a website: it opens in a tab, which the settings page
 				// would cover.
-				a.Settings.Close()
+				a.Settings.Close(w)
 				a.Tabs.Open(webStore)
 			case "extensionAnswerPrompt":
 				m.AnswerPrompt(c.On)
 			case "extensionLoadUnpacked":
-				m.LoadUnpacked()
+				m.LoadUnpacked(w)
 			case "extensionInstallPackage":
-				m.InstallPackage()
+				m.InstallPackage(w)
 			case "extensionRemove":
 				m.Remove(c.ID)
 			case "extensionSetEnabled":

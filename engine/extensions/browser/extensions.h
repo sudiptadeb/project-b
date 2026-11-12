@@ -70,9 +70,12 @@ class Extensions : public extensions::ExtensionRegistryObserver,
   void DispatchEvent(const std::string& id,
                      const std::string& event,
                      const std::string& args_json);
-  void OpenPopup(const std::string& id, const GURL& url, const gfx::RectF& anchor);
+  void OpenPopup(int64_t window,
+                 const std::string& id,
+                 const GURL& url,
+                 const gfx::RectF& anchor);
   void ClosePopup();
-  void ChoosePath(int kind);
+  void ChoosePath(int64_t window, int kind);
 
   // Development only, for the driver, which can't press the buttons of the system's
   // panel: the next ChoosePath answers with this path instead of asking.

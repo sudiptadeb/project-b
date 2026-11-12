@@ -113,19 +113,19 @@ void CallEdit(int32_t command) {
   g_engine->Edit(command);
 }
 
-void CallOpenSettings() {
+void CallOpenSettings(int64_t window) {
   CheckMainThread();
-  g_engine->OpenSettings();
+  g_engine->OpenSettings(window);
 }
 
-void CallCloseSettings() {
+void CallCloseSettings(int64_t window) {
   CheckMainThread();
-  g_engine->CloseSettings();
+  g_engine->CloseSettings(window);
 }
 
-void CallSendToSettings(const char* json, size_t length) {
+void CallSendToSettings(int64_t window, const char* json, size_t length) {
   CheckMainThread();
-  g_engine->SendToSettings(json, length);
+  g_engine->SendToSettings(window, json, length);
 }
 
 void CallSetMenu(const char* json, size_t length) {
@@ -142,28 +142,36 @@ void CallAppCommand(int32_t command) {
 #endif
 }
 
-void CallRequestWindow(int32_t request) {
+// Go only names windows it opened and the engine hasn't closed.
+Window* NativeWindow(int64_t window) {
+  Engine::AppWindow* w = g_engine->window(window);
+  CHECK(w) << "no window " << window;
+  return w->window.get();
+}
+
+void CallRequestWindow(int64_t window, int32_t request) {
   CheckMainThread();
   switch (request) {
     case PB_WINDOW_CLOSE:
-      g_engine->CloseWindow();
+      g_engine->CloseWindow(window);
       break;
     case PB_WINDOW_MINIMISE:
-      g_engine->window()->Minimize();
+      NativeWindow(window)->Minimize();
       break;
     case PB_WINDOW_ZOOM:
-      g_engine->window()->Zoom();
+      NativeWindow(window)->Zoom();
       break;
     case PB_WINDOW_FULL_SCREEN:
-      g_engine->window()->ToggleFullScreen();
+      NativeWindow(window)->ToggleFullScreen();
       break;
     case PB_WINDOW_FRONT:
-      g_engine->window()->BringToFront();
+      NativeWindow(window)->BringToFront();
       break;
   }
 }
 
-void CallSetWindowLayout(const PBWindowLayout* l,
+void CallSetWindowLayout(int64_t window,
+                         const PBWindowLayout* l,
                          const PBRegion* regions,
                          size_t region_count) {
   CheckMainThread();
@@ -180,7 +188,7 @@ void CallSetWindowLayout(const PBWindowLayout* l,
     layout.regions.push_back({gfx::RectF(r.x, r.y, r.w, r.h),
                               static_cast<Window::Area>(r.area)});
   }
-  g_engine->window()->SetLayout(std::move(layout));
+  NativeWindow(window)->SetLayout(std::move(layout));
 }
 
 void CallFocusPage() {
@@ -188,14 +196,14 @@ void CallFocusPage() {
   g_engine->FocusPage();
 }
 
-void CallFocusShell() {
+void CallFocusShell(int64_t window) {
   CheckMainThread();
-  g_engine->FocusShell();
+  g_engine->FocusShell(window);
 }
 
-void CallSendToShell(const char* json, size_t length) {
+void CallSendToShell(int64_t window, const char* json, size_t length) {
   CheckMainThread();
-  g_engine->SendToShell(json, length);
+  g_engine->SendToShell(window, json, length);
 }
 
 void CallSetHookSubscribed(int32_t hook, int on) {
@@ -206,7 +214,8 @@ void CallSetHookSubscribed(int32_t hook, int on) {
 #if BUILDFLAG(IS_ANDROID)
 void CallInstallUpdate(const char* path) {
   CheckMainThread();
-  g_engine->window()->InstallPackage(path);
+  // Android has one window, and the installer belongs to the app, not to it.
+  g_engine->windows().begin()->second->window->InstallPackage(path);
 }
 #endif
 
@@ -218,10 +227,11 @@ void CallPostWakeup() {
 
 }  // namespace
 
-Engine::Engine(content::BrowserContext* browser_context,
-               Window* window,
-               ShellPage* shell)
-    : browser_context_(browser_context), window_(window), shell_(shell) {
+Engine::AppWindow::AppWindow(int64_t id) : id(id) {}
+Engine::AppWindow::~AppWindow() = default;
+
+Engine::Engine(content::BrowserContext* browser_context)
+    : browser_context_(browser_context) {
   CHECK(!g_engine);
   g_engine = this;
 }
@@ -288,9 +298,57 @@ PageTab* Engine::active_tab() const {
   return it == tabs_.end() ? nullptr : it->second.get();
 }
 
-void Engine::FocusShellForTraversal(bool reverse) {
-  shell_->contents()->Focus();
-  shell_->contents()->FocusThroughTabTraversal(reverse);
+Engine::AppWindow* Engine::window(int64_t id) const {
+  auto it = windows_.find(id);
+  return it == windows_.end() ? nullptr : it->second.get();
+}
+
+// Until the layout says which window shows which tab, every tab is in window 1.
+Engine::AppWindow* Engine::WindowOf(int64_t tab) const {
+  return window(1);
+}
+
+void Engine::OpenWindow(int64_t id, base::OnceClosure on_close) {
+  auto w = std::make_unique<AppWindow>(id);
+  w->window = std::make_unique<Window>(std::move(on_close));
+  timeline::Mark("window.created");
+  w->shell = std::make_unique<ShellPage>(browser_context_, id);
+  timeline::Mark("shell.created");
+#if BUILDFLAG(IS_ANDROID)
+  w->window->SetShellContents(w->shell->contents());
+#else
+  w->window->SetShellView(w->shell->contents()->GetNativeView());
+#endif
+  ShellPage* shell = w->shell.get();
+  windows_[id] = std::move(w);
+  shell->Load();
+}
+
+void Engine::ShowWindow(int64_t id) {
+  Window* native = window(id)->window.get();
+  native->Show();
+  timeline::Mark("window.shown");
+  native->ListenForState(base::BindRepeating(
+      [](int64_t id, const Window::State& s) {
+        hooks::Args args;
+        args.Int(id);
+        args.Double(s.size.width());
+        args.Double(s.size.height());
+        args.Double(s.controls.x());
+        args.Double(s.controls.y());
+        args.Double(s.controls.width());
+        args.Double(s.controls.height());
+        args.Double(s.corner_radius);
+        args.Bool(s.full_screen);
+        hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
+      },
+      id));
+}
+
+void Engine::FocusShellForTraversal(int64_t from_tab, bool reverse) {
+  content::WebContents* shell = WindowOf(from_tab)->shell->contents();
+  shell->Focus();
+  shell->FocusThroughTabTraversal(reverse);
 }
 
 void Engine::FocusPageForTraversal(bool reverse) {
@@ -324,9 +382,9 @@ PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
   }
 #endif
 #if BUILDFLAG(IS_ANDROID)
-  window_->AddPageContents(tab->contents());
+  WindowOf(id)->window->AddPageContents(tab->contents());
 #else
-  window_->AddPageView(tab->contents()->GetNativeView());
+  WindowOf(id)->window->AddPageView(tab->contents()->GetNativeView());
 #endif
   tabs_[id] = std::move(tab);
   return raw;
@@ -340,9 +398,9 @@ void Engine::CloseTab(int64_t tab) {
     return;
   }
 #if BUILDFLAG(IS_ANDROID)
-  window_->RemovePageContents(it->second->contents());
+  WindowOf(tab)->window->RemovePageContents(it->second->contents());
 #else
-  window_->RemovePageView(it->second->contents()->GetNativeView());
+  WindowOf(tab)->window->RemovePageView(it->second->contents()->GetNativeView());
 #endif
   if (active_tab_ == tab) {
     active_tab_ = 0;
@@ -358,12 +416,13 @@ void Engine::ShowTab(int64_t tab) {
     return;
   }
   active_tab_ = tab;
+  Window* native = WindowOf(tab)->window.get();
 #if BUILDFLAG(IS_ANDROID)
-  window_->ShowPageContents(it->second->contents());
+  native->ShowPageContents(it->second->contents());
 #else
-  window_->ShowPageView(it->second->contents()->GetNativeView());
+  native->ShowPageView(it->second->contents()->GetNativeView());
 #endif
-  window_->SetTitle(it->second->contents()->GetTitle());
+  native->SetTitle(it->second->contents()->GetTitle());
   it->second->contents()->WasShown();
   for (const auto& [id, other] : tabs_) {
     if (id != tab) {
@@ -450,11 +509,14 @@ int64_t Engine::DuplicateTab(int64_t tab) {
 }
 
 content::WebContents* Engine::FocusedContents() const {
-  for (content::WebContents* contents :
-       {settings_ ? settings_->contents() : nullptr, shell_->contents()}) {
-    if (contents && contents->GetRenderWidgetHostView() &&
-        contents->GetRenderWidgetHostView()->HasFocus()) {
-      return contents;
+  for (const auto& [id, w] : windows_) {
+    for (content::WebContents* contents :
+         {w->settings ? w->settings->contents() : nullptr,
+          w->shell->contents()}) {
+      if (contents && contents->GetRenderWidgetHostView() &&
+          contents->GetRenderWidgetHostView()->HasFocus()) {
+        return contents;
+      }
     }
   }
   PageTab* tab = active_tab();
@@ -494,70 +556,74 @@ void Engine::Edit(int32_t command) {
   }
 }
 
-void Engine::OpenSettings() {
-  if (settings_) {
+void Engine::OpenSettings(int64_t window) {
+  AppWindow* w = this->window(window);
+  if (w->settings) {
     return;
   }
-  settings_ = std::make_unique<SettingsPage>(browser_context_);
+  w->settings = std::make_unique<SettingsPage>(browser_context_);
   timeline::Mark("settings.open.created");
 #if BUILDFLAG(IS_ANDROID)
-  window_->SetOverlayContents(settings_->contents());
+  w->window->SetOverlayContents(w->settings->contents());
 #else
-  window_->SetOverlayView(settings_->contents()->GetNativeView());
+  w->window->SetOverlayView(w->settings->contents()->GetNativeView());
 #endif
   timeline::Mark("settings.open.shown");
-  settings_->Load();
-  settings_->contents()->Focus();
+  w->settings->Load();
+  w->settings->contents()->Focus();
 }
 
 // Like CloseTab, the request can come from the page's own key event, so the page dies
 // on a later task.
-void Engine::CloseSettings() {
-  if (!settings_) {
+void Engine::CloseSettings(int64_t window) {
+  AppWindow* w = this->window(window);
+  if (!w->settings) {
     return;
   }
 #if BUILDFLAG(IS_ANDROID)
-  window_->RemoveOverlayContents(settings_->contents());
+  w->window->RemoveOverlayContents(w->settings->contents());
 #else
-  window_->RemoveOverlayView(settings_->contents()->GetNativeView());
+  w->window->RemoveOverlayView(w->settings->contents()->GetNativeView());
 #endif
   content::GetUIThreadTaskRunner({})->DeleteSoon(FROM_HERE,
-                                                 std::move(settings_));
+                                                 std::move(w->settings));
   FocusPage();
 }
 
-void Engine::SendToSettings(const char* json, size_t length) {
-  if (settings_) {
-    settings_->Send(std::string(json, length));
+void Engine::SendToSettings(int64_t window, const char* json, size_t length) {
+  AppWindow* w = this->window(window);
+  if (w->settings) {
+    w->settings->Send(std::string(json, length));
   }
 }
 
 // Same reason as CloseTab: the request can arrive inside a view's own event.
-void Engine::CloseWindow() {
+void Engine::CloseWindow(int64_t window) {
   content::GetUIThreadTaskRunner({})->PostTask(
-      FROM_HERE, base::BindOnce(&Window::Close, base::Unretained(window_)));
+      FROM_HERE, base::BindOnce(&Window::Close,
+                                base::Unretained(this->window(window)->window.get())));
 }
 
-// While the settings page is open it keeps the keyboard: a focus request from the shell
-// or Go, such as one still on its way from before it opened, waits until it closes.
+// While a window's settings page is open it keeps the keyboard: a focus request from
+// the shell or Go, such as one still on its way from before it opened, waits until it
+// closes.
 void Engine::FocusPage() {
-  if (settings_) {
-    return;
-  }
-  if (PageTab* tab = active_tab()) {
+  PageTab* tab = active_tab();
+  if (tab && !WindowOf(tab->id())->settings) {
     tab->contents()->Focus();
   }
 }
 
-void Engine::FocusShell() {
-  if (settings_) {
+void Engine::FocusShell(int64_t window) {
+  AppWindow* w = this->window(window);
+  if (w->settings) {
     return;
   }
-  shell_->contents()->Focus();
+  w->shell->contents()->Focus();
 }
 
-void Engine::SendToShell(const char* json, size_t length) {
-  shell_->Send(std::string(json, length));
+void Engine::SendToShell(int64_t window, const char* json, size_t length) {
+  this->window(window)->shell->Send(std::string(json, length));
 }
 
 }  // namespace project_b

@@ -158,10 +158,10 @@ func (m *Manager) Buttons() []Button {
 // OpenPopup is which extension's popup is showing, or "".
 func (m *Manager) OpenPopup() string { return m.popup }
 
-// Click is a press on an extension's button, which sits at anchor in the window. It
-// opens the button's popup under it, or closes that popup if it is the one showing. A
-// button with no popup tells its extension it was clicked.
-func (m *Manager) Click(id string, anchor engine.Rect) {
+// Click is a press on an extension's button, which sits at anchor in window w. It opens
+// the button's popup under it, or closes that popup if it is the one showing. A button
+// with no popup tells its extension it was clicked.
+func (m *Manager) Click(w engine.WindowID, id string, anchor engine.Rect) {
 	if m.popup == id {
 		m.ClosePopup()
 		return
@@ -172,7 +172,7 @@ func (m *Manager) Click(id string, anchor engine.Rect) {
 	}
 	if popup := m.Prop(id, tab, Popup); popup != "" {
 		m.popup = id
-		m.eng.OpenExtensionPopup(id, popup, anchor)
+		m.eng.OpenExtensionPopup(w, id, popup, anchor)
 		m.changed()
 	} else if m.onClicked != nil {
 		m.onClicked(id)

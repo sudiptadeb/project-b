@@ -55,7 +55,7 @@ void PageTab::DidFirstVisuallyNonEmptyPaint() {
 
 void PageTab::TitleWasSet(content::NavigationEntry* entry) {
   if (Engine::Get()->active_tab() == this) {
-    Engine::Get()->window()->SetTitle(contents_->GetTitle());
+    Engine::Get()->WindowOf(id_)->window->SetTitle(contents_->GetTitle());
   }
   WebContentsObserverHooks::TitleWasSet(entry);
 }
@@ -172,11 +172,11 @@ content::WebContents* PageTab::AddNewContents(
 bool PageTab::HandleKeyboardEvent(content::WebContents* source,
                                   const input::NativeWebKeyboardEvent& event) {
   return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
-         Engine::Get()->window()->HandleUnhandledKey(event);
+         Window::HandleUnhandledKey(event);
 }
 
 bool PageTab::TakeFocus(content::WebContents* source, bool reverse) {
-  Engine::Get()->FocusShellForTraversal(reverse);
+  Engine::Get()->FocusShellForTraversal(id_, reverse);
   return true;
 }
 

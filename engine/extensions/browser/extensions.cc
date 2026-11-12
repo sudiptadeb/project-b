@@ -576,7 +576,8 @@ void Extensions::DispatchEvent(const std::string& id,
                                                   std::move(*args)));
 }
 
-void Extensions::OpenPopup(const std::string& id,
+void Extensions::OpenPopup(int64_t window,
+                           const std::string& id,
                            const GURL& url,
                            const gfx::RectF& anchor) {
   const extensions::Extension* extension =
@@ -587,7 +588,7 @@ void Extensions::OpenPopup(const std::string& id,
     return;
   }
   popup_ = std::make_unique<ExtensionPopup>(
-      extension, browser_context_, Engine::Get()->window(), url, anchor,
+      extension, browser_context_, window, url, anchor,
       base::BindOnce(&Extensions::ClosePopup, weak_factory_.GetWeakPtr()));
 }
 
@@ -607,13 +608,14 @@ content::WebContents* Extensions::popup_contents() const {
   return popup_ ? popup_->host_contents() : nullptr;
 }
 
-void Extensions::ChoosePath(int kind) {
+void Extensions::ChoosePath(int64_t window, int kind) {
   if (!driver_choice_.empty()) {
     PathChosen(std::exchange(driver_choice_, base::FilePath()));
     return;
   }
-  ShowPathChooser(kind, base::BindOnce(&Extensions::PathChosen,
-                                       weak_factory_.GetWeakPtr()));
+  ShowPathChooser(Engine::Get()->window(window)->window.get(), kind,
+                  base::BindOnce(&Extensions::PathChosen,
+                                 weak_factory_.GetWeakPtr()));
 }
 
 void Extensions::PathChosen(const base::FilePath& path) {
@@ -778,12 +780,14 @@ const PBExtensionCalls* Extensions::Calls() {
             Get()->DispatchEvent(id, event, args_json);
           },
       .open_popup =
-          [](const char* id, const char* url, double x, double y, double w,
-             double h) {
-            Get()->OpenPopup(id, GURL(url), gfx::RectF(x, y, w, h));
+          [](int64_t window, const char* id, const char* url, double x,
+             double y, double w, double h) {
+            Get()->OpenPopup(window, id, GURL(url), gfx::RectF(x, y, w, h));
           },
       .close_popup = []() { Get()->ClosePopup(); },
-      .choose_path = [](int32_t kind) { Get()->ChoosePath(kind); },
+      .choose_path = [](int64_t window, int32_t kind) {
+        Get()->ChoosePath(window, kind);
+      },
   };
   return &calls;
 }

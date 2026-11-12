@@ -21,12 +21,13 @@ namespace project_b {
 // own folder under shell/ beside the binary.
 void RegisterShellWebUI(content::BrowserContext* browser_context);
 
-// The shell: one transparent page covering the window. It talks to the Go core with
-// chrome.send, and the core answers by calling window.__shellReceive.
+// A window's shell: one transparent page covering the window. It talks to the Go core
+// with chrome.send, and the core answers by calling window.__shellReceive.
 class ShellPage : public content::WebContentsObserver,
                   public WebContentsDelegateHooks {
  public:
-  explicit ShellPage(content::BrowserContext* browser_context);
+  // window is Go's id for the window the shell is on.
+  ShellPage(content::BrowserContext* browser_context, int64_t window);
   ShellPage(const ShellPage&) = delete;
   ShellPage& operator=(const ShellPage&) = delete;
   ~ShellPage() override;
@@ -48,6 +49,7 @@ class ShellPage : public content::WebContentsObserver,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
+  const int64_t window_;
   std::unique_ptr<content::WebContents> contents_;
   base::WeakPtrFactory<ShellPage> weak_factory_{this};
 };

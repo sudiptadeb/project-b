@@ -59,11 +59,14 @@
   project_b::Engine* engine = project_b::Engine::Get();
   if (event.type == NSEventTypeKeyDown && !event.isARepeat) {
     project_b::timeline::Input("input.key", made);
-  } else if (event.type == NSEventTypeLeftMouseUp && engine &&
-             event.window ==
-                 engine->window()->native_window().GetNativeNSWindow()) {
-    engine->window()->NoteClick(
-        gfx::PointF(event.locationInWindow.x, event.locationInWindow.y), made);
+  } else if (event.type == NSEventTypeLeftMouseUp && engine) {
+    for (const auto& [id, w] : engine->windows()) {
+      if (event.window == w->window->native_window().GetNativeNSWindow()) {
+        w->window->NoteClick(
+            gfx::PointF(event.locationInWindow.x, event.locationInWindow.y),
+            made);
+      }
+    }
   }
   [super sendEvent:event];
   // Content drops a modifier's release after a key the browser handled, so Go hears

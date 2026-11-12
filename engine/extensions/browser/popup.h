@@ -10,8 +10,6 @@
 
 namespace project_b {
 
-class Window;
-
 // An extension's popup: a page of the extension in a WebContents of its own, shown in a
 // view under the toolbar button that opened it, over the shell and the page. It takes
 // the size its page lays out to, as Chrome's does, and asks to be closed when the page
@@ -23,7 +21,7 @@ class ExtensionPopup : public extensions::ExtensionHost {
   // on_close runs, on a later task, when the popup should go; the owner destroys it.
   ExtensionPopup(const extensions::Extension* extension,
                  content::BrowserContext* browser_context,
-                 Window* window,
+                 int64_t window,
                  const GURL& url,
                  const gfx::RectF& anchor,
                  base::OnceClosure on_close);
@@ -46,7 +44,9 @@ class ExtensionPopup : public extensions::ExtensionHost {
   void OnWebContentsLostFocus(
       content::RenderWidgetHost* render_widget_host) override;
 
-  const raw_ptr<Window> window_;
+  // Go's id for the window the popup is over. The windows close before the extensions
+  // do at shutdown, so it may be gone.
+  const int64_t window_;
   const gfx::RectF anchor_;
   gfx::Size size_;
   bool shown_ = false;

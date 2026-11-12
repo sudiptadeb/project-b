@@ -134,7 +134,7 @@ func (r *extRig) beginInstall() {
 	file := filepath.Join(r.t.TempDir(), "test.crx")
 	pack(r.t, file, "1.0")
 	r.x.FireExtension("choose", "", file)
-	r.on(func() { r.m.InstallPackage() })
+	r.on(func() { r.m.InstallPackage(1) })
 	r.until("the install prompt", func() bool { return r.m.Prompt() != nil })
 }
 
@@ -188,7 +188,7 @@ func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
 	folder, _ := filepath.Abs(testExtension)
 	r.x.FireExtension("choose", "", folder)
-	r.on(func() { r.m.LoadUnpacked() })
+	r.on(func() { r.m.LoadUnpacked(1) })
 	r.until("the unpacked extension", func() bool { return len(r.m.Installed()) == 1 })
 	r.on(func() {
 		if e := r.m.Installed()[0]; !e.Unpacked || e.Path != folder || e.ID == testExtensionID {
@@ -199,7 +199,7 @@ func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "test.crx")
 	pack(t, file, "1.1")
 	r.x.FireExtension("choose", "", file)
-	r.on(func() { r.m.InstallPackage() })
+	r.on(func() { r.m.InstallPackage(1) })
 	r.until("the install prompt", func() bool { return r.m.View().Prompt != nil })
 	r.on(func() { r.m.AnswerPrompt(true) })
 	r.until("the packaged extension", func() bool { return len(r.m.Installed()) == 2 })
@@ -208,9 +208,9 @@ func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
 	}
 
 	// Picking nothing does nothing, and a folder with no manifest is an error to show.
-	r.on(func() { r.m.LoadUnpacked() })
+	r.on(func() { r.m.LoadUnpacked(1) })
 	r.x.FireExtension("choose", "", t.TempDir())
-	r.on(func() { r.m.LoadUnpacked() })
+	r.on(func() { r.m.LoadUnpacked(1) })
 	r.until("the error", func() bool { return r.m.View().Error != "" })
 	r.on(func() {
 		if n := len(r.m.Installed()); n != 2 {

@@ -53,7 +53,7 @@ bool SettingsPage::HandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
   return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
-         Engine::Get()->window()->HandleUnhandledKey(event);
+         Window::HandleUnhandledKey(event);
 }
 
 #if BUILDFLAG(IS_ANDROID)

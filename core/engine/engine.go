@@ -12,6 +12,9 @@ import "errors"
 // TabID identifies a tab across the boundary. Content's own objects never cross it.
 type TabID int64
 
+// WindowID identifies a window across the boundary. The app makes them, 1 for the first.
+type WindowID int64
+
 // Rect is in window coordinates, CSS pixels.
 type Rect struct {
 	X float64 `json:"x"`
@@ -130,28 +133,28 @@ type Engine interface {
 	// Edit runs a text-editing command in whichever page has the keyboard.
 	Edit(c EditCommand)
 
-	// RequestWindow asks the native window to close, which ends the app, minimise,
+	// RequestWindow asks a native window to close, which ends the app, minimise,
 	// zoom, go in or out of full screen, or come to the front. What follows arrives as
 	// WindowChanged.
-	RequestWindow(r WindowRequest)
+	RequestWindow(w WindowID, r WindowRequest)
 
-	// SetWindowLayout is everything about how the window behaves, from the window
+	// SetWindowLayout is everything about how a window behaves, from the window
 	// manager, whenever any of it changes.
-	SetWindowLayout(l WindowLayout)
+	SetWindowLayout(w WindowID, l WindowLayout)
 	// FocusPage gives keyboard focus to the shown tab's page; FocusShell gives it to
-	// the shell page, which then places it inside itself.
+	// a window's shell page, which then places it inside itself.
 	FocusPage()
-	FocusShell()
+	FocusShell(w WindowID)
 
-	// SendToShell delivers one message to the shell page.
-	SendToShell(msg []byte)
+	// SendToShell delivers one message to a window's shell page.
+	SendToShell(w WindowID, msg []byte)
 
-	// OpenSettings puts the settings page over the whole window, in a page of its own,
-	// and gives it the keyboard; CloseSettings takes it away. SendToSettings delivers one
-	// message to it while it is open.
-	OpenSettings()
-	CloseSettings()
-	SendToSettings(msg []byte)
+	// OpenSettings puts the settings page over the whole of a window, in a page of its
+	// own, and gives it the keyboard; CloseSettings takes it away. SendToSettings delivers
+	// one message to it while it is open.
+	OpenSettings(w WindowID)
+	CloseSettings(w WindowID)
+	SendToSettings(w WindowID, msg []byte)
 
 	// SetMenu replaces the native menu bar, where the platform has one.
 	SetMenu(m Menu)
@@ -163,7 +166,8 @@ type Engine interface {
 
 // Listener is what an engine tells the app. There is exactly one.
 type Listener interface {
-	ShellMessage(msg []byte)
+	// ShellMessage is one message from a window's shell page.
+	ShellMessage(w WindowID, msg []byte)
 
 	// NavigationStarting fires at the start and on each redirect. Returning false
 	// blocks the navigation.
@@ -203,16 +207,16 @@ type Listener interface {
 	// title, as macOS App Shortcuts does. It fires after start and whenever they change.
 	OSBindings(byTitle map[string]Key)
 
-	// SettingsMessage is one message from the settings page.
-	SettingsMessage(msg []byte)
+	// SettingsMessage is one message from a window's settings page.
+	SettingsMessage(w WindowID, msg []byte)
 
-	// WindowChanged says what the native window is now. It fires after start, on
+	// WindowChanged says what a native window is now. It fires after start, on
 	// resize and on entering or leaving full screen.
-	WindowChanged(s WindowState)
+	WindowChanged(w WindowID, s WindowState)
 
-	// ShellCrashed says the shell page's renderer died. The engine reloads it, and the
-	// new shell reports its layout again.
-	ShellCrashed()
+	// ShellCrashed says a window's shell page's renderer died. The engine reloads it, and
+	// the new shell reports its layout again.
+	ShellCrashed(w WindowID)
 
 	// ProcessCrashed says a child process crashed.
 	ProcessCrashed(p ProcessCrash)

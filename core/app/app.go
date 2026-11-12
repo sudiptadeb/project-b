@@ -49,6 +49,9 @@ type App struct {
 	keyIn engine.Surface
 }
 
+// theWindow is the one window, until there are more.
+const theWindow engine.WindowID = 1
+
 // starters are what a build tag adds to Start. A tagged file appends one when it loads,
 // so nothing here names it; each builds its managers and wires them to the rest.
 var starters []func(a *App, e engine.Engine, cfg Config)
@@ -65,10 +68,11 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
 	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()))
-	closeWindow := func() { a.Window.Request(engine.WindowClose) }
+	a.Window.Open(theWindow)
+	closeWindow := func() { a.Window.Request(theWindow, engine.WindowClose) }
 	a.Update = update.New(cfg.Update, e.Post, closeWindow)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
-	a.Commands = commands.New(e, cfg.ProfileDir, a.Window.FullScreen)
+	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(theWindow) })
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); closeWindow() })
@@ -102,7 +106,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnChanged(func(tabs.Tab) { a.Commands.RefreshMenu() })
 	a.Tabs.OnListChanged(a.Commands.RefreshMenu)
 	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
-	a.Window.OnControlsChanged(func(engine.Rect, float64) { a.Commands.RefreshMenu() })
+	a.Window.OnControlsChanged(func(engine.WindowID, engine.Rect, float64) { a.Commands.RefreshMenu() })
 	a.Commands.Load()
 	for _, start := range starters {
 		start(a, e, cfg)
@@ -121,7 +125,7 @@ func (a *App) Stop() {
 	a.Crash.Stop()
 }
 
-func (a *App) ShellMessage(msg []byte) { a.Shell.Handle(msg) }
+func (a *App) ShellMessage(w engine.WindowID, msg []byte) { a.Shell.Handle(w, msg) }
 
 func (a *App) NavigationStarting(tab engine.TabID, url string) bool {
 	return a.Tabs.HandleNavigationStarting(tab, url)
@@ -166,7 +170,7 @@ func (a *App) ActivateRequested(tab engine.TabID) { a.Tabs.Activate(tab) }
 // Handover is the request of a copy started on this profile while this one runs: the
 // window comes to the front, and each URL opens in a new tab in front.
 func (a *App) Handover(urls []string) {
-	a.Window.Request(engine.WindowFront)
+	a.Window.Request(theWindow, engine.WindowFront)
 	for _, u := range urls {
 		a.Tabs.Open(u)
 	}
@@ -197,12 +201,14 @@ func (a *App) MenuChosen(action string) { a.Commands.Run(action) }
 
 func (a *App) OSBindings(byTitle map[string]engine.Key) { a.Commands.OSBindings(byTitle) }
 
-func (a *App) SettingsMessage(msg []byte) { a.Settings.Handle(msg) }
+func (a *App) SettingsMessage(w engine.WindowID, msg []byte) { a.Settings.Handle(w, msg) }
 
-func (a *App) WindowChanged(s engine.WindowState) { a.Window.HandleWindowChanged(s) }
+func (a *App) WindowChanged(w engine.WindowID, s engine.WindowState) {
+	a.Window.HandleWindowChanged(w, s)
+}
 
-func (a *App) ShellCrashed() {
-	a.Window.HandleShellCrashed()
+func (a *App) ShellCrashed(w engine.WindowID) {
+	a.Window.HandleShellCrashed(w)
 	a.Shell.HandleShellCrashed()
 }
 

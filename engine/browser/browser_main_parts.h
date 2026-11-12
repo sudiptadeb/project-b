@@ -17,8 +17,6 @@ class BrowserContext;
 class ChildProcesses;
 class Engine;
 class Extensions;
-class ShellPage;
-class Window;
 
 // The profile folder, and the folder inside it that belongs to Chromium.
 base::FilePath ProfileDir();
@@ -51,8 +49,6 @@ class BrowserMainParts : public content::BrowserMainParts {
 #if BUILDFLAG(PB_EXTENSIONS)
   std::unique_ptr<Extensions> extensions_;
 #endif
-  std::unique_ptr<Window> window_;
-  std::unique_ptr<ShellPage> shell_;
   std::unique_ptr<Engine> engine_;
   std::unique_ptr<ChildProcesses> child_processes_;
   base::OnceClosure quit_;

@@ -12,7 +12,8 @@
 
 namespace project_b {
 
-void ShowPathChooser(int kind,
+void ShowPathChooser(Window* window,
+                     int kind,
                      base::OnceCallback<void(const base::FilePath&)> done) {
   NSOpenPanel* panel = [NSOpenPanel openPanel];
   panel.allowsMultipleSelection = NO;
@@ -23,9 +24,7 @@ void ShowPathChooser(int kind,
   }
   __block base::OnceCallback<void(const base::FilePath&)> answer =
       std::move(done);
-  NSWindow* window =
-      Engine::Get()->window()->native_window().GetNativeNSWindow();
-  [panel beginSheetModalForWindow:window
+  [panel beginSheetModalForWindow:window->native_window().GetNativeNSWindow()
                 completionHandler:^(NSModalResponse response) {
                   std::move(answer).Run(
                       response == NSModalResponseOK

@@ -43,10 +43,18 @@ typedef struct PBExtensionCalls {
   // it with free().
   char* (*list)(void);
   void (*dispatch_event)(const char* id, const char* event, const char* args_json);
-  // The anchor is in shell coordinates, y measured down from the top.
-  void (*open_popup)(const char* id, const char* url, double x, double y, double w, double h);
+  // Over a window, under the anchor in its shell's coordinates, y measured down from
+  // the top.
+  void (*open_popup)(int64_t window,
+                     const char* id,
+                     const char* url,
+                     double x,
+                     double y,
+                     double w,
+                     double h);
   void (*close_popup)(void);
-  void (*choose_path)(int32_t kind);  // PBPathKind
+  // On a window.
+  void (*choose_path)(int64_t window, int32_t kind);  // PBPathKind
 } PBExtensionCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_EXTENSIONS_ABI_H_

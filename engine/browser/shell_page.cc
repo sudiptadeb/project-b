@@ -49,8 +49,8 @@ namespace project_b {
 namespace {
 
 // Our pages, each an app of its own (shell/src/apps/<app>) at chrome://<app>/, served from
-// shell/<app>/ beside the binary. Each has the one WebContents it belongs in, and its
-// messages cross to Go as one event.
+// shell/<app>/ beside the binary. Each window has the one WebContents each belongs in,
+// and their messages cross to Go as one event, with the window.
 struct App {
   const char* host;
   PBEvent event;
@@ -72,21 +72,27 @@ const App* AppFor(const GURL& url) {
   return nullptr;
 }
 
-// The WebContents an app belongs in: the shell's, or the settings page's while it is open.
-content::WebContents* HomeOf(const App& app) {
-  Engine* engine = Engine::Get();
-  if (app.event == PB_EVENT_SHELL_MESSAGE) {
-    return engine->shell()->contents();
+// The window whose page for app this WebContents is: its shell's, or its settings page's
+// while that is open. 0 when it is no window's.
+int64_t HomeWindow(const App& app, content::WebContents* contents) {
+  for (const auto& [id, w] : Engine::Get()->windows()) {
+    content::WebContents* home =
+        app.event == PB_EVENT_SHELL_MESSAGE ? w->shell->contents()
+        : w->settings                       ? w->settings->contents()
+                                            : nullptr;
+    if (home == contents) {
+      return id;
+    }
   }
-  return engine->settings() ? engine->settings()->contents() : nullptr;
+  return 0;
 }
 
-// Forwards chrome.send(name, [json]) to Go as one event: 'shell' from the shell,
-// 'settings' from the settings page.
+// Forwards chrome.send(name, [json]) to Go as one event, with the window: 'shell' from a
+// shell, 'settings' from a settings page.
 class ShellMessageHandler : public content::WebUIMessageHandler {
  public:
-  ShellMessageHandler(const char* name, PBEvent event)
-      : name_(name), event_(event) {}
+  ShellMessageHandler(const char* name, PBEvent event, int64_t window)
+      : name_(name), event_(event), window_(window) {}
 
   void RegisterMessages() override {
     web_ui()->RegisterMessageCallback(
@@ -101,15 +107,17 @@ class ShellMessageHandler : public content::WebUIMessageHandler {
       return;
     }
     hooks::Args hook_args;
+    hook_args.Int(window_);
     hook_args.Str(args[0].GetString());
     hooks::Fire(event_, hook_args);
   }
 
   const char* const name_;
   const PBEvent event_;
+  const int64_t window_;
 };
 
-// The bridge to Go belongs to each app's own WebContents. The factory sees only the URL,
+// The bridge to Go belongs to each app's own WebContents in a window. The factory sees only the URL,
 // so content makes a controller for chrome://shell/ or chrome://settings/ wherever it
 // loads; anywhere else the controller takes away the page's bindings, so it has no
 // chrome.send, and drops whatever arrives anyway.
@@ -118,20 +126,20 @@ class AppController : public content::WebUIController {
   AppController(content::WebUI* web_ui, const App& app)
       : content::WebUIController(web_ui),
         app_(app),
-        is_home_(web_ui->GetWebContents() == HomeOf(app)) {
-    if (!is_home_) {
+        window_(HomeWindow(app, web_ui->GetWebContents())) {
+    if (!window_) {
       LOG(WARNING) << "chrome://" << app_.host << "/ outside its page: no bindings";
       web_ui->SetBindings(content::BindingsPolicySet());
       return;
     }
     web_ui->AddMessageHandler(
-        std::make_unique<ShellMessageHandler>(app_.host, app_.event));
+        std::make_unique<ShellMessageHandler>(app_.host, app_.event, window_));
   }
 
   bool OverrideHandleWebUIMessage(const GURL& source_url,
                                   const std::string& message,
                                   const base::ListValue& args) override {
-    if (is_home_) {
+    if (window_) {
       return false;
     }
     LOG(WARNING) << "dropped \"" << message << "\" from chrome://" << app_.host
@@ -143,7 +151,8 @@ class AppController : public content::WebUIController {
 
  private:
   const App app_;
-  const bool is_home_;
+  // The window this is the page of, or 0 when it is outside its page.
+  const int64_t window_;
 };
 
 WEB_UI_CONTROLLER_TYPE_IMPL(AppController)
@@ -273,8 +282,9 @@ void RegisterShellWebUI(content::BrowserContext* browser_context) {
   }
 }
 
-ShellPage::ShellPage(content::BrowserContext* browser_context)
-    : contents_(content::WebContents::Create(
+ShellPage::ShellPage(content::BrowserContext* browser_context, int64_t window)
+    : window_(window),
+      contents_(content::WebContents::Create(
           content::WebContents::CreateParams(browser_context))) {
   Observe(contents_.get());
   contents_->SetDelegate(this);
@@ -320,7 +330,9 @@ void ShellPage::DidFinishNavigation(content::NavigationHandle* handle) {
 // until the new shell reports its layout again.
 void ShellPage::PrimaryMainFrameRenderProcessGone(
     base::TerminationStatus status) {
-  hooks::Fire(PB_EVENT_SHELL_CRASHED, hooks::Args());
+  hooks::Args args;
+  args.Int(window_);
+  hooks::Fire(PB_EVENT_SHELL_CRASHED, args);
   // The reload waits for a later task. Content is still telling its observers the
   // process is gone, and a renderer started before they have all heard is one that
   // those who track renderers lose.
@@ -340,7 +352,7 @@ bool ShellPage::HandleKeyboardEvent(
     content::WebContents* source,
     const input::NativeWebKeyboardEvent& event) {
   return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
-         Engine::Get()->window()->HandleUnhandledKey(event);
+         Window::HandleUnhandledKey(event);
 }
 
 bool ShellPage::TakeFocus(content::WebContents* source, bool reverse) {

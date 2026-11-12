@@ -71,8 +71,13 @@ void Reply(const std::string& id, const std::string& text) {
   fflush(stdout);
 }
 
+// The window the driver acts on.
+Engine::AppWindow* Current() {
+  return Engine::Get()->window(1);
+}
+
 NSWindow* TheWindow() {
-  return Engine::Get()->window()->native_window().GetNativeNSWindow();
+  return Current()->window->native_window().GetNativeNSWindow();
 }
 
 NSTimeInterval Now() {
@@ -97,7 +102,7 @@ std::string Classify(NSView* hit) {
     return "nil";
   }
   NSView* shell =
-      Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView();
+      Current()->shell->contents()->GetNativeView().GetNativeNSView();
   if ([hit isDescendantOf:shell]) {
     return "shell";
   }
@@ -105,7 +110,7 @@ std::string Classify(NSView* hit) {
   if (tab && [hit isDescendantOf:tab->contents()->GetNativeView().GetNativeNSView()]) {
     return "page";
   }
-  SettingsPage* settings = Engine::Get()->settings();
+  SettingsPage* settings = Current()->settings.get();
   if (settings &&
       [hit isDescendantOf:settings->contents()->GetNativeView().GetNativeNSView()]) {
     return "settings";
@@ -317,7 +322,7 @@ void Stats(const std::string& id) {
                 go_stats.c_str(), window.isKeyWindow, window.isMainWindow,
                 window.isVisible,
                 (window.occlusionState & NSWindowOcclusionStateVisible) != 0,
-                Engine::Get()->window()->ignored_stale_bounds()));
+                Current()->window->ignored_stale_bounds()));
 }
 
 void Run(const std::string& line) {
@@ -420,11 +425,11 @@ void Run(const std::string& line) {
     [TheWindow() toggleFullScreen:nil];
     Reply(id, "ok");
   } else if (cmd == "eval") {
-    Eval(id, Engine::Get()->shell()->contents(), rest(2));
+    Eval(id, Current()->shell->contents(), rest(2));
   } else if (cmd == "evalpage") {
     Eval(id, Engine::Get()->active_tab()->contents(), rest(2));
   } else if (cmd == "evalsettings") {
-    if (SettingsPage* settings = Engine::Get()->settings()) {
+    if (SettingsPage* settings = Current()->settings.get()) {
       Eval(id, settings->contents(), rest(2));
     } else {
       Reply(id, "ERR no settings page");
@@ -440,7 +445,7 @@ void Run(const std::string& line) {
     }
   } else if (cmd == "popup") {
     // Where the popup is, in shell coordinates: x y w h, all zero for none.
-    const gfx::RectF b = Engine::Get()->window()->popup_bounds();
+    const gfx::RectF b = Current()->window->popup_bounds();
     Reply(id, base::StringPrintf("%.0f %.0f %.0f %.0f", b.x(), b.y(), b.width(),
                                  b.height()));
   } else if (cmd == "choose") {
@@ -474,7 +479,7 @@ void Run(const std::string& line) {
                                  int(c.blueComponent * 255 + 0.5)));
   } else if (cmd == "showncolor") {
     // What the window painted when it first went on screen.
-    Reply(id, base::StringPrintf("#%06x", Engine::Get()->window()->shown_rgb()));
+    Reply(id, base::StringPrintf("#%06x", Current()->window->shown_rgb()));
   } else if (cmd == "frame") {
     // The band the window's content view draws over everything, and its curve.
     CALayer* layer = TheWindow().contentView.layer;
@@ -488,7 +493,7 @@ void Run(const std::string& line) {
   } else if (cmd == "title") {
     Reply(id, base::SysNSStringToUTF8(TheWindow().title));
   } else if (cmd == "bounds") {
-    gfx::RectF b = Engine::Get()->window()->page_bounds();
+    gfx::RectF b = Current()->window->page_bounds();
     // The shown page's frame in the window's content view, where the layout put it.
     NSView* page_view =
         Engine::Get()->active_tab()->contents()->GetNativeView().GetNativeNSView();
@@ -510,13 +515,13 @@ void Run(const std::string& line) {
                   NSMinX(close_frame), NSMaxX(zoom), from_top,
                   close_frame.size.width));
   } else if (cmd == "shellhidden") {
-    Engine::Get()->shell()->contents()->GetNativeView().GetNativeNSView().hidden =
+    Current()->shell->contents()->GetNativeView().GetNativeNSView().hidden =
         parts[2] == "1";
     Reply(id, "ok");
   } else if (cmd == "pids") {
     Reply(id, base::StringPrintf(
                   "{\"shell\":%d,\"page\":%d}",
-                  Engine::Get()->shell()->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid(),
+                  Current()->shell->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid(),
                   Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->GetProcess().Pid()));
   } else if (cmd == "gc") {
     const base::TimeTicks start = base::TimeTicks::Now();
@@ -559,7 +564,7 @@ void Run(const std::string& line) {
             id));
   } else if (cmd == "strayshell") {
     Stray() = content::WebContents::Create(content::WebContents::CreateParams(
-        Engine::Get()->shell()->contents()->GetBrowserContext()));
+        Current()->shell->contents()->GetBrowserContext()));
     Stray()->GetController().LoadURLWithParams(
         content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
     AskStrayShell(id, 100);
@@ -567,7 +572,7 @@ void Run(const std::string& line) {
     Engine::Get()->active_tab()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
     Reply(id, "ok");
   } else if (cmd == "crashshell") {
-    Engine::Get()->shell()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
+    Current()->shell->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);
     Reply(id, "ok");
   } else if (cmd == "close") {
     Reply(id, "ok");
@@ -633,7 +638,7 @@ void Capture(const std::string& id, const std::string& path) {
   auto state = base::MakeRefCounted<CaptureState>();
   state->id = id;
   state->path = path;
-  state->bounds = Engine::Get()->window()->page_bounds();
+  state->bounds = Current()->window->page_bounds();
 
   auto copy = [](content::WebContents* contents,
                  base::OnceCallback<void(const content::CopyFromSurfaceResult&)> done) {
@@ -646,8 +651,8 @@ void Capture(const std::string& id, const std::string& path) {
   };
 
   // The settings page covers the whole window while it is open: it alone is the picture.
-  SettingsPage* settings = Engine::Get()->settings();
-  copy(settings ? settings->contents() : Engine::Get()->shell()->contents(),
+  SettingsPage* settings = Current()->settings.get();
+  copy(settings ? settings->contents() : Current()->shell->contents(),
        base::BindOnce(
            [](scoped_refptr<CaptureState> state,
               const content::CopyFromSurfaceResult& result) {
@@ -682,7 +687,7 @@ void Capture(const std::string& id, const std::string& path) {
 }  // namespace
 
 void StartDriver(const base::FilePath& fifo) {
-  Engine::Get()->window()->ForceKeyForDriver();
+  Current()->window->ForceKeyForDriver();
   const std::string path = fifo.value();
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     // Opened read-write so it doesn't see end-of-file between writers.

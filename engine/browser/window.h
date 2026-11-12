@@ -26,7 +26,7 @@ struct NativeWebKeyboardEvent;
 
 namespace project_b {
 
-// The native window: the pages' views at the bottom, one shown at a time, the shell's
+// A native window: the pages' views at the bottom, one shown at a time, the shell's
 // view on top covering everything. Go's window manager describes how it behaves in one
 // Layout; the window only follows it, and reports its State back.
 class Window {
@@ -125,7 +125,8 @@ class Window {
   // copy started on this profile hands over to this one.
   void BringToFront();
 
-  bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
+  // A key none of our pages used goes to the menu bar, which is the app's, not a window's.
+  static bool HandleUnhandledKey(const input::NativeWebKeyboardEvent& event);
 
 #if !BUILDFLAG(IS_ANDROID)
   // The window's frame on screen, y measured down from the top of the main screen, and

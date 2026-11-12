@@ -161,16 +161,16 @@ func (m *Manager) Pin(id string, on bool) {
 	m.changed()
 }
 
-// LoadUnpacked asks the user for a folder and loads the extension in it.
-func (m *Manager) LoadUnpacked() {
+// LoadUnpacked asks the user, on window w, for a folder and loads the extension in it.
+func (m *Manager) LoadUnpacked(w engine.WindowID) {
 	m.choosing = engine.PathFolder
-	m.eng.ChoosePath(engine.PathFolder)
+	m.eng.ChoosePath(w, engine.PathFolder)
 }
 
-// InstallPackage asks the user for a package file and installs it.
-func (m *Manager) InstallPackage() {
+// InstallPackage asks the user, on window w, for a package file and installs it.
+func (m *Manager) InstallPackage(w engine.WindowID) {
 	m.choosing = engine.PathPackage
-	m.eng.ChoosePath(engine.PathPackage)
+	m.eng.ChoosePath(w, engine.PathPackage)
 }
 
 // HandlePathChosen takes the folder or package the user picked.

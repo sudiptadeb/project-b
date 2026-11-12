@@ -12,7 +12,7 @@ package main
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_show_tab(const PBEngineCalls* c, int64_t tab) { c->show_tab(tab); }
-static inline void call_request_window(const PBEngineCalls* c, int32_t request) { c->request_window(request); }
+static inline void call_request_window(const PBEngineCalls* c, int64_t window, int32_t request) { c->request_window(window, request); }
 static inline void call_load_url(const PBEngineCalls* c, int64_t tab, const char* url) { c->load_url(tab, url); }
 static inline void call_go_back(const PBEngineCalls* c, int64_t tab) { c->go_back(tab); }
 static inline void call_go_forward(const PBEngineCalls* c, int64_t tab) { c->go_forward(tab); }
@@ -23,15 +23,15 @@ static inline void call_set_zoom(const PBEngineCalls* c, int64_t tab, double fac
 static inline double call_get_zoom(const PBEngineCalls* c, int64_t tab) { return c->get_zoom(tab); }
 static inline int64_t call_duplicate_tab(const PBEngineCalls* c, int64_t tab) { return c->duplicate_tab(tab); }
 static inline void call_edit(const PBEngineCalls* c, int32_t command) { c->edit(command); }
-static inline void call_open_settings(const PBEngineCalls* c) { c->open_settings(); }
-static inline void call_close_settings(const PBEngineCalls* c) { c->close_settings(); }
-static inline void call_send_to_settings(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_settings(json, length); }
+static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
+static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
+static inline void call_send_to_settings(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_settings(window, json, length); }
 static inline void call_set_menu(const PBEngineCalls* c, const char* json, size_t length) { c->set_menu(json, length); }
 static inline void call_app_command(const PBEngineCalls* c, int32_t command) { c->app_command(command); }
-static inline void call_set_window_layout(const PBEngineCalls* c, const PBWindowLayout* layout, const PBRegion* regions, size_t count) { c->set_window_layout(layout, regions, count); }
+static inline void call_set_window_layout(const PBEngineCalls* c, int64_t window, const PBWindowLayout* layout, const PBRegion* regions, size_t count) { c->set_window_layout(window, layout, regions, count); }
 static inline void call_focus_page(const PBEngineCalls* c) { c->focus_page(); }
-static inline void call_focus_shell(const PBEngineCalls* c) { c->focus_shell(); }
-static inline void call_send_to_shell(const PBEngineCalls* c, const char* json, size_t length) { c->send_to_shell(json, length); }
+static inline void call_focus_shell(const PBEngineCalls* c, int64_t window) { c->focus_shell(window); }
+static inline void call_send_to_shell(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_shell(window, json, length); }
 static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
 static inline void native_nil_deref(void) { *(volatile int*)0 = 1; }
@@ -83,8 +83,8 @@ func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.
 
 func (e *nativeEngine) ShowTab(tab engine.TabID) { C.call_show_tab(e.calls, C.int64_t(tab)) }
 
-func (e *nativeEngine) RequestWindow(r engine.WindowRequest) {
-	C.call_request_window(e.calls, C.int32_t(r))
+func (e *nativeEngine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
+	C.call_request_window(e.calls, C.int64_t(w), C.int32_t(r))
 }
 
 func (e *nativeEngine) LoadURL(tab engine.TabID, url string) {
@@ -119,15 +119,15 @@ func (e *nativeEngine) DuplicateTab(tab engine.TabID) engine.TabID {
 
 func (e *nativeEngine) Edit(c engine.EditCommand) { C.call_edit(e.calls, C.int32_t(c)) }
 
-func (e *nativeEngine) OpenSettings() { C.call_open_settings(e.calls) }
+func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }
 
-func (e *nativeEngine) CloseSettings() { C.call_close_settings(e.calls) }
+func (e *nativeEngine) CloseSettings(w engine.WindowID) { C.call_close_settings(e.calls, C.int64_t(w)) }
 
-func (e *nativeEngine) SendToSettings(msg []byte) {
+func (e *nativeEngine) SendToSettings(w engine.WindowID, msg []byte) {
 	if len(msg) == 0 {
 		return
 	}
-	C.call_send_to_settings(e.calls, (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
+	C.call_send_to_settings(e.calls, C.int64_t(w), (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
 }
 
 func (e *nativeEngine) SetMenu(m engine.Menu) {
@@ -141,7 +141,7 @@ func (e *nativeEngine) SetMenu(m engine.Menu) {
 
 func (e *nativeEngine) AppCommand(c engine.AppCommand) { C.call_app_command(e.calls, C.int32_t(c)) }
 
-func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
+func (e *nativeEngine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 	rgb, err := strconv.ParseInt(strings.TrimPrefix(l.FrameColor, "#"), 16, 32)
 	if err != nil {
 		timeline.Errorf("window colour %q is not #rrggbb", l.FrameColor)
@@ -161,18 +161,18 @@ func (e *nativeEngine) SetWindowLayout(l engine.WindowLayout) {
 		frame_rgb: C.int32_t(rgb), frame_width: C.double(l.FrameWidth),
 		theme: C.int32_t(l.Theme),
 	}
-	C.call_set_window_layout(e.calls, &layout, first, C.size_t(len(regions)))
+	C.call_set_window_layout(e.calls, C.int64_t(w), &layout, first, C.size_t(len(regions)))
 }
 
 func (e *nativeEngine) FocusPage() { C.call_focus_page(e.calls) }
 
-func (e *nativeEngine) FocusShell() { C.call_focus_shell(e.calls) }
+func (e *nativeEngine) FocusShell(w engine.WindowID) { C.call_focus_shell(e.calls, C.int64_t(w)) }
 
-func (e *nativeEngine) SendToShell(msg []byte) {
+func (e *nativeEngine) SendToShell(w engine.WindowID, msg []byte) {
 	if len(msg) == 0 {
 		return
 	}
-	C.call_send_to_shell(e.calls, (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
+	C.call_send_to_shell(e.calls, C.int64_t(w), (*C.char)(unsafe.Pointer(&msg[0])), C.size_t(len(msg)))
 }
 
 // Post runs fn on the main thread. Any goroutine may call it.

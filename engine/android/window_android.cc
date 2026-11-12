@@ -149,9 +149,11 @@ class BrowserWindow : public content::CompositorClient {
 
   // The phone's back key closes settings while it is open, as its close button does, and is
   // otherwise the shell's back button while the tab has somewhere to go back to.
+  // Android has one window, 1.
   bool BackKey(JNIEnv* env) {
-    if (Engine::Get()->settings()) {
+    if (Engine::Get()->window(1)->settings) {
       hooks::Args args;
+      args.Int(1);
       args.Str(R"({"t":"close"})");
       hooks::Fire(PB_EVENT_SETTINGS_MESSAGE, args);
       return true;
@@ -161,6 +163,7 @@ class BrowserWindow : public content::CompositorClient {
       return false;
     }
     hooks::Args args;
+    args.Int(1);
     args.Str(R"({"t":"back"})");
     hooks::Fire(PB_EVENT_SHELL_MESSAGE, args);
     return true;
@@ -319,6 +322,7 @@ void Window::ToggleFullScreen() {}
 // Android runs one copy of the app, so no other copy hands over to bring it forward.
 void Window::BringToFront() {}
 
+// static
 bool Window::HandleUnhandledKey(const input::NativeWebKeyboardEvent& event) {
   return false;
 }

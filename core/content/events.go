@@ -53,12 +53,12 @@ var terminationNames = map[TerminationStatus]string{
 
 // Events is what the adapter itself reports. Always on; there is nothing to subscribe.
 type Events struct {
-	OnShellMessage    func(msg []byte)
+	OnShellMessage    func(w engine.WindowID, msg []byte)
 	OnTabOpened       func(opener, tab engine.TabID, url string, foreground bool)
 	OnFaviconChanged  func(tab engine.TabID, dataURL string)
-	OnWindowChanged   func(s engine.WindowState)
-	OnShellCrashed    func()
-	OnSettingsMessage func(msg []byte)
+	OnWindowChanged   func(w engine.WindowID, s engine.WindowState)
+	OnShellCrashed    func(w engine.WindowID)
+	OnSettingsMessage func(w engine.WindowID, msg []byte)
 	OnMenuChosen      func(action string)
 	OnOSBindings      func(byTitle map[string]engine.Key)
 	OnModsChanged     func(m engine.Mods)
@@ -73,7 +73,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	switch id {
 	case eventShellMessage:
 		if e.OnShellMessage != nil {
-			e.OnShellMessage([]byte(r.str()))
+			e.OnShellMessage(engine.WindowID(r.int()), []byte(r.str()))
 		}
 	case eventTabOpened:
 		if e.OnTabOpened != nil {
@@ -85,7 +85,7 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 	case eventWindowChanged:
 		if e.OnWindowChanged != nil {
-			e.OnWindowChanged(engine.WindowState{
+			e.OnWindowChanged(engine.WindowID(r.int()), engine.WindowState{
 				W:            r.float(),
 				H:            r.float(),
 				Controls:     engine.Rect{X: r.float(), Y: r.float(), W: r.float(), H: r.float()},
@@ -95,11 +95,11 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 	case eventShellCrashed:
 		if e.OnShellCrashed != nil {
-			e.OnShellCrashed()
+			e.OnShellCrashed(engine.WindowID(r.int()))
 		}
 	case eventSettingsMsg:
 		if e.OnSettingsMessage != nil {
-			e.OnSettingsMessage([]byte(r.str()))
+			e.OnSettingsMessage(engine.WindowID(r.int()), []byte(r.str()))
 		}
 	case eventMenuChosen:
 		if e.OnMenuChosen != nil {

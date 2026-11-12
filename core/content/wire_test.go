@@ -52,8 +52,10 @@ type recorder struct {
 	allow bool
 }
 
-func (r *recorder) note(s string)           { r.got = append(r.got, s) }
-func (r *recorder) ShellMessage(msg []byte) { r.note("shell " + string(msg)) }
+func (r *recorder) note(s string) { r.got = append(r.got, s) }
+func (r *recorder) ShellMessage(w engine.WindowID, msg []byte) {
+	r.note(fmt.Sprintf("shell %d %s", w, msg))
+}
 func (r *recorder) NavigationStarting(tab engine.TabID, url string) bool {
 	r.note("starting " + url)
 	return r.allow
@@ -92,11 +94,13 @@ func (r *recorder) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) b
 func (r *recorder) ModsChanged(m engine.Mods)                { r.note(fmt.Sprint("mods ", m)) }
 func (r *recorder) MenuChosen(action string)                 { r.note("menu " + action) }
 func (r *recorder) OSBindings(byTitle map[string]engine.Key) { r.note(fmt.Sprint("os ", byTitle)) }
-func (r *recorder) SettingsMessage(msg []byte)               { r.note("settings " + string(msg)) }
-func (r *recorder) WindowChanged(s engine.WindowState) {
-	r.note(fmt.Sprintf("window %gx%g r=%g full=%v", s.W, s.H, s.CornerRadius, s.FullScreen))
+func (r *recorder) SettingsMessage(w engine.WindowID, msg []byte) {
+	r.note(fmt.Sprintf("settings %d %s", w, msg))
 }
-func (r *recorder) ShellCrashed() { r.note("shell crashed") }
+func (r *recorder) WindowChanged(w engine.WindowID, s engine.WindowState) {
+	r.note(fmt.Sprintf("window %d %gx%g r=%g full=%v", w, s.W, s.H, s.CornerRadius, s.FullScreen))
+}
+func (r *recorder) ShellCrashed(w engine.WindowID) { r.note(fmt.Sprintf("shell %d crashed", w)) }
 func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
 	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))
 }
@@ -239,10 +243,12 @@ func TestLoadProgressReachesTheListener(t *testing.T) {
 func TestEngineEventsNeedNoSubscription(t *testing.T) {
 	h, r, _ := wired(t)
 	h.Dispatch(eventTabOpened, []Value{{I: 1}, {I: 2}, {S: "https://p.test/"}, {I: 1}})
-	h.Dispatch(eventWindowChanged, []Value{{D: 1100}, {D: 700}, {D: 1}, {D: 2}, {D: 3}, {D: 4}, {D: 20}, {I: 1}})
-	h.Dispatch(eventShellCrashed, nil)
+	h.Dispatch(eventWindowChanged, []Value{{I: 2}, {D: 1100}, {D: 700}, {D: 1}, {D: 2}, {D: 3}, {D: 4}, {D: 20}, {I: 1}})
+	h.Dispatch(eventShellCrashed, []Value{{I: 2}})
+	h.Dispatch(eventShellMessage, []Value{{I: 2}, {S: `{"t":"ready"}`}})
+	h.Dispatch(eventSettingsMsg, []Value{{I: 2}, {S: `{"t":"close"}`}})
 	h.Dispatch(eventProcessCrashed, []Value{{S: "renderer"}, {I: int64(TerminationStatusProcessCrashed)}, {I: 11}, {I: 42}, {S: "https://p.test/"}})
-	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 1100x700 r=20 full=true", "shell crashed", "renderer crashed 11 42 https://p.test/"}) {
+	if !reflect.DeepEqual(r.got, []string{"opened https://p.test/", "window 2 1100x700 r=20 full=true", "shell 2 crashed", `shell 2 {"t":"ready"}`, `settings 2 {"t":"close"}`, "renderer crashed 11 42 https://p.test/"}) {
 		t.Fatalf("got %v", r.got)
 	}
 	if h.Counts()["engine.TabOpened"] != 1 {

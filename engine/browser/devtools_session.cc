@@ -26,12 +26,11 @@ namespace project_b {
 
 namespace {
 
-// There is one window.
-constexpr int kWindowId = 1;
-
+// DevTools names a window by Go's id for it.
 Window* GetWindow(int window_id) {
   Engine* engine = Engine::Get();
-  return engine && window_id == kWindowId ? engine->window() : nullptr;
+  Engine::AppWindow* w = engine ? engine->window(window_id) : nullptr;
+  return w ? w->window.get() : nullptr;
 }
 
 std::unique_ptr<protocol::Browser::Bounds> BoundsOf(Window* window) {
@@ -147,12 +146,14 @@ protocol::Response DevToolsSession::GetWindowForTarget(
   if (!web_contents) {
     return protocol::Response::ServerError("No web contents in the target");
   }
-  Window* window = GetWindow(kWindowId);
-  if (!window || hooks::TabOf(web_contents) <= 0) {
+  const int64_t tab = hooks::TabOf(web_contents);
+  Engine::AppWindow* window =
+      tab > 0 ? Engine::Get()->WindowOf(tab) : nullptr;
+  if (!window) {
     return protocol::Response::ServerError("Browser window not found");
   }
-  *out_window_id = kWindowId;
-  *out_bounds = BoundsOf(window);
+  *out_window_id = window->id;
+  *out_bounds = BoundsOf(window->window.get());
   return protocol::Response::Success();
 }
 

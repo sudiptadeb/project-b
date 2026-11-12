@@ -129,7 +129,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		e.Post(func() { a.ShellMessage(msg) })
+		e.Post(func() { a.ShellMessage(1, msg) })
 	})
 	// The settings page, an app of its own as in the real app, with its own channel.
 	mux.Handle("GET /settings/", http.StripPrefix("/settings/", webUI(filepath.Join(*shellDir, "settings"))))
@@ -140,7 +140,7 @@ func main() {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		e.Post(func() { a.SettingsMessage(msg) })
+		e.Post(func() { a.SettingsMessage(1, msg) })
 	})
 	mux.HandleFunc("GET /mock/page", serve("mock_page.html", "text/html; charset=utf-8"))
 	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Page) })

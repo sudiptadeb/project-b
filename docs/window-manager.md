@@ -88,9 +88,10 @@ type WindowState struct {
 }
 ```
 
-On `Engine`, `SetWindowLayout(l WindowLayout)` replaces `SetPageBounds`,
+On `Engine`, `SetWindowLayout(w WindowID, l WindowLayout)` replaces `SetPageBounds`,
 `SetShellRegions`, `SetDragRegions` and `SetWindowFrame`. On `Listener`,
-`WindowChanged(s WindowState)` replaces `WindowControlsChanged`. The order of `Regions`
+`WindowChanged(w WindowID, s WindowState)` replaces `WindowControlsChanged`. Each names
+the window by Go's id for it ([windows.md](windows.md)). The order of `Regions`
 is the decision: the manager puts drag areas first, then shell areas. Every engine only
 walks the list, so none of them knows the rule.
 
@@ -186,7 +187,7 @@ const (
 )
 ```
 
-`RequestWindow(r WindowRequest)` on `Engine` replaces `CloseWindow`: the tabs closing the
+`RequestWindow(w WindowID, r WindowRequest)` on `Engine` replaces `CloseWindow`: the tabs closing the
 last tab and the updater relaunching ask the window manager too. The shell sends
 `{"t":"window","text":"close" | "minimise" | "zoom" | "fullScreen"}`. On macOS nothing in
 the shell sends one yet, since the system's buttons do the job.

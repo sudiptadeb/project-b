@@ -68,20 +68,13 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 #endif
   RegisterShellWebUI(browser_context_.get());
 
-  window_ = std::make_unique<Window>(base::BindOnce(
-      [](base::OnceClosure* quit) {
-        content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
-                                                     std::move(*quit));
-      },
-      &quit_));
-  timeline::Mark("window.created");
-
-  shell_ = std::make_unique<ShellPage>(browser_context_.get());
-  timeline::Mark("shell.created");
-  window_->SetShellView(shell_->contents()->GetNativeView());
-  engine_ = std::make_unique<Engine>(browser_context_.get(), window_.get(),
-                                     shell_.get());
-  shell_->Load();
+  engine_ = std::make_unique<Engine>(browser_context_.get());
+  engine_->OpenWindow(1, base::BindOnce(
+                             [](base::OnceClosure* quit) {
+                               content::GetUIThreadTaskRunner({})->PostTask(
+                                   FROM_HERE, std::move(*quit));
+                             },
+                             &quit_));
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
@@ -90,20 +83,7 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   child_processes_ = std::make_unique<ChildProcesses>();
   // Go has given the window its first layout, frame included, so its first frame on
   // screen is already the frame colour. It still shows before any renderer has drawn.
-  window_->Show();
-  timeline::Mark("window.shown");
-  window_->ListenForState(base::BindRepeating([](const Window::State& s) {
-    hooks::Args args;
-    args.Double(s.size.width());
-    args.Double(s.size.height());
-    args.Double(s.controls.x());
-    args.Double(s.controls.y());
-    args.Double(s.controls.width());
-    args.Double(s.controls.height());
-    args.Double(s.corner_radius);
-    args.Bool(s.full_screen);
-    hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
-  }));
+  engine_->ShowWindow(1);
   StartRemoteDebugging();
 
   if (command_line->HasSwitch("pb-driver")) {
@@ -122,11 +102,9 @@ void BrowserMainParts::PostMainMessageLoopRun() {
   child_processes_.reset();
   Go().stop();
   engine_.reset();
-  shell_.reset();
 #if BUILDFLAG(PB_EXTENSIONS)
   extensions_.reset();
 #endif
-  window_.reset();
   browser_context_.reset();
   screen_.reset();
 }

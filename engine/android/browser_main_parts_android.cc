@@ -54,30 +54,12 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 }
 
 void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
-  window_ = std::make_unique<Window>(base::DoNothing());
-  timeline::Mark("window.created");
-  shell_ = std::make_unique<ShellPage>(browser_context_.get());
-  timeline::Mark("shell.created");
-  window_->SetShellContents(shell_->contents());
-  engine_ = std::make_unique<Engine>(browser_context_.get(), window_.get(),
-                                     shell_.get());
-  shell_->Load();
+  engine_ = std::make_unique<Engine>(browser_context_.get());
+  engine_->OpenWindow(1, base::DoNothing());
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              blocked_hosts.c_str(), hooks::kTableHash);
   child_processes_ = std::make_unique<ChildProcesses>();
-  window_->Show();
-  window_->ListenForState(base::BindRepeating([](const Window::State& s) {
-    hooks::Args args;
-    args.Double(s.size.width());
-    args.Double(s.size.height());
-    args.Double(s.controls.x());
-    args.Double(s.controls.y());
-    args.Double(s.controls.width());
-    args.Double(s.controls.height());
-    args.Double(s.corner_radius);
-    args.Bool(s.full_screen);
-    hooks::Fire(PB_EVENT_WINDOW_CHANGED, args);
-  }));
+  engine_->ShowWindow(1);
 }
 
 void BrowserMainParts::WillRunMainMessageLoop(

@@ -19,9 +19,9 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	active := func() bool { return a.Tabs.Active().ID != 0 }
 
 	add("app.about", "About Project B", func() { e.AppCommand(engine.AppAbout) })
-	add("app.settings", "Settings…", a.Settings.Open)
+	add("app.settings", "Settings…", func() { a.Settings.Open(theWindow) })
 	add("app.checkUpdate", "Check for Updates…", func() {
-		a.Settings.Open()
+		a.Settings.Open(theWindow)
 		a.Update.CheckNow()
 	})
 	add("app.hide", "Hide Project B", func() { e.AppCommand(engine.AppHide) })
@@ -29,17 +29,17 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	add("app.showAll", "Show All", func() { e.AppCommand(engine.AppShowAll) })
 	add("app.quit", "Quit Project B", closeWindow)
 
-	add("tab.new", "New Tab", func() { a.Shell.Interaction("tab.new", func() { a.Tabs.Create() }) })
-	add("address.focus", "Open Location…", a.Shell.FocusAddressBar)
+	add("tab.new", "New Tab", func() { a.Shell.Interaction(theWindow, "tab.new", func() { a.Tabs.Create() }) })
+	add("address.focus", "Open Location…", func() { a.Shell.FocusAddressBar(theWindow) })
 	add("window.close", "Close Window", closeWindow)
 	// The settings page sits over the tabs like a tab of its own, so closing the tab
 	// closes it first.
 	add("tab.close", "Close Tab", func() {
-		if a.Settings.IsOpen() {
-			a.Settings.Close()
+		if a.Settings.IsOpen(theWindow) {
+			a.Settings.Close(theWindow)
 			return
 		}
-		a.Shell.Interaction("tab.close", a.Tabs.CloseActive)
+		a.Shell.Interaction(theWindow, "tab.close", a.Tabs.CloseActive)
 	})
 
 	for _, c := range []struct {
@@ -67,8 +67,8 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	stop.Enabled = func() bool { return a.Tabs.Active().Loading }
 	add("nav.reload", "Reload This Page", a.Tabs.Reload).Enabled = active
 	add("nav.reloadHard", "Force Reload This Page", a.Tabs.ReloadBypassingCache).Enabled = active
-	full := add("view.fullScreen", "Full Screen", func() { a.Window.Request(engine.WindowFullScreen) })
-	full.Checked = a.Window.FullScreen
+	full := add("view.fullScreen", "Full Screen", func() { a.Window.Request(theWindow, engine.WindowFullScreen) })
+	full.Checked = func() bool { return a.Window.FullScreen(theWindow) }
 	add("view.zoomReset", "Actual Size", a.Tabs.ZoomReset).Enabled = active
 	add("view.zoomIn", "Zoom In", a.Tabs.ZoomIn).Enabled = active
 	add("view.zoomOut", "Zoom Out", a.Tabs.ZoomOut).Enabled = active
@@ -80,7 +80,7 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 		if a.keyIn == engine.SurfaceShell {
 			e.FocusPage()
 		} else {
-			a.Shell.FocusAddressBar()
+			a.Shell.FocusAddressBar(theWindow)
 		}
 	}
 	add("focus.nextPane", "Focus Next Pane", nextPane)
@@ -103,8 +103,8 @@ func (a *App) registerActions(e engine.Engine, closeWindow func()) {
 	}
 	add("tab.selectLast", "Last Tab", a.Tabs.ActivateLast)
 
-	add("window.minimize", "Minimize", func() { a.Window.Request(engine.WindowMinimise) })
-	add("window.zoom", "Zoom", func() { a.Window.Request(engine.WindowZoom) })
+	add("window.minimize", "Minimize", func() { a.Window.Request(theWindow, engine.WindowMinimise) })
+	add("window.zoom", "Zoom", func() { a.Window.Request(theWindow, engine.WindowZoom) })
 	add("window.bringAllToFront", "Bring All to Front", func() { e.AppCommand(engine.AppBringAllToFront) })
 
 	for _, act := range a.actions {

@@ -44,7 +44,7 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	return r
 }
 
-func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage([]byte(cmd)) }) }
+func (r *rig) shell(cmd string) { r.e.Post(func() { r.a.ShellMessage(1, []byte(cmd)) }) }
 
 // waitFor reads shell messages until one matches.
 func (r *rig) waitFor(match func(map[string]any) bool) map[string]any {
@@ -358,7 +358,7 @@ func (r *rig) openSettings() (<-chan []byte, map[string]any) {
 	return got, r.waitOn(got, func(m map[string]any) bool { return m["t"] == "snapshot" })
 }
 
-func (r *rig) settings(cmd string) { r.e.Post(func() { r.a.SettingsMessage([]byte(cmd)) }) }
+func (r *rig) settings(cmd string) { r.e.Post(func() { r.a.SettingsMessage(1, []byte(cmd)) }) }
 
 func (r *rig) waitOn(ch <-chan []byte, match func(map[string]any) bool) map[string]any {
 	r.t.Helper()

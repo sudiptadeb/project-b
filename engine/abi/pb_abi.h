@@ -31,15 +31,15 @@ typedef struct PBValue {
 // The adapter's own events, which are not content hooks. Their values are listed
 // beside each. Matches core/content/events.go.
 typedef enum PBEvent {
-  PB_EVENT_SHELL_MESSAGE = 1,           // s: json
+  PB_EVENT_SHELL_MESSAGE = 1,           // i: window, s: json
   PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
-  PB_EVENT_WINDOW_CHANGED = 4,          // d: w, d: h, the content area; d: x, d: y, d: w,
-                                        // d: h, the window buttons; d: corner radius;
-                                        // i: full screen
+  PB_EVENT_WINDOW_CHANGED = 4,          // i: window; d: w, d: h, the content area; d: x,
+                                        // d: y, d: w, d: h, the window buttons; d: corner
+                                        // radius; i: full screen
   PB_EVENT_PING = 5,                    // nothing; the driver measures the crossing
-  PB_EVENT_SHELL_CRASHED = 6,           // nothing; the shell page's renderer died
-  PB_EVENT_SETTINGS_MESSAGE = 7,        // s: json, from the settings page
+  PB_EVENT_SHELL_CRASHED = 6,           // i: window; its shell page's renderer died
+  PB_EVENT_SETTINGS_MESSAGE = 7,        // i: window, s: json, from its settings page
   PB_EVENT_MENU_CHOSEN = 8,             // s: the chosen item's action id
   PB_EVENT_OS_BINDINGS = 9,             // s: json, {title: {code, mods}}, the keys the
                                         // OS gives our menu items (macOS App Shortcuts)
@@ -125,7 +125,8 @@ typedef enum PBTimelineKind {
   PB_TIMELINE_ERROR = 5,
 } PBTimelineKind;
 
-// What Go can ask the adapter to do. Handed over once, at start.
+// What Go can ask the adapter to do. Handed over once, at start. A window is named by
+// Go's id for it, 1 for the first.
 typedef struct PBEngineCalls {
   // Makes a hidden tab. show_tab shows one tab and hides the rest.
   int64_t (*create_tab)(void);
@@ -144,18 +145,19 @@ typedef struct PBEngineCalls {
   int64_t (*duplicate_tab)(int64_t tab);
   // Runs a PBEditCommand in whichever of our pages has the keyboard.
   void (*edit)(int32_t command);
-  void (*request_window)(int32_t request);  // PBWindowRequest
+  void (*request_window)(int64_t window, int32_t request);  // PBWindowRequest
   // regions are in order: the first that holds a point decides. None holds it: the page.
-  void (*set_window_layout)(const PBWindowLayout* layout,
+  void (*set_window_layout)(int64_t window,
+                            const PBWindowLayout* layout,
                             const PBRegion* regions,
                             size_t region_count);
   void (*focus_page)(void);
-  void (*focus_shell)(void);
-  void (*send_to_shell)(const char* json, size_t length);
-  // The settings page, over the whole window in its own page while open.
-  void (*open_settings)(void);
-  void (*close_settings)(void);
-  void (*send_to_settings)(const char* json, size_t length);
+  void (*focus_shell)(int64_t window);
+  void (*send_to_shell)(int64_t window, const char* json, size_t length);
+  // A window's settings page, over the whole window in its own page while open.
+  void (*open_settings)(int64_t window);
+  void (*close_settings)(int64_t window);
+  void (*send_to_settings)(int64_t window, const char* json, size_t length);
   // Replaces the native menu bar: json is Go's engine.Menu.
   void (*set_menu)(const char* json, size_t length);
   void (*app_command)(int32_t command);  // PBAppCommand

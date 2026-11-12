@@ -90,14 +90,16 @@ type Extensions interface {
 	// args is the JSON list of the listener's arguments.
 	DispatchExtensionEvent(id, event, args string)
 
-	// OpenExtensionPopup shows an extension's page in a view of its own under the anchor,
-	// a rectangle in window coordinates. There is one popup at a time. It closes when
-	// the user clicks elsewhere or it closes itself, and the engine says so.
-	OpenExtensionPopup(id, url string, anchor Rect)
+	// OpenExtensionPopup shows an extension's page in a view of its own over a window,
+	// under the anchor, a rectangle in that window's coordinates. There is one popup at a
+	// time. It closes when the user clicks elsewhere or it closes itself, and the engine
+	// says so.
+	OpenExtensionPopup(w WindowID, id, url string, anchor Rect)
 	CloseExtensionPopup()
 
-	// ChoosePath asks the user for a folder or a package file. PathChosen answers.
-	ChoosePath(kind PathKind)
+	// ChoosePath asks the user for a folder or a package file, on a window. PathChosen
+	// answers.
+	ChoosePath(w WindowID, kind PathKind)
 }
 
 // ExtensionsListener is what such an engine tells the app. There is exactly one.

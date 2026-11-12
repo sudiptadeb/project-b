@@ -1,9 +1,10 @@
-// Package window owns how the native window behaves: which areas drag it, which belong
-// to the shell, where the page goes, its frame, and requests to close, minimise, zoom or
-// go full screen. It is the only manager that tells the engine about the window.
+// Package window owns how each native window behaves: which areas drag it, which belong
+// to its shell, where the page goes, its frame, and requests to close, minimise, zoom or
+// go full screen. It is the only manager that tells the engine about the windows.
 package window
 
 import (
+	"maps"
 	"slices"
 
 	"projectb/engine"
@@ -20,135 +21,163 @@ type ShellLayout struct {
 	ViewH float64       `json:"viewH"`
 }
 
-// Manager owns the window.
+// Manager owns the windows.
 type Manager struct {
 	eng        engine.Engine
 	color      string
 	theme      engine.Theme
 	frameWidth float64
-	shell      ShellLayout
-	state      engine.WindowState
-	sent       engine.WindowLayout
-	onChanged  []func(engine.Rect, float64)
+	windows    map[engine.WindowID]*window
+	onChanged  []func(engine.WindowID, engine.Rect, float64)
 	onColor    []func(string)
 }
 
-// New returns a manager and gives the window its first layout, which carries the
-// frame, color, "#rrggbb", 4px wide, and the theme. The engine reports its state after
-// it starts.
+// window is what the manager keeps for one window: the shell's last report, the
+// engine's last state, and the layout last sent.
+type window struct {
+	shell ShellLayout
+	state engine.WindowState
+	sent  engine.WindowLayout
+}
+
+// New returns a manager with no windows. Every window it opens has the frame, color,
+// "#rrggbb", 4px wide, and the theme.
 func New(eng engine.Engine, color string, theme engine.Theme) *Manager {
-	m := &Manager{eng: eng, color: color, theme: theme, frameWidth: 4}
-	m.sent = m.layout()
-	eng.SetWindowLayout(m.sent)
-	return m
+	return &Manager{eng: eng, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}}
+}
+
+// Open gives window id its first layout, which carries the frame. The engine reports its
+// state after it starts.
+func (m *Manager) Open(id engine.WindowID) {
+	w := &window{}
+	m.windows[id] = w
+	w.sent = m.layout(w)
+	m.eng.SetWindowLayout(id, w.sent)
+}
+
+// Windows returns the open windows, in the order they were opened.
+func (m *Manager) Windows() []engine.WindowID {
+	ids := slices.Collect(maps.Keys(m.windows))
+	slices.Sort(ids)
+	return ids
 }
 
 // layout is the one decision: drag areas first, then the shell's, and the page under
 // everything else. In full screen there is no window to move, so nothing drags.
-func (m *Manager) layout() engine.WindowLayout {
+func (m *Manager) layout(w *window) engine.WindowLayout {
 	l := engine.WindowLayout{
-		ViewW:      m.shell.ViewW,
-		ViewH:      m.shell.ViewH,
-		Page:       m.shell.Page,
+		ViewW:      w.shell.ViewW,
+		ViewH:      w.shell.ViewH,
+		Page:       w.shell.Page,
 		FrameColor: m.color,
 		FrameWidth: m.frameWidth,
 		Theme:      m.theme,
 	}
-	if !m.state.FullScreen {
-		for _, r := range m.shell.Drag {
+	if !w.state.FullScreen {
+		for _, r := range w.shell.Drag {
 			l.Regions = append(l.Regions, engine.Region{Rect: r, Area: engine.AreaDrag})
 		}
 	}
-	for _, r := range m.shell.Shell {
+	for _, r := range w.shell.Shell {
 		l.Regions = append(l.Regions, engine.Region{Rect: r, Area: engine.AreaShell})
 	}
 	return l
 }
 
-// update sends the layout when it differs from the last one sent.
-func (m *Manager) update() {
-	l := m.layout()
-	if l.ViewW == m.sent.ViewW && l.ViewH == m.sent.ViewH && l.Page == m.sent.Page &&
-		l.FrameColor == m.sent.FrameColor && l.FrameWidth == m.sent.FrameWidth && l.Theme == m.sent.Theme &&
-		slices.Equal(l.Regions, m.sent.Regions) {
+// update sends a window's layout when it differs from the last one sent.
+func (m *Manager) update(id engine.WindowID) {
+	w := m.windows[id]
+	l := m.layout(w)
+	if l.ViewW == w.sent.ViewW && l.ViewH == w.sent.ViewH && l.Page == w.sent.Page &&
+		l.FrameColor == w.sent.FrameColor && l.FrameWidth == w.sent.FrameWidth && l.Theme == w.sent.Theme &&
+		slices.Equal(l.Regions, w.sent.Regions) {
 		return
 	}
-	m.sent = l
-	m.eng.SetWindowLayout(l)
+	w.sent = l
+	m.eng.SetWindowLayout(id, l)
 }
 
-// HandleShellLayout takes the shell's report.
-func (m *Manager) HandleShellLayout(l ShellLayout) {
-	m.shell = l
-	m.update()
+// updateAll sends every window's layout that changed.
+func (m *Manager) updateAll() {
+	for _, id := range m.Windows() {
+		m.update(id)
+	}
+}
+
+// HandleShellLayout takes a window's shell's report.
+func (m *Manager) HandleShellLayout(id engine.WindowID, l ShellLayout) {
+	m.windows[id].shell = l
+	m.update(id)
 }
 
 // HandleShellCrashed drops what the dead shell claimed, so the page takes every press
 // until the reloaded shell reports again. The page stays where it was.
-func (m *Manager) HandleShellCrashed() {
-	m.shell.Shell = nil
-	m.shell.Drag = nil
-	m.update()
+func (m *Manager) HandleShellCrashed(id engine.WindowID) {
+	w := m.windows[id]
+	w.shell.Shell = nil
+	w.shell.Drag = nil
+	m.update(id)
 }
 
-// HandleWindowChanged takes the engine's report.
-func (m *Manager) HandleWindowChanged(s engine.WindowState) {
-	old := m.state
-	m.state = s
-	m.update()
+// HandleWindowChanged takes the engine's report about a window.
+func (m *Manager) HandleWindowChanged(id engine.WindowID, s engine.WindowState) {
+	w := m.windows[id]
+	old := w.state
+	w.state = s
+	m.update(id)
 	if s.Controls != old.Controls || s.CornerRadius != old.CornerRadius {
 		for _, f := range m.onChanged {
-			f(s.Controls, s.CornerRadius)
+			f(id, s.Controls, s.CornerRadius)
 		}
 	}
 }
 
-// FullScreen says whether the window is in full screen.
-func (m *Manager) FullScreen() bool { return m.state.FullScreen }
+// FullScreen says whether a window is in full screen.
+func (m *Manager) FullScreen(id engine.WindowID) bool { return m.windows[id].state.FullScreen }
 
-// Request asks the window to close, minimise, zoom, or go in or out of full screen.
+// Request asks a window to close, minimise, zoom, or go in or out of full screen.
 // The engine reports what came of it.
-func (m *Manager) Request(r engine.WindowRequest) { m.eng.RequestWindow(r) }
+func (m *Manager) Request(id engine.WindowID, r engine.WindowRequest) { m.eng.RequestWindow(id, r) }
 
-// Color is the one colour the window paints natively and the shell paints its frame
+// Color is the one colour every window paints natively and the shell paints its frame
 // with, "#rrggbb".
 func (m *Manager) Color() string { return m.color }
 
 // OnColorChanged subscribes to the frame colour changing.
 func (m *Manager) OnColorChanged(f func(string)) { m.onColor = append(m.onColor, f) }
 
-// SetColor repaints the window's frame in color, and tells whoever subscribed, so the
-// window and the shell change together.
+// SetColor repaints every window's frame in color, and tells whoever subscribed, so the
+// windows and the shells change together.
 func (m *Manager) SetColor(color string) {
 	if color == m.color {
 		return
 	}
 	m.color = color
-	m.update()
+	m.updateAll()
 	for _, f := range m.onColor {
 		f(color)
 	}
 }
 
-// SetTheme draws the window's own parts light, dark or as the system does.
+// SetTheme draws the windows' own parts light, dark or as the system does.
 func (m *Manager) SetTheme(t engine.Theme) {
 	m.theme = t
-	m.update()
+	m.updateAll()
 }
 
-// FrameWidth is the width of the frame band, in CSS pixels, for the window and the
-// shell alike.
+// FrameWidth is the width of the frame band, in CSS pixels, for the windows and the
+// shells alike.
 func (m *Manager) FrameWidth() float64 { return m.frameWidth }
 
-// Controls returns where the native window controls are. Empty when there are none.
-func (m *Manager) Controls() engine.Rect { return m.state.Controls }
+// Controls returns where a window's native controls are. Empty when there are none.
+func (m *Manager) Controls(id engine.WindowID) engine.Rect { return m.windows[id].state.Controls }
 
-// CornerRadius returns the radius the OS rounds the window's corners with, in CSS
+// CornerRadius returns the radius the OS rounds a window's corners with, in CSS
 // pixels. 0 when the corners are square, as in full screen.
-func (m *Manager) CornerRadius() float64 { return m.state.CornerRadius }
+func (m *Manager) CornerRadius(id engine.WindowID) float64 { return m.windows[id].state.CornerRadius }
 
-// OnControlsChanged subscribes to the controls moving, appearing or disappearing, and
-// to the corner radius changing.
-func (m *Manager) OnControlsChanged(f func(engine.Rect, float64)) {
+// OnControlsChanged subscribes to a window's controls moving, appearing or disappearing,
+// and to its corner radius changing.
+func (m *Manager) OnControlsChanged(f func(engine.WindowID, engine.Rect, float64)) {
 	m.onChanged = append(m.onChanged, f)
 }

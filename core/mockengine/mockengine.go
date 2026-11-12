@@ -56,7 +56,7 @@ type tab struct {
 }
 
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
-// as it does with real content.
+// as it does with real content. It has one window, 1, which the dev server shows.
 type Engine struct {
 	queue    chan func()
 	listener engine.Listener
@@ -123,7 +123,7 @@ func (e *Engine) reportWindow() {
 	e.mu.Lock()
 	e.window = s
 	e.mu.Unlock()
-	e.listener.WindowChanged(s)
+	e.listener.WindowChanged(1, s)
 	e.Window.Publish(e.WindowState())
 }
 
@@ -196,7 +196,7 @@ func (e *Engine) Reload(id engine.TabID) {
 
 // RequestWindow closes the window, goes in or out of full screen, and records every
 // request. A mock window has nothing to minimise, zoom or bring to the front.
-func (e *Engine) RequestWindow(r engine.WindowRequest) {
+func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	e.mu.Lock()
 	e.requests = append(e.requests, r)
 	e.closed = e.closed || r == engine.WindowClose
@@ -212,7 +212,7 @@ func (e *Engine) RequestWindow(r engine.WindowRequest) {
 
 // The real window moves the page's view to where the layout puts it, and hit-tests with
 // its regions. The mock says so on its Window feed, and the dev window does the same.
-func (e *Engine) SetWindowLayout(l engine.WindowLayout) {
+func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 	e.mu.Lock()
 	e.layout = l
 	e.mu.Unlock()
@@ -289,14 +289,14 @@ func (e *Engine) Edits() []engine.EditCommand {
 
 // The real window puts the settings page in a view over everything. The mock says so on
 // its Window feed, and the dev window draws it there.
-func (e *Engine) OpenSettings() {
+func (e *Engine) OpenSettings(w engine.WindowID) {
 	e.mu.Lock()
 	e.settings = true
 	e.mu.Unlock()
 	e.Window.Publish(e.WindowState())
 }
 
-func (e *Engine) CloseSettings() {
+func (e *Engine) CloseSettings(w engine.WindowID) {
 	e.mu.Lock()
 	e.settings = false
 	e.mu.Unlock()
@@ -346,7 +346,7 @@ func (e *Engine) SettingsOpen() bool {
 	return e.settings
 }
 
-func (e *Engine) SendToSettings(msg []byte) { e.Settings.Publish(msg) }
+func (e *Engine) SendToSettings(w engine.WindowID, msg []byte) { e.Settings.Publish(msg) }
 
 func (e *Engine) SetMenu(m engine.Menu) {
 	e.mu.Lock()
@@ -365,9 +365,9 @@ func (e *Engine) AppCommand(engine.AppCommand) {}
 
 func (e *Engine) FocusPage() {}
 
-func (e *Engine) FocusShell() {}
+func (e *Engine) FocusShell(engine.WindowID) {}
 
-func (e *Engine) SendToShell(msg []byte) { e.Shell.Publish(msg) }
+func (e *Engine) SendToShell(w engine.WindowID, msg []byte) { e.Shell.Publish(msg) }
 
 func (e *Engine) Post(fn func()) { e.queue <- fn }
 

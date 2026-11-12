@@ -138,7 +138,7 @@ func (e *Engine) DispatchExtensionEvent(id, event, args string) {
 	e.extensions.events = append(e.extensions.events, Event{id, event, json.RawMessage(args)})
 }
 
-func (e *Engine) OpenExtensionPopup(id, url string, anchor engine.Rect) {
+func (e *Engine) OpenExtensionPopup(w engine.WindowID, id, url string, anchor engine.Rect) {
 	e.extensions.mu.Lock()
 	e.extensions.popup = &Popup{id, url, anchor}
 	e.extensions.mu.Unlock()
@@ -168,7 +168,7 @@ func (e *Engine) openPopup() any {
 }
 
 // ChoosePath answers with what the test said the user would pick.
-func (e *Engine) ChoosePath(engine.PathKind) {
+func (e *Engine) ChoosePath(engine.WindowID, engine.PathKind) {
 	e.extensions.mu.Lock()
 	path := e.extensions.choose
 	e.extensions.choose = ""

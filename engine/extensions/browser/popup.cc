@@ -26,7 +26,7 @@ constexpr gfx::Size kMaxSize(800, 600);
 
 ExtensionPopup::ExtensionPopup(const extensions::Extension* extension,
                                content::BrowserContext* browser_context,
-                               Window* window,
+                               int64_t window,
                                const GURL& url,
                                const gfx::RectF& anchor,
                                base::OnceClosure on_close)
@@ -51,8 +51,9 @@ ExtensionPopup::ExtensionPopup(const extensions::Extension* extension,
 }
 
 ExtensionPopup::~ExtensionPopup() {
-  if (shown_) {
-    window_->RemovePopupView(host_contents()->GetNativeView());
+  Engine::AppWindow* window = Engine::Get()->window(window_);
+  if (shown_ && window) {
+    window->window->RemovePopupView(host_contents()->GetNativeView());
   }
 }
 
@@ -67,7 +68,8 @@ void ExtensionPopup::AskToClose() {
 // The view goes up once the page has loaded and laid out, so it is never seen empty.
 void ExtensionPopup::OnDidStopFirstLoad() {
   shown_ = true;
-  window_->SetPopupView(host_contents()->GetNativeView(), anchor_, size_);
+  Engine::Get()->window(window_)->window->SetPopupView(
+      host_contents()->GetNativeView(), anchor_, size_);
   host_contents()->Focus();
 }
 
@@ -87,7 +89,8 @@ void ExtensionPopup::ResizeDueToAutoResize(content::WebContents* web_contents,
                                            const gfx::Size& new_size) {
   size_ = new_size;
   if (shown_) {
-    window_->SetPopupView(host_contents()->GetNativeView(), anchor_, size_);
+    Engine::Get()->window(window_)->window->SetPopupView(
+        host_contents()->GetNativeView(), anchor_, size_);
   }
 }
 
@@ -113,7 +116,11 @@ void ExtensionPopup::OnWebContentsLostFocus(
 }
 
 void ExtensionPopup::CloseUnlessShellHasFocus() {
-  if (!Engine::Get()->shell()->contents()->GetRenderWidgetHostView()->HasFocus()) {
+  if (!Engine::Get()
+           ->window(window_)
+           ->shell->contents()
+           ->GetRenderWidgetHostView()
+           ->HasFocus()) {
     AskToClose();
   }
 }

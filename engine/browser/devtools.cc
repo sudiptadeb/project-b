@@ -76,8 +76,15 @@ std::optional<uint16_t> ParsePort(std::string_view text) {
 
 bool IsShell(content::WebContents* web_contents) {
   Engine* engine = Engine::Get();
-  return engine && web_contents &&
-         web_contents == engine->shell()->contents();
+  if (!engine || !web_contents) {
+    return false;
+  }
+  for (const auto& [id, w] : engine->windows()) {
+    if (web_contents == w->shell->contents()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -112,7 +119,7 @@ void CloseBrowserSoon() {
   content::GetUIThreadTaskRunner({})->PostTask(
       FROM_HERE, base::BindOnce([] {
         if (Engine* engine = Engine::Get()) {
-          engine->CloseWindow();
+          engine->CloseWindow(1);
         }
       }));
 }

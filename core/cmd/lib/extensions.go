@@ -14,9 +14,9 @@ static inline void ext_uninstall(const PBEngineCalls* c, const char* id) { c->ex
 static inline void ext_set_enabled(const PBEngineCalls* c, const char* id, int on) { c->extensions()->set_enabled(id, on); }
 static inline char* ext_list(const PBEngineCalls* c) { return c->extensions()->list(); }
 static inline void ext_dispatch_event(const PBEngineCalls* c, const char* id, const char* event, const char* args) { c->extensions()->dispatch_event(id, event, args); }
-static inline void ext_open_popup(const PBEngineCalls* c, const char* id, const char* url, double x, double y, double w, double h) { c->extensions()->open_popup(id, url, x, y, w, h); }
+static inline void ext_open_popup(const PBEngineCalls* c, int64_t window, const char* id, const char* url, double x, double y, double w, double h) { c->extensions()->open_popup(window, id, url, x, y, w, h); }
 static inline void ext_close_popup(const PBEngineCalls* c) { c->extensions()->close_popup(); }
-static inline void ext_choose_path(const PBEngineCalls* c, int32_t kind) { c->extensions()->choose_path(kind); }
+static inline void ext_choose_path(const PBEngineCalls* c, int64_t window, int32_t kind) { c->extensions()->choose_path(window, kind); }
 */
 import "C"
 
@@ -98,16 +98,16 @@ func (e *nativeEngine) DispatchExtensionEvent(id, event, args string) {
 	C.ext_dispatch_event(e.calls, cid, cevent, cargs)
 }
 
-func (e *nativeEngine) OpenExtensionPopup(id, url string, anchor engine.Rect) {
+func (e *nativeEngine) OpenExtensionPopup(w engine.WindowID, id, url string, anchor engine.Rect) {
 	cid, free1 := cstr(id)
 	defer free1()
 	curl, free2 := cstr(url)
 	defer free2()
-	C.ext_open_popup(e.calls, cid, curl, C.double(anchor.X), C.double(anchor.Y), C.double(anchor.W), C.double(anchor.H))
+	C.ext_open_popup(e.calls, C.int64_t(w), cid, curl, C.double(anchor.X), C.double(anchor.Y), C.double(anchor.W), C.double(anchor.H))
 }
 
 func (e *nativeEngine) CloseExtensionPopup() { C.ext_close_popup(e.calls) }
 
-func (e *nativeEngine) ChoosePath(kind engine.PathKind) {
-	C.ext_choose_path(e.calls, C.int32_t(kind))
+func (e *nativeEngine) ChoosePath(w engine.WindowID, kind engine.PathKind) {
+	C.ext_choose_path(e.calls, C.int64_t(w), C.int32_t(kind))
 }

@@ -320,7 +320,7 @@ struct Window::Impl {
 
 Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->window = [[PBNSWindow alloc]
-      initWithContentRect:NSMakeRect(120, 120, 1100, 700)
+      initWithContentRect:NSMakeRect(80, 120, 1280, 720)
                 styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                           NSWindowStyleMaskMiniaturizable |
                           NSWindowStyleMaskResizable |
@@ -341,7 +341,7 @@ Window::Window(base::OnceClosure on_close) : impl_(std::make_unique<Impl>()) {
   impl_->window.delegate = impl_->delegate;
 
   impl_->container = [[PBContainerView alloc]
-      initWithFrame:NSMakeRect(0, 0, 1100, 700)];
+      initWithFrame:NSMakeRect(0, 0, 1280, 720)];
   impl_->container.wantsLayer = YES;
   impl_->window.contentView = impl_->container;
 

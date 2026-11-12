@@ -285,6 +285,8 @@ shell never carries it. Each of our pages is a separate app, built the way pweb 
 pages: `shell/src/apps/<app>/` has the app's `index.html` and code, what apps share sits in
 `shell/src/` (imported as `@/`), and `VITE_APP=<app> vite build` builds one app into
 `dist/<app>/` as `index.html`, `<app>.js` and `<app>.css`; `npm run build` builds them all.
+The app's own build doesn't use `dist`: ninja runs `engine/build_shell.py`, which builds every
+app into the build folder's `shell/<app>/` whenever a file the shell reads has changed.
 The engine serves each app at `chrome://<app>/` from its own folder, and gives the bridge
 to Go only to the WebContents the app belongs in. It has two sections, General (what the shell's panel had: tab
 layout, frame colour, updates) and Keyboard:

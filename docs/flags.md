@@ -41,7 +41,8 @@ The flags today:
 
 `"build": true` says a flag's code can be left out of a build. Everything is built in unless
 `WITHOUT` names it: `WITHOUT=extensions tools/build.sh`. `build.sh` names no flag; it passes
-`WITHOUT` to GN as `project_b_without`, and to vite. From the same file:
+`WITHOUT` to GN as `project_b_without`, and GN passes it on to vite when ninja builds the
+shell. From the same file:
 
 - **GN** (`engine/flags.gni`) makes `project_b_built`, the ids built in, and stops at a name in
   `WITHOUT` that isn't a build flag.

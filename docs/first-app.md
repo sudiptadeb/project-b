@@ -97,7 +97,8 @@ stays out of history. A crashed page has no view, so the frame colour shows ther
 ## Our own page
 
 The engine knows exactly one page of ours, `chrome://shell/`, built from `shell/` and served
-from the app's `Resources/shell`. It gets its bridge only in the shell's own WebContents;
+from the app's `Resources/shell` (`out/pb/shell` in the build folder, which ninja builds with
+vite through `engine/build_shell.py`). It gets its bridge only in the shell's own WebContents;
 anywhere else its WebUI controller gives it no bindings and drops whatever it sends, and
 the policy gate refuses it in every tab, however it is reached. No other page has
 `chrome.send`, and Chromium itself refuses a web page's link to a `chrome://` page or a

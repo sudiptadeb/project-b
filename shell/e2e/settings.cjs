@@ -104,7 +104,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   const shell = await browser.newPage({ viewport: { width: 1100, height: 700 } });
   watch(shell);
   await shell.goto(base + '/');
-  await shell.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
+  await shell.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   await settle(shell);
   const root = (name) => shell.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
 

@@ -3,7 +3,6 @@ import { onMounted, ref } from 'vue';
 import CrashNotice from './CrashNotice.vue';
 import UpdateStatus from './UpdateStatus.vue';
 import { setPageElement } from './regions.js';
-import { state } from './state.js';
 
 const el = ref(null);
 onMounted(() => setPageElement(el.value));
@@ -11,9 +10,7 @@ onMounted(() => setPageElement(el.value));
 
 <template>
   <div class="main">
-    <div ref="el" class="page-view">
-      <iframe v-if="state.engine === 'mock'" src="/mock/page" title="Mock page"></iframe>
-    </div>
+    <div ref="el" class="page-view"></div>
     <CrashNotice />
     <UpdateStatus />
   </div>
@@ -33,10 +30,4 @@ onMounted(() => setPageElement(el.value));
   height: 100%;
 }
 
-iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
 </style>

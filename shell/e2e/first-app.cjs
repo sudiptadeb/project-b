@@ -48,6 +48,14 @@ function check(name, ok, detail = '') {
   if (!ok) failed++;
 }
 const regions = async (q = '') => (await fetch(`${base}/mock/regions${q}`)).json();
+const until = async (test, ms = 5000) => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (await test()) return true;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return false;
+};
 const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60)))));
 
 (async () => {
@@ -62,7 +70,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const bar = page.getByRole('combobox', { name: 'Address' });
   const list = page.locator('#suggestions');
   const options = page.getByRole('option');
-  const mock = page.frameLocator('iframe');
+  const mock = page.frameLocator('iframe.mock-page');
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
   await settle(page);
   await page.screenshot({ path: path.join(out, '1-empty.png') });
@@ -75,6 +83,13 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   let r = await regions();
   check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
   check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
+  // The dev window places the mock page where the layout puts it, as the real window does.
+  const placed = async () => {
+    const want = (await regions()).bounds;
+    const box = await page.locator('iframe.mock-page').boundingBox();
+    return !!box && box.x === want.x && box.y === want.y && box.width === want.w && box.height === want.h;
+  };
+  check('the dev window puts the page where the layout says', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
   check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
   check('no update bubble when nothing is happening', (await page.locator('.update').count()) === 0);
   const pageBounds = JSON.stringify(r.bounds);
@@ -348,6 +363,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the active tab\'s shape runs under the bar, so no line shows between them', joint[0] > joint[1], JSON.stringify(joint));
   r = await regions();
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
+  check('and the dev window moves the page there', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
   check('the bands beside the toolbar under the strip are shell, not drag', (await regions('?x=2&y=60')).hit === 'shell');
   await page.getByRole('button', { name: 'New Tab', exact: true }).click();
@@ -396,7 +412,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await phone.goto(base + '/');
   const phoneBar = phone.getByRole('combobox', { name: 'Address' });
-  await phone.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
+  await phone.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   await phoneBar.click();
   await phone.keyboard.type('exam');
   await phone.getByRole('option').first().waitFor();

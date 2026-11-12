@@ -83,8 +83,9 @@ type Engine struct {
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
 
-	// What the dev window draws over the shell, where the real window has views of its
-	// own: the settings page and an extension's popup. Each message is WindowState's.
+	// What the dev window draws with the shell, where the real window has views of its
+	// own: the page, the settings page and an extension's popup. Each message is
+	// WindowState's.
 	Window Feed
 }
 
@@ -189,10 +190,13 @@ func (e *Engine) RequestWindow(r engine.WindowRequest) {
 	}
 }
 
+// The real window moves the page's view to where the layout puts it. The mock says so on
+// its Window feed, and the dev window moves the mock page there.
 func (e *Engine) SetWindowLayout(l engine.WindowLayout) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.layout = l
+	e.mu.Unlock()
+	e.Window.Publish(e.WindowState())
 }
 
 // Layout is the last layout the app gave the window.
@@ -264,7 +268,7 @@ func (e *Engine) Edits() []engine.EditCommand {
 }
 
 // The real window puts the settings page in a view over everything. The mock says so on
-// its Window feed, and the dev window draws the page there.
+// its Window feed, and the dev window draws it there.
 func (e *Engine) OpenSettings() {
 	e.mu.Lock()
 	e.settings = true
@@ -280,13 +284,15 @@ func (e *Engine) CloseSettings() {
 	e.Window.Publish(e.WindowState())
 }
 
-// WindowState is what goes over the shell now, as the Window feed sends it:
-// {"t":"window","settings":open,"popup":the extension popup or null}. Any goroutine.
+// WindowState is what the window holds besides the shell, as the Window feed sends it:
+// {"t":"window","page":where the page goes,"settings":open,"popup":the extension popup or
+// null}. The page's rectangle is the layout's, in the shell's coordinates, which on the
+// mock are the dev window's. Any goroutine.
 func (e *Engine) WindowState() []byte {
 	e.mu.Lock()
-	settings := e.settings
+	page, settings := e.layout.Page, e.settings
 	e.mu.Unlock()
-	b, _ := json.Marshal(map[string]any{"t": "window", "settings": settings, "popup": e.openPopup()})
+	b, _ := json.Marshal(map[string]any{"t": "window", "page": page, "settings": settings, "popup": e.openPopup()})
 	return b
 }
 

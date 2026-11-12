@@ -101,7 +101,7 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   const shell = await browser.newPage({ viewport: { width: 1100, height: 700 } });
   watch(shell);
   await shell.goto(base + '/');
-  await shell.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
+  await shell.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
 
   // The dev window draws the settings page over the shell once Go asks for it, as the real
   // window does (mockwindow.js). The test drives a page of its own at /settings, which talks
@@ -265,7 +265,7 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   setFlag(false);
   await startServers();
   await shell.goto(base + '/');
-  await shell.frameLocator('iframe').getByRole('button', { name: 'Navigate' }).waitFor();
+  await shell.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   errors.splice(before);
   check('with the flag off the shell has no extensions toolbar', (await shell.locator('.pbx-toolbar').count()) === 0);
   await shell.getByRole('button', { name: 'Settings', exact: true }).click();

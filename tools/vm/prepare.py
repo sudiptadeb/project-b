@@ -18,19 +18,19 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-import rfb  # Stops here, saying so, under a Python without numpy.
+import screen  # Stops here, saying so, under a Python without numpy.
 
 import numpy as np
 
-TART = rfb.VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
-os.environ["TART_HOME"] = rfb.VM_HOME + "/tart-home"
+TART = screen.VM_HOME + "/bin/tart.app/Contents/MacOS/tart"
+os.environ["TART_HOME"] = screen.VM_HOME + "/tart-home"
 ASK = ['with timeout of 10 seconds', 'tell application "System Events" to count processes', 'end timeout']
 BLUE = (0, 122, 255)  # macOS's accent blue, the filled button of a prompt.
 BUTTON = (100, 22)  # Smaller than the Allow button, in points.
 
 
 def guest(*cmd, timeout=60):
-    return subprocess.run([TART, "exec", rfb.VM, *cmd], capture_output=True, text=True, timeout=timeout)
+    return subprocess.run([TART, "exec", screen.VM, *cmd], capture_output=True, text=True, timeout=timeout)
 
 
 def answers():
@@ -61,28 +61,28 @@ def main():
     if answers():
         print("System Events: tart-guest-agent may control it")
         return
-    vnc = rfb.Vnc()
+    desk = screen.Screen()
     for _ in range(3):
         # Ask in the background, so the prompt is up while this looks for it.
         args = [a for line in ASK for a in ("-e", line)]
-        asking = subprocess.Popen([TART, "exec", rfb.VM, "/usr/bin/osascript", *args],
+        asking = subprocess.Popen([TART, "exec", screen.VM, "/usr/bin/osascript", *args],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         where = None
         for _ in range(16):
             time.sleep(0.5)
-            where = allow_button(vnc.image(), vnc.scale)
+            where = allow_button(desk.image(), desk.scale)
             if where:
                 break
         if where:
             print(f"clicking Allow at {where[0]:.0f}, {where[1]:.0f}")
-            vnc.click(*where)
+            desk.click(*where)
         asking.wait(timeout=60)
         if answers():
             print("System Events: tart-guest-agent may control it now")
             return
-    vnc.shot(rfb.VM_HOME + f"/prepare-{rfb.VM}.png")
-    sys.exit(f"System Events still doesn't answer tart-guest-agent in {rfb.VM}. The screen is in "
-             f"{rfb.VM_HOME}/prepare-{rfb.VM}.png: if a prompt shows, click Allow by hand (docs/vm-testing.md).")
+    desk.shot(screen.VM_HOME + f"/prepare-{screen.VM}.png")
+    sys.exit(f"System Events still doesn't answer tart-guest-agent in {screen.VM}. The screen is in "
+             f"{screen.VM_HOME}/prepare-{screen.VM}.png: if a prompt shows, click Allow by hand (docs/vm-testing.md).")
 
 
 main()

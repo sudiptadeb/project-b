@@ -3,7 +3,4 @@
 set -eu
 . "$(dirname "$0")/vars.sh"
 
-# The amarit unit stays, exited, for start.sh to restart.
-"$TART" stop "$VM" --timeout 60 || true
-rm -f "$VNC_URL_FILE" "$FRAME_FILE"  # The window's watch ended with the VM.
-"$TART" list
+deskrig vm stop "$VM" || true

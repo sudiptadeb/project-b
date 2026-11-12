@@ -2,8 +2,8 @@
 
 `tools/drive_first_app.py` runs with no display, so it can't exercise AppKit's event dispatch,
 the window buttons or dragging. `tools/vm/` is for those: a macOS VM with a
-real desktop, driven from outside through its display, mouse and keyboard. It is the `vm`
-group of `tools/test.sh`.
+real desktop, driven by [deskrig](https://github.com/sudiptadeb/deskrig): real mouse and keys
+inside the VM, frames from its window. It is the `vm` group of `tools/test.sh`.
 
 ## Status (2026-11-09)
 
@@ -86,25 +86,20 @@ the guest's screen, not composites; each folder has an `ABOUT.txt` that says so.
   asks for the rectangles in both tab layouts with two tabs open, and AppKit's own place for the
   window buttons and the page. A change to the shell's layout needs no new numbers in the script.
 - Drags are posted inside the VM as the guest's own mouse events, with each step's movement
-  set. The window server moves a window by those movements, and Screen Sharing's pointer
-  events lose part of them: over it, a drag on Terminal's title bar moved it only some of
-  the way, and a second drag on Project B's often not at all.
-- Command is `Super_L`; Screen Sharing ignores `Meta_L`. Input sent in the first half second of a
-  connection is dropped, so `rfb.py` waits a second after connecting.
+  set. The window server moves a window by those movements. This dates from input over Screen
+  Sharing, whose pointer events lost part of a drag; deskrig's own `drag` posts movements too.
 - The guest draws at 1x, 1440x900 pixels for 1440x900 points.
 - Clicking the wallpaper hides every window (Show Desktop), so the app is opened with `open`.
   `prepare.py` also turns `EnableStandardClickToShowDesktop` off.
 - Resting the pointer on the green button opens macOS's Move & Resize menu, which takes the next
   click. After leaving full screen, the pointer moves away.
-- After a boot, an "App Background Activity" notice sits over the window's top right; `check.py`
-  swipes it away.
+- After a boot, an "App Background Activity" notice sits over the window's top right; `deskrig vm
+  start` and `check.py` close it (`deskrig dismiss-notifications`).
 - Leaving full screen puts the window back where macOS last placed it itself, which can be the
   zoomed frame.
-- `amarit run` on a unit removed seconds earlier stops the new process at once (exit 0, Tart prints
-  "Stopping VM"). `stop.sh` keeps the unit and `start.sh` restarts it.
 - Once per VM: the first window move asks "tart-guest-agent wants to control System Events",
   and until someone answers, every such call waits and times out. `prepare.py`, which `run.sh`
-  runs after starting the VM, clicks the prompt's Allow through VNC and checks that System
+  runs after starting the VM, clicks the prompt's Allow and checks that System
   Events then answers; the grant stays on the VM's disk. Writing it into the VM's TCC database
   doesn't hold, because tccd keeps its own. On a VM that already allows it, `prepare.py` changes
   nothing. It also turns off `EnableStandardClickToShowDesktop`.
@@ -185,10 +180,9 @@ By hand, a step at a time:
 
 ### A second VM
 
-`PB_VM` names the VM every script here works on, `pb-test` by default. Each VM has its own
-amarit unit (`macos-vm-<VM>`), Screen Sharing address file (`vnc-url-<VM>`), shared folder
-(`share-<VM>`) and run lock, so two run side by side, for example one for the release checks
-and one for a feature's:
+`PB_VM` names the VM every script here works on, `pb-test` by default. Each VM is a deskrig
+target of the same name, with its own run lock, so two run side by side, for example one for
+the release checks and one for a feature's:
 
     PB_VM=pb-build tools/vm/setup.sh  # once: a VM of its own, from the image
     PB_VM=pb-build tools/vm/run.sh <DMG>
@@ -199,44 +193,36 @@ most two macOS VMs at once. `run.sh` readies a new VM by itself (`prepare.py`, s
 
 What the checks need, and what they say when it's missing:
 
+- **deskrig**, in `~/.local/bin`: `curl -fsSL https://raw.githubusercontent.com/sudiptadeb/deskrig/main/install.sh | sh`.
+  `tools/vm/deskrig.py` is a copy of its Python client.
 - **The VM's own Python**, `~/PW_TOOLS/macos-vm/venv/bin/python`, which `setup.sh` makes with
-  numpy, pillow and cryptography. The system's Python has none of them, and `check.py` and
-  `rfb.py` say so under it. `tools/test.sh vm` uses the right one.
+  numpy and pillow. The system's Python has neither, and `check.py` says so under it.
+  `tools/test.sh vm` uses the right one.
 - **The VM running**, by `start.sh`, which needs the desktop login below once per boot.
-- **This Mac's desktop unlocked, and deskctl allowed to record the screen**, for the VM's pictures
-  ([Pictures](#pictures)). `start.sh` asks `desk status` first and says what's missing.
-- **`~/PW_TOOLS/macos-vm/frame-<VM>.bin`**, the VM's latest frame, which `start.sh` has `desk
-  watch` keep current. `rfb.py` refuses to run without it.
-- **`~/PW_TOOLS/macos-vm/vnc-url-<VM>`**, the VM's Screen Sharing address. `start.sh` writes it
-  when the desktop is up and `stop.sh` removes it. If the VM runs and the file is gone,
-  run `start.sh` again: it leaves a running VM alone and only writes the address.
+- **This Mac's desktop unlocked, and deskrig allowed to record the screen**, for the VM's frames
+  ([Pictures](#pictures)). `deskrig status` and `deskrig setup permissions` say what's missing.
 - **The app installed in the VM**, by `install-dmg.sh`.
 
 `check.py` prints pass or FAIL for each check with what it measured, and saves a shot per step
 under `~/PW_TOOLS/macos-vm/shots/`. Look at the shots; a check only compares pixels.
 
-To drive it by hand, with coordinates in points:
+To drive it by hand, with coordinates in points, use deskrig on the VM's target:
 
-    rfb.py shot out.png | click X Y | dbl X Y | move X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
-
-Run those with the VM's Python, with `PB_VM` set for a VM other than `pb-test`. `TART_HOME=~/PW_TOOLS/macos-vm/tart-home tart exec pb-test <command>`
-runs a command inside the VM with no password and no network.
+    deskrig --target pb-test shot out.png | click X Y | dblclick X Y | drag X1 Y1 X2 Y2 | key cmd+t | type "text"
+    deskrig --target pb-test run -- <command>   # inside the VM, in its desktop session
 
 ## Pictures
 
-The VM runs in a window on this Mac's desktop, and `desk watch` (`tools/deskctl`) keeps that
-window's latest frame in `~/PW_TOOLS/macos-vm/frame-<VM>.bin`, through ScreenCaptureKit, which
-sends a frame whenever the window changes, up to 60 a second. `rfb.py` reads it and cuts off the
-window's title bar; `wait_frame` waits for the next one. Screen Sharing still carries the mouse
-and keys, and is asked for one frame only, at login.
+The VM runs in a window on this Mac's desktop, and `deskrig frames` keeps that window's latest
+frame, cropped to the VM's screen, in a mapped file, through ScreenCaptureKit, which sends a
+frame whenever the window changes. `screen.py` reads it; `wait_frame` waits for the next one.
+The mouse and keys go in inside the VM, through Tart's guest agent.
 
-The window shows the VM's screen when it changes; Screen Sharing's picture of it came 0.2 to 14 s
-late, which looked like the app taking clicks late (bug 5). The cost: the window sits on the
-desktop while the VM runs, and the desktop has to stay logged in and unlocked. The capture works
-with other windows over it, but not with it minimised.
-
-`desk watch` ends by itself when the VM's process does. `start.sh` starts it again on a VM that's
-already running, replacing the old one; its errors go to `frame-<VM>.bin.log`.
+The window shows the VM's screen when it changes; Screen Sharing's picture of it, which these
+checks used until 2026-11-12, came 0.2 to 14 s late, which looked like the app taking clicks
+late (bug 5). The cost: the window sits on the desktop while the VM runs, and the desktop has to
+stay logged in and unlocked. The capture works with other windows over it, but not with it
+minimised.
 
 ## Decisions
 
@@ -245,21 +231,16 @@ already running, replacing the old one; its errors go to `frame-<VM>.bin.log`.
 - **`macos-tahoe-base`, not `-vanilla`**: three months newer, and it has Tart's guest agent, so
   `tart exec` works. It's macOS 26.6.2, with auto-login. Its login, `admin` / `admin`, is a public
   default. It holds none of the owner's credentials.
-- **The VM's own Screen Sharing, not Tart's `--vnc-experimental`.** Tart prints `127.0.0.1` for that
-  server, but it listens on every interface (`lsof`: `TCP *:59307`), and a sandbox profile can only
-  block the bind, not limit who connects. A firewall rule would need root. Screen Sharing is on in
-  the image, on the VM's private address, so nothing new listens on this Mac's network. The same goes
-  for the VM's SSH, which these scripts don't use. Frames and input then go through macOS inside
-  the VM instead of the virtual display and keyboard. The image already grants Screen Sharing the
-  permissions; it asked for nothing. If this doesn't work out, `rfb.py` also has the login
-  for the other server, but using that one needs the owner's OK.
-- **Pictures from the VM's window, not Screen Sharing** ([Pictures](#pictures)). Tart's own
-  VNC would read the display directly too, but it listens on every interface (below).
+- **No VNC.** Tart's `--vnc-experimental` listens on every interface (`lsof`: `TCP *:59307`)
+  though it prints `127.0.0.1`, and using it needs the owner's OK. The VM's own Screen Sharing
+  sent its pictures seconds late. deskrig needs neither: input through Tart's guest agent,
+  frames from the window ([Pictures](#pictures)). Nothing listens on this Mac's network.
 - **1440x900 points.** The guest draws them at 1x, so a shot has one pixel per point.
-- **The DMG goes in through a read-only shared folder**, so it has no quarantine flag. Gatekeeper
+- **The DMG goes in through deskrig's read-only shared folder** (`deskrig install`), so it has no
+  quarantine flag. Gatekeeper
   and the signing profile aren't tested here.
 - **Window positions come from macOS's window list**, read inside the VM. Only the checks read
-  it; the app gets its input through VNC.
+  it; the app gets its input from deskrig.
 
 ## Remove it
 

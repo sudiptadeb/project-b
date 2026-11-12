@@ -10,6 +10,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
     python3 tools/drive_first_app.py timeline   # only the timeline
+    python3 tools/drive_first_app.py cookies    # only cookies kept across a restart
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -48,6 +49,16 @@ class Pages(http.server.BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header("Location", "chrome://shell/")
             self.end_headers()
+            return
+        if self.path == "/cookie":
+            # Sets a cookie that lasts an hour, and shows in its title the cookies it got.
+            body = f"<!doctype html><title>{self.headers.get('Cookie', 'none')}</title>".encode()
+            self.send_response(200)
+            self.send_header("Set-Cookie", "a=1; Max-Age=3600")
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         body = {
             # Counts the clicks that reach the page, in its title.
@@ -1009,6 +1020,23 @@ def browsing_checks():
     app.close()
 
 
+def cookie_checks():
+    """A cookie a page sets is saved in the profile and sent back after a restart."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    visit(app, PAGES + "cookie")
+    check("the first visit sends no cookie", app.js("document.title", page=True) == "none")
+    app.close()
+    check("the cookie is saved in the profile", os.path.exists(os.path.join(profile, "chromium/Network/Cookies")))
+    app = App(profile)
+    app.wait("!!document.querySelector('input')", 30)
+    visit(app, PAGES + "cookie")
+    check("the cookie is sent back after a restart", app.js("document.title", page=True) == "a=1", app.js("document.title", page=True))
+    app.close()
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    run_parts([settings_checks] if sys.argv[1:] == ["settings"] else [timeline_checks] if sys.argv[1:] == ["timeline"] else [version_checks, timeline_checks, browsing_checks, settings_checks])
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, cookie_checks]))

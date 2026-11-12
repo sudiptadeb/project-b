@@ -14,8 +14,9 @@ research behind it is in `project-b-research/`: `ulaa-modes.md`,
 - One window with one page rectangle. Go calls `ShowTab`, and the engine puts that tab's view
   in the rectangle and hides the rest (`engine/browser/engine.cc`). Which tab shows is
   already our decision; content only renders.
-- Cookies and the cache aren't saved: the engine never gives the network layer its file
-  paths, so a login is lost on quit.
+- Cookies and the cache are saved in the profile's `chromium/` folder (`Network/Cookies`,
+  `Cache`), unencrypted, so a login survives a quit
+  (`engine/browser/content_browser_client.cc`).
 - Nothing stops a second copy of the app from starting on the same folder.
 
 ## The four things

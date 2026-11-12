@@ -37,6 +37,13 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
       content::NavigationThrottleRegistry& registry) override;
   std::string GetProduct() override;
   std::string GetUserAgent() override;
+  void ConfigureNetworkContextParams(
+      content::BrowserContext* context,
+      bool in_memory,
+      const base::FilePath& relative_partition_path,
+      network::mojom::NetworkContextParams* network_context_params,
+      cert_verifier::mojom::CertVerifierCreationParams*
+          cert_verifier_creation_params) override;
   std::vector<base::FilePath> GetNetworkContextsParentDirectory() override;
 
 };

@@ -5,9 +5,11 @@
 #include "base/path_service.h"
 #include "components/embedder_support/user_agent_utils.h"
 #include "components/version_info/version_info_with_user_agent.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "project_b/engine/browser/browser_main_parts.h"
+#include "services/network/public/mojom/network_context.mojom.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/posix/global_descriptors.h"
@@ -67,6 +69,36 @@ std::string ContentBrowserClient::GetProduct() {
 
 std::string ContentBrowserClient::GetUserAgent() {
   return embedder_support::GetUserAgent();
+}
+
+// Cookies and the HTTP cache are saved in the partition's folder, as Chrome lays a
+// profile out: chromium/Network/Cookies and chromium/Cache. Cookies are stored as
+// Chromium writes them, unencrypted, with no OS keychain. Session cookies are not kept
+// across a quit, Chromium's default. An in-memory partition gets no files. DevTools
+// lays its own proxy over these params after this.
+void ContentBrowserClient::ConfigureNetworkContextParams(
+    content::BrowserContext* context,
+    bool in_memory,
+    const base::FilePath& relative_partition_path,
+    network::mojom::NetworkContextParams* network_context_params,
+    cert_verifier::mojom::CertVerifierCreationParams*
+        cert_verifier_creation_params) {
+  ContentBrowserClientHooks::ConfigureNetworkContextParams(
+      context, in_memory, relative_partition_path, network_context_params,
+      cert_verifier_creation_params);
+  network_context_params->enable_encrypted_cookies = false;
+  if (in_memory) {
+    return;
+  }
+  base::FilePath path = context->GetPath().Append(relative_partition_path);
+  auto& file_paths = network_context_params->file_paths;
+  file_paths = network::mojom::NetworkContextFilePaths::New();
+  file_paths->data_directory = path.Append(FILE_PATH_LITERAL("Network"));
+  file_paths->cookie_database_name =
+      base::FilePath(FILE_PATH_LITERAL("Cookies"));
+  file_paths->http_server_properties_file_name =
+      base::FilePath(FILE_PATH_LITERAL("Network Persistent State"));
+  file_paths->http_cache_directory = path.Append(FILE_PATH_LITERAL("Cache"));
 }
 
 // The sandboxed network process may only write under these folders.

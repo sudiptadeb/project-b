@@ -99,7 +99,6 @@ func (m *Manager) Handle(msg []byte) {
 	case "ready":
 		snapshot := map[string]any{
 			"t":            "snapshot",
-			"engine":       m.eng.Name(),
 			"tabs":         m.tabs.All(),
 			"active":       m.tabs.ActiveID(),
 			"windowColor":  m.window.Color(),

@@ -95,8 +95,9 @@ Time zero is the process's start: its creation time from the kernel on a Mac, to
 microsecond; on Android the time Android started it, to the millisecond. `main.entered`
 is the first thing our code does, so the time before it is the loader's.
 
-A page on the mock engine has no engine to give its navigation start, so its entries are
-stamped as they arrive.
+On the mock engine the dev server plays the engine: the page's `performance.timeOrigin`,
+its navigation start in wall time, goes to Go before anything the page sends
+(`core/cmd/dev/webui.js`), and Go places it on the timeline (`timeline.FromWall`).
 
 Entries are numbered in the order they were recorded. A page's entries arrive a little
 after they happened, so sort by time when reading.

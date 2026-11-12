@@ -275,9 +275,10 @@ the DMG passes the same 84.
 - **Shell rectangles are a frame or two stale after a layout change**, plus the hop to the
   main process. A click 30 ms after Cmd+T hit the strip's old empty space and dragged
   instead. A person can't click that fast; the driver can, and waits.
-- **The mock cannot show compositing bugs.** An opaque background on the shell's root
+- **The mock could not show compositing bugs.** An opaque background on the shell's root
   painted over the page hole and looked fine over the mock's iframe. Only the real
-  driver's composite caught it.
+  driver's composite caught it. The mock's window now holds the shell in a frame over the
+  page's, as the real window holds its views, so an opaque shell hides the page there too.
 - Favicons: content hands over the candidates and downloads one; the adapter picks the
   plain icon declared smallest, encodes a PNG and sends a data URL. iana.org shows its
   icon; example.com, whose `/favicon.ico` is a 404, shows none.

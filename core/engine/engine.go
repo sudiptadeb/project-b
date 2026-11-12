@@ -105,9 +105,6 @@ const (
 
 // Engine is what the app can ask a browser engine to do.
 type Engine interface {
-	// Name says which engine this is, so the shell can show the mock page.
-	Name() string
-
 	// CreateTab makes a hidden tab. ShowTab shows it.
 	CreateTab() TabID
 	CloseTab(tab TabID)

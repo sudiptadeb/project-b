@@ -20,13 +20,22 @@ const buildFlags = Object.fromEntries(
   builds.map((f) => ['@' + f.id, resolve(__dirname, 'src', without.includes(f.id) ? f.id + '-off' : f.id)]),
 );
 
+// On the dev server a page gets what the engine gives it in the real app, chrome.send and
+// the call back, from core/cmd/dev's /mock/webui.js, as that server's own pages do. Open
+// /mock/window, the OS window, which holds the shell at /shell/.
+const mockEngine = {
+  name: 'mock-engine',
+  apply: 'serve',
+  transformIndexHtml: () => [{ tag: 'script', attrs: { src: '/mock/webui.js' }, injectTo: 'head-prepend' }],
+};
+
 export default defineConfig(({ command }) => {
   const app = process.env.VITE_APP;
   if (command === 'build' && !app) {
     throw new Error('set VITE_APP to one of: ' + readdirSync(apps).join(', '));
   }
   return {
-    plugins: [vue()],
+    plugins: [vue(), mockEngine],
     // A build's root is its app's folder, so its index.html lands at dist/<app>/index.html.
     root: resolve(apps, app || ''),
     base: './',

@@ -75,8 +75,6 @@ type nativeEngine struct {
 	posted []func()
 }
 
-func (e *nativeEngine) Name() string { return "content" }
-
 func (e *nativeEngine) CreateTab() engine.TabID {
 	return engine.TabID(C.call_create_tab(e.calls))
 }

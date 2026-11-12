@@ -43,10 +43,15 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
     (cd shell && npm run build)
     (cd core && go run ./cmd/dev -shell ../shell/dist)    # then open http://127.0.0.1:8765
 
-What the real window draws over the shell, the mock draws in the browser: the gear opens the
-settings page over the shell, and an extension's button its popup, a card naming the page
-(`shell/src/apps/shell/mockwindow.js`). The settings page also opens alone at
-http://127.0.0.1:8765/settings/.
+The browser tab is the OS window (`core/cmd/dev/window.html`): it holds what the real window
+holds in views, the mock page where the layout puts the page, the shell over it in a
+transparent frame, the frame band and window controls, the settings page over everything
+when the gear opens it, and an extension's popup, a card naming the page. Each press goes
+where the real window sends it, by the layout's regions. The shell and the settings page
+are the real app's, unchanged: the server gives them `chrome.send` as the engine does
+(`core/cmd/dev/webui.js`). The shell also opens alone at http://127.0.0.1:8765/shell/, and
+the settings page at http://127.0.0.1:8765/settings/. With `npm run dev` in `shell/`, open
+the window at `/mock/window` on Vite's server.
 
 ## Test it
 

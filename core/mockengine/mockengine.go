@@ -22,7 +22,8 @@ var Controls = engine.Rect{X: 19, Y: 19, W: 60, H: 14}
 // CornerRadius is what macOS 26 rounds that window's corners with. Full screen has none.
 const CornerRadius = 26.0
 
-// Width and Height are the mock window's content size, the real window's first size.
+// Width and Height are the mock window's content size until the dev window reports its
+// own, as the real window's first size.
 const (
 	Width  = 1100.0
 	Height = 700.0
@@ -62,11 +63,13 @@ type Engine struct {
 	nextTab  engine.TabID
 	tabs     map[engine.TabID]*tab
 	shown    engine.TabID
-	full     bool // Full screen, so there are no window controls.
+	full     bool    // Full screen, so there are no window controls.
+	w, h     float64 // The window's content size.
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu         sync.Mutex
 	layout     engine.WindowLayout
+	window     engine.WindowState // The last one reported.
 	requests   []engine.WindowRequest
 	closed     bool
 	hidden     []engine.TabID // Tabs told they are hidden since the last ShowTab.
@@ -83,15 +86,14 @@ type Engine struct {
 	Shell Feed // Messages to the shell page.
 	Page  Feed // State for the mock page.
 
-	// What the dev window draws with the shell, where the real window has views of its
-	// own: the page, the settings page and an extension's popup. Each message is
-	// WindowState's.
+	// What the dev window holds besides the shell, as the real window holds it in views
+	// of its own, and how it hit-tests. Each message is WindowState's.
 	Window Feed
 }
 
 // New returns an engine. Call Run to start its main thread.
 func New() *Engine {
-	return &Engine{queue: make(chan func(), 4096), tabs: map[engine.TabID]*tab{}}
+	return &Engine{queue: make(chan func(), 4096), tabs: map[engine.TabID]*tab{}, w: Width, h: Height}
 }
 
 // Run is the main loop. It never returns.
@@ -113,15 +115,33 @@ func (e *Engine) SetListener(l engine.Listener) {
 }
 
 func (e *Engine) reportWindow() {
-	s := engine.WindowState{W: Width, H: Height, FullScreen: e.full}
+	s := engine.WindowState{W: e.w, H: e.h, FullScreen: e.full}
 	if !e.full {
 		s.Controls = Controls
 		s.CornerRadius = CornerRadius
 	}
+	e.mu.Lock()
+	e.window = s
+	e.mu.Unlock()
 	e.listener.WindowChanged(s)
+	e.Window.Publish(e.WindowState())
 }
 
-func (e *Engine) Name() string { return "mock" }
+// Resize is the dev window reporting its content size, as the real window reports a
+// resize. Any goroutine.
+func (e *Engine) Resize(w, h float64) {
+	e.Post(func() {
+		e.w, e.h = w, h
+		e.reportWindow()
+	})
+}
+
+// Reported is the state the window last reported.
+func (e *Engine) Reported() engine.WindowState {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.window
+}
 
 func (e *Engine) CreateTab() engine.TabID {
 	e.nextTab++
@@ -190,8 +210,8 @@ func (e *Engine) RequestWindow(r engine.WindowRequest) {
 	}
 }
 
-// The real window moves the page's view to where the layout puts it. The mock says so on
-// its Window feed, and the dev window moves the mock page there.
+// The real window moves the page's view to where the layout puts it, and hit-tests with
+// its regions. The mock says so on its Window feed, and the dev window does the same.
 func (e *Engine) SetWindowLayout(l engine.WindowLayout) {
 	e.mu.Lock()
 	e.layout = l
@@ -284,17 +304,40 @@ func (e *Engine) CloseSettings() {
 	e.Window.Publish(e.WindowState())
 }
 
-// WindowState is what the window holds besides the shell, as the Window feed sends it:
-// {"t":"window","page":where the page goes,"settings":open,"popup":the extension popup or
-// null}. The page's rectangle is the layout's, in the shell's coordinates, which on the
-// mock are the dev window's. Any goroutine.
+// WindowState is what the window holds besides the shell, and how it draws and hit-tests,
+// as the Window feed sends it:
+//
+//	{"t":"window", "page":where the page goes, "regions":[{x,y,w,h,"area":"drag"|"shell"}],
+//	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
+//	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
+//
+// The rectangles are the layout's, in the shell's coordinates, which on the mock are the
+// dev window's. The regions are in order: the first that holds a point decides. Any
+// goroutine.
 func (e *Engine) WindowState() []byte {
+	type region struct {
+		engine.Rect
+		Area string `json:"area"`
+	}
 	e.mu.Lock()
-	page, settings := e.layout.Page, e.settings
+	l, w, settings := e.layout, e.window, e.settings
 	e.mu.Unlock()
-	b, _ := json.Marshal(map[string]any{"t": "window", "page": page, "settings": settings, "popup": e.openPopup()})
+	regions := []region{}
+	for _, r := range l.Regions {
+		regions = append(regions, region{r.Rect, AreaNames[r.Area]})
+	}
+	var controls *engine.Rect
+	if w.Controls != (engine.Rect{}) {
+		controls = &w.Controls
+	}
+	b, _ := json.Marshal(map[string]any{"t": "window", "page": l.Page, "regions": regions,
+		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": w.CornerRadius,
+		"settings": settings, "popup": e.openPopup()})
 	return b
 }
+
+// AreaNames are what the dev window and its tests call each area.
+var AreaNames = [...]string{engine.AreaPage: "page", engine.AreaShell: "shell", engine.AreaDrag: "drag"}
 
 // SettingsOpen says whether the app has the settings page open.
 func (e *Engine) SettingsOpen() bool {

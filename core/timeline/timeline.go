@@ -127,6 +127,14 @@ func (m *Manager) Now() int64 {
 	return int64(time.Since(m.origin))
 }
 
+// FromWall is a wall-clock time's place on the timeline, for a clock that gives wall time
+// only.
+func (m *Manager) FromWall(t time.Time) int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return int64(t.Sub(m.origin))
+}
+
 // Record adds one entry. t is its time, or Now. Beginning a span that is open, and
 // ending one that isn't, do nothing: whichever layer saw the interaction first began it.
 func (m *Manager) Record(kind Kind, src, name, text string, t int64) {
@@ -184,10 +192,10 @@ type pageEntry struct {
 }
 
 // FromPage records an entry one of our pages sent. Its time is the page's own, placed on
-// the timeline by the page's origin. A page whose origin nobody gave, as on the mock
-// engine, is stamped as it arrives. No entry is later than its arrival: the origin is a few
-// microseconds off at times, and a span the shell began at a click then began after Go's
-// first mark of it, which was then left out of the span's stages.
+// the timeline by the page's origin, which the engine gives as the page's document
+// starts. No entry is later than its arrival: the origin is a few microseconds off at
+// times, and a span the shell began at a click then began after Go's first mark of it,
+// which was then left out of the span's stages.
 func (m *Manager) FromPage(page string, msg []byte) {
 	var p pageEntry
 	if err := json.Unmarshal(msg, &p); err != nil {
@@ -201,13 +209,9 @@ func (m *Manager) FromPage(page string, msg []byte) {
 		return
 	}
 	m.mu.Lock()
-	origin, known := m.origins[page]
+	origin := m.origins[page]
 	m.mu.Unlock()
-	t := Now
-	if known {
-		t = min(origin+int64(p.At*1e6), m.Now())
-	}
-	m.Record(p.Kind, page, p.Name, p.Text, t)
+	m.Record(p.Kind, page, p.Name, p.Text, min(origin+int64(p.At*1e6), m.Now()))
 }
 
 // Since returns the entries kept in memory that were recorded after entry seq, oldest
@@ -371,9 +375,10 @@ func Errorf(format string, args ...any) {
 	std.Record(KindError, SrcGo, "", fmt.Sprintf(format, args...), Now)
 }
 
-// Record, PageOrigin, FromPage, Since and NowNanos are the app's timeline's: see Manager.
+// Record, PageOrigin, FromPage, FromWall, Since and NowNanos are the app's timeline's: see Manager.
 func Record(kind Kind, src, name, text string, t int64) { std.Record(kind, src, name, text, t) }
 func PageOrigin(page string, t int64)                   { std.PageOrigin(page, t) }
 func FromPage(page string, msg []byte)                  { std.FromPage(page, msg) }
+func FromWall(t time.Time) int64                        { return std.FromWall(t) }
 func Since(seq uint64) ([]Entry, uint64)                { return std.Since(seq) }
 func NowNanos() int64                                   { return std.Now() }

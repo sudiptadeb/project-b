@@ -62,13 +62,10 @@ document.addEventListener('animationstart', () => { animations++; schedule(); })
 document.addEventListener('animationend', () => { animations = Math.max(0, animations - 1); schedule(); });
 document.addEventListener('animationcancel', () => { animations = Math.max(0, animations - 1); schedule(); });
 
-// Each marked element also says so in data-region, which the mock's dev window reads to
-// send the page's clicks past the shell, as the real window does (mockwindow.js).
-function directive(set, outline, region) {
+function directive(set, outline) {
   return {
     mounted(el) {
       set.add(el);
-      el.dataset.region = region;
       observer.observe(el);
       if (debug) {
         el.style.outline = outline;
@@ -77,7 +74,6 @@ function directive(set, outline, region) {
     },
     unmounted(el) {
       set.delete(el);
-      delete el.dataset.region;
       observer.unobserve(el);
       schedule();
     },
@@ -85,10 +81,10 @@ function directive(set, outline, region) {
 }
 
 // v-shell: this element belongs to the shell, wherever it sits in the page.
-export const vShell = directive(marked, '2px solid rgba(220, 38, 38, 0.8)', 'shell');
+export const vShell = directive(marked, '2px solid rgba(220, 38, 38, 0.8)');
 
 // v-drag: this empty space in the top row moves the window. Nothing inside it gets clicks.
-export const vDrag = directive(draggable, '2px dashed rgba(38, 99, 220, 0.8)', 'drag');
+export const vDrag = directive(draggable, '2px dashed rgba(38, 99, 220, 0.8)');
 
 // setPageElement says where the page goes. It isn't shell, so it isn't marked.
 export function setPageElement(el) {

@@ -66,18 +66,31 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
+  // The page is the OS window: the shell is in a frame of its own, over the mock page's,
+  // both at the window's coordinates. Locators reach the shell through its frame, and
+  // survive it loading again; keyboard, mouse and screenshots are the window's.
   await page.goto(base + '/');
-  const bar = page.getByRole('combobox', { name: 'Address' });
-  const list = page.locator('#suggestions');
-  const options = page.getByRole('option');
+  const ui = page.frameLocator('iframe.shell');
+  const shellFrame = () => page.frame({ url: /\/shell\/$/ });
+  // A person's pointer arrives in many moves. The window gives the shell the pointer on
+  // the first move into its region, so the shell's hover begins with the next; Playwright's
+  // hover is one move, so this makes two.
+  const hover = async (locator) => {
+    const b = await locator.boundingBox();
+    await page.mouse.move(b.x + b.width / 2 - 1, b.y + b.height / 2);
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  };
+  const bar =ui.getByRole('combobox', { name: 'Address' });
+  const list = ui.locator('#suggestions');
+  const options = ui.getByRole('option');
   const mock = page.frameLocator('iframe.mock-page');
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
   await settle(page);
   await page.screenshot({ path: path.join(out, '1-empty.png') });
 
-  const back = page.getByRole('button', { name: 'Back' });
-  const forward = page.getByRole('button', { name: 'Forward' });
-  const reload = page.getByRole('button', { name: 'Reload' });
+  const back = ui.getByRole('button', { name: 'Back' });
+  const forward = ui.getByRole('button', { name: 'Forward' });
+  const reload = ui.getByRole('button', { name: 'Reload' });
   check('opens with nothing to go back to or reload', (await back.isDisabled()) && (await forward.isDisabled()) && (await reload.isDisabled()));
 
   let r = await regions();
@@ -91,7 +104,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   };
   check('the dev window puts the page where the layout says', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
   check('opens with the address bar focused, as a new tab does', await bar.evaluate((el) => el === document.activeElement));
-  check('no update bubble when nothing is happening', (await page.locator('.update').count()) === 0);
+  check('no update bubble when nothing is happening', (await ui.locator('.update').count()) === 0);
   const pageBounds = JSON.stringify(r.bounds);
 
   // Waits for the commit. The URL shows as soon as loading starts, and a new navigation
@@ -99,7 +112,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const loaded = async (expected) => {
     await mock.getByText(expected, { exact: true }).waitFor();
     await mock.getByText('Loaded', { exact: true }).waitFor();
-    await page.waitForFunction((v) => document.querySelector('input').value === v, expected);
+    await shellFrame().waitForFunction((v) => document.querySelector('input').value === v, expected);
   };
   const visit = async (text, expected) => {
     await bar.fill(text);
@@ -110,7 +123,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await visit('https://go.dev/learn', 'https://go.dev/learn');
   await visit('https://example.org/', 'https://example.org/');
   check('address bar shows the final URL', (await bar.inputValue()) === 'https://example.org/');
-  check('the progress bar shows the page\'s real load progress', (await page.$eval('.progress', (el) => el.style.width)) === '100%');
+  check('the progress bar shows the page\'s real load progress', (await ui.locator('.progress').evaluate((el) => el.style.width)) === '100%');
 
   // Back, forward and reload.
   check('back is on and forward is off after new pages', (await back.isEnabled()) && (await forward.isDisabled()) && (await reload.isEnabled()));
@@ -127,7 +140,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await back.click();
   await loaded('https://go.dev/learn');
   await visit('https://example.org/', 'https://example.org/');
-  await page.waitForFunction(() => document.querySelector('[aria-label=Forward]').disabled);
+  await shellFrame().waitForFunction(() => document.querySelector('[aria-label=Forward]').disabled);
   check('a new page drops what was ahead', await forward.isDisabled());
 
   // Suggestions come from real history, over the page.
@@ -150,11 +163,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   // Bar and list behave as one UI.
   await page.keyboard.press('ArrowDown');
-  check('down moves into the list', (await bar.inputValue()).startsWith('https://example') && (await page.locator('li.active').count()) === 1);
+  check('down moves into the list', (await bar.inputValue()).startsWith('https://example') && (await ui.locator('li.active').count()) === 1);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
-  check('up from the first item returns to what was typed', (await bar.inputValue()) === 'exam' && (await page.locator('li.active').count()) === 0, await bar.inputValue());
+  check('up from the first item returns to what was typed', (await bar.inputValue()) === 'exam' && (await ui.locator('li.active').count()) === 0, await bar.inputValue());
   check('focus never left the address bar', await bar.evaluate((el) => el === document.activeElement));
   await page.keyboard.press('Escape');
   await settle(page);
@@ -165,7 +178,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await bar.fill('');
   await page.keyboard.type('go.d');
   await options.first().click();
-  await page.waitForFunction(() => document.querySelector('input').value === 'https://go.dev/learn');
+  await shellFrame().waitForFunction(() => document.querySelector('input').value === 'https://go.dev/learn');
   check('clicking a suggestion navigates', (await list.count()) === 0);
 
   // Clicking the page closes the box.
@@ -176,27 +189,41 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await settle(page);
   check('clicking the page closes the box', (await list.count()) === 0 && (await bar.inputValue()) === 'https://go.dev/learn');
 
+  // The window sends each press where its regions say, with the mouse moved there first,
+  // as a person's is: beside the suggestions the page takes it, on them the shell.
+  const titleButton = await page.locator('iframe.mock-page').contentFrame().getByRole('button', { name: 'Title' }).boundingBox();
+  await page.mouse.click(titleButton.x + titleButton.width / 2, titleButton.y + titleButton.height / 2);
+  check('a press in the page area reaches the page', await until(async () => (await ui.locator('.row.tab.active').innerText()).includes('A new title')), await ui.locator('.row.tab.active').innerText());
+  await bar.click();
+  await page.keyboard.type('exam');
+  await options.first().waitFor();
+  await settle(page);
+  const optionBox = await options.last().boundingBox();
+  check('the suggestions lie over the page', optionBox.y > (await regions()).bounds.y, JSON.stringify(optionBox));
+  await page.mouse.click(optionBox.x + 40, optionBox.y + optionBox.height / 2);
+  check('a press on them, over the page, reaches the shell', await until(async () => (await list.count()) === 0 && (await bar.inputValue()).startsWith('https://example')), await bar.inputValue());
+
   // Events from the page side. Shortcuts arrive from the engine, whichever page had focus.
   const shortcut = async (name) => {
     await mock.getByLabel('Key name').fill(name);
     await mock.getByRole('button', { name: 'Key', exact: true }).click();
   };
   await shortcut('focusAddressBar');
-  await page.waitForFunction(() => document.activeElement === document.querySelector('input'));
+  await shellFrame().waitForFunction(() => document.activeElement === document.querySelector('input'));
   check('the shortcut focuses the address bar from the page', true);
   await page.keyboard.press('Escape');
 
   await mock.getByRole('button', { name: 'Fail' }).click();
-  await page.getByText('Failed', { exact: true }).waitFor();
+  await ui.getByText('Failed', { exact: true }).waitFor();
   check('a failed navigation shows', true);
   await mock.getByRole('button', { name: 'Crash' }).click();
-  await page.getByText('Crashed', { exact: true }).waitFor();
+  await ui.getByText('Crashed', { exact: true }).waitFor();
   check('a crashed page shows', true);
 
   // Policy.
   await bar.fill('https://www.blocked.test/secret');
   await bar.press('Enter');
-  await page.getByText('Blocked', { exact: true }).waitFor();
+  await ui.getByText('Blocked', { exact: true }).waitFor();
   await bar.click();
   await bar.fill('');
   await page.keyboard.type('secret');
@@ -230,16 +257,16 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await mock.locator('form[data-kind=navigate] input').fill('chrome://shell/');
   await mock.getByRole('button', { name: 'Navigate' }).click();
   check('a page linking to chrome://shell/ is refused', await mockShows('Blocked', 'chrome://shell/'));
-  await page.getByRole('button', { name: 'Tabs on top' }).click();
-  await page.locator('.strip').waitFor();
-  await page.getByRole('button', { name: 'Tabs on the side' }).click();
-  await page.locator('nav').waitFor();
+  await ui.getByRole('button', { name: 'Tabs on top' }).click();
+  await ui.locator('.strip').waitFor();
+  await ui.getByRole('button', { name: 'Tabs on the side' }).click();
+  await ui.locator('nav').waitFor();
   await settle(page);
-  check('after those attempts the shell still takes clicks: the layout toggle works', (await page.locator('.strip').count()) === 0);
+  check('after those attempts the shell still takes clicks: the layout toggle works', (await ui.locator('.strip').count()) === 0);
 
   // The engine says where the window controls are; the shell leaves exactly that space.
   // In full screen there are none, so the first control moves into their place.
-  const toggle = page.getByRole('button', { name: /sidebar/ });
+  const toggle = ui.getByRole('button', { name: /sidebar/ });
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions('?x=74&y=16');
@@ -248,37 +275,59 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the frame\'s left, right and bottom edges never drag', (await regions('?x=2&y=300')).hit !== 'drag' && (await regions('?x=1098&y=300')).hit !== 'drag' && (await regions('?x=600&y=698')).hit !== 'drag');
   check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
   // The frame colour has one owner: Go gave it to the window and to the shell.
-  const frame = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
+  const frame = await shellFrame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
   check('the window and the shell paint the frame colour Go owns', frame === '#4f9e9e' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
   check('the window already had the frame colour when it went on screen', (await regions()).shownColor === frame, (await regions()).shownColor);
 
   // The shell is not a page: nothing scrolls, and a trackpad swipe must not rubber-band it.
-  const rootStyle = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return [s.overflow, s.overscrollBehaviorY, document.scrollingElement.scrollHeight - window.innerHeight]; });
+  const rootStyle = await shellFrame().evaluate(() => { const s = getComputedStyle(document.documentElement); return [s.overflow, s.overscrollBehaviorY, document.scrollingElement.scrollHeight - window.innerHeight]; });
   check('the shell document neither scrolls nor bounces', rootStyle[0] === 'hidden' && rootStyle[1] === 'none' && rootStyle[2] === 0, JSON.stringify(rootStyle));
 
   // The engine also says how round the window's corners are; the frame's inner edge
   // follows, one frame width inside.
-  const windowRadius = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
+  const windowRadius = () => shellFrame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--window-radius').trim());
   check('the shell hears the window\'s corner radius from the engine', (await windowRadius()) === '26px', await windowRadius());
   await mock.getByRole('button', { name: 'Full screen' }).click();
-  await page.waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
+  await shellFrame().waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
   check('in full screen the corners are square', (await windowRadius()) === '0px', await windowRadius());
   check('in full screen nothing drags: the empty top row is shell', (await regions('?x=600&y=2')).hit === 'shell' && (await regions()).drag.length === 0, JSON.stringify((await regions()).drag));
   await mock.getByRole('button', { name: 'Full screen' }).click();
-  await page.waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
+  await shellFrame().waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);
   check('and the corners their curve', (await windowRadius()) === '26px', await windowRadius());
   check('and the empty top row drags again', (await regions('?x=600&y=2')).hit === 'drag');
 
+  // The window draws its frame band over the shell and the page, and its controls where
+  // the engine reports them; full screen has none.
+  const band = await page.locator('.band').evaluate((el) => { const s = getComputedStyle(el); return [s.borderTopColor, s.borderLeftWidth, s.borderRadius]; });
+  check('the window draws the frame band in the frame colour, the frame width wide', JSON.stringify(band) === JSON.stringify(['rgb(79, 158, 158)', '4px', '26px']), JSON.stringify(band));
+  const controls = page.locator('.controls');
+  const controlsBox = await controls.boundingBox();
+  check('and its controls where the engine reports them', JSON.stringify(controlsBox) === JSON.stringify({ x: 19, y: 19, width: 60, height: 14 }), JSON.stringify(controlsBox));
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  check('in full screen the window has no controls', await until(async () => !(await controls.isVisible())));
+  await mock.getByRole('button', { name: 'Full screen' }).click();
+  check('and out of it they are back', await until(() => controls.isVisible()));
+
+  // The window's size reaches Go as the real window's does, and the shell's layout follows.
+  const sized = async (w, h) => {
+    const r = await regions();
+    return r.window.W === w && r.window.H === h && r.bounds.w === w - 224 - 4 && r.bounds.y + r.bounds.h === h - 4 && (await placed());
+  };
+  await page.setViewportSize({ width: 900, height: 600 });
+  check('resizing the window reaches Go, and the page follows the shell\'s layout', await until(() => sized(900, 600)), JSON.stringify(await regions()));
+  await page.setViewportSize({ width: 1100, height: 700 });
+  check('and back', await until(() => sized(1100, 700)), JSON.stringify(await regions()));
+
   // Tabs.
-  const rows = page.getByRole('tab');
-  const activeRow = page.locator('.row.tab.active');
+  const rows = ui.getByRole('tab');
+  const activeRow = ui.locator('.row.tab.active');
   const rowTitles = () => rows.evaluateAll((els) => els.map((el) => el.querySelector('.title').textContent));
   check('one tab to start with, active', (await rows.count()) === 1 && (await activeRow.count()) === 1);
   await visit('https://example.org/', 'https://example.org/');
-  await page.getByRole('button', { name: 'New Tab', exact: true }).click();
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('New Tab adds a tab and makes it active', (await activeRow.innerText()).startsWith('New Tab'), await activeRow.innerText());
   check('a new tab has an empty, focused address bar', (await bar.inputValue()) === '' && (await bar.evaluate((el) => el === document.activeElement)));
   await mock.getByText('tab 2', { exact: true }).waitFor();
@@ -298,96 +347,96 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await visit('https://example.net/', 'https://example.net/');
   check('each tab keeps its own title', JSON.stringify(await rowTitles()) === JSON.stringify(['Mock example.org', 'Mock example.net']), JSON.stringify(await rowTitles()));
   await rows.first().click();
-  await page.waitForFunction((v) => document.querySelector('input').value === v, 'https://example.org/');
+  await shellFrame().waitForFunction((v) => document.querySelector('input').value === v, 'https://example.org/');
   check('clicking a row switches tabs and the address bar follows', (await rows.first().getAttribute('aria-selected')) === 'true');
   check('back follows the tab that has history', await back.isEnabled());
   await mock.getByText('tab 1', { exact: true }).waitFor();
   check('the page view shows the active tab', true);
 
   // Favicons come from the page; a tab without one shows none.
-  check('a tab with no favicon shows no icon', (await page.locator('[role=tab] img').count()) === 0);
+  check('a tab with no favicon shows no icon', (await ui.locator('[role=tab] img').count()) === 0);
   await mock.getByRole('button', { name: 'Favicon' }).click();
-  await page.locator('[role=tab][aria-selected=true] img').waitFor();
-  check('the favicon the page gives shows on its row only', (await page.locator('[role=tab] img').count()) === 1);
+  await ui.locator('[role=tab][aria-selected=true] img').waitFor();
+  check('the favicon the page gives shows on its row only', (await ui.locator('[role=tab] img').count()) === 1);
   await visit('https://example.org/', 'https://example.org/');
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab] img').length === 0);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab] img').length === 0);
   check('a new page drops the old favicon', true);
 
   // The page opens a tab.
   await mock.getByRole('button', { name: 'Open in new tab' }).click();
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   await loaded('https://opened.test/');
   check('a tab the page opens appears and is active', (await activeRow.innerText()).includes('opened.test'), await activeRow.innerText());
 
   await shortcut('tab1');
-  await page.waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
+  await shellFrame().waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
   check('Cmd+1 picks the first tab', true);
   await shortcut('nextTab');
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]')[1].getAttribute('aria-selected') === 'true');
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]')[1].getAttribute('aria-selected') === 'true');
   check('Shift+Cmd+] picks the next tab', true);
   await shortcut('closeTab');
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('Cmd+W closes the active tab and its right neighbour takes over', (await activeRow.innerText()).includes('opened.test'), await activeRow.innerText());
   await shortcut('newTab');
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   check('Cmd+T opens a tab', (await bar.inputValue()) === '');
 
   // Close with the button on the row.
-  await rows.nth(1).hover();
+  await hover(rows.nth(1));
   await rows.nth(1).getByRole('button', { name: /^Close/ }).click();
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('the close button on a row closes that tab', !(await rowTitles()).some((t) => t.includes('opened.test')), JSON.stringify(await rowTitles()));
 
   // The sidebar collapses and the page follows.
   await toggle.click();
-  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 0);
+  await shellFrame().waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 0);
   await settle(page);
   r = await regions();
   check('collapsing the sidebar gives its width to the page', r.bounds.x === 4 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '4-collapsed.png') });
   await toggle.click();
-  await page.waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 220);
+  await shellFrame().waitForFunction(() => document.querySelector('nav').getBoundingClientRect().width === 220);
   await settle(page);
   r = await regions();
   check('expanding it takes the width back', r.bounds.x === 224, JSON.stringify(r.bounds));
   await page.screenshot({ path: path.join(out, '5-tabs.png') });
 
   // The same tabs on top. One switch, kept by the managers, drives both layouts.
-  const strip = page.locator('.strip');
-  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  const strip = ui.locator('.strip');
+  await ui.getByRole('button', { name: 'Tabs on top' }).click();
   await strip.waitFor();
   await settle(page);
-  check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await page.locator('.strip [aria-selected=true]').count()) === 1);
+  check('switching puts the same tabs in a strip on top', (await rows.count()) === 2 && (await activeRow.count()) === 0 && (await ui.locator('.strip [aria-selected=true]').count()) === 1);
   check('the strip leaves the window controls their space', (await rows.first().boundingBox()).x === 19 + 60 + 8, String((await rows.first().boundingBox()).x));
-  const joint = await page.evaluate(() => { const shape = document.querySelector('.strip .shape').getBoundingClientRect(); const strip = document.querySelector('.strip').getBoundingClientRect(); return [shape.bottom, strip.bottom]; });
+  const joint = await shellFrame().evaluate(() => { const shape = document.querySelector('.strip .shape').getBoundingClientRect(); const strip = document.querySelector('.strip').getBoundingClientRect(); return [shape.bottom, strip.bottom]; });
   check('the active tab\'s shape runs under the bar, so no line shows between them', joint[0] > joint[1], JSON.stringify(joint));
   r = await regions();
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('and the dev window moves the page there', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
   check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
   check('the bands beside the toolbar under the strip are shell, not drag', (await regions('?x=2&y=60')).hit === 'shell');
-  await page.getByRole('button', { name: 'New Tab', exact: true }).click();
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
+  await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   check('New Tab works from the strip', (await bar.inputValue()) === '');
   await rows.first().click();
-  await page.waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
+  await shellFrame().waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
   check('clicking a strip tab activates it', true);
-  await rows.nth(2).hover();
+  await hover(rows.nth(2));
   await rows.nth(2).getByRole('button', { name: /^Close/ }).click();
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 2);
   check('the close button on a strip tab closes it', true);
   await page.screenshot({ path: path.join(out, '6-horizontal.png') });
-  await page.getByRole('button', { name: 'Tabs on the side' }).click();
-  await page.locator('nav').waitFor();
+  await ui.getByRole('button', { name: 'Tabs on the side' }).click();
+  await ui.locator('nav').waitFor();
   await settle(page);
   check('switching back brings the sidebar and the page follows', (await rows.count()) === 2 && (await regions()).bounds.x === 224);
-  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await ui.getByRole('button', { name: 'Tabs on top' }).click();
   await strip.waitFor();
 
   // Closing the last tab closes the window.
   await shortcut('closeTab');
   await shortcut('closeTab');
-  await page.waitForFunction(() => document.querySelectorAll('[role=tab]').length === 0);
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 0);
   await mock.getByText('Window closed', { exact: true }).waitFor();
   check('closing the last tab closes the window', (await regions()).closed === true);
 
@@ -403,22 +452,23 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('history survives a restart', (await options.count()) === 3, String(await options.count()));
   check('titles survive a restart', /Mock example/.test(await options.first().innerText()));
   await page.keyboard.press('Escape');
-  check('the tab layout survives a restart', (await page.locator('.strip').count()) === 1);
-  await page.getByRole('button', { name: 'Tabs on the side' }).click();
-  await page.locator('nav').waitFor();
-  check('and can be switched back', (await page.locator('.strip').count()) === 0);
+  check('the tab layout survives a restart', (await ui.locator('.strip').count()) === 1);
+  await ui.getByRole('button', { name: 'Tabs on the side' }).click();
+  await ui.locator('nav').waitFor();
+  check('and can be switched back', (await ui.locator('.strip').count()) === 0);
 
   // Phone width.
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   await phone.goto(base + '/');
-  const phoneBar = phone.getByRole('combobox', { name: 'Address' });
+  const phoneUi = phone.frameLocator('iframe.shell');
+  const phoneBar = phoneUi.getByRole('combobox', { name: 'Address' });
   await phone.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   await phoneBar.click();
   await phone.keyboard.type('exam');
-  await phone.getByRole('option').first().waitFor();
+  await phoneUi.getByRole('option').first().waitFor();
   await settle(phone);
   await phone.screenshot({ path: path.join(out, '3-phone.png') });
-  const scroll = await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  const scroll = await phone.frame({ url: /\/shell\/$/ }).evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   check('no horizontal scroll on a phone', scroll);
   // The mock engine keeps one layout, the last any page sent. Left open, this page sends its
   // own again when the server restarts below, and now and then it lands after the other's.
@@ -460,7 +510,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   });
   await new Promise((r) => releaseServer.listen(releasePort, '127.0.0.1', r));
   const updateArgs = () => ['-version=0.1.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`];
-  const bubble = page.locator('.update');
+  const bubble = ui.locator('.update');
 
   fs.rmSync(installed, { recursive: true, force: true });
   fakeApp(installed, '0.1.0');
@@ -469,9 +519,9 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await page.goto(base + '/');
   errors.length = 0;
   await mock.getByRole('button', { name: 'Navigate' }).waitFor();
-  await page.getByText(/Downloading Project B 0\.2\.0… [1-9]\d?%/).waitFor({ timeout: 10000 });
+  await ui.getByText(/Downloading Project B 0\.2\.0… [1-9]\d?%/).waitFor({ timeout: 10000 });
   await settle(page);
-  const progress = Number(await page.getByRole('progressbar', { name: 'Update download' }).getAttribute('aria-valuenow'));
+  const progress = Number(await ui.getByRole('progressbar', { name: 'Update download' }).getAttribute('aria-valuenow'));
   check('the bubble shows how much of the release has arrived', progress > 0 && progress < 100, String(progress));
   await page.screenshot({ path: path.join(out, '7-update-downloading.png') });
   r = await regions();
@@ -480,23 +530,23 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the bubble takes no layout space', JSON.stringify(r.bounds) === pageBounds, JSON.stringify(r.bounds));
   check('the bubble is shell, so its click does not reach the page', r.regions.length === 3 && (await regions(`?x=${bb.x + 10}&y=${bb.y + 10}`)).hit === 'shell', JSON.stringify(r.regions));
   check('just above the bubble is still the page', (await regions(`?x=${bb.x + 10}&y=${bb.y - 10}`)).hit === 'page');
-  const relaunch = page.getByRole('button', { name: /Relaunch to update/ });
+  const relaunch = ui.getByRole('button', { name: /Relaunch to update/ });
   await relaunch.waitFor({ timeout: 10000 });
   await settle(page);
   await page.screenshot({ path: path.join(out, '8-update-ready.png') });
   check('the bubble offers relaunch once the release is checked and staged', /0\.2\.0 is ready/.test(await bubble.innerText()), await bubble.innerText());
   check('the installed app is untouched until relaunch', version(path.join(installed, 'Project B.app')) === '0.1.0');
-  await page.getByRole('button', { name: 'Tabs on top' }).click();
+  await ui.getByRole('button', { name: 'Tabs on top' }).click();
   await strip.waitFor();
   await settle(page);
   r = await regions();
   bb = await bubble.boundingBox();
   check('with the tabs on top the bubble follows the page\'s corner', bb.x === r.bounds.x && bb.x === 4 && bb.y + bb.height === r.bounds.y + r.bounds.h, JSON.stringify({ bb, bounds: r.bounds }));
   await page.screenshot({ path: path.join(out, '9-update-ready-horizontal.png') });
-  await page.getByRole('button', { name: 'Tabs on the side' }).click();
-  await page.locator('nav').waitFor();
+  await ui.getByRole('button', { name: 'Tabs on the side' }).click();
+  await ui.locator('nav').waitFor();
   await relaunch.click();
-  await page.waitForFunction(async () => (await (await fetch('/mock/regions')).json()).closed === true);
+  await until(async () => (await regions()).closed === true);
   check('relaunch puts the new release in place and closes the window', version(path.join(installed, 'Project B.app')) === '0.2.0');
   check('the running release is kept as the previous one', version(path.join(profile, 'updates/previous/Project B.app')) === '0.1.0');
   await stopServer();
@@ -512,7 +562,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await startServer(updateArgs());
   await page.goto(base + '/');
   errors.length = 0;
-  await page.getByText(/Update to 0\.2\.0 failed/).waitFor({ timeout: 10000 });
+  await ui.getByText(/Update to 0\.2\.0 failed/).waitFor({ timeout: 10000 });
   await settle(page);
   await page.screenshot({ path: path.join(out, '10-update-failed.png') });
   check('a corrupted download is refused and the bubble says so', /sha256/.test(await bubble.innerText()), await bubble.innerText());

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project B</title>
+<!--
+  The mock's OS window. On the mock engine the browser tab is the window, and this page
+  holds what the real window holds in native views, bottom to top:
+
+    page      the mock page, where the layout puts the shown tab's page; hidden while
+              that is empty.
+    shell     the shell, over the whole window and transparent, so the page shows through
+              its unpainted hole.
+    band      the frame band around the window's edge, and the window controls where the
+              engine reports them (none in full screen), over both.
+    settings  the settings page over everything while it is open.
+    popup     an extension's popup under its button. The mock runs no extension pages, so
+              it is a card that names the page; a click outside it closes it.
+
+  Go's mock engine says what to draw on /mock/window/events: the state on connecting,
+  then each change, as WindowState in core/mockengine has it. This page tells Go its size
+  on /mock/window/size, as the real window reports its own.
+
+  Each press goes where the real window sends it: the layout's regions decide, drag first,
+  then shell, otherwise the page. The pointer is watched in this document and in both
+  frames', and the shell lets the pointer through to the page while it is over the page's
+  part. The shell never knows it runs here.
+-->
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #6b6b6b; }
+  /* Playwright checks a click's target before it moves the mouse, by hit-testing this
+     document; here what is hit depends on where the pointer last was. A transform on
+     the window makes it check the presses that land in the frame instead. */
+  #window { position: fixed; inset: 0; overflow: hidden; transform: translate(0); }
+  iframe { position: absolute; border: 0; }
+  .mock-page { display: none; }
+  .shell { inset: 0; width: 100%; height: 100%; background: transparent; }
+  .band { position: absolute; inset: 0; box-sizing: border-box; border-style: solid; pointer-events: none; }
+  .controls { position: absolute; display: none; justify-content: space-between; align-items: center; pointer-events: none; }
+  .controls i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 20%); }
+  .controls i:nth-child(1) { background: #ff5f57; }
+  .controls i:nth-child(2) { background: #febc2e; }
+  .controls i:nth-child(3) { background: #28c840; }
+  .mock-settings { inset: 0; width: 100%; height: 100%; background: Canvas; }
+  .mock-popup-backdrop { position: absolute; inset: 0; }
+  .mock-popup {
+    position: absolute; width: 320px; padding: 12px 14px; border-radius: 12px; box-sizing: border-box;
+    background: Canvas; color: CanvasText; font: 13px system-ui;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 25%), 0 8px 24px rgb(0 0 0 / 20%);
+  }
+  .mock-popup .url { margin-top: 6px; opacity: 0.7; word-break: break-all; }
+</style>
+</head>
+<body>
+<div id="window">
+  <iframe class="mock-page" title="Mock page" src="/mock/page"></iframe>
+  <iframe class="shell" title="Shell" src="/shell/"></iframe>
+  <div class="band"></div>
+  <div class="controls"><i></i><i></i><i></i></div>
+</div>
+<script>
+  const win = document.getElementById('window');
+  const page = win.querySelector('.mock-page');
+  const shell = win.querySelector('.shell');
+  const band = win.querySelector('.band');
+  const controls = win.querySelector('.controls');
+  let state = { page: null, regions: [] };
+  let pointer = null;
+  let settings = null;
+  let popup = null;
+
+  // What a press at x, y does, as engine.WindowLayout.At decides it: the first region
+  // that holds the point, which lists the drag areas before the shell's.
+  function areaAt(x, y) {
+    const r = state.regions.find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+    return r ? r.area : 'page';
+  }
+
+  function route() {
+    if (pointer) shell.style.pointerEvents = areaAt(pointer.x, pointer.y) === 'page' ? 'none' : 'auto';
+  }
+
+  // watch follows the pointer in one document, whose point is offset from the window's.
+  // A press holds whatever it began on, so a move with a button down changes nothing.
+  function watch(target, offset) {
+    for (const type of ['pointermove', 'pointerdown', 'wheel']) {
+      target.addEventListener(type, (e) => {
+        if (e.type === 'pointermove' && e.buttons) return;
+        const o = offset();
+        pointer = { x: e.clientX + o.x, y: e.clientY + o.y };
+        route();
+      }, { capture: true, passive: true });
+    }
+  }
+  const origin = () => ({ x: 0, y: 0 });
+  watch(window, origin);
+  page.addEventListener('load', () => watch(page.contentWindow, () => state.page || origin()));
+  shell.addEventListener('load', () => {
+    watch(shell.contentWindow, origin);
+    // Chrome paints a frame opaque when its document's colour scheme differs from the
+    // frame element's, so the element follows the scheme the shell's theme sets.
+    const root = shell.contentDocument.documentElement;
+    const mirror = () => { shell.style.colorScheme = getComputedStyle(root).colorScheme; };
+    new MutationObserver(mirror).observe(root, { attributes: true, attributeFilter: ['style', 'class'] });
+    mirror();
+    // The real window gives the shell the keyboard first.
+    shell.contentWindow.focus();
+  });
+
+  function placePage(r) {
+    const shown = !!r && r.w > 0 && r.h > 0;
+    page.style.display = shown ? 'block' : 'none';
+    if (shown) Object.assign(page.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+  }
+
+  function drawFrame(s) {
+    band.style.borderColor = s.frameColor;
+    band.style.borderWidth = `${s.frameWidth}px`;
+    win.style.background = s.frameColor;
+    win.style.borderRadius = band.style.borderRadius = `${s.cornerRadius}px`;
+    const c = s.controls;
+    controls.style.display = c ? 'flex' : 'none';
+    if (c) Object.assign(controls.style, { left: `${c.x}px`, top: `${c.y}px`, width: `${c.w}px`, height: `${c.h}px` });
+  }
+
+  function showSettings(open) {
+    if (open && !settings) {
+      settings = document.createElement('iframe');
+      settings.className = 'mock-settings';
+      settings.title = 'Settings';
+      settings.src = '/settings/';
+      // The real overlay takes the keyboard as it opens, and gives it back as it closes.
+      settings.addEventListener('load', () => settings?.contentWindow?.focus());
+      win.append(settings);
+    } else if (!open && settings) {
+      settings.remove();
+      settings = null;
+      shell.contentWindow.focus();
+    }
+  }
+
+  function showPopup(p) {
+    popup?.remove();
+    popup = null;
+    if (!p) return;
+    popup = document.createElement('div');
+    popup.className = 'mock-popup-backdrop';
+    const card = document.createElement('div');
+    card.className = 'mock-popup';
+    card.dataset.extension = p.extension;
+    const a = p.anchor;
+    Object.assign(card.style, { top: `${a.y + a.h + 6}px`, left: `${Math.max(8, a.x + a.w - 320)}px` });
+    card.innerHTML = '<b>Extension popup</b><div class="url"></div>';
+    card.querySelector('.url').textContent = p.url;
+    card.addEventListener('mousedown', (e) => e.stopPropagation());
+    popup.addEventListener('mousedown', () => {
+      fetch('/mock/extensions/fire', { method: 'POST', body: new URLSearchParams({ kind: 'closePopup', extension: p.extension }) });
+    });
+    popup.append(card);
+    win.append(popup);
+  }
+
+  new EventSource('/mock/window/events').onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.t !== 'window') return;
+    state = msg;
+    placePage(msg.page);
+    drawFrame(msg);
+    route();
+    showSettings(msg.settings);
+    showPopup(msg.popup);
+  };
+
+  // The window's size, which Go hears as the real window reports its own.
+  function reportSize() {
+    fetch('/mock/window/size', { method: 'POST', body: new URLSearchParams({ w: innerWidth, h: innerHeight }) });
+  }
+  addEventListener('resize', reportSize);
+  reportSize();
+</script>
+</body>
+</html>

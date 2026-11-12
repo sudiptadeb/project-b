@@ -72,13 +72,10 @@ func TestPageEntryIsNoLaterThanItsArrival(t *testing.T) {
 	}
 }
 
-func TestPageWithoutOriginIsStampedOnArrival(t *testing.T) {
+func TestWallClockTimeLandsOnTheTimeline(t *testing.T) {
 	m := New(nil)
-	before := m.Now()
-	m.FromPage("settings", []byte(`{"kind":"mark","name":"settings.mounted","at":99999}`))
-	entries, _ := m.Since(0)
-	if e := entries[0]; e.T < before || e.T > m.Now() {
-		t.Fatalf("stamped %d, outside %d to now", e.T, before)
+	if got := m.FromWall(m.origin.Add(2 * time.Second)); got != 2_000_000_000 {
+		t.Fatalf("2 s after the origin is %d on the timeline", got)
 	}
 }
 

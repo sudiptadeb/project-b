@@ -12,7 +12,6 @@ export { phone };
 const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 
 export const state = reactive({
-  engine: '',
   tabs: [],
   active: 0,
   // Where the tabs go: 'vertical' (a sidebar) or 'horizontal' (a strip on top).
@@ -92,7 +91,6 @@ export function connect() {
       extensionsMessage(m);
       switch (m.t) {
         case 'snapshot':
-          state.engine = m.engine;
           state.tabs = m.tabs;
           state.active = m.active;
           state.windowColor = m.windowColor;

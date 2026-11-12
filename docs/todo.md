@@ -60,6 +60,11 @@ Take an item off when it lands or is dropped.
 - Move focus decisions into Go (fixes Cmd+W pressed twice quickly).
 - A single-instance lock.
 - An engine stress test against other engines, once the owner calls the engine solid.
+- **Extensions, later** ([extensions.md](extensions.md#open-for-the-owner)): updates on a
+  timer, from the store each extension came from; an update that asks for more permissions
+  turned off until the user agrees, as Chrome does; keys for extension commands, with the
+  keymap; and trying Bitwarden, Okta, 1Password (needs `nativeMessaging`) and Grammarly
+  (needs `identity`) past their install.
 - A comparison of JS frameworks for the shell, and the final language decision.
 
 ## Small fixes

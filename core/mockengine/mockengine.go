@@ -265,7 +265,7 @@ func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 	win.layout = l
 	win.hidden = win.hidden[:0]
 	for _, id := range win.visible {
-		if !slices.Contains(visible, id) && e.tabs[id] != nil {
+		if !slices.Contains(visible, id) && e.tabs[id] != nil && !e.shownElsewhere(w, id) {
 			win.hidden = append(win.hidden, id)
 		}
 	}
@@ -282,6 +282,17 @@ func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 			e.publishPage(w, shown, t.state, t.current)
 		}
 	}
+}
+
+// shownElsewhere says whether a window other than w shows a tab: one that moved there,
+// which the real engine doesn't tell it is hidden as it leaves w.
+func (e *Engine) shownElsewhere(w engine.WindowID, id engine.TabID) bool {
+	for other, win := range e.windows {
+		if other != w && slices.Contains(win.visible, id) {
+			return true
+		}
+	}
+	return false
 }
 
 // Page is where a layout puts the first visible tab's page, which the mock page shows,

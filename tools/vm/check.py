@@ -272,34 +272,45 @@ def field_middle(img, win, x):
 CAL = "/tmp/pb-layout"  # In the guest: the driver's pipe, its output and a throwaway profile.
 
 
+def driven(where, profile):
+    """Opens the installed app with its driver (--pb-driver, as tools/drive_first_app.py uses
+    it), on a profile of its own, keeping the driver's pipe and the app's output in where in
+    the guest. Returns ask(*parts), which sends one driver command and returns its answer,
+    once the driver has started."""
+    guest("/bin/sh", "-c", f"rm -rf {where}; mkdir -p {where} && mkfifo {where}/fifo")
+    fresh_profile(profile, profile)
+    guest("/usr/bin/open", "-n", "--stdout", f"{where}/out", "--stderr", f"{where}/err", APP, "--args",
+          f"--pb-driver={where}/fifo", f"--user-data-dir={profile}")
+    asked = [0]
+
+    def reply(key, timeout=30):
+        end = time.time() + timeout
+        while time.time() < end:
+            for line in guest("/bin/cat", f"{where}/out").splitlines():
+                if line.startswith(f"PBDRIVER {key} "):
+                    return line[len(f"PBDRIVER {key} "):]
+            time.sleep(0.3)
+        sys.exit(f"the app's driver didn't answer {key}; its output: {guest('/bin/cat', f'{where}/out', f'{where}/err')[-2000:]}")
+
+    def ask(*parts):
+        asked[0] += 1
+        guest("/bin/sh", "-c", 'printf "%s\\n" "$1" > "$2"', "sh", " ".join([str(asked[0]), *parts]), f"{where}/fifo")
+        return reply(asked[0])
+
+    reply("start")
+    return ask
+
+
 def layout():
     """Where the shell draws everything the checks click, in both tab layouts, asked from the
-    installed app through its driver (--pb-driver, as tools/drive_first_app.py uses it).
+    installed app through its driver.
 
     A launch of its own, with its own profile, so the checks after it still start from a fresh
     app. Returns the shell's rectangles as (x, y, w, h) in window points from the top left for
     the window size it opened at, with two tabs open, and AppKit's own report of the window
     buttons and the page ("bounds").
     """
-    guest("/bin/sh", "-c", f"rm -rf {CAL}; mkdir -p {CAL} && mkfifo {CAL}/fifo")
-    fresh_profile(f"{CAL}/profile", f"{CAL}/profile")
-    guest("/usr/bin/open", "-n", "--stdout", f"{CAL}/out", "--stderr", f"{CAL}/err", APP, "--args",
-          f"--pb-driver={CAL}/fifo", f"--user-data-dir={CAL}/profile")
-    asked = [0]
-
-    def reply(key, timeout=30):
-        end = time.time() + timeout
-        while time.time() < end:
-            for line in guest("/bin/cat", f"{CAL}/out").splitlines():
-                if line.startswith(f"PBDRIVER {key} "):
-                    return line[len(f"PBDRIVER {key} "):]
-            time.sleep(0.3)
-        sys.exit(f"the app's driver didn't answer {key}; its output: {guest('/bin/cat', f'{CAL}/out', f'{CAL}/err')[-2000:]}")
-
-    def ask(*parts):
-        asked[0] += 1
-        guest("/bin/sh", "-c", 'printf "%s\\n" "$1" > "$2"', "sh", " ".join([str(asked[0]), *parts]), f"{CAL}/fifo")
-        return reply(asked[0])
+    ask = driven(CAL, f"{CAL}/profile")
 
     def js(expr):
         return json.loads(ask("eval", expr) or "null")
@@ -322,7 +333,6 @@ def layout():
         found["bounds"] = json.loads(ask("bounds"))
         return found
 
-    reply("start")
     until("!!document.querySelector('input')")
     js("document.querySelector('.new-tab').click()")
     until("document.querySelectorAll('[role=tab]').length===2")
@@ -641,6 +651,35 @@ def window_checks():
         guest("/usr/bin/killall", "project_b")
 
 
+MOVE = "/tmp/pb-move"  # In the guest: the driver's pipe and output, and a profile, for move_checks.
+ALPHA_RGB = (43, 108, 176)  # alpha.html's colour.
+
+
+def move_checks():
+    """A tab moved to the other window arrives there still showing its page. The move is
+    Go's, asked for through the driver's own DevTools command, ProjectB.moveTab."""
+    guest("/usr/bin/killall", "project_b")
+    ask = driven(MOVE, f"{MOVE}/profile")
+    window_or_stop("the app starts with one window")
+    go_to(ALPHA)
+    until(titles, lambda t: t == ["Alpha"])
+    desk.key("cmd+t")
+    go_to(BRAVO)
+    until(titles, lambda t: t == ["Bravo"])
+    desk.key("cmd+n")
+    until(windows, lambda w: len(w) == 2)
+    shot("move-before")
+    ask("projectb", "moveTab", json.dumps({"tab": 1, "window": 2, "index": 0}))
+    now = until(titles, lambda t: sorted(t) == ["Alpha", "Bravo"])
+    front = windows()[0]
+    middle_of_page = crop(desk.image(), front[0] + front[2] / 2, front[1] + front[3] / 2, 40, 40)
+    shot("move-after")
+    check("a tab moved to the other window arrives there showing its page",
+          now[:1] == ["Alpha"] and float(np.mean(near(middle_of_page, ALPHA_RGB))) > 0.9, str(now))
+    desk.key("cmd+q")
+    until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10)
+
+
 if why := missing():
     screen.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
 os.makedirs(SHOTS, exist_ok=True)
@@ -667,6 +706,7 @@ time.sleep(1)
 # "check.py windows" runs only the checks of several windows.
 if sys.argv[1:] == ["windows"]:
     window_checks()
+    move_checks()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 
@@ -1125,5 +1165,6 @@ check("the layout button brings the tabs back to the side", float(np.mean(near(c
 
 check("Cmd+Q ends the app", quit_app())
 window_checks()
+move_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

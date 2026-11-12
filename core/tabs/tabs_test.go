@@ -230,3 +230,27 @@ func TestRemovingAWindowClosesItsTabs(t *testing.T) {
 		t.Fatalf("closed %v, all %v", e.closed, ids(m.All()))
 	}
 }
+
+// A tab moves to a place in another window's list, keeps its id and is active there; the
+// window it left goes on as if it had closed there, and one left empty is emptied.
+func TestMovingATabBetweenWindows(t *testing.T) {
+	e := &fakeEngine{}
+	m := oneWindow(e)
+	a, b := m.Create(), m.Create()
+	m.AddWindow(2)
+	c := m.Create()
+	var emptied []engine.WindowID
+	m.OnEmpty(func(w engine.WindowID) { emptied = append(emptied, w) })
+
+	m.Move(b, 2, 0)
+	if m.WindowOf(b) != 2 || !slices.Equal(ids(m.AllIn(2)), []engine.TabID{b, c}) || m.ActiveIn(2) != b {
+		t.Fatalf("window 2 %v active %v", ids(m.AllIn(2)), m.ActiveIn(2))
+	}
+	if !slices.Equal(ids(m.AllIn(1)), []engine.TabID{a}) || m.ActiveIn(1) != a || len(e.closed) != 0 {
+		t.Fatalf("window 1 %v active %v, closed %v", ids(m.AllIn(1)), m.ActiveIn(1), e.closed)
+	}
+	m.Move(a, 2, 2)
+	if !slices.Equal(ids(m.AllIn(2)), []engine.TabID{b, c, a}) || !slices.Equal(emptied, []engine.WindowID{1}) || len(e.closed) != 0 {
+		t.Fatalf("window 2 %v, emptied %v, closed %v", ids(m.AllIn(2)), emptied, e.closed)
+	}
+}

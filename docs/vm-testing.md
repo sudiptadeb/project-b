@@ -178,13 +178,15 @@ app with real keys and clicks: Cmd+N makes a second window, a little down and ri
 first and the same size; Cmd+L and typing go to the window clicked; a second start of the app
 with a URL opens it in a new tab in the window used last, which comes to the front; the Window
 menu lists both windows, and Cmd+` brings the other one to the front; Cmd+W on
-a window's last tab closes that window; and Shift+Cmd+W on the last window quits the app.
+a window's last tab closes that window; Shift+Cmd+W on the last window quits the app; and
+a tab moved to the other window, through the driver's `ProjectB.moveTab`, arrives there
+still showing its page.
 Which window shows what is read from the windows' titles, each its shown tab's, through
 System Events in the VM, and the windows' frames from the window server. They run alone with
 
     tools/vm/run.sh <DMG path or URL> windows
 
-On 2026-11-13 all eight passed on this branch's build. The Window menu's list and Cmd+` are
+On 2026-11-13 all nine passed on this branch's build. The Window menu's list and Cmd+` are
 AppKit's own, with nothing of ours: the list follows the windows' titles, and Cmd+` makes
 another window key, which the engine reports to Go like any other.
 

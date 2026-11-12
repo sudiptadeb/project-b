@@ -576,6 +576,15 @@ void Run(const std::string& line) {
     PBValue result{};
     hooks::Ask(PB_EVENT_DEVTOOLS_COMMAND, args, &result);
     Reply(id, hooks::TakeString(result));
+  } else if (cmd == "projectb") {
+    // One of our own DevTools commands, "projectb <method> <params json>", as a client of
+    // the debugging port sends ProjectB.<method>: Go's answer is the reply.
+    hooks::Args args;
+    args.Str("ProjectB." + parts[2]);
+    args.Str(rest(3));
+    PBValue result{};
+    hooks::Ask(PB_EVENT_DEVTOOLS_COMMAND, args, &result);
+    Reply(id, hooks::TakeString(result));
   } else if (cmd == "color") {
     NSColor* c = [TheWindow().backgroundColor
         colorUsingColorSpace:NSColorSpace.sRGBColorSpace];

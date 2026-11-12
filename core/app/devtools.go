@@ -14,6 +14,9 @@ import (
 //	ProjectB.isAllowedURL {url}   {allowed: whether policy lets a tab load it}
 //	ProjectB.panic                panics in Go, as a bug would
 //	ProjectB.getTimeline {since}  {entries: [the timeline kept in memory, after entry since], last: seq}
+//	ProjectB.moveTab {tab, window, index}
+//	                              moves a tab to a place in another window's list, or with
+//	                              window 0 into a new window of its own: {window: where it is}
 //
 // The port is only open when the app is started with --remote-debugging-port, and a
 // client of it can already drive the whole browser.
@@ -38,6 +41,20 @@ func (a *App) DevToolsCommand(method string, params []byte) (any, error) {
 		}
 		entries, last := timeline.Since(p.Since)
 		return map[string]any{"entries": entries, "last": last}, nil
+	case "ProjectB.moveTab":
+		var p struct {
+			Tab    engine.TabID    `json:"tab"`
+			Window engine.WindowID `json:"window"`
+			Index  int             `json:"index"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		if p.Window == 0 {
+			return map[string]any{"window": a.NewWindowWith(p.Tab)}, nil
+		}
+		a.Tabs.Move(p.Tab, p.Window, p.Index)
+		return map[string]any{"window": p.Window}, nil
 	case "ProjectB.panic":
 		panic("ProjectB.panic, asked for over DevTools")
 	}

@@ -31,7 +31,7 @@ func (a *App) registerActions(e engine.Engine) {
 
 	add("tab.new", "New Tab", func() { a.Shell.Interaction(a.Tabs.Front(), "tab.new", func() { a.Tabs.Create() }) })
 	add("address.focus", "Open Location…", func() { a.Shell.FocusAddressBar(a.Tabs.Front()) })
-	add("window.new", "New Window", a.NewWindow)
+	add("window.new", "New Window", func() { a.NewWindow() })
 	add("window.close", "Close Window", func() { a.Window.Request(a.Tabs.Front(), engine.WindowClose) })
 	// The settings page sits over the tabs like a tab of its own, so closing the tab
 	// closes it first.

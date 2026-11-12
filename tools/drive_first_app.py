@@ -13,6 +13,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py cookies    # only cookies kept across a restart
     python3 tools/drive_first_app.py visible    # only the tabs a window shows
     python3 tools/drive_first_app.py windows    # only several windows
+    python3 tools/drive_first_app.py move       # only moving a tab between windows
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -1123,6 +1124,65 @@ def window_checks():
     App.running.remove(app)
 
 
+def move_checks():
+    """A tab moving to another window keeps its id and its page: nothing reloads, a form
+    keeps what was typed, a timer goes on, and the window it arrives in shows it. A tab can
+    move into a new window of its own, and a window whose last tab leaves closes. The move
+    is Go's, asked for through our own DevTools command."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    app.wait("!!document.querySelector('input')", 30)
+    windows = lambda: json.loads(app.cmd("windows"))
+    move = lambda tab, window: json.loads(app.cmd("projectb", "moveTab", json.dumps({"tab": tab, "window": window, "index": 0})))
+    visit(app, "data:text/html,<title>Kept</title><input id=f><script>n=0;setInterval(()=>n++,20)</script>")
+    app.js("document.getElementById('f').value='typed';window.kept=42", page=True)
+    app.cmd("key", "cmd+t")
+    app.wait(f"{ROWS}===2")
+    app.cmd("key", "cmd+n")
+    deadline = time.time() + 10
+    while len(windows()) < 2 and time.time() < deadline:
+        time.sleep(0.05)
+
+    move(1, 2)
+    deadline = time.time() + 10
+    while windows()[1]["tabs"] != [1] and time.time() < deadline:
+        time.sleep(0.05)
+    check("a tab moved to another window shows there", [w["tabs"] for w in windows()] == [[2], [1]], windows())
+    kept = json.loads(app.cmd("evaltab", 1, "[window.kept, document.getElementById('f').value, n]"))
+    check("its page didn't reload: what the page and the form held is there", kept[:2] == [42, "typed"], kept)
+    deadline = time.time() + 5
+    later = kept[2]
+    while later <= kept[2] and time.time() < deadline:
+        later = json.loads(app.cmd("evaltab", 1, "n"))
+    check("and it goes on running", later > kept[2], (kept[2], later))
+    app.cmd("window", 2)
+    visible = json.loads(app.cmd("visible"))
+    check("the window it arrived in shows its view and tells it it is shown",
+          [(v["tab"], v["hidden"], v["shown"]) for v in visible] == [(1, False, True)], visible)
+    check("both shells list their tabs: two in the window it arrived in, the moved one active",
+          app.js(f"{ROWS}") == 2 and app.js(ACTIVE_ROW_TITLE) == "Kept", app.js(ACTIVE_ROW_TITLE))
+    app.cmd("window", 1)
+    check("and one in the window it left", app.js(f"{ROWS}") == 1)
+
+    # Into a new window of its own, which starts with it and no tab of its own.
+    move(3, 0)
+    deadline = time.time() + 10
+    while [w["tabs"] for w in windows()][2:] != [[3]] and time.time() < deadline:
+        time.sleep(0.05)
+    check("a tab moved into a new window is that window's only tab", [w["tabs"] for w in windows()][2:] == [[3]] and
+          [w["id"] for w in windows()] == [1, 2, 3], windows())
+
+    # The first window's last tab leaves, and it closes.
+    move(2, 3)
+    deadline = time.time() + 10
+    while len(windows()) > 2 and time.time() < deadline:
+        time.sleep(0.05)
+    check("a window whose last tab moves away closes", [w["id"] for w in windows()] == [2, 3], windows())
+    app.cmd("window", 2)
+    app.cmd("key", "cmd+q")
+    check("Cmd+Q ends the app with both windows, cleanly", app.proc.wait(timeout=20) == 0)
+    App.running.remove(app)
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1141,5 +1201,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, cookie_checks]))

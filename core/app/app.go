@@ -130,9 +130,22 @@ func (a *App) openWindow() engine.WindowID {
 	return w
 }
 
-// NewWindow opens a window with one new tab.
-func (a *App) NewWindow() {
-	a.Tabs.CreateIn(a.openWindow())
+// NewWindow opens a window with one new tab, and returns both.
+func (a *App) NewWindow() (engine.WindowID, engine.TabID) {
+	w := a.openWindow()
+	return w, a.Tabs.CreateIn(w)
+}
+
+// NewWindowWith opens a window holding a tab moved out of its window, with no tab of its
+// own, and returns it. A tab that is its window's only one has a window already: it stays,
+// and that window is the one returned.
+func (a *App) NewWindowWith(tab engine.TabID) engine.WindowID {
+	if w := a.Tabs.WindowOf(tab); len(a.Tabs.AllIn(w)) == 1 {
+		return w
+	}
+	w := a.openWindow()
+	a.Tabs.Move(tab, w, 0)
+	return w
 }
 
 // Stop flushes what's pending and says the run ended cleanly. Call it on the way out.

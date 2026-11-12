@@ -264,16 +264,47 @@ func (m *Manager) Close(id engine.TabID) {
 		return
 	}
 	w := m.windowOf[id]
+	i := m.detach(id)
+	delete(m.tabs, id)
+	m.eng.CloseTab(id)
+	m.left(w, id, i)
+}
+
+// Move moves a tab to window w, at index in its list, and makes it the active tab there.
+// The tab keeps its id and its page goes on running. The window it left goes on as if the
+// tab had closed there.
+func (m *Manager) Move(id engine.TabID, w engine.WindowID, index int) {
+	if m.tabs[id] == nil {
+		return
+	}
+	from := m.windowOf[id]
+	i := m.detach(id)
+	m.windowOf[id] = w
 	win := m.windows[w]
+	win.order = slices.Insert(win.order, index, id)
+	win.recent = append(win.recent, id)
+	win.active = id
+	win.touch(id)
+	m.left(from, id, i)
+}
+
+// detach takes a tab out of its window's lists, and says where it was in its order.
+func (m *Manager) detach(id engine.TabID) int {
+	win := m.windows[m.windowOf[id]]
 	win.endCycle()
 	i := slices.Index(win.order, id)
-	delete(m.tabs, id)
 	delete(m.windowOf, id)
 	win.order = slices.Delete(win.order, i, i+1)
 	if j := slices.Index(win.recent, id); j >= 0 {
 		win.recent = slices.Delete(win.recent, j, j+1)
 	}
-	m.eng.CloseTab(id)
+	return i
+}
+
+// left is what window w does once a tab at position i has left it: with no tabs it fires
+// OnEmpty; if the tab was active, its right neighbour, or the left one at the end, is.
+func (m *Manager) left(w engine.WindowID, id engine.TabID, i int) {
+	win := m.windows[w]
 	if len(win.order) == 0 {
 		win.active = 0
 		m.listChanged()

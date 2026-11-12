@@ -13,6 +13,7 @@ import (
 	"projectb/app"
 	"projectb/engine"
 	"projectb/mockengine"
+	"projectb/tabs"
 )
 
 // rig runs the real managers on the mock engine, as the dev server does.
@@ -652,5 +653,75 @@ func TestAShellCrashResetsOnlyItsWindow(t *testing.T) {
 	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
 	if len(snap["tabs"].([]any)) != 2 {
 		t.Fatalf("the reloaded shell's snapshot: %v", snap["tabs"])
+	}
+}
+
+// moveTab asks Go to move a tab, as ProjectB.moveTab does over DevTools.
+func (r *rig) moveTab(tab engine.TabID, window engine.WindowID, index int) {
+	r.t.Helper()
+	r.e.Post(func() {
+		if _, err := r.a.DevToolsCommand("ProjectB.moveTab", []byte(fmt.Sprintf(`{"tab":%d,"window":%d,"index":%d}`, tab, window, index))); err != nil {
+			r.t.Errorf("moveTab: %v", err)
+		}
+	})
+	r.e.Settle()
+}
+
+// A tab moves to another window, where it is the active tab, and both shells hear their
+// new lists; a window whose last tab moves away closes. A tab moved into a new window of
+// its own is that window's only tab, and a window's only tab doesn't move.
+func TestMovingATabToAnotherWindow(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	second := r.openSecondWindow()
+	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	inSecond := snap["active"].(float64)
+	r.e.Fire(1, "focus", "")
+	r.e.Fire(1, "key", "newTab")
+	r.waitFor(isTabs(2))
+
+	r.moveTab(1, 2, 0)
+	m := r.waitOn(second, isTabs(2))
+	if m["active"] != float64(1) || m["tabs"].([]any)[0].(map[string]any)["id"] != float64(1) {
+		t.Fatalf("window 2 after the move: %v", m)
+	}
+	r.waitFor(isTabs(1))
+
+	// Into a new window of its own: window 3 starts with the tab, and no tab of its own.
+	third, stop := r.e.Feeds(3).Shell.Subscribe()
+	t.Cleanup(stop)
+	var made engine.WindowID
+	r.e.Post(func() { made = r.a.NewWindowWith(engine.TabID(inSecond)) })
+	r.e.Settle()
+	if made != 3 {
+		t.Fatalf("the new window holding the tab is %v", made)
+	}
+	r.e.Post(func() { r.a.ShellMessage(3, []byte(`{"t":"ready"}`)) })
+	snap = r.waitOn(third, func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if tabs := snap["tabs"].([]any); len(tabs) != 1 || snap["active"] != inSecond {
+		t.Fatalf("window 3: %v active %v", tabs, snap["active"])
+	}
+	// Its only tab has a window already, which is the one Go answers with.
+	var stays engine.WindowID
+	r.e.Post(func() { stays = r.a.NewWindowWith(engine.TabID(inSecond)) })
+	r.e.Settle()
+	if w := r.e.Windows(); stays != 3 || !slices.Equal(w, []engine.WindowID{1, 2, 3}) {
+		t.Fatalf("moving a window's only tab out answered %v; windows %v", stays, w)
+	}
+
+	// Window 3's last tab moves to window 1, and window 3 closes.
+	r.moveTab(engine.TabID(inSecond), 1, 0)
+	if !r.e.Closed(3) || !slices.Equal(r.e.Windows(), []engine.WindowID{1, 2}) {
+		t.Fatalf("closed %v, windows %v", r.e.Closed(3), r.e.Windows())
+	}
+
+	// A new window answers with its id and its first tab's.
+	var w engine.WindowID
+	var tab engine.TabID
+	var in []tabs.Tab
+	r.e.Post(func() { w, tab = r.a.NewWindow(); in = r.a.Tabs.AllIn(w) })
+	r.e.Settle()
+	if w != 4 || len(in) != 1 || in[0].ID != tab {
+		t.Fatalf("NewWindow answered %v %v; its tabs %+v", w, tab, in)
 	}
 }

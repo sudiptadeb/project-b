@@ -23,7 +23,14 @@ behind it is `project-b-research/windows-survey.md`.
   change of size. The shell is still "page 0" to the hooks, so a key doesn't say which
   window it came from; keys go to the window in front.
 - Extensions see one window, id 1, and "the current window" is the window in front;
-  DevTools' `newWindow` opens a tab. Moving a tab to another window isn't built.
+  DevTools' `newWindow` opens a tab.
+- Go moves a tab to a place in another window's list, or into a new window made for it,
+  which then holds only that tab (`tabs.Manager.Move`, `App.NewWindowWith`). The tab keeps
+  its id and its page goes on running: the engine moves its view when the other window's
+  layout lists it, and tells it nothing hidden. The window it arrives in makes it active;
+  the one it left goes on as if it had closed there, and closes if it was its last tab.
+  Both shells hear it in their tab lists. Nothing in the app asks for a move yet; the
+  driver and DevTools do, through `ProjectB.moveTab`.
 
 ## What changes
 
@@ -66,10 +73,11 @@ front.
 
 Each commit builds and leaves a working app.
 
-1. A window id on every window call and event, with one window.
-2. The list of visible tabs in the layout, with one entry; `ShowTab` goes.
-3. A second window: making one, closing one, the window in front, Cmd+N, commands and
-   menus following it, quit apart from close, the handover into the window used last.
-4. What macOS expects of an app with several windows: the Window menu's list and Cmd+`.
-5. Moving a tab to another window.
+1. Done. A window id on every window call and event, with one window.
+2. Done. The list of visible tabs in the layout, with one entry; `ShowTab` goes.
+3. Done. A second window: making one, closing one, the window in front, Cmd+N, commands
+   and menus following it, quit apart from close, the handover into the window used last.
+4. Done. What macOS expects of an app with several windows: the Window menu's list and
+   Cmd+`.
+5. Done. Moving a tab to another window.
 6. Extensions' `chrome.windows` and DevTools' window calls with real windows.

@@ -5,7 +5,7 @@ the Extensions flag is on (Settings, Flags; [flags.md](flags.md)). It is off by 
 This is the design as built. The research behind it is in
 `project-b-research/chrome-extensions.md` and `chrome-extensions-reassessment.md`.
 
-    tools/fetch-extensions.sh                     # five real packages into .tools/extensions/
+    tools/fetch-extensions.sh                     # six real packages into .tools/extensions/
     tools/pack-test-extension.py                  # ours, packed into the same folder
     (cd core && go run ./cmd/extstore -dir ../.tools/extensions)    # the mock store, on 127.0.0.1:8766
     tools/build.sh                                # extensions are in the build by default
@@ -21,7 +21,7 @@ and visit `http://127.0.0.1:8766/`.
 
 What works today, in the real app: uBlock Origin Lite installs from the real Chrome Web Store's
 page, and it and the test extension from the mock store's page, each with the prompt; uBlock Origin Lite blocks, and shows its count on its button;
-content scripts, service workers, messaging and `chrome.storage` run; buttons pin and unpin;
+content scripts, service workers, messaging both ways and `chrome.storage` run; Fonts Ninja opens its panel; buttons pin and unpin;
 popups open, size themselves and take clicks; Load unpacked and a local `.crx` install; and all
 of it is there again after a restart.
 
@@ -121,6 +121,11 @@ Go's answer, a result or an error, goes back. The names come from Chrome's schem
 nothing lists them twice. A function Go doesn't have answers "… is not available in Project B",
 as a call Chrome refuses does.
 
+**Messages to a tab.** `tabs.sendMessage` and `tabs.connect` open a message channel, as
+`runtime.sendMessage` does the other way, and never reach Go as calls. Chrome answers them in
+its renderer code (`//chrome`); ours are `engine/extensions/renderer/tabs_hooks.cc`, and the
+browser finds the tab by Go's id in `api_client.cc`.
+
 **One event path.** Go fires `tabs.onCreated`, `onUpdated`, `onActivated`, `onRemoved` and
 `action.onClicked` with `DispatchExtensionEvent`, one extension at a time, because what a tab
 object holds depends on who reads it.
@@ -161,6 +166,10 @@ the extension, taking a picture of a tab. Such a function is a subclass of `GoFu
 `engine/extensions/browser/<api>_functions.cc`, declared in `engine_functions.h` and listed
 in `kEngineFunctions` in `go_function.cc`. It does the engine's part and then calls `Ask`
 with the arguments Go should see, so the decision stays in Go. `action.setIcon` is one.
+
+**A function that runs in the page.** A few never reach the browser as a function call:
+Chrome answers them in the renderer, with a hooks delegate. Ours are in
+`engine/extensions/renderer/`, registered in `api_provider.cc`; `tabs.sendMessage` is one.
 
 ## Installing: the store is a website
 
@@ -229,7 +238,7 @@ the folder `tools/fetch-extensions.sh` fills, `.tools/extensions/`, which git ig
 - `GET /icon/<id>.png`.
 - `GET /update?x=id%3D<id>%26v%3D<version>%26uc`: gupdate XML in the Web Store's shape. Nothing reads it yet.
 
-It serves uBlock Origin Lite, Bitwarden, Okta, 1Password and Grammarly, fetched from the Web
+It serves uBlock Origin Lite, Bitwarden, Okta, 1Password, Grammarly and Fonts Ninja, fetched from the Web
 Store's public update endpoint, and one of ours: `tools/test-extension/`, a small Manifest V3
 extension with an action popup, a content script, storage, tabs and messaging.
 `tools/pack-test-extension.py [version]` packs it as a CRX3 into the store's folder, signed with
@@ -304,7 +313,8 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   section's switch and Relaunch turn it on. Started with the mock store as
   its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
   sees the content script run and an ad host blocked, pins and unpins, opens the popup and
-  clicks in it, restarts, turns one off and removes it. Then, started as it ships, it opens the
+  clicks in it, has its service worker message the tab, restarts, turns one off and removes it.
+  Fonts Ninja, installed the same way, opens its panel on the page when its button is pressed. Then, started as it ships, it opens the
   Chrome Web Store from the extension manager, installs uBlock Origin Lite with the real page's
   "Add to Chrome", and sees it block. It needs the network, and Google's page as it is today.
   Its first wait, 30 s for the store's tab, has run out once with the store answering; the
@@ -361,11 +371,7 @@ Every check below was left out on purpose, to be discussed and then built or dro
 
 ## Open for the owner
 
-- **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`. So are
-  `tabs.sendMessage` and `tabs.connect` from the extension to a tab: Chrome implements both in
-  `//chrome`'s renderer code. Messages from a content script to its extension work.
-  Fonts Ninja shows it: its button sends the page a message, so pressing it does nothing.
-  `tools/drive_extensions.py` reports it on a `known` line, and fails once it works.
+- **`action.setIcon` with a canvas bitmap** (`imageData`) isn't supported, only `path`.
 - **Extension commands have no keys.** `commands.getAll` lists them without shortcuts, and
   nothing fires `commands.onCommand`. They belong in the keymap, with the menus work.
 - **`action.openPopup`, `tabs.query` by `url` or `title`, `tabs.move`, zoom, `captureVisibleTab`,

@@ -66,8 +66,12 @@ source_set("common") {
     sources += [
       "extensions/common/extensions_client.cc",
       "extensions/common/extensions_client.h",
+      "extensions/renderer/api_provider.cc",
+      "extensions/renderer/api_provider.h",
       "extensions/renderer/content_renderer_client.cc",
       "extensions/renderer/content_renderer_client.h",
+      "extensions/renderer/tabs_hooks.cc",
+      "extensions/renderer/tabs_hooks.h",
       "extensions/utility/content_utility_client.cc",
       "extensions/utility/content_utility_client.h",
     ]

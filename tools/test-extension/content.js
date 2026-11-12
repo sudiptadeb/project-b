@@ -3,3 +3,16 @@
 chrome.runtime.sendMessage({ type: 'page' }).then((answer) => {
   document.documentElement.dataset.pbTestExtension = JSON.stringify(answer);
 });
+
+// The background script's messages to this tab: an answer to one, and a port.
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message.type === 'hello') {
+    respond({ href: location.href });
+  }
+});
+chrome.runtime.onConnect.addListener((port) => {
+  port.onMessage.addListener((m) => {
+    document.documentElement.dataset.pbTabMessages = JSON.stringify(m);
+  });
+  port.postMessage({ href: location.href });
+});

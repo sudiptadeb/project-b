@@ -12,6 +12,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       await chrome.storage.local.set({ pages });
       await chrome.action.setBadgeText({ text: String(pages) });
       respond({ pages, tab: sender.tab.id, version: chrome.runtime.getManifest().version });
+      // And messages the tab back, once and over a port, as tabs.sendMessage and
+      // tabs.connect do.
+      const answer = await chrome.tabs.sendMessage(sender.tab.id, { type: 'hello' });
+      const port = chrome.tabs.connect(sender.tab.id, { name: 'test' });
+      port.onMessage.addListener((m) => port.postMessage({ type: 'answered', sent: answer.href, got: m.href }));
     });
     return true;
   }

@@ -227,6 +227,9 @@ def extension_checks():
     app.wait("!!document.documentElement.dataset.pbTestExtension", 30, page=True)
     answer = json.loads(app.js("document.documentElement.dataset.pbTestExtension", page=True))
     check("a content script runs and its message is answered by the service worker", answer["pages"] >= 1 and answer["tab"] > 0, answer)
+    app.wait("!!document.documentElement.dataset.pbTabMessages", 20, page=True)
+    back = json.loads(app.js("document.documentElement.dataset.pbTabMessages", page=True))
+    check("the service worker messages the tab with tabs.sendMessage and tabs.connect", back["sent"] == back["got"] == app.js("location.href", page=True), back)
 
     # uBlock Origin Lite blocks the ad host.
     visit(app, PAGE)
@@ -425,27 +428,22 @@ def limit(name, works, detail=""):
         print("known " + name + ("" if detail == "" else " -> " + str(detail)), flush=True)
 
 
-# Whether a page holds an extension's frame, looking inside shadow roots too.
-EXTENSION_FRAME = """(()=>{const all=r=>[...r.querySelectorAll('*')].flatMap(e=>[e,...(e.shadowRoot?all(e.shadowRoot):[])]);
-return all(document).some(e=>e.tagName==='IFRAME'&&e.src.startsWith('chrome-extension://'))})()"""
-
-
-def limit_checks():
-    """Real extensions that need what isn't built yet. Each limit is listed in
-    docs/extensions.md, under "Open for the owner"."""
+def fonts_ninja_checks():
+    """Fonts Ninja: a button with no popup, which messages the page."""
     app = App(new_profile(), MOCK_STORE)
     app.wait("!!document.querySelector('input')", 30)
     install_from_store(app, FN_ID)
     pin(app, FN_NAME, True)
     visit(app, PAGE)
-    time.sleep(2)  # its content script runs at document_idle
     # Its button has no popup: the service worker sends the page "fn-activate" with
-    # tabs.sendMessage, and the content script opens its panel.
+    # tabs.sendMessage, and the content script opens its panel, in a closed shadow root
+    # of an element of its own.
+    panel = "document.querySelector('fn-ninja-root')?.getBoundingClientRect().height>0"
+    time.sleep(2)  # its content script runs at document_idle
+    check("Fonts Ninja's panel is closed at first", not app.js(panel, page=True))
     click(app, f"[aria-label={json.dumps(FN_NAME)}]")
-    deadline = time.time() + 10
-    while not app.js(EXTENSION_FRAME, page=True) and time.time() < deadline:
-        time.sleep(0.2)
-    limit("Fonts Ninja opens its panel on the page: needs tabs.sendMessage to a tab", app.js(EXTENSION_FRAME, page=True))
+    app.wait(panel, 10, page=True)
+    check("its button opens its panel on the page, by tabs.sendMessage", True)
     app.close()
 
 
@@ -480,6 +478,8 @@ if __name__ == "__main__":
     subprocess.check_call(["go", "build", "-o", store_bin, "./cmd/extstore"], cwd=os.path.join(ROOT, "core"))
     store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", STORE.split("//")[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        run_parts([extension_checks, flag_off_checks, limit_checks, web_store_checks])
+        # One part by name, such as "fonts_ninja", or all of them.
+        parts = [extension_checks, flag_off_checks, fonts_ninja_checks, web_store_checks]
+        run_parts([p for p in parts if sys.argv[1:] in ([], [p.__name__.removesuffix("_checks")])])
     finally:
         store.terminate()

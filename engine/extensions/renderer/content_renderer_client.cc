@@ -1,5 +1,7 @@
 #include "project_b/engine/extensions/renderer/content_renderer_client.h"
 
+#include "project_b/engine/extensions/renderer/api_provider.h"
+
 #include "content/public/common/isolated_world_ids.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_frame_observer.h"
@@ -74,6 +76,7 @@ void ContentRendererClient::RenderThreadStarted() {
   extensions_ = std::make_unique<RendererClient>();
   extensions_->AddAPIProvider(
       std::make_unique<extensions::CoreExtensionsRendererAPIProvider>());
+  extensions_->AddAPIProvider(std::make_unique<RendererAPIProvider>());
   extensions_->RenderThreadStarted();
   blink::WebSecurityPolicy::RegisterURLSchemeAsExtension(
       blink::WebString::FromAscii(extensions::kExtensionScheme));

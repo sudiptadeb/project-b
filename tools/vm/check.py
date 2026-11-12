@@ -44,24 +44,9 @@ os.environ["TART_HOME"] = VM_HOME + "/tart-home"
 # Checks that fail because of a bug we know about, by the check's name, with the bug. Such a
 # failure is reported as "known" and doesn't fail the run; a known check that passes says so,
 # so the entry can go once the bug is fixed. A new failure anywhere else fails the run.
-SLOW_INPUT = "a click or a shortcut can wait one to three seconds before the app takes it (docs/vm-testing.md, bug 5)"
-STALE = "after a change of size or layout, the old picture can stay on screen for a second or two (docs/vm-testing.md, bug 7)"
-LATE_CLICKS = "after leaving full screen onto another frame the shell takes clicks late or not at all (docs/vm-testing.md, bug 2)"
 KNOWN = {
-    "green button: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
-    "Ctrl+Cmd+F: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
-    "tabs on top, green button: after leaving, the shell takes a click within 1 s": LATE_CLICKS,
     "a live resize keeps the page against the frame in every frame":
         "during a live resize the page runs past the frame in some frames (docs/vm-testing.md, bug 7)",
-    "Cmd+T adds a tab within 0.5 s": SLOW_INPUT,
-    "the layout button puts the tabs on top within 1 s": SLOW_INPUT,
-    "the layout button brings the tabs back to the side within 1 s": SLOW_INPUT,
-    "after the tabs move to the top, the sidebar is gone within 1 s": STALE,
-    "after the tabs move back to the side, the sidebar shows within 1 s": STALE,
-    "after a resize from outside the app, the page fills its new place within 0.5 s": STALE,
-    "after zoom, the page fills its new place within 2 s": STALE,
-    "after zooming back, the page fills its place within 2 s": STALE,
-    "after leaving full screen, the page fills its place within 2 s": STALE,
 }
 
 # The test pages, served inside the VM so no check waits on the internet. Each is one colour,
@@ -654,8 +639,8 @@ def address():
 
 def until(get, ok, limit=PAGE_LOAD + 5):
     """get() once ok() holds of it, or as it is after the limit. Checks of whether something
-    works wait for their result this way, because a click or key can land seconds late
-    (SLOW_INPUT) and a picture can lag (STALE): only the checks named "within" time things.
+    works wait for their result this way, so a slow step fails only its own "within" check:
+    only the checks named "within" time things.
     Waiting also keeps a late input from landing on the step after its own."""
     end = time.time() + limit
     now = get()
@@ -942,8 +927,8 @@ if HOME_PAGE is not None:
 set_window(home)
 
 
-# Tabs on top, from a new launch: leaving full screen above can leave the shell deaf to
-# clicks (LATE_CLICKS), and nothing below should fail for that.
+# Tabs on top, from a new launch: leaving full screen above has left the shell deaf to
+# clicks (docs/vm-testing.md, bug 2), and nothing below should fail for that.
 quit_app()
 fresh_profile()
 time.sleep(1)
@@ -962,7 +947,7 @@ def tabs_on_top(img):
 
 def switch_layout(rect, to_top, name):
     """Clicks the layout button and waits up to 5 s for the tabs to move, timing it, so a
-    click the app takes late (SLOW_INPUT) fails only this check and not the ones after it."""
+    click the app takes late fails only this check and not the ones after it."""
     click_on(rect, right=True)
     start = time.time()
     while time.time() - start < 5 and tabs_on_top(vnc.image()) != to_top:
@@ -994,7 +979,7 @@ print(f"tabs on top: window buttons {lights(img, home)}", flush=True)
 
 def page_until(want, limit=PAGE_LOAD + 5):
     """The page, tabs on top, once want(page) holds, or as it is after the limit. A click or key
-    can land seconds late here (SLOW_INPUT, timed by the layout checks), so each step waits
+    that lands late (timed by the layout checks) mustn't land on a later step, so each step waits
     for its own result before the next, and a late one can't land on the step after it."""
     end = time.time() + limit
     now = page(PAGE_H)

@@ -6,6 +6,8 @@
 # WITHOUT=extensions tools/build.sh. GN, Go's build tags and the shell all read it from
 # there (docs/flags.md). Keep such a build in a folder of its own (OUT=out/noext), so
 # switching doesn't rebuild either.
+# Ninja builds the shell's pages into $OUT/shell, as it builds Go (engine/build_shell.py),
+# so any build of project_b has a current shell.
 # Compiles go to a remote build server when one answers at PB_REMOTE (default
 # localhost:8980), and the build is local otherwise; PB_REMOTE=off keeps it local. The
 # commands are the same either way. Setting a server up: docs/remote-build.md.
@@ -22,7 +24,7 @@ PB_REMOTE=${PB_REMOTE:-localhost:8980}
 # thousands of workers; against one Mac, steps at the back of the queue time out.
 PB_REMOTE_JOBS=${PB_REMOTE_JOBS:-60}
 
-# depot_tools goes in front of the caller's PATH; everything else (npm, go...) stays.
+# depot_tools goes in front of the caller's PATH; everything else (node, go...) stays.
 export PATH=$ROOT/depot_tools:$PATH
 export PYTHONUNBUFFERED=1 DEPOT_TOOLS_UPDATE=0
 
@@ -66,8 +68,8 @@ PROBLEMS=0
 problem() { echo "  FAIL $1"; echo "       fix: $2"; PROBLEMS=$((PROBLEMS + 1)); }
 ok() { echo "  ok   $1"; }
 
-if command -v npm >/dev/null; then ok "npm $(npm --version) at $(command -v npm)"
-else problem "npm is not on PATH" "brew install node, then open a new terminal"; fi
+if NODE=$(command -v node); then ok "node $(node --version) at $NODE"
+else problem "node is not on PATH" "brew install node, then open a new terminal"; fi
 
 if [ -d "$ROOT/shell/node_modules" ]; then ok "shell dependencies installed"
 else problem "shell/node_modules is missing" "(cd shell && npm install)"; fi
@@ -120,9 +122,6 @@ if [ "$PROBLEMS" -gt 0 ]; then
   exit 1
 fi
 
-echo "=== $(date '+%F %T') shell"
-(cd "$ROOT/shell" && npm run build 2>&1 | tail -2) || { echo "RESULT=failed shell"; exit 1; }
-
 echo "=== $(date '+%F %T') expose the repo to GN, with no upstream edits"
 mkdir -p "$SRC/project_b"
 ln -sfn ../../../engine "$SRC/project_b/engine"
@@ -142,6 +141,7 @@ use_siso = true
 target_cpu = "arm64"
 root_extra_deps = [ "//project_b/engine" ]
 project_b_go = "$GO"
+project_b_node = "$NODE"
 ARGS
 if [ "$RELEASE" = 1 ]; then
   cat >> "$OUT/args.gn" <<ARGS
@@ -189,8 +189,5 @@ if [ "$RC" -ne 0 ]; then
   exit 1
 fi
 
-# One folder per page: shell/shell/, shell/settings/.
-rm -rf "$OUT/shell"
-cp -R "$ROOT/shell/dist" "$OUT/shell"
 ls -la "$OUT/project_b" "$OUT/project_b_helper" "$OUT/libproject_b_content.dylib" 2>/dev/null
 echo "RESULT=ok $(date '+%F %T')"

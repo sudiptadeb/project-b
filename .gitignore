@@ -9,3 +9,5 @@
 __pycache__/
 # Tools fetched or built for this machine: ChromeDriver, deskctl and its signing key.
 /.tools/
+# Editor settings, per person.
+/.idea/

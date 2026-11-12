@@ -19,3 +19,4 @@ export TART_HOME="$VM_HOME/tart-home"
 # deskrig, for runs started where ~/.local/bin isn't on PATH (amarit's units, cron).
 export PATH="$PATH:$HOME/.local/bin"
 export PB_VM="$VM"  # For check.py and screen.py, which the scripts start.
+export DESKRIG_TARGET="$VM"  # Every deskrig command acts on the VM, never this Mac.

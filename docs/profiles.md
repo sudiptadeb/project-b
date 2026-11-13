@@ -215,7 +215,7 @@ Each step is usable on its own.
 2. Several windows, and the list of visible tabs in place of the one page rectangle.
 3. Profiles: the list, creating one from a template, one process each, opening another,
    reset. Its own note: [profiles-build.md](profiles-build.md).
-4. Workspaces.
+4. Workspaces. Its own note: [workspaces.md](workspaces.md).
 5. The shell as a pref, with the shell's own data blob.
 
 The owner agreed to this order on 2026-11-12. Step 1 saves cookies as Chromium writes them,

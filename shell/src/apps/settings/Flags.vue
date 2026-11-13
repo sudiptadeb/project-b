@@ -56,9 +56,10 @@ function error(flag, text) {
         <label class="label" :for="f.type === 'boolean' || f.type === 'enum' || !f.built ? 'flag-' + f.id : undefined">
           <span class="name">
             {{ f.name }}
-            <span v-if="f.pending" class="tag">Relaunch to apply</span>
+            <span v-if="!f.built" class="tag">Not in this build</span>
+            <span v-else-if="f.pending" class="tag">Relaunch to apply</span>
           </span>
-          <span class="secondary">{{ f.built ? f.description : 'Not in this build' }}</span>
+          <span class="secondary">{{ f.description }}</span>
         </label>
         <input
           v-if="f.type === 'boolean'"

@@ -95,7 +95,12 @@ def settings_wait(app, expr, timeout=20):
 
 
 def settings_click(app, selector):
-    x, y = settings(app, f"(()=>{{const r=document.querySelector({json.dumps(selector)}).getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()")
+    """Clicks the middle of what selector finds in the settings page, after checking that
+    a press there lands on it: when something else is on top, it says what."""
+    x, y, on = settings(app, f"""(()=>{{const e=document.querySelector({json.dumps(selector)}),r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,
+        t=document.elementFromPoint(x,y);return [x,y,e===t||e.contains(t)?'':(t?t.outerHTML.slice(0,160):'nothing')+' at '+[Math.round(x),Math.round(y)]+' of '+[innerWidth,innerHeight]]}})()""")
+    if on:
+        raise RuntimeError(f"{selector} is under {on}")
     app.cmd("click", x, y)
 
 

@@ -219,7 +219,7 @@ func (e *Engine) FireExtension(kind, extension, value string) {
 		e.Post(func() {
 			var n int
 			fmt.Sscan(value, &n)
-			e.extensions.listener.ExtensionBlockedCount(extension, e.windows[1].shown, n)
+			e.extensions.listener.ExtensionBlockedCount(extension, e.shown(1, 0), n)
 		})
 	}
 }

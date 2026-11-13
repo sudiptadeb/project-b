@@ -181,7 +181,7 @@ func TestTheFirstTabHoldsTheBlankPage(t *testing.T) {
 	for loaded := false; !loaded; {
 		select {
 		case b := <-r.pages:
-			loaded = string(b) == `{"state":"loaded","tab":1,"url":"about:blank"}`
+			loaded = string(b) == `{"slot":0,"state":"loaded","tab":1,"url":"about:blank"}`
 		case <-deadline:
 			t.Fatal("the first tab never loaded the blank page")
 		}
@@ -292,26 +292,26 @@ func TestTabsThroughTheShellAndKeys(t *testing.T) {
 	r.visit("https://b.test/")
 
 	// The page opens a tab: the engine made it, Go put it in the list and showed it.
-	r.e.Fire(1, "open", "https://c.test/")
+	r.e.Fire(1, 0, "open", "https://c.test/")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 3 })
 	if m["active"].(float64) == second {
 		t.Fatalf("opened tab should be active: %v", m)
 	}
 	r.waitForTab(func(tab map[string]any) bool { return tab["url"] == "https://c.test/" && tab["loading"] == false })
 
-	r.e.Fire(1, "key", "tab1")
+	r.e.Fire(1, 0, "key", "tab1")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == float64(1) })
-	r.e.Fire(1, "key", "nextTab")
+	r.e.Fire(1, 0, "key", "nextTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == second })
-	r.e.Fire(1, "key", "closeTab")
+	r.e.Fire(1, 0, "key", "closeTab")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 2 })
 	if m["active"] == second {
 		t.Fatalf("closed tab still active: %v", m)
 	}
 
 	// Closing the rest closes the window.
-	r.e.Fire(1, "key", "closeTab")
-	r.e.Fire(1, "key", "closeTab")
+	r.e.Fire(1, 0, "key", "closeTab")
+	r.e.Fire(1, 0, "key", "closeTab")
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 0 })
 	deadline := time.Now().Add(time.Second)
 	for !r.e.Closed(1) {
@@ -354,7 +354,7 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.Layout(1).FrameColor, r.e.Layout(1).FrameWidth)
 	}
 
-	r.e.Fire(1, "fullscreen", "")
+	r.e.Fire(1, 0, "fullscreen", "")
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "controls" })
 	if m["controls"].(map[string]any)["w"] != float64(0) || m["cornerRadius"] != float64(0) {
 		t.Fatalf("full screen should report no controls and square corners: %v", m)
@@ -470,7 +470,7 @@ func TestAKeyAddedInSettingsRunsItsAction(t *testing.T) {
 		t.Fatalf("keymap.json = %s", b)
 	}
 
-	r.e.Fire(1, "key", "closeTab")
+	r.e.Fire(1, 0, "key", "closeTab")
 	deadline := time.Now().Add(5 * time.Second)
 	for r.e.SettingsOpen(1) {
 		if time.Now().After(deadline) {
@@ -498,20 +498,20 @@ func TestCtrlTabCyclesRecentTabs(t *testing.T) {
 		r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && m["active"] == id })
 	}
 	// Recent: 3, 2, 1.
-	r.e.Fire(1, "key", "recentTab")
+	r.e.Fire(1, 0, "key", "recentTab")
 	active(2)
-	r.e.Fire(1, "key", "recentTab")
+	r.e.Fire(1, 0, "key", "recentTab")
 	active(1)
-	r.e.Fire(1, "release", "")
+	r.e.Fire(1, 0, "release", "")
 	// Recent: 1, 3, 2.
-	r.e.Fire(1, "key", "recentTab")
+	r.e.Fire(1, 0, "key", "recentTab")
 	active(3)
-	r.e.Fire(1, "release", "")
+	r.e.Fire(1, 0, "release", "")
 	// Recent: 3, 1, 2. Backward from the newest comes round to the oldest.
-	r.e.Fire(1, "key", "recentTabBack")
+	r.e.Fire(1, 0, "key", "recentTabBack")
 	active(2)
-	r.e.Fire(1, "release", "")
-	r.e.Fire(1, "key", "recentTab")
+	r.e.Fire(1, 0, "release", "")
+	r.e.Fire(1, 0, "key", "recentTab")
 	active(3)
 }
 
@@ -558,7 +558,7 @@ func (r *rig) openSecondWindow() <-chan []byte {
 	r.t.Helper()
 	second, stop := r.e.Feeds(2).Shell.Subscribe()
 	r.t.Cleanup(stop)
-	r.e.Fire(1, "key", "newWindow")
+	r.e.Fire(1, 0, "key", "newWindow")
 	r.e.Settle()
 	if w := r.e.Windows(); !slices.Equal(w, []engine.WindowID{1, 2}) {
 		r.t.Fatalf("windows after Cmd+N: %v", w)
@@ -587,15 +587,15 @@ func TestASecondWindow(t *testing.T) {
 	}
 
 	// Cmd+T acts on the window in front, window 2.
-	r.e.Fire(2, "key", "newTab")
+	r.e.Fire(2, 0, "key", "newTab")
 	r.waitOn(second, isTabs(2))
 	// Window 1 comes to the front, and Cmd+T acts on it.
-	r.e.Fire(1, "focus", "")
-	r.e.Fire(1, "key", "newTab")
+	r.e.Fire(1, 0, "focus", "")
+	r.e.Fire(1, 0, "key", "newTab")
 	r.waitFor(isTabs(2))
 
 	// Settings opens over the window it was asked in.
-	r.e.Fire(2, "focus", "")
+	r.e.Fire(2, 0, "focus", "")
 	r.e.Post(func() { r.a.ShellMessage(2, []byte(`{"t":"run","text":"app.settings"}`)) })
 	r.e.Settle()
 	if !r.e.SettingsOpen(2) || r.e.SettingsOpen(1) {
@@ -605,7 +605,7 @@ func TestASecondWindow(t *testing.T) {
 	// Closing window 2's tabs closes window 2: its settings page goes first, then a tab
 	// at a time. The app goes on with window 1.
 	for range 3 {
-		r.e.Fire(2, "key", "closeTab")
+		r.e.Fire(2, 0, "key", "closeTab")
 	}
 	r.e.Settle()
 	if !r.e.Closed(2) || !slices.Equal(r.e.Windows(), []engine.WindowID{1}) || r.e.Quit() {
@@ -613,7 +613,7 @@ func TestASecondWindow(t *testing.T) {
 	}
 
 	// Window 1's own close button closes it, the last window, which quits.
-	r.e.Fire(1, "close", "")
+	r.e.Fire(1, 0, "close", "")
 	r.e.Settle()
 	if !r.e.Quit() {
 		t.Fatal("closing the last window didn't quit")
@@ -627,7 +627,7 @@ func TestAHandoverOpensInTheWindowUsedLast(t *testing.T) {
 	defer r.stop()
 	second := r.openSecondWindow()
 	r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
-	r.e.Fire(1, "focus", "")
+	r.e.Fire(1, 0, "focus", "")
 	r.e.Post(func() { r.a.Handover([]string{"https://h.test/"}) })
 	m := r.waitFor(isTabs(2))
 	if url := m["tabs"].([]any)[1].(map[string]any)["url"]; url != "https://h.test/" {
@@ -651,7 +651,7 @@ func TestAShellCrashResetsOnlyItsWindow(t *testing.T) {
 	second := r.openSecondWindow()
 	r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
 	r.e.Post(func() { r.a.ShellCrashed(2) })
-	r.e.Fire(2, "key", "newTab")
+	r.e.Fire(2, 0, "key", "newTab")
 	r.e.Settle()
 	select {
 	case b := <-second:
@@ -688,8 +688,8 @@ func TestMovingATabToAnotherWindow(t *testing.T) {
 	second := r.openSecondWindow()
 	snap := r.waitOn(second, func(m map[string]any) bool { return m["t"] == "snapshot" })
 	inSecond := snap["active"].(float64)
-	r.e.Fire(1, "focus", "")
-	r.e.Fire(1, "key", "newTab")
+	r.e.Fire(1, 0, "focus", "")
+	r.e.Fire(1, 0, "key", "newTab")
 	r.waitFor(isTabs(2))
 
 	r.moveTab(1, 2, 0)
@@ -767,7 +767,7 @@ func TestWindowsAsAnotherManagerSeesThem(t *testing.T) {
 	r.e.Post(func() { r.a.Window.OnEvent(func(e window.Event) { events = append(events, e) }) })
 	r.e.Settle()
 	r.openSecondWindow()
-	r.e.Fire(1, "focus", "")
+	r.e.Fire(1, 0, "focus", "")
 	r.e.Settle()
 	r.moveTab(1, 2, 0)
 
@@ -942,7 +942,7 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 	}
 	r.show(tab["id"].(float64))
 	r.visit("https://work.test/")
-	r.e.Fire(1, "open", "https://work.test/more")
+	r.e.Fire(1, 0, "open", "https://work.test/more")
 	m = r.waitFor(isTabs(3))
 	if opened := m["tabs"].([]any)[2].(map[string]any); opened["workspace"] != work.ID {
 		t.Fatalf("the tab its page opened is %v", opened)

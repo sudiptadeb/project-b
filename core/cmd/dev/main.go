@@ -219,14 +219,23 @@ func main() {
 		})
 	})
 	mux.HandleFunc("GET /mock/page", serve("mock_page.html", "text/html; charset=utf-8"))
-	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Page) })
+	// Each mock page is one slot of its window's, ?slot=<n>, and hears its slot's state, the
+	// last one first.
+	mux.HandleFunc("GET /mock/events", func(w http.ResponseWriter, r *http.Request) {
+		win := windowOf(r)
+		slot, _ := strconv.Atoi(r.URL.Query().Get("slot"))
+		stream(w, r, &e.Feeds(win).Page, func() []byte { return e.PageState(win, slot) })
+	})
 	// What the window page holds and how it hit-tests: the state now, then each change.
 	mux.HandleFunc("GET /mock/window/events", func(w http.ResponseWriter, r *http.Request) {
 		win := windowOf(r)
 		stream(w, r, &e.Feeds(win).Window, func() []byte { return e.WindowState(win) })
 	})
+	// What a page or the user does: kind, its value, and the tab whose page it is in, or
+	// none for the first one the window shows.
 	mux.HandleFunc("POST /mock/fire", func(w http.ResponseWriter, r *http.Request) {
-		e.Fire(windowOf(r), r.FormValue("kind"), r.FormValue("value"))
+		tab, _ := strconv.ParseInt(r.FormValue("tab"), 10, 64)
+		e.Fire(windowOf(r), engine.TabID(tab), r.FormValue("kind"), r.FormValue("value"))
 	})
 	mux.HandleFunc("GET /mock/regions", func(w http.ResponseWriter, r *http.Request) {
 		win := windowOf(r)
@@ -239,7 +248,7 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "page": e.PageOf(win), "dock": e.DockColor(), "opened": opened.Load(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "page": e.PageOf(win), "shell": e.PageOf(win).Shell(), "focused": e.Focused(), "dock": e.DockColor(), "opened": opened.Load(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)
@@ -295,7 +304,8 @@ func windowOf(r *http.Request) engine.WindowID {
 }
 
 // stream sends a feed to the browser as server-sent events, after now's message if it is
-// given: it is read once subscribed, so no change falls between it and the feed.
+// given and there is one: it is read once subscribed, so no change falls between it and
+// the feed.
 func stream(w http.ResponseWriter, r *http.Request, f *mockengine.Feed, now ...func() []byte) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -308,7 +318,9 @@ func stream(w http.ResponseWriter, r *http.Request, f *mockengine.Feed, now ...f
 	defer stop()
 	fmt.Fprint(w, ": connected\n\n")
 	for _, msg := range now {
-		fmt.Fprintf(w, "data: %s\n\n", msg())
+		if b := msg(); b != nil {
+			fmt.Fprintf(w, "data: %s\n\n", b)
+		}
 	}
 	flusher.Flush()
 	for {

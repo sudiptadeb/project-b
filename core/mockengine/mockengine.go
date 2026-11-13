@@ -1,6 +1,7 @@
 // Package mockengine is a browser engine with no browser in it. Its page is a set of
-// buttons that fire the events real content would: navigation, title, failure, crash,
-// a page opening a tab, a key press, full screen.
+// buttons that fire the events real content would, for the tab it shows: navigation,
+// title, failure, crash, a page opening a tab, a key press, full screen. A window shows a
+// mock page for each tab its layout lists.
 package mockengine
 
 import (
@@ -81,6 +82,8 @@ type Engine struct {
 	menu       engine.Menu
 	dockColor  string
 	edits      []engine.EditCommand
+	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
+	focused engine.TabID
 
 	// The fake extension runtime, in a build with extensions.
 	extensions extensionRuntime
@@ -90,9 +93,10 @@ type Engine struct {
 type window struct {
 	page   engine.Page
 	layout engine.WindowLayout
-	// visible are the tabs the layout shows; the mock page shows the first, shown.
+	// visible are the tabs the layout shows, in its order. The window has a mock page for
+	// each, by its place in the list, its slot, and pages is what each slot's shows.
 	visible           []engine.TabID
-	shown             engine.TabID
+	pages             [][]byte
 	hidden            []engine.TabID // Tabs told they are hidden by the last layout.
 	full              bool           // Full screen, so there are no window controls.
 	w, h              float64        // The window's content size.
@@ -106,7 +110,7 @@ type window struct {
 type Feeds struct {
 	Shell    Feed // Messages to the shell page.
 	Settings Feed // Messages to the settings page.
-	Page     Feed // State for the mock page.
+	Page     Feed // State for the mock pages, each message for one slot.
 	// What the dev window draws with the shell, where the real window has views of its
 	// own: the page, the settings page and an extension's popup. Each message is
 	// WindowState's.
@@ -215,9 +219,10 @@ func (e *Engine) Workspace(id engine.TabID) string {
 func (e *Engine) CloseTab(id engine.TabID) {
 	delete(e.tabs, id)
 	for w, win := range e.windows {
-		if win.shown == id {
-			win.shown = 0
-			e.publishPage(w, 0, "none", "")
+		for slot, v := range win.visible {
+			if v == id {
+				e.publishPage(w, slot, 0, "none", "")
+			}
 		}
 	}
 }
@@ -252,11 +257,13 @@ func (e *Engine) RequestWindow(w engine.WindowID, r engine.WindowRequest) {
 	case engine.WindowClose:
 		// Like the real one, it closes on a later turn, after the call that asked.
 		e.Post(func() {
+			for slot := range max(1, len(e.windows[w].visible)) {
+				e.publishPage(w, slot, 0, "closed", "")
+			}
 			e.mu.Lock()
 			delete(e.windows, w)
 			e.closed = append(e.closed, w)
 			e.mu.Unlock()
-			e.publishPage(w, 0, "closed", "")
 			e.listener.WindowClosed(w)
 		})
 	case engine.WindowFullScreen:
@@ -291,8 +298,9 @@ func (e *Engine) SetWindowBounds(w engine.WindowID, r engine.Rect) {
 }
 
 // The real window puts each visible tab's view where the layout says, and tells a tab
-// that leaves the list it is hidden. The mock shows the first one's page, says where on
-// the window's Window feed, and its dev window moves the mock page there.
+// that leaves the list it is hidden. The mock says where each goes on the window's Window
+// feed, and its dev window puts a mock page there for each, by slot: a slot that shows
+// another tab now hears what that tab shows.
 func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 	win := e.windows[w]
 	var visible []engine.TabID
@@ -309,19 +317,24 @@ func (e *Engine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 			win.hidden = append(win.hidden, id)
 		}
 	}
-	e.mu.Unlock()
+	old := win.visible
 	win.visible = visible
+	e.mu.Unlock()
 	e.Feeds(w).Window.Publish(e.WindowState(w))
-	shown := engine.TabID(0)
-	if len(visible) > 0 {
-		shown = visible[0]
-	}
-	if shown != win.shown {
-		win.shown = shown
-		if t := e.tabs[shown]; t != nil {
-			e.publishPage(w, shown, t.state, t.current)
+	for slot, id := range visible {
+		if slot >= len(old) || old[slot] != id {
+			t := e.tabs[id]
+			e.publishPage(w, slot, id, t.state, t.current)
 		}
 	}
+}
+
+// shown is the tab in window w's slot, or 0.
+func (e *Engine) shown(w engine.WindowID, slot int) engine.TabID {
+	if win := e.windows[w]; win != nil && slot < len(win.visible) {
+		return win.visible[slot]
+	}
+	return 0
 }
 
 // shownElsewhere says whether a window other than w shows a tab: one that moved there,
@@ -335,8 +348,7 @@ func (e *Engine) shownElsewhere(w engine.WindowID, id engine.TabID) bool {
 	return false
 }
 
-// Page is where a layout puts the first visible tab's page, which the mock page shows,
-// or nothing.
+// Page is where a layout puts the first visible tab's page, or nothing.
 func Page(l engine.WindowLayout) engine.Rect {
 	if len(l.Tabs) == 0 {
 		return engine.Rect{}
@@ -452,13 +464,13 @@ func (e *Engine) CloseSettings(w engine.WindowID) {
 // WindowState is what window w holds besides the shell, and how it draws and hit-tests,
 // as its Window feed sends it:
 //
-//	{"t":"window", "shell":the id of the shell the window loads, "page":where the mock page goes,
+//	{"t":"window", "shell":the id of the shell the window loads,
+//	 "pages":[{"tab":id,"rect":{x,y,w,h}}] where each mock page goes, by slot,
 //	 "regions":[{x,y,w,h,"area":"drag"|"shell"}],
 //	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
 //	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
 //
-// The mock shows one page per window, the first visible tab's, so "page" is where the
-// layout puts that. The rectangles are the layout's, in the shell's coordinates, which on
+// The rectangles are the layout's, in the shell's coordinates, which on
 // the mock are the dev window's. The regions are in order: the first that holds a point
 // decides. A window that closed holds nothing. Any goroutine.
 func (e *Engine) WindowState(w engine.WindowID) []byte {
@@ -470,9 +482,15 @@ func (e *Engine) WindowState(w engine.WindowID) []byte {
 	var l engine.WindowLayout
 	var s engine.WindowState
 	var page engine.Page
+	pages := []engine.VisibleTab{}
 	settings := false
 	if win := e.windows[w]; win != nil {
 		l, s, page, settings = win.layout, win.reported, win.page, win.settings
+		for _, v := range l.Tabs {
+			if slices.Contains(win.visible, v.Tab) {
+				pages = append(pages, v)
+			}
+		}
 	}
 	e.mu.Unlock()
 	regions := []region{}
@@ -483,7 +501,7 @@ func (e *Engine) WindowState(w engine.WindowID) []byte {
 	if s.Controls != (engine.Rect{}) {
 		controls = &s.Controls
 	}
-	b, _ := json.Marshal(map[string]any{"t": "window", "shell": page.Shell(), "page": Page(l), "regions": regions,
+	b, _ := json.Marshal(map[string]any{"t": "window", "shell": page.Shell(), "pages": pages, "regions": regions,
 		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": s.CornerRadius,
 		"settings": settings, "popup": e.openPopup(w)})
 	return b
@@ -547,7 +565,19 @@ func (e *Engine) AppCommand(c engine.AppCommand) {
 	}
 }
 
-func (e *Engine) FocusTab(engine.TabID) {}
+// FocusTab gives the tab the keyboard, which the mock only remembers.
+func (e *Engine) FocusTab(tab engine.TabID) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.focused = tab
+}
+
+// Focused is the tab last given the keyboard, by FocusTab or a press in its page.
+func (e *Engine) Focused() engine.TabID {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.focused
+}
 
 func (e *Engine) FocusShell(engine.WindowID) {}
 
@@ -595,15 +625,18 @@ func (e *Engine) Hidden(w engine.WindowID) []engine.TabID {
 	return nil
 }
 
-// Fire makes the engine do what a button on window w's mock page says, to the tab it
-// shows. Any goroutine.
-func (e *Engine) Fire(w engine.WindowID, kind, value string) {
+// Fire makes the engine do what a button on a mock page of window w says, to the tab the
+// page shows, or to the first tab the window shows for 0. Any goroutine.
+func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 	e.Post(func() {
 		win := e.windows[w]
 		if win == nil {
 			return
 		}
-		shown := win.shown
+		shown := tab
+		if shown == 0 {
+			shown = e.shown(w, 0)
+		}
 		t := e.tabs[shown]
 		switch kind {
 		case "navigate":
@@ -621,10 +654,17 @@ func (e *Engine) Fire(w engine.WindowID, kind, value string) {
 				t.navSeq++
 				t.state = "crashed"
 				e.listener.PageCrashed(shown)
-				e.publishPage(w, shown, t.state, t.current)
+				e.showPage(shown, t.state, t.current)
 			}
 		case "favicon":
 			e.listener.FaviconChanged(shown, value)
+		case "focusTab":
+			// A press in the page, which takes the keyboard, as a click does in the real
+			// window's.
+			if t != nil {
+				e.FocusTab(shown)
+				e.listener.TabFocused(shown)
+			}
 		case "menu":
 			// A menu bar item chosen, by its action id, as the real menu bar says.
 			e.listener.MenuChosen(value)
@@ -714,17 +754,39 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 	})
 }
 
-// publishPage tells window w's mock page what to show: a tab, or 0 for none.
-func (e *Engine) publishPage(w engine.WindowID, id engine.TabID, state, u string) {
-	b, _ := json.Marshal(map[string]any{"tab": id, "state": state, "url": u})
+// publishPage tells the mock page in window w's slot what to show: a tab, or 0 for none.
+// The window keeps it for a page that connects later.
+func (e *Engine) publishPage(w engine.WindowID, slot int, id engine.TabID, state, u string) {
+	b, _ := json.Marshal(map[string]any{"slot": slot, "tab": id, "state": state, "url": u})
+	if win := e.windows[w]; win != nil {
+		e.mu.Lock()
+		for len(win.pages) <= slot {
+			win.pages = append(win.pages, nil)
+		}
+		win.pages[slot] = b
+		e.mu.Unlock()
+	}
 	e.Feeds(w).Page.Publish(b)
 }
 
-// showPage tells the mock page of whichever window shows a tab what it shows now.
+// PageState is the last message for the mock page in window w's slot, or nil before any.
+// Any goroutine.
+func (e *Engine) PageState(w engine.WindowID, slot int) []byte {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if win := e.windows[w]; win != nil && slot < len(win.pages) {
+		return win.pages[slot]
+	}
+	return nil
+}
+
+// showPage tells the mock page of each slot that shows a tab what it shows now.
 func (e *Engine) showPage(id engine.TabID, state, u string) {
 	for w, win := range e.windows {
-		if win.shown == id {
-			e.publishPage(w, id, state, u)
+		for slot, v := range win.visible {
+			if v == id {
+				e.publishPage(w, slot, id, state, u)
+			}
 		}
 	}
 }

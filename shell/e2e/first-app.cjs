@@ -95,6 +95,7 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   let r = await regions();
   check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
+  check('the window loads the standard shell', r.shell === 'standard', r.shell);
   check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   // The dev window places the mock page where the layout puts it, as the real window does.
   const placed = async () => {
@@ -347,6 +348,31 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('back and reload follow the new, empty tab', (await back.isDisabled()) && (await reload.isDisabled()));
   await visit('https://example.net/', 'https://example.net/');
   check('each tab keeps its own title', JSON.stringify(await rowTitles()) === JSON.stringify(['Mock example.org', 'Mock example.net']), JSON.stringify(await rowTitles()));
+
+  // A layout that lists two tabs, as a shell with panes sends, gets a mock page for each,
+  // where it puts them, in its order. Each page's buttons act on its own tab, and a press
+  // in one gives its tab the keyboard, which makes it active; the shell then lists that
+  // tab alone again.
+  r = await regions();
+  const half = { ...r.bounds, w: r.bounds.w / 2 };
+  await fetch(`${base}/shell/send`, { method: 'POST', body: JSON.stringify({ t: 'layout', shell: r.regions, drag: r.drag, viewW: 1100, viewH: 700,
+    tabs: [{ tab: 2, rect: half }, { tab: 1, rect: { ...half, x: half.x + half.w } }] }) });
+  const frames = page.locator('iframe.mock-page');
+  const framesShow = async (want) => JSON.stringify(await frames.evaluateAll((els) => els.filter((el) => el.style.display !== 'none').map((el) => {
+    const b = el.getBoundingClientRect();
+    return [Number(el.dataset.tab), b.x, b.width];
+  }))) === JSON.stringify(want);
+  check('a layout with two tabs gets a mock page for each, where it puts them, in its order', await until(() => framesShow([[2, half.x, half.w], [1, half.x + half.w, half.w]])), JSON.stringify(await frames.evaluateAll((els) => els.map((el) => el.dataset.tab))));
+  const second = page.frameLocator('iframe.mock-page[data-tab="1"]');
+  await second.getByText('tab 1', { exact: true }).waitFor();
+  await second.locator('form[data-kind=title] input').fill('Its own title');
+  const secondTitle = await second.getByRole('button', { name: 'Title' }).boundingBox();
+  await page.mouse.click(secondTitle.x + secondTitle.width / 2, secondTitle.y + secondTitle.height / 2);
+  check("a press in the second page reaches it, and its button acts on its own tab", await until(async () => (await rowTitles())[0] === 'Its own title'), JSON.stringify(await rowTitles()));
+  check('and gives its tab the keyboard, as the real engine says', await until(async () => (await regions()).focused === 1), String((await regions()).focused));
+  check('which makes it active, and the shell lists it alone again', await until(async () => (await rows.first().getAttribute('aria-selected')) === 'true' && (await framesShow([[1, r.bounds.x, r.bounds.w]]))));
+  await rows.nth(1).click();
+  await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]')[1].getAttribute('aria-selected') === 'true');
   await rows.first().click();
   await shellFrame().waitForFunction((v) => document.querySelector('input').value === v, 'https://example.org/');
   check('clicking a row switches tabs and the address bar follows', (await rows.first().getAttribute('aria-selected')) === 'true');

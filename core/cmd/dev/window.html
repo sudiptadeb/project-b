@@ -10,8 +10,10 @@
   windows, by the id in its address, /?window=<id>, window 1 at plain /, and it passes
   that id on to every page it holds and every feed it reads:
 
-    page      the mock page, where the layout puts the shown tab's page; hidden while
-              that is empty.
+    pages     a mock page for each tab the layout shows, where the layout puts it, in its
+              order, each kept by its place in the list, its slot, and marked with its
+              tab, data-tab. The first is always there, hidden while the layout shows
+              no tab.
     shell     the shell the window loads, /shell/<id>/, over the whole window and
               transparent, so the page shows through its unpainted hole.
     band      the frame band around the window's edge, and the window controls where the
@@ -25,8 +27,8 @@
   on /mock/window/size, as the real window reports its own.
 
   Each press goes where the real window sends it: the layout's regions decide, drag first,
-  then shell, otherwise the page. The pointer is watched in this document and in both
-  frames', and the shell lets the pointer through to the page while it is over the page's
+  then shell, otherwise the page. The pointer is watched in this document and in every
+  frame's, and the shell lets the pointer through to the pages while it is over a page's
   part. The shell never knows it runs here.
 -->
 <style>
@@ -65,15 +67,16 @@
   // Which of Go's windows this is.
   const id = new URLSearchParams(location.search).get('window') || '1';
   const win = document.getElementById('window');
-  const page = win.querySelector('.mock-page');
   const shell = win.querySelector('.shell');
+  // The mock pages, by slot.
+  const pages = [win.querySelector('.mock-page')];
   const band = win.querySelector('.band');
   const controls = win.querySelector('.controls');
-  let state = { page: null, regions: [] };
+  let state = { pages: [], regions: [] };
   let pointer = null;
   let settings = null;
   let popup = null;
-  page.src = `/mock/page?window=${id}`;
+  pages[0].src = `/mock/page?window=${id}&slot=0`;
 
   // What a press at x, y does, as engine.WindowLayout.At decides it: the first region
   // that holds the point, which lists the drag areas before the shell's.
@@ -100,7 +103,8 @@
   }
   const origin = () => ({ x: 0, y: 0 });
   watch(window, origin);
-  page.addEventListener('load', () => watch(page.contentWindow, () => state.page || origin()));
+  const follow = (frame) => frame.addEventListener('load', () => watch(frame.contentWindow, () => ({ x: frame.offsetLeft, y: frame.offsetTop })));
+  follow(pages[0]);
   shell.addEventListener('load', () => {
     watch(shell.contentWindow, origin);
     // Chrome paints a frame opaque when its document's colour scheme differs from the
@@ -119,10 +123,25 @@
     if (shell.getAttribute('src') !== src) shell.src = src;
   }
 
-  function placePage(r) {
-    const shown = !!r && r.w > 0 && r.h > 0;
-    page.style.display = shown ? 'block' : 'none';
-    if (shown) Object.assign(page.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+  // placePages puts a mock page where the layout puts each tab, a new one under the shell
+  // for a slot that had none, and takes away the slots it no longer has, but the first.
+  function placePages(shown) {
+    while (pages.length < shown.length) {
+      const frame = document.createElement('iframe');
+      frame.className = 'mock-page';
+      frame.title = 'Mock page';
+      frame.src = `/mock/page?window=${id}&slot=${pages.length}`;
+      follow(frame);
+      shell.before(frame);
+      pages.push(frame);
+    }
+    while (pages.length > Math.max(1, shown.length)) pages.pop().remove();
+    pages.forEach((frame, slot) => {
+      const p = shown[slot];
+      frame.style.display = p ? 'block' : 'none';
+      frame.dataset.tab = p ? p.tab : '';
+      if (p) Object.assign(frame.style, { left: `${p.rect.x}px`, top: `${p.rect.y}px`, width: `${p.rect.w}px`, height: `${p.rect.h}px` });
+    });
   }
 
   function drawFrame(s) {
@@ -177,7 +196,7 @@
     if (msg.t !== 'window') return;
     state = msg;
     loadShell(msg.shell);
-    placePage(msg.page);
+    placePages(msg.pages);
     drawFrame(msg);
     route();
     showSettings(msg.settings);

@@ -44,7 +44,7 @@ The app is `chromium/src/out/pb/project_b`. Run it directly.
     (cd core && go run ./cmd/dev -shell ../shell/dist)    # then open http://127.0.0.1:8765
 
 The browser tab is the OS window (`core/cmd/dev/window.html`): it holds what the real window
-holds in views, the mock page where the layout puts the page, the shell over it in a
+holds in views, a mock page for each tab the layout shows, where it puts it, the shell over them in a
 transparent frame, the frame band and window controls, the settings page over everything
 when the gear opens it, and an extension's popup, a card naming the page. Each press goes
 where the real window sends it, by the layout's regions. The shell and the settings page

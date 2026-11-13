@@ -1678,8 +1678,19 @@ def workspace_menu_checks():
             raise TimeoutError("the settings page never opened")
         time.sleep(0.1)
     settings("[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Workspaces').click()")
+    # New workspace… opens a dialog with the name and the colour; Create makes it.
     for name in ("Work", "Shopping"):
-        settings(f"(()=>{{const i=document.querySelector('[aria-label=\"New workspace\\'s name\"]');i.value={json.dumps(name)};i.dispatchEvent(new Event('input'));i.form.requestSubmit()}})()")
+        settings("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='New workspace…').click()")
+        deadline = time.time() + 5
+        while not settings("!!document.querySelector('#workspace-name')"):
+            if time.time() > deadline:
+                raise TimeoutError("the New workspace dialog never opened")
+            time.sleep(0.1)
+        settings(f"(()=>{{const i=document.querySelector('#workspace-name');i.value={json.dumps(name)};i.dispatchEvent(new Event('input'));i.form.requestSubmit()}})()")
+        while settings("!!document.querySelector('#workspace-name')"):
+            if time.time() > deadline:
+                raise TimeoutError("the New workspace dialog never closed")
+            time.sleep(0.1)
     deadline = time.time() + 10
     while [i["title"] for i in item()["items"]] != ["Work", "Shopping"] and time.time() < deadline:
         time.sleep(0.1)

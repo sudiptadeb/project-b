@@ -1,6 +1,6 @@
 // The terminal shell's own tests, on the mock engine: its panes in groups, the splits, the
-// dividers, and the groups kept in its own data across a reload. The contract every shell
-// keeps is shell-contract.cjs's.
+// dividers, the groups kept in its own data across a reload, and the gear. The contract
+// every shell keeps is shell-contract.cjs's.
 // Run: node shell/e2e/shells/terminal.cjs   (from the repo root, after `npm run build` in shell/)
 
 const path = require('path');
@@ -179,6 +179,11 @@ const { check, fire, regions, settle, until } = lib;
   check('and becomes the active pane', (await regions()).active === t1 && await marked(t1));
   await title(t2).getByRole('button', { name: /^Close/ }).click();
   check('closing the other leaves one pane with the body to itself', await until(async () => JSON.stringify((await shown())[t1]) === JSON.stringify(one)), JSON.stringify({ one, now: await shown() }));
+
+  // The gear at the strip's far end opens the settings page.
+  check('settings starts closed', (await regions()).settingsOpen === false);
+  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+  check('the gear opens the settings page', await until(async () => (await regions()).settingsOpen === true));
 
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();

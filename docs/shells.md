@@ -258,9 +258,11 @@ dense and square.
 - **Go's tabs are panes, in groups.** One group shows at a time and fills the window. A
   group is a tree: a split is a row or a column of parts with their shares, a leaf is one
   tab. The strip on top has a chip per group, with a segment per pane, each the tab's
-  `role="tab"` element; the chips follow Go's order. Each pane has a title bar with split
-  right, split down and close; a press on it makes the pane active. The prompt line at the
-  foot is the address bar, with back, forward and reload, and the update when one is ready.
+  `role="tab"` element; the chips follow Go's order. New Tab follows the chips, and at the
+  strip's far end are the extensions and a gear that opens settings. Each pane has a title
+  bar with split right, split down and close; a press on it makes the pane active. The
+  prompt line at the foot is the address bar, with back, forward and reload, and the update
+  when one is ready.
 - **The active tab is the focused pane,** and the group shown is the one that holds it.
   Closing the active pane makes the pane that takes its room active first, so its group
   stays shown.

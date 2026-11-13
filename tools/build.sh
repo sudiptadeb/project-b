@@ -142,6 +142,15 @@ ln -sfn ../../../shell "$SRC/project_b/shell"
 
 cd "$SRC" || exit 1
 mkdir -p "$OUT"
+# $OUT/.pb-tree names the checkout $OUT was last built from. Ninja goes by mtimes, so after
+# another checkout's build every file it changed has outputs newer than ours and would be
+# kept. When the name differs, touch our sources so all of project_b rebuilds from this tree.
+# Any script that builds another checkout into a shared out dir writes its own path here.
+if [ "$(cat "$OUT/.pb-tree" 2>/dev/null)" != "$ROOT" ]; then
+  echo "  last built from $(cat "$OUT/.pb-tree" 2>/dev/null || echo nothing recorded); rebuilding project_b from $ROOT"
+  (cd "$ROOT" && git ls-files -z engine core shell | xargs -0 touch)
+fi
+echo "$ROOT" > "$OUT/.pb-tree"
 cat > "$OUT/args.gn" <<ARGS
 is_debug = false
 is_component_build = false

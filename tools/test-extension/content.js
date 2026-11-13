@@ -24,8 +24,9 @@ if (location.search === '?capture') {
   });
 }
 
-// On a page asking for it, what the extension saw of a second window.
-if (location.search === '?windows') {
+// On a page asking it by id, what the extension saw of a second window. The packaged copy
+// and the unpacked one both run here, and only one may open a window.
+if (new URLSearchParams(location.search).get('windows') === chrome.runtime.id) {
   chrome.runtime.sendMessage({ type: 'windows' }).then((answer) => {
     document.documentElement.dataset.pbWindows = JSON.stringify(answer);
   });

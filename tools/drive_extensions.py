@@ -249,7 +249,7 @@ def extension_checks():
     visit(app, PAGE)
 
     # A second window: the extension opens one, finds it in front, and closes it.
-    visit(app, PAGE + "?windows")
+    visit(app, PAGE + "?windows=" + TEST_ID)
     app.wait("!!document.documentElement.dataset.pbWindows", 20, page=True)
     seen = json.loads(app.js("document.documentElement.dataset.pbWindows", page=True))
     check("chrome.windows opens, finds and closes a second window",

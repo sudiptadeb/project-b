@@ -17,7 +17,7 @@ connect({ focusAddressBar: () => address.value.focus() });
     <button aria-label="New Tab" @click="send({ t: 'newTab' })">+</button>
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
-    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
+    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />
     <button @click="send({ t: 'run', text: 'app.settings' })">Settings</button>
   </header>
   <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>

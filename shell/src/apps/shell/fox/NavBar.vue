@@ -3,7 +3,7 @@ import AddressField from './AddressField.vue';
 import AppMenu from './AppMenu.vue';
 import { withKey } from './hints.js';
 import { ExtensionsToolbar } from '@extensions';
-import { activeTab, focusPage, send } from '@/sdk/vue.js';
+import { activeTab, focusPage, send, state } from '@/sdk/vue.js';
 
 // Back, forward and reload on the left, the address field centred in the row, the
 // extensions and the menu on the right. Reload is Stop while the page loads.
@@ -32,7 +32,7 @@ function act(msg) {
       </div>
       <AddressField />
       <div class="side end">
-        <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
+        <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />
         <AppMenu />
       </div>
       <!-- The active page's load progress, along the bar's foot while it loads. -->

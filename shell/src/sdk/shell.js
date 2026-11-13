@@ -4,7 +4,6 @@
 // follows it (docs/shells.md). The managers own the truth: the state is only ever
 // replaced by what they send, and a shell starts from a snapshot.
 
-import { extensionsMessage } from '@extensions';
 import { shown } from '@/keys.js';
 import { paintTheme } from '@/theme.js';
 import { channel, send } from './channel.js';
@@ -53,13 +52,19 @@ export const state = {
   crashLog: '',
   // macOS's report of that crash, or the folder it keeps its reports in.
   crashReport: '',
+  // The extensions' buttons, null while the Extensions flag is off: buttons, each {id, name,
+  // title, icon, badge, badgeColor, badgeTextColor, enabled, pinned}, in the order the
+  // menu lists them; popup, the id of the extension whose popup is open, or ''; and prompt,
+  // an install or a removal waiting for the user's answer, {id, name, version, icon,
+  // permissions, remove}, or null.
+  extensions: null,
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'extensions']);
 
 const listeners = [];
 
@@ -77,6 +82,20 @@ function change(fields) {
 // The root's colours follow the frame colour and the theme.
 onChange((fields) => {
   if ('windowColor' in fields || 'theme' in fields) paintTheme(state.windowColor, state.theme);
+});
+
+// While an extension's popup is open, a press anywhere in the shell closes it. The one
+// exception is the popup's own button, which the shell marks data-extension="<id>": that
+// press goes to Go as any press on it does, and Go closes the popup it finds open. The
+// engine closes it for a press outside the shell.
+function closePopup(e) {
+  const own = e.target.closest('[data-extension]');
+  if (!own || own.dataset.extension !== state.extensions.popup) send({ t: 'extensionClosePopup' });
+}
+onChange((fields) => {
+  if (!('extensions' in fields)) return;
+  if (state.extensions?.popup) addEventListener('pointerdown', closePopup, true);
+  else removeEventListener('pointerdown', closePopup, true);
 });
 
 // saveData keeps value, any JSON, as this window's copy of the shell's own data, in place
@@ -159,7 +178,6 @@ export function connect(handlers = {}, drawn = (fn) => fn()) {
   inputs();
   channel.listen(
     (m) => {
-      extensionsMessage(m);
       switch (m.t) {
         case 'snapshot': {
           const { t, ...all } = m;

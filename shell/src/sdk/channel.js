@@ -1,6 +1,6 @@
 // The one channel every shell speaks on, 'shell'. The extensions' toolbar sends on it too,
-// so this is all it brings with it into the settings page's build, which shares @extensions:
-// nothing here sends until asked.
+// through extensions.js, so this is all it brings with it into the settings page's build,
+// which shares @extensions: nothing here sends until asked.
 
 import { bridge } from '@/bridge.js';
 

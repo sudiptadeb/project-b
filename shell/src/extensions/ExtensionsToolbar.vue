@@ -1,33 +1,31 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { send } from '@/sdk/channel.js';
+import { manageExtensions, pinExtension, pressExtension } from '@/sdk/extensions.js';
 import ExtensionIcon from './ExtensionIcon.vue';
 import InstallPrompt from './InstallPrompt.vue';
 import PinIcon from './PinIcon.vue';
-import { extensions } from './state.js';
 
 // The toolbar's extensions, as Chrome has them: a button for each pinned one, then the
 // puzzle piece, whose menu lists them all. A press only tells Go where the button is. The
 // engine opens the popup under it, in a view of its own, so the shell never draws it.
-const pinned = computed(() => extensions.value.buttons.filter((b) => b.pinned));
+// extensions is what Go sends, the shell SDK's state.extensions, and what goes back is the
+// SDK's too (sdk/extensions.js).
+const props = defineProps({ extensions: Object });
+const pinned = computed(() => props.extensions.buttons.filter((b) => b.pinned));
 const toolbar = ref(null);
 const puzzle = ref(null);
 const menu = ref(false);
 
-function press(id, el) {
-  const r = el.getBoundingClientRect();
-  send({ t: 'extensionClick', extension: id, rect: { x: r.x, y: r.y, w: r.width, h: r.height } });
-}
-
 // From the menu, the popup opens under the puzzle piece.
 function openFromMenu(id) {
   menu.value = false;
-  press(id, puzzle.value);
+  pressExtension(id, puzzle.value);
 }
 
 function manage() {
   menu.value = false;
-  send({ t: 'extensionsManage' });
+  manageExtensions();
 }
 
 // The menu closes on Escape, on a press anywhere else in the shell, and when the page
@@ -41,22 +39,6 @@ function onPress(e) {
 function onBlur() {
   menu.value = false;
 }
-
-// While a popup is open, a press anywhere in the shell closes it. The one exception is
-// the popup's own button: that press goes to Go as any press on it does, and Go closes
-// the popup it finds open. The engine closes it for a press outside the shell.
-function onPressWithPopup(e) {
-  const own = e.target.closest('[data-extension]');
-  if (!own || own.dataset.extension !== extensions.value.popup) send({ t: 'extensionClosePopup' });
-}
-// Nothing is known of extensions until the snapshot arrives.
-watch(
-  () => extensions.value?.popup,
-  (open) => {
-    if (open) window.addEventListener('pointerdown', onPressWithPopup, true);
-    else window.removeEventListener('pointerdown', onPressWithPopup, true);
-  },
-);
 
 watch(menu, (on) => {
   if (on) {
@@ -83,7 +65,7 @@ watch(menu, (on) => {
       :disabled="!b.enabled"
       :aria-label="b.title || b.name"
       :title="b.title || b.name"
-      @click="press(b.id, $event.currentTarget)"
+      @click="pressExtension(b.id, $event.currentTarget)"
     >
       <ExtensionIcon :src="b.icon" :name="b.name" />
       <span v-if="b.badge" class="pbx-badge" :style="{ background: b.badgeColor || null, color: b.badgeTextColor || null }">{{ b.badge.slice(0, 4) }}</span>
@@ -114,7 +96,7 @@ watch(menu, (on) => {
             :class="{ 'pbx-pinned': b.pinned }"
             :aria-label="(b.pinned ? 'Unpin ' : 'Pin ') + b.name"
             :title="b.pinned ? 'Unpin from the toolbar' : 'Pin to the toolbar'"
-            @click="send({ t: 'extensionPin', extension: b.id, on: !b.pinned })"
+            @click="pinExtension(b.id, !b.pinned)"
           >
             <PinIcon :on="b.pinned" />
           </button>

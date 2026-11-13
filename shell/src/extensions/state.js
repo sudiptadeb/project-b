@@ -1,6 +1,6 @@
-// The extension manager's state, as Go sends it. Each page has its own copy: the shell's
-// is the toolbar's buttons and the open popup, the settings page's everything the
-// extension manager shows. Both come in the snapshot and in an 'extensions' message.
+// The extension manager's state, as Go sends it to the settings page: everything the
+// extension manager shows, in the snapshot and in an 'extensions' message. The shell's
+// copy, the toolbar's buttons and the open popup, is in its SDK's state.
 
 import { ref } from 'vue';
 

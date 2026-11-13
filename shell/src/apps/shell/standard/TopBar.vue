@@ -39,7 +39,7 @@ function switchLayout() {
     <div v-else class="space" style="width: 4px"></div>
     <NavButtons />
     <AddressBar />
-    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar && !phone" />
+    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar && !phone" :extensions="state.extensions" />
     <button
       v-if="!phone"
       class="icon-button layout"

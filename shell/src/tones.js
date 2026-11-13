@@ -25,6 +25,7 @@ export function tones(frame, dark) {
       '--hover': 'rgba(255, 255, 255, 0.08)',
       '--press': 'rgba(255, 255, 255, 0.14)',
       '--danger': '#f28b82',
+      '--on-danger': '#1f1f1f',
     };
   }
   return {
@@ -41,7 +42,8 @@ export function tones(frame, dark) {
     '--line': 'rgba(15, 20, 25, 0.1)',
     '--hover': 'rgba(255, 255, 255, 0.6)',
     '--press': 'rgba(0, 0, 0, 0.08)',
-    '--danger': '#ea3323',
+    '--danger': '#d93025',
+    '--on-danger': '#ffffff',
   };
 }
 

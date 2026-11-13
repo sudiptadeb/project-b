@@ -1,22 +1,27 @@
-// The shell's copy of the state. The managers own the truth: this is only ever replaced
-// by what they send, and a new shell starts from a snapshot.
+// What every shell is built on: its copy of Go's state, the channel to Go, and the helpers
+// every shell needs to draw tabs. The managers own the truth: the state is only ever
+// replaced by what they send, and a shell starts from a snapshot (docs/shells.md).
 
 import { computed, nextTick, reactive } from 'vue';
-import { end, listen, mark, painted, send } from '@/bridge.js';
 import { extensionsMessage } from '@extensions';
-import { reportLayout } from './regions.js';
+import { channel, send } from './channel.js';
+import { measureNow, reportLayout } from './regions.js';
 
-import { phone } from '@/phone.js';
-import { measureNow } from './regions.js';
+export { send };
 
-export { phone };
+const { mark, end, painted, firstPaint, inputs } = channel.timeline;
+
+mark('shell.script');
 
 const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 
+// state is everything Go sends, as it last sent it.
 export const state = reactive({
+  // This window's tabs in order, and the active one's id.
   tabs: [],
   active: 0,
-  // Where the tabs go: 'vertical' (a sidebar) or 'horizontal' (a strip on top).
+  // Where the standard shell puts the tabs: 'vertical' (a sidebar) or 'horizontal' (a
+  // strip on top).
   tabLayout: 'vertical',
   // 'system', 'light' or 'dark', as Go's theme pref says.
   theme: 'system',
@@ -24,13 +29,10 @@ export const state = reactive({
   controls: { x: 0, y: 0, w: 0, h: 0 },
   // The radius the OS rounds the window's corners with, in CSS pixels. 0 in full screen.
   cornerRadius: 0,
-  // The frame the window paints natively; the shell paints its own bands with the same
+  // The frame the window paints natively; a shell paints its own bands with the same
   // colour and width.
   windowColor: '',
   frameWidth: 0,
-  // Whether the sidebar is open. The shell's own, so it stays here. On a phone the
-  // sidebar is the drawer, closed until asked for.
-  sidebar: !phone,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
   // with the release's version and, when it failed, why; and how a check the user asked
   // for went.
@@ -40,8 +42,8 @@ export const state = reactive({
   // The platform, as the keymap names it, and the key each action shows, by action id.
   platform: 'mac',
   keys: {},
-  // The profile's workspaces, each with its id, name and colour. A tab in one shows a dot
-  // in its colour; the default workspace isn't among them.
+  // The profile's workspaces, each with its id, name and colour; the default workspace
+  // isn't among them.
   workspaces: [],
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
@@ -49,17 +51,21 @@ export const state = reactive({
   crashReport: '',
 });
 
-// tabsOnTop says the tabs are a strip above the toolbar rather than a sidebar.
-export const tabsOnTop = computed(() => !phone && state.tabLayout === 'horizontal');
+// The messages that are only state: each sets the fields it carries.
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout']);
 
-// activeTab is the tab whose page is showing.
+// activeTab is the tab the address bar, back, forward and reload act on.
 export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
 
 // focusPage gives the keyboard to the active tab's page. The layout goes first, so the
-// window already shows the tab when it gets the keyboard.
+// window already shows the tab when it gets the keyboard: once Vue has drawn the change
+// that asked for it, as a v-page learns the tab it shows only then. A watcher on the
+// active tab runs before that.
 export function focusPage() {
-  measureNow();
-  send({ t: 'focusTab', id: state.active });
+  nextTick(() => {
+    measureNow();
+    send({ t: 'focusTab', id: state.active });
+  });
 }
 
 // workspaceOf is the workspace a tab is in, or undefined for the default one.
@@ -67,8 +73,8 @@ export function workspaceOf(tab) {
   return state.workspaces.find((w) => w.id === tab.workspace);
 }
 
-// tabLabel is what a tab's row or strip entry says: the title, else the host while the
-// page is on its way, else New Tab.
+// tabLabel is what a tab's entry says: the title, else the host while the page is on its
+// way, else New Tab.
 export function tabLabel(tab) {
   if (tab.title) return tab.title;
   if (tab.url) {
@@ -94,35 +100,21 @@ export const controlSpace = computed(() => {
     : { left: '8px', right: window.innerWidth - c.x + 8 - frame + 'px' };
 });
 
-let onSuggestions = () => {};
-let onFocusAddressBar = () => {};
-
-export function setHandlers(handlers) {
-  onSuggestions = handlers.suggestions;
-  onFocusAddressBar = handlers.focusAddressBar;
-}
-
-export function connect() {
-  listen(
+// connect says ready, and from then on keeps state as Go sends it. Once the snapshot is
+// drawn it reports the layout and says shown. handlers are the shell's own, by message
+// kind, each called with the message after state has it: suggestions, focusAddressBar,
+// or any other. Call it once, as the shell's app is made.
+export function connect(handlers = {}) {
+  mark('shell.mounted');
+  firstPaint();
+  inputs();
+  channel.listen(
     (m) => {
       extensionsMessage(m);
       switch (m.t) {
-        case 'snapshot':
-          state.tabs = m.tabs;
-          state.active = m.active;
-          state.windowColor = m.windowColor;
-          state.frameWidth = m.frameWidth;
-          state.controls = m.controls;
-          state.cornerRadius = m.cornerRadius;
-          state.tabLayout = m.tabLayout;
-          state.theme = m.theme;
-          state.update = m.update;
-          state.running = m.running;
-          state.crashLog = m.crashLog;
-          state.crashReport = m.crashReport;
-          state.platform = m.platform;
-          state.keys = m.keys;
-          state.workspaces = m.workspaces;
+        case 'snapshot': {
+          const { t, ...all } = m;
+          Object.assign(state, all);
           mark('shell.snapshot');
           // Once the page shows it, and Go has its regions to route clicks, Go marks the
           // app ready.
@@ -131,52 +123,23 @@ export function connect() {
             send({ t: 'shown' });
           });
           break;
+        }
         // Go asks for a span to end once what it just sent is drawn.
         case 'paint':
           painted(() => end(m.span));
-          break;
-        case 'keys':
-          state.keys = m.keys;
-          break;
-        case 'crashLog':
-          state.crashLog = m.crashLog;
-          state.crashReport = m.crashReport;
-          break;
-        case 'update':
-          state.update = m.update;
-          break;
-        case 'tabs':
-          state.tabs = m.tabs;
-          state.active = m.active;
           break;
         case 'tab': {
           const i = state.tabs.findIndex((t) => t.id === m.tab.id);
           if (i >= 0) state.tabs[i] = m.tab;
           break;
         }
-        case 'theme':
-          state.theme = m.theme;
-          break;
-        case 'workspaces':
-          state.workspaces = m.workspaces;
-          break;
-        case 'tabLayout':
-          state.tabLayout = m.tabLayout;
-          break;
-        case 'windowColor':
-          state.windowColor = m.windowColor;
-          break;
-        case 'controls':
-          state.controls = m.controls;
-          state.cornerRadius = m.cornerRadius;
-          break;
-        case 'suggestions':
-          onSuggestions(m.id, m.items || []);
-          break;
-        case 'focusAddressBar':
-          onFocusAddressBar();
-          break;
+        default:
+          if (updates.has(m.t)) {
+            const { t, ...fields } = m;
+            Object.assign(state, fields);
+          }
       }
+      handlers[m.t]?.(m);
     },
     () => send({ t: 'ready' }),
   );

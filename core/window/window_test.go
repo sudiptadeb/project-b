@@ -31,7 +31,7 @@ func (r *recorder) last() engine.WindowLayout { return r.layouts[len(r.layouts)-
 
 // one is a manager with window 1 open.
 func one(e *recorder) *Manager {
-	m := New(e, engine.PageShell, "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return 1 })
+	m := New(e, engine.ShellPage("standard"), "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return 1 })
 	m.Open(1, 0)
 	return m
 }
@@ -228,7 +228,7 @@ func TestEachWindowHasItsOwnLayout(t *testing.T) {
 // windows open and close.
 func TestWhatAnotherManagerReadsAndHears(t *testing.T) {
 	front := engine.WindowID(1)
-	m := New(&recorder{}, engine.PageShell, "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return front })
+	m := New(&recorder{}, engine.ShellPage("standard"), "#4f9e9e", engine.ThemeSystem, func() engine.WindowID { return front })
 	var events []Event
 	m.OnEvent(func(e Event) { events = append(events, e) })
 	m.Open(1, 0)

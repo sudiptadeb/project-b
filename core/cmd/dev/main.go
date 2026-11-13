@@ -165,7 +165,11 @@ func main() {
 		}
 		timeline.PageOrigin(r.FormValue("page"), timeline.FromWall(time.UnixMicro(int64(ms*1000))))
 	})
-	mux.Handle("GET /shell/", http.StripPrefix("/shell/", webUI(filepath.Join(*shellDir, "shell"))))
+	// Each shell, at /shell/<id>/, as the real app has it at chrome://shell/<id>/.
+	mux.HandleFunc("GET /shell/{id}/", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		http.StripPrefix("/shell/"+id+"/", webUI(filepath.Join(*shellDir, "shell", id))).ServeHTTP(w, r)
+	})
 	mux.HandleFunc("GET /shell/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Shell) })
 	mux.HandleFunc("POST /shell/send", func(w http.ResponseWriter, r *http.Request) {
 		msg, err := io.ReadAll(r.Body)
@@ -177,7 +181,7 @@ func main() {
 		e.Post(func() {
 			// As in the real engine, a page whose window closed speaks to no one, and only
 			// a window's own page is its shell.
-			if e.Open(win) && e.PageOf(win) == engine.PageShell {
+			if e.Open(win) && e.PageOf(win).Shell() != "" {
 				a.ShellMessage(win, msg)
 			}
 		})

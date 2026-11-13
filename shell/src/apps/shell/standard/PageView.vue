@@ -1,19 +1,13 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
 import CrashNotice from './CrashNotice.vue';
 import UpdateStatus from './UpdateStatus.vue';
-import { measureNow, setPageElement } from './regions.js';
-import { state } from './state.js';
-
-// The page hole shows the active tab.
-const el = ref(null);
-onMounted(() => setPageElement(el.value, () => state.active));
-watch(() => state.active, measureNow);
+import { state } from '@/kit/shell.js';
 </script>
 
+<!-- The page hole shows the active tab. -->
 <template>
   <div class="main">
-    <div ref="el" class="page-view"></div>
+    <div v-page="state.active" class="page-view"></div>
     <CrashNotice />
     <UpdateStatus />
   </div>

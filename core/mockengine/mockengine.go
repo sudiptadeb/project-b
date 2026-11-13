@@ -452,7 +452,8 @@ func (e *Engine) CloseSettings(w engine.WindowID) {
 // WindowState is what window w holds besides the shell, and how it draws and hit-tests,
 // as its Window feed sends it:
 //
-//	{"t":"window", "page":where the mock page goes, "regions":[{x,y,w,h,"area":"drag"|"shell"}],
+//	{"t":"window", "shell":the id of the shell the window loads, "page":where the mock page goes,
+//	 "regions":[{x,y,w,h,"area":"drag"|"shell"}],
 //	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
 //	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
 //
@@ -468,9 +469,10 @@ func (e *Engine) WindowState(w engine.WindowID) []byte {
 	e.mu.Lock()
 	var l engine.WindowLayout
 	var s engine.WindowState
+	var page engine.Page
 	settings := false
 	if win := e.windows[w]; win != nil {
-		l, s, settings = win.layout, win.reported, win.settings
+		l, s, page, settings = win.layout, win.reported, win.page, win.settings
 	}
 	e.mu.Unlock()
 	regions := []region{}
@@ -481,7 +483,7 @@ func (e *Engine) WindowState(w engine.WindowID) []byte {
 	if s.Controls != (engine.Rect{}) {
 		controls = &s.Controls
 	}
-	b, _ := json.Marshal(map[string]any{"t": "window", "page": Page(l), "regions": regions,
+	b, _ := json.Marshal(map[string]any{"t": "window", "shell": page.Shell(), "page": Page(l), "regions": regions,
 		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": s.CornerRadius,
 		"settings": settings, "popup": e.openPopup(w)})
 	return b

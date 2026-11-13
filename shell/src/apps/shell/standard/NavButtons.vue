@@ -1,6 +1,5 @@
 <script setup>
-import { send } from '@/bridge.js';
-import { activeTab, focusPage } from './state.js';
+import { activeTab, focusPage, send } from '@/kit/shell.js';
 
 function act(t) {
   send({ t });

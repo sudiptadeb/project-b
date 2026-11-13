@@ -77,7 +77,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Workspaces = workspaces.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
-	a.Window = window.New(e, engine.PageShell, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
+	a.Window = window.New(e, engine.ShellPage("standard"), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
 	a.Tabs.OnMoved(a.Window.HandleTabMoved)
 	first := a.openWindow()

@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/memory/weak_ptr.h"
@@ -17,9 +18,9 @@ class WebContents;
 
 namespace project_b {
 
-// Makes our pages loadable in pages_context, and only there: chrome://shell/,
-// chrome://settings/ and chrome://picker/, each served from its own folder under shell/
-// beside the binary.
+// Makes our pages loadable in pages_context, and only there: each shell at
+// chrome://shell/<id>/, chrome://settings/ and chrome://picker/, each served from its own
+// folder under shell/ beside the binary.
 // Call it once.
 void RegisterShellWebUI(content::BrowserContext* pages_context);
 
@@ -29,8 +30,8 @@ void RegisterShellWebUI(content::BrowserContext* pages_context);
 class ShellPage : public content::WebContentsObserver,
                   public WebContentsDelegateHooks {
  public:
-  // window is Go's id for the window the page is on, and page its app: "shell" or
-  // "picker".
+  // window is Go's id for the window the page is on, and page what covers it, as Go
+  // names it: "shell/<id>" for a shell, or "picker".
   ShellPage(content::BrowserContext* browser_context,
             int64_t window,
             const std::string& page);
@@ -40,6 +41,9 @@ class ShellPage : public content::WebContentsObserver,
 
   content::WebContents* contents() const { return contents_.get(); }
   const std::string& page() const { return page_; }
+  // The app the page is, whose channel it speaks on: "shell" for every shell, or
+  // "picker".
+  std::string_view app() const;
   void Load();
   void Send(const std::string& json);
 

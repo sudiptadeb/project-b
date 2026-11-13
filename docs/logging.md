@@ -132,7 +132,7 @@ In the order they happen on a Mac:
 | `go.starting` | Go | Go's managers are being built |
 | `window.created` | C++ | Go asked for its first window, and the native window exists |
 | `shell.created` | C++ | The window's shell `WebContents` exists |
-| `shell.navigation_start` | C++ | Its load of `chrome://shell/` began: the page's time zero |
+| `shell.navigation_start` | C++ | Its load of `chrome://shell/<id>/` began: the page's time zero |
 | `window.shown` | C++ | The window is on screen, in the frame colour |
 | `go.started` | Go | Go's managers are built and the first tab is asked for |
 | `shell.committed` | C++ | The shell's renderer has the document |

@@ -12,7 +12,7 @@ export PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH
 export DOCKER_HOST=unix://$HOME/.colima/pb-android/docker.sock
 
 cd "$ROOT"
-[ -f shell/dist/shell/shell.js ] || { echo "build the shell first"; exit 1; }
+[ -f shell/dist/shell/standard/standard.js ] || { echo "build the shell first"; exit 1; }
 
 echo "=== $(date '+%F %T') start the VM"
 colima start -p pb-android --activate=false

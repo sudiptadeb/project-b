@@ -12,8 +12,8 @@
 
     page      the mock page, where the layout puts the shown tab's page; hidden while
               that is empty.
-    shell     the shell, over the whole window and transparent, so the page shows through
-              its unpainted hole.
+    shell     the shell the window loads, /shell/<id>/, over the whole window and
+              transparent, so the page shows through its unpainted hole.
     band      the frame band around the window's edge, and the window controls where the
               engine reports them (none in full screen), over both.
     settings  the settings page over everything while it is open.
@@ -74,7 +74,6 @@
   let settings = null;
   let popup = null;
   page.src = `/mock/page?window=${id}`;
-  shell.src = `/shell/?window=${id}`;
 
   // What a press at x, y does, as engine.WindowLayout.At decides it: the first region
   // that holds the point, which lists the drag areas before the shell's.
@@ -113,6 +112,12 @@
     // The real window gives the shell the keyboard first.
     shell.contentWindow.focus();
   });
+
+  // The window's page is the shell its state names; another one loads in its place.
+  function loadShell(name) {
+    const src = `/shell/${name}/?window=${id}`;
+    if (shell.getAttribute('src') !== src) shell.src = src;
+  }
 
   function placePage(r) {
     const shown = !!r && r.w > 0 && r.h > 0;
@@ -171,6 +176,7 @@
     const msg = JSON.parse(e.data);
     if (msg.t !== 'window') return;
     state = msg;
+    loadShell(msg.shell);
     placePage(msg.page);
     drawFrame(msg);
     route();

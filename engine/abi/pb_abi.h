@@ -175,8 +175,8 @@ typedef struct PBEngineCalls {
   int64_t (*duplicate_tab)(int64_t tab);
   // Runs a PBEditCommand in whichever of our pages has the keyboard.
   void (*edit)(int32_t command);
-  // Makes a window and the page covering it, chrome://<page>/: "shell", or "picker" in a
-  // copy that hasn't chosen its profile. It puts it on screen with its first layout, a
+  // Makes a window and the page covering it, chrome://<page>/: a shell, "shell/<id>", or
+  // "picker" in a copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.
   // Its first state follows once this call has returned.
   void (*create_window)(int64_t window,

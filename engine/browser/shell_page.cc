@@ -1,5 +1,7 @@
 #include "project_b/engine/browser/shell_page.h"
 
+#include <algorithm>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -13,6 +15,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
@@ -51,8 +54,9 @@ namespace project_b {
 namespace {
 
 // Our pages, each an app of its own (shell/src/apps/<app>) at chrome://<app>/, served from
-// shell/<app>/ beside the binary. Each window has the one WebContents each belongs in,
-// and their messages cross to Go as one event, with the window.
+// shell/<app>/ beside the binary. Every shell is an app of "shell": shell <id> is
+// chrome://shell/<id>/, served from shell/shell/<id>/. Each window has the one WebContents
+// each belongs in, and their messages cross to Go as one event, with the window.
 struct App {
   const char* host;
   PBEvent event;
@@ -82,8 +86,8 @@ int64_t HomeWindow(const App& app, content::WebContents* contents) {
     content::WebContents* home =
         app.event == PB_EVENT_SETTINGS_MESSAGE
             ? (w->settings ? w->settings->contents() : nullptr)
-        : w->shell->page() == app.host ? w->shell->contents()
-                                       : nullptr;
+        : w->shell->app() == app.host ? w->shell->contents()
+                                      : nullptr;
     if (home == contents) {
       return id;
     }
@@ -210,11 +214,16 @@ class AppDataSource : public content::URLDataSource {
   void StartDataRequest(const GURL& url,
                         const content::WebContents::Getter& wc_getter,
                         GotDataCallback callback) override {
+    std::string name = Name(url);
+    if (name.empty()) {
+      std::move(callback).Run(nullptr);
+      return;
+    }
 #if BUILDFLAG(IS_ANDROID)
     // On Android the apps are in the APK, not in a folder.
     base::MemoryMappedFile::Region region;
-    base::File asset(base::android::OpenApkAsset(
-        "assets/shell/" + host_ + "/" + Name(url), &region));
+    base::File asset(
+        base::android::OpenApkAsset("assets/shell/" + name, &region));
     base::MemoryMappedFile mapped;
     CHECK(mapped.Initialize(std::move(asset), region));
     std::string data(base::as_string_view(mapped.bytes()));
@@ -224,8 +233,7 @@ class AppDataSource : public content::URLDataSource {
 #else
     base::FilePath dir;
     CHECK(base::PathService::Get(base::DIR_ASSETS, &dir));
-    base::FilePath file =
-        dir.Append("shell").AppendASCII(host_).AppendASCII(Name(url));
+    base::FilePath file = dir.Append("shell").AppendASCII(name);
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
         base::BindOnce(
@@ -277,16 +285,38 @@ class AppDataSource : public content::URLDataSource {
   }
 
  private:
-  // Only these files exist, so a path can't reach outside the folder: index.html, and the
-  // app's one script and one stylesheet.
+  // The file a URL names, as a path in the folder of our pages, or "" for none. Only an
+  // app's index.html, its one script and its one stylesheet exist, so no path reaches
+  // outside its folder; any other path of settings or the picker is its index.html. A
+  // shell's folder is its id, the path's first part: lower-case letters, digits and
+  // dashes.
   std::string Name(const GURL& url) const {
-    std::string path(url.path());
-    for (const char* ext : {".js", ".css"}) {
-      if (path == "/" + host_ + ext) {
-        return host_ + ext;
-      }
+    std::string_view path = url.path().substr(1);
+    if (host_ != "shell") {
+      return host_ + "/" + (IsOwnFile(host_, path) ? std::string(path) : "index.html");
     }
-    return "index.html";
+    size_t slash = path.find('/');
+    if (slash == std::string_view::npos) {
+      return "";
+    }
+    std::string_view id = path.substr(0, slash);
+    std::string_view file = path.substr(slash + 1);
+    if (file.empty()) {
+      file = "index.html";
+    }
+    if (id.empty() || !std::ranges::all_of(id, [](char c) {
+          return base::IsAsciiLower(c) || base::IsAsciiDigit(c) || c == '-';
+        }) ||
+        (file != "index.html" && !IsOwnFile(id, file))) {
+      return "";
+    }
+    return base::StrCat({"shell/", id, "/", file});
+  }
+
+  // Whether file is the script or the stylesheet of the app whose files are called name.
+  static bool IsOwnFile(std::string_view name, std::string_view file) {
+    return file == base::StrCat({name, ".js"}) ||
+           file == base::StrCat({name, ".css"});
   }
 
   const std::string host_;
@@ -319,6 +349,10 @@ ShellPage::~ShellPage() {
   contents_->SetDelegate(nullptr);
 }
 
+std::string_view ShellPage::app() const {
+  return std::string_view(page_).substr(0, page_.find('/'));
+}
+
 void ShellPage::Load() {
   contents_->GetController().LoadURLWithParams(
       content::NavigationController::LoadURLParams(
@@ -348,7 +382,7 @@ void ShellPage::RenderFrameCreated(content::RenderFrameHost* frame) {
 }
 
 void ShellPage::DidFinishNavigation(content::NavigationHandle* handle) {
-  timeline::PageCommitted(page_, handle);
+  timeline::PageCommitted(app(), handle);
 }
 
 // Go's window manager takes back what a dead shell claimed, so the page keeps working

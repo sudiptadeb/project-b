@@ -453,8 +453,8 @@ Mac only, on branch `menus-shortcuts`.
   macOS App Shortcuts are read at start and on every change (key-value observing on our
   defaults, All Applications included) and sent to Go. `settings_page.cc` is the settings
   page; `Window::SetOverlayView` puts it over everything and gives it every press.
-- **Shell:** `shell/src/apps/settings/` is the settings app and `shell/src/apps/shell/`
-  the shell, each built on its own (`npm run build` builds both). The shell's panel is gone; the gear runs
+- **Shell:** `shell/src/apps/settings/` is the settings app and `shell/src/apps/shell/standard/`
+  the standard shell, each built on its own (`npm run build` builds both). The shell's panel is gone; the gear runs
   `app.settings`, and the sidebar's New Tab hint shows whatever key New Tab has now.
 
 Where the build differs from the design, or decided something the design left open:

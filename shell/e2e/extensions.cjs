@@ -30,7 +30,7 @@ function cannotRun(why) {
 if (!fs.existsSync(path.join(storeDir, 'catalogue.json'))) {
   cannotRun('No mock store: run tools/fetch-extensions.sh and tools/pack-test-extension.py first.');
 }
-if (!fs.readFileSync(path.join(root, 'shell/dist/shell/shell.js'), 'utf8').includes('pbx-')) {
+if (!fs.readFileSync(path.join(root, 'shell/dist/shell/standard/standard.js'), 'utf8').includes('pbx-')) {
   cannotRun('shell/dist was built without extensions: run `npm run build` in shell/ without WITHOUT=extensions first.');
 }
 
@@ -288,9 +288,7 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   const off = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-no-extensions-'));
   const env = { ...process.env, WITHOUT: 'extensions' };
   const shellDir = path.join(root, 'shell');
-  for (const app of fs.readdirSync(path.join(shellDir, 'src/apps'))) {
-    execFileSync('npx', ['vite', 'build', '--logLevel', 'error', '--outDir', path.join(off, app)], { cwd: shellDir, env: { ...env, VITE_APP: app }, stdio: 'inherit' });
-  }
+  execFileSync('node', ['build.js', '--logLevel', 'error', '--outDir', off], { cwd: shellDir, env, stdio: 'inherit' });
   const leaked = fs.readdirSync(off, { recursive: true })
     .filter((f) => fs.statSync(path.join(off, f)).isFile() && fs.readFileSync(path.join(off, f), 'utf8').includes('pbx-'));
   check('a build without extensions has no extensions UI', leaked.length === 0, leaked.join(', '));

@@ -1,6 +1,5 @@
 <script setup>
-import { send } from '@/bridge.js';
-import { state } from './state.js';
+import { send, state } from '@/kit/shell.js';
 
 // Says the last run crashed, where its log is and where macOS's report is, until the user
 // closes it. Go decides whether there is one.

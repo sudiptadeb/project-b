@@ -1,6 +1,6 @@
 // How a page of ours talks to the managers: chrome.send, and a global the engine calls
-// with each message. Nothing else knows. The shell and the settings page each have a
-// channel: 'shell' or 'settings'.
+// with each message. Nothing else knows. Each page has a channel: 'shell' for every
+// shell (through @/kit/shell.js), 'settings' or 'picker'.
 
 import { timeline } from '@/timeline.js';
 
@@ -24,18 +24,4 @@ export function bridge(channel) {
     addEventListener('mouseup', () => b.timeline.end('input.click'), true);
   };
   return b;
-}
-
-const shell = bridge('shell');
-export const listen = shell.listen;
-export const { mark, end, painted, firstPaint, inputs } = shell.timeline;
-
-// The commands that start an interaction the timeline measures, and its span. The span
-// begins here, at the user's click, and Go has the shell end it once the result is drawn.
-const spans = { newTab: 'tab.new', closeTab: 'tab.close', activateTab: 'tab.activate', setTabLayout: 'tabs.layout' };
-
-export function send(msg) {
-  const span = msg.t === 'run' && msg.text === 'app.settings' ? 'settings.open' : spans[msg.t];
-  if (span) shell.timeline.begin(span);
-  shell.send(msg);
 }

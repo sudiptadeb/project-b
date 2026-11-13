@@ -2,9 +2,9 @@
 import { computed } from 'vue';
 import AddressBar from './AddressBar.vue';
 import NavButtons from './NavButtons.vue';
-import { send } from '@/bridge.js';
 import { ExtensionsToolbar } from '@extensions';
-import { activeTab, controlSpace as controls, phone, state, tabsOnTop } from './state.js';
+import { activeTab, controlSpace as controls, send, state } from '@/kit/shell.js';
+import { phone, tabsOnTop, view } from './state.js';
 
 // With the tabs on the side this row is the title bar: it holds the space for the native
 // window controls, and its empty parts drag the window. With the tabs on top the strip
@@ -30,11 +30,11 @@ function switchLayout() {
       <button
         class="icon-button"
         type="button"
-        :aria-label="state.sidebar ? 'Hide sidebar' : 'Show sidebar'"
-        :aria-expanded="state.sidebar"
-        @click="state.sidebar = !state.sidebar"
+        :aria-label="view.sidebar ? 'Hide sidebar' : 'Show sidebar'"
+        :aria-expanded="view.sidebar"
+        @click="view.sidebar = !view.sidebar"
       >
-        <svg width="14" height="13" viewBox="0 0 14 13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.18.75H1.75a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h10.43a1 1 0 0 0 1-1V1.75a1 1 0 0 0-1-1Z"/><path d="M4.56.75V12"/><path v-if="state.sidebar" d="M4.28.75H.75v11h3.53z" fill="currentColor" stroke="none" opacity=".25"/></svg>
+        <svg width="14" height="13" viewBox="0 0 14 13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12.18.75H1.75a1 1 0 0 0-1 1V11a1 1 0 0 0 1 1h10.43a1 1 0 0 0 1-1V1.75a1 1 0 0 0-1-1Z"/><path d="M4.56.75V12"/><path v-if="view.sidebar" d="M4.28.75H.75v11h3.53z" fill="currentColor" stroke="none" opacity=".25"/></svg>
       </button>
     </template>
     <div v-else class="space" style="width: 4px"></div>

@@ -1,6 +1,5 @@
 <script setup>
-import { send } from '@/bridge.js';
-import { state, tabLabel } from './state.js';
+import { send, state, tabLabel } from '@/kit/shell.js';
 
 // A phone's tabs: one favicon each, in a row under the toolbar. A tap shows that tab; the
 // sidebar button opens the full list. A tab with no favicon yet shows its label's first

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { send } from '@/bridge.js';
-import { activeTab, focusPage, setHandlers, state } from './state.js';
+import { activeTab, focusPage, send, state } from '@/kit/shell.js';
+import { addressBar } from './state.js';
 
 const input = ref(null);
 const focused = ref(false);
@@ -122,15 +122,13 @@ function focusBar() {
 }
 
 onMounted(() => {
-  setHandlers({
-    suggestions(id, list) {
-      if (id === latestQuery) {
-        items.value = list;
-        highlight.value = -1;
-      }
-    },
-    focusAddressBar: () => input.value.focus(),
-  });
+  addressBar.suggestions = (id, list) => {
+    if (id === latestQuery) {
+      items.value = list;
+      highlight.value = -1;
+    }
+  };
+  addressBar.focus = () => input.value.focus();
 });
 
 watch(

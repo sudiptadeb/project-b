@@ -58,7 +58,7 @@ class Pages(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/redirect":
             self.send_response(302)
-            self.send_header("Location", "chrome://shell/")
+            self.send_header("Location", "chrome://shell/standard/")
             self.end_headers()
             return
         if self.path == "/cookie":
@@ -77,7 +77,7 @@ class Pages(http.server.BaseHTTPRequestHandler):
             # Links to itself: in this tab, in a new tab without its opener, as target=_blank
             # is by default and rel=noopener says outright.
             "/store": b'<!doctype html><title>Store</title><a id=link href=/store>Here</a> <a id=blank target=_blank href=/store>Blank</a> <a id=noopener target=_blank rel=noopener href=/store>No opener</a>',
-        }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>')
+        }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/standard/">The shell</a>')
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(body)))
@@ -724,12 +724,12 @@ def browsing_checks():
 
     status = "(document.querySelector('.status')||{}).innerText||''"
     visit(app, PAGES + "links")
-    typed("chrome://shell/")
+    typed("chrome://shell/standard/")
     try:
         app.wait(f"{status}==='Blocked'", 10)
-        check("typing chrome://shell/ is refused by the gate", True)
+        check("typing chrome://shell/standard/ is refused by the gate", True)
     except TimeoutError as e:
-        check("typing chrome://shell/ is refused by the gate", False, e)
+        check("typing chrome://shell/standard/ is refused by the gate", False, e)
     # A refused load leaves the tab on content's error page, a moment after the chip shows.
     try:
         app.wait("location.href==='chrome-error://chromewebdata/'", 10, page=True)
@@ -740,11 +740,11 @@ def browsing_checks():
     app.js("document.querySelector('a').click(), 1", page=True)
     time.sleep(1)
     landed = app.js("[location.href, typeof (window.chrome && chrome.send)]", page=True)
-    check("a page's link to chrome://shell/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/" and landed[1] == "undefined", (landed, app.js(status)))
+    check("a page's link to chrome://shell/standard/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/standard/" and landed[1] == "undefined", (landed, app.js(status)))
     typed(PAGES + "redirect")
     time.sleep(2)
     landed = app.js("[location.href, typeof (window.chrome && chrome.send)]", page=True)
-    check("a redirect to chrome://shell/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/" and landed[1] == "undefined", landed)
+    check("a redirect to chrome://shell/standard/ is refused, and the tab has no bridge", landed[0] != "chrome://shell/standard/" and landed[1] == "undefined", landed)
     # Content serves chrome://gpu/ itself. The gate lets it through; whether it renders
     # depends on the resources the app bundles.
     typed("chrome://gpu/")
@@ -757,12 +757,12 @@ def browsing_checks():
     before = shell_messages()
     stray = app.cmd("strayshell pages", timeout=30)
     time.sleep(1)
-    check("a chrome://shell/ page outside the shell gets no bridge", stray == "chrome://shell/ undefined", stray)
+    check("a chrome://shell/standard/ page outside the shell gets no bridge", stray == "chrome://shell/standard/ undefined", stray)
     check("and Go receives no shell message from it", shell_messages() == before, (before, shell_messages()))
     # Our pages load only in their own context. In the profile's, where every tab is, the
     # shell's address is no page at all, even with no gate in the way.
     stray = app.cmd("strayshell tabs", timeout=30)
-    check("chrome://shell/ in the tabs' context doesn't load the shell: it ends on an error page", stray == "chrome-error://chromewebdata/ undefined", stray)
+    check("chrome://shell/standard/ in the tabs' context doesn't load the shell: it ends on an error page", stray == "chrome-error://chromewebdata/ undefined", stray)
     click(app, "[aria-label='Tabs on top']")
     try:
         app.wait("!!document.querySelector('.strip')", 5)

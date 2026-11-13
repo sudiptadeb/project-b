@@ -2,8 +2,9 @@
 """Builds the shell's apps with vite into the build folder, and writes a depfile.
 
 Each app in shell/src/apps/<app>/ lands in shell/<app>/, which the engine serves as
-chrome://<app>/. The stamp is written last, inside that folder, so deleting the folder
-builds it again.
+chrome://<app>/, and each shell, shell/src/apps/shell/<id>/, in shell/shell/<id>/, served
+as chrome://shell/<id>/; shell/build.js builds them all. The stamp is written last, inside
+that folder, so deleting the folder builds it again.
 """
 
 import os
@@ -26,17 +27,14 @@ def main():
         "WITHOUT": without,
         "PATH": os.path.dirname(node) + ":/usr/bin:/bin",
     })
-    vite = os.path.join(shell, "node_modules/vite/bin/vite.js")
     shutil.rmtree(out, ignore_errors=True)
-    for app in sorted(os.listdir(os.path.join(shell, "src/apps"))):
-        env["VITE_APP"] = app
-        subprocess.check_call(
-            [node, vite, "build", "--logLevel", "warn", "--outDir", os.path.join(out, app)],
-            cwd=shell, env=env)
+    subprocess.check_call(
+        [node, "build.js", "--logLevel", "warn", "--outDir", out], cwd=shell, env=env)
 
     deps = [os.path.join(link, "core/flags/registry.json")]
     deps += [os.path.join(link, "shell", name)
-             for name in ("vite.config.js", "package.json", "package-lock.json")]
+             for name in ("vite.config.js", "apps.js", "build.js", "package.json",
+                          "package-lock.json")]
     for root, _, files in os.walk(os.path.join(shell, "src")):
         for name in files:
             rel = os.path.relpath(os.path.join(root, name), shell)

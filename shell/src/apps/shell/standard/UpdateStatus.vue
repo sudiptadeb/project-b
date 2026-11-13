@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import { send } from '@/bridge.js';
-import { phone, state } from './state.js';
+import { send, state } from '@/kit/shell.js';
+import { phone } from './state.js';
 
 // The update manager's state, shown the way a browser shows a link's address: a small
 // bubble in the page's bottom-left corner, there only while something is happening. On a

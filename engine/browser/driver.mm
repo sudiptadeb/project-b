@@ -280,7 +280,7 @@ void Eval(const std::string& id, content::WebContents* contents, const std::stri
       /*world_id=*/0);
 }
 
-// A WebContents that is neither the shell nor a tab, asked for chrome://shell/: a copy of
+// A WebContents that is neither the shell nor a tab, asked for the standard shell: a copy of
 // the shell that got past the gate, which only sees tabs. It is in our pages' context, or
 // in the profile's, where the tabs are.
 std::unique_ptr<content::WebContents>& Stray() {
@@ -292,7 +292,7 @@ std::unique_ptr<content::WebContents>& Stray() {
 void AskStrayShell(std::string id, int tries) {
   content::WebContents* contents = Stray().get();
   if (tries > 0 && (contents->IsLoading() ||
-                    contents->GetLastCommittedURL() != GURL("chrome://shell/"))) {
+                    contents->GetLastCommittedURL() != GURL("chrome://shell/standard/"))) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
                    dispatch_get_main_queue(), ^{
                      AskStrayShell(id, tries - 1);
@@ -718,7 +718,7 @@ void Run(const std::string& line) {
         parts.size() > 2 && parts[2] == "tabs" ? engine->browser_context()
                                                : engine->pages_context()));
     Stray()->GetController().LoadURLWithParams(
-        content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
+        content::NavigationController::LoadURLParams(GURL("chrome://shell/standard/")));
     AskStrayShell(id, 100);
   } else if (cmd == "crashpage") {
     Focused()->contents()->GetPrimaryMainFrame()->GetProcess()->Shutdown(1);

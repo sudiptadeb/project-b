@@ -49,7 +49,7 @@ transparent frame, the frame band and window controls, the settings page over ev
 when the gear opens it, and an extension's popup, a card naming the page. Each press goes
 where the real window sends it, by the layout's regions. The shell and the settings page
 are the real app's, unchanged: the server gives them `chrome.send` as the engine does
-(`core/cmd/dev/webui.js`). The shell also opens alone at http://127.0.0.1:8765/shell/, and
+(`core/cmd/dev/webui.js`). The shell also opens alone at http://127.0.0.1:8765/shell/standard/, and
 the settings page at http://127.0.0.1:8765/settings/. With `npm run dev` in `shell/`, open
 the window at `/mock/window` on Vite's server. Each window Go makes is a page of its own:
 window 1 at `/`, and the one New Window makes at `/?window=2`, in a tab you open.

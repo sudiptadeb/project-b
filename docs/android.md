@@ -330,7 +330,7 @@ adapter here, with `Window` as the one Android file (`engine/android/window_andr
 | Updates | The same manager and the same `amarit.Client`, every minute, on the `android/arm64` asset. The APK is downloaded into the profile, size and sha256 checked by amarit, and the bubble and the settings panel offer to install it: see [Updates on a phone](#updates-on-a-phone) |
 
 **Tabs on a phone.** A sidebar would take half a phone's width, so on a touch screen (`shell/src/phone.js`)
-the tabs are favicons in a row of their own under the toolbar (`apps/shell/TabIcons.vue`), the shown one marked as in the sidebar;
+the tabs are favicons in a row of their own under the toolbar (`apps/shell/standard/TabIcons.vue`), the shown one marked as in the sidebar;
 a tap shows that tab, and a tab with no favicon yet shows its title's first letter. The sidebar button opens the
 sidebar's own list as a drawer over the toolbar and the page: choosing a tab or New Tab closes it, a tap outside closes
 it, and a tab's close button leaves it open. Every tab's close button shows, since there's no hover. The tab layout

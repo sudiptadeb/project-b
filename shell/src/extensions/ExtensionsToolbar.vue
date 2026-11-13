@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { send } from '@/bridge.js';
+import { send } from '@/kit/channel.js';
 import ExtensionIcon from './ExtensionIcon.vue';
 import InstallPrompt from './InstallPrompt.vue';
 import PinIcon from './PinIcon.vue';

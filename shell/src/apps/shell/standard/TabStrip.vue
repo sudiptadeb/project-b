@@ -1,7 +1,6 @@
 <script setup>
-import { send } from '@/bridge.js';
 import { shown } from '@/keys.js';
-import { controlSpace as controls, state, tabLabel, workspaceOf } from './state.js';
+import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,
 // leaves the native window controls their space, and its empty parts drag the window.

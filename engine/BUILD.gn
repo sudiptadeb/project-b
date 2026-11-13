@@ -34,9 +34,9 @@ action("go_core") {
   args += project_b_built
 }
 
-# The shell's pages, one folder per app: shell/shell/, shell/settings/, shell/picker/. The
-# engine serves each from there as chrome://<app>/, and tools/package.sh copies them into
-# the app.
+# The shell's pages, one folder per app: shell/settings/, shell/picker/, and a folder per
+# shell in shell/shell/. The engine serves each from there as chrome://<app>/, a shell as
+# chrome://shell/<id>/, and tools/package.sh copies them into the app.
 action("shell") {
   script = "build_shell.py"
   outputs = [ "$root_out_dir/shell/.stamp" ]

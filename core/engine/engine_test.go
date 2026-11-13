@@ -16,3 +16,12 @@ func TestTheFirstRegionThatHoldsAPointDecides(t *testing.T) {
 		}
 	}
 }
+
+func TestAShellsPageNamesItsShell(t *testing.T) {
+	if p := ShellPage("standard"); p != "shell/standard" || p.Shell() != "standard" {
+		t.Errorf("ShellPage(standard) = %q, its shell %q", p, p.Shell())
+	}
+	if PagePicker.Shell() != "" {
+		t.Errorf("the picker is shell %q", PagePicker.Shell())
+	}
+}

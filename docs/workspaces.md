@@ -57,7 +57,7 @@ the order of building at the end says which steps are done.
   default workspace, or in one the list doesn't hold, shows none. Every shell has the list
   in its snapshot, and hears it again, `{"t": "workspaces", "workspaces": [...]}`, when a
   workspace is made or renamed, so the dots follow at once (`core/app/workspaces.go`,
-  `shell/src/apps/shell/`). The mock's page fires a menu item by its action, as the menu
+  `shell/src/apps/shell/standard/`). The mock's page fires a menu item by its action, as the menu
   bar does (`/mock/fire`, kind `menu`).
 - Settings has a Workspaces section, after Profile: each workspace's colour and name, which
   can be changed, and New Workspace, with a name and a colour from a colour picker. Go

@@ -5,7 +5,8 @@ import Sidebar from './Sidebar.vue';
 import TabIcons from './TabIcons.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
-import { phone, state, tabsOnTop } from './state.js';
+import { state } from '@/kit/shell.js';
+import { phone, tabsOnTop, view } from './state.js';
 import { useTheme } from '@/theme.js';
 
 // Every layout shows the same tabs from the same state; only where they sit differs. On a
@@ -39,7 +40,7 @@ watchEffect(() => {
     </div>
     <div class="edge bottom"></div>
     <!-- A tap outside the drawer closes it, and goes no further. -->
-    <div v-if="phone && state.sidebar" v-shell class="drawer" @click.self="state.sidebar = false">
+    <div v-if="phone && view.sidebar" v-shell class="drawer" @click.self="view.sidebar = false">
       <Sidebar drawer />
     </div>
   </div>

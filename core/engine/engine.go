@@ -7,7 +7,10 @@
 // A worker goroutine that finishes something uses Post to get back onto it.
 package engine
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // TabID identifies a tab across the boundary. Content's own objects never cross it.
 type TabID int64
@@ -64,14 +67,25 @@ const (
 	SurfaceSettings
 )
 
-// Page is which of our pages covers a window: the shell, or the picker in a copy that
-// hasn't chosen its profile. Each is an app of its own, chrome://<page>/.
+// Page is which of our pages covers a window: a shell, or the picker in a copy that
+// hasn't chosen its profile. Each is an app of its own, chrome://<page>/: a shell's page
+// is "shell/<id>", at chrome://shell/<id>/.
 type Page string
 
-const (
-	PageShell  Page = "shell"
-	PagePicker Page = "picker"
-)
+// PagePicker is the picker's page.
+const PagePicker Page = "picker"
+
+// ShellPage is the page of the shell called id.
+func ShellPage(id string) Page { return Page("shell/" + id) }
+
+// Shell is the id of the shell the page is, or "" for a page that isn't a shell.
+func (p Page) Shell() string {
+	id, ok := strings.CutPrefix(string(p), "shell/")
+	if !ok {
+		return ""
+	}
+	return id
+}
 
 // MenuItem is one entry of the native menu bar. A submenu has Items; a separator has
 // none of the rest.

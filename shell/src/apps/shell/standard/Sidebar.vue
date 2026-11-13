@@ -1,7 +1,7 @@
 <script setup>
-import { send } from '@/bridge.js';
+import { send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
 import { shown } from '@/keys.js';
-import { state, tabLabel, workspaceOf } from './state.js';
+import { view } from './state.js';
 
 // As the phone's drawer, choosing a tab or opening a new one closes it; closing a tab
 // leaves it open for the next.
@@ -9,12 +9,12 @@ const props = defineProps({ drawer: Boolean });
 
 function open(msg) {
   send(msg);
-  if (props.drawer) state.sidebar = false;
+  if (props.drawer) view.sidebar = false;
 }
 </script>
 
 <template>
-  <nav v-shell class="sidebar" :class="{ closed: !state.sidebar, drawer }" aria-label="Tabs">
+  <nav v-shell class="sidebar" :class="{ closed: !view.sidebar, drawer }" aria-label="Tabs">
     <div class="inner">
       <button class="row new-tab" type="button" @click="open({ t: 'newTab' })">
         <span class="icon">

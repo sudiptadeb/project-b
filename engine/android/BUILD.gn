@@ -121,22 +121,23 @@ repack("pak") {
 
 android_assets("assets") {
   sources = [ "$root_out_dir/project_b.pak" ]
-  # Each app of shell/src/apps, as tools/package.sh lays them out for the Mac.
+  # Each app of shell/src/apps, and each shell, as tools/package.sh lays them out for the
+  # Mac.
   renaming_sources = [
     "../../shell/dist/settings/index.html",
     "../../shell/dist/settings/settings.css",
     "../../shell/dist/settings/settings.js",
-    "../../shell/dist/shell/index.html",
-    "../../shell/dist/shell/shell.css",
-    "../../shell/dist/shell/shell.js",
+    "../../shell/dist/shell/standard/index.html",
+    "../../shell/dist/shell/standard/standard.css",
+    "../../shell/dist/shell/standard/standard.js",
   ]
   renaming_destinations = [
     "shell/settings/index.html",
     "shell/settings/settings.css",
     "shell/settings/settings.js",
-    "shell/shell/index.html",
-    "shell/shell/shell.css",
-    "shell/shell/shell.js",
+    "shell/shell/standard/index.html",
+    "shell/shell/standard/standard.css",
+    "shell/shell/standard/standard.js",
   ]
   disable_compression = true
   deps = [

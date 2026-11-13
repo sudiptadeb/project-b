@@ -13,8 +13,6 @@
 import { send } from './channel.js';
 import { controls } from './controls.js';
 
-const debug = new URLSearchParams(location.search).get('debug') === 'regions';
-
 const marked = new Set();
 // Each element marked v-drag, and what watches its subtree.
 const draggable = new Map();
@@ -102,9 +100,6 @@ export const vShell = {
   mounted(el) {
     marked.add(el);
     observer.observe(el);
-    if (debug) {
-      el.style.outline = '2px solid rgba(220, 38, 38, 0.8)';
-    }
     schedule();
   },
   unmounted(el) {
@@ -123,9 +118,6 @@ export const vDrag = {
     watch.observe(el, { subtree: true, childList: true, attributes: true, characterData: true });
     draggable.set(el, watch);
     observer.observe(el);
-    if (debug) {
-      el.style.outline = '2px dashed rgba(38, 99, 220, 0.8)';
-    }
     schedule();
   },
   unmounted(el) {

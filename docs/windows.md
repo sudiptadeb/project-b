@@ -112,4 +112,14 @@ applied and its own state, over everything else:
 
 It only draws: it takes no presses and claims no part of the title bar, so the window
 drags and clicks as it does without it. It is macOS's `PBRegionOutlineView` in
-`engine/browser/window_mac.mm`.
+`engine/browser/window_mac.mm`. The controls inside a drag bar are shell areas, so they
+are red inside the bar's blue.
+
+The mock draws the same outlines in its window page (`core/cmd/dev/window.html`), from the
+window state the mock engine sends it, the flag among it: the drag areas dashed 4 and 3,
+the frame band 2 and 2, each shown tab's id in 10px at its page's top left. As in the real
+app the flag takes effect at launch: the dev server hands the mock engine the switches of
+the profile's saved flags as it starts, so after turning it on in settings, start
+`go run ./cmd/dev` again.
+`shell/e2e/outlines.cjs` checks an outline of the right kind on each tracked rectangle,
+with one tab and with the settings page open, and none with the flag off.

@@ -99,6 +99,9 @@ The browser passes `--pb-extensions` to every child process it starts, in
   `-flags` adds the ones the registry has no row of): each drawn by its type, saved, refused,
   and Relaunch beside the waiting flag only.
 - `shell/e2e/extensions.cjs`: with the flag off, no toolbar button and no Extensions section.
+- `shell/e2e/outlines.cjs`: Show window regions on the mock, read from the profile's flags at
+  launch as the real engine reads its switches: the window page outlines what the window
+  manager tracks with it on, and nothing with it off.
 - `tools/drive_extensions.py`: the real app runs extensions from a profile with the flag on;
   with it off, there is no button and the store's page has no store API, and the Flags
   section's switch and Relaunch start the app again on the same profile.

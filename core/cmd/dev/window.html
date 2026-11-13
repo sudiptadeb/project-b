@@ -21,6 +21,9 @@
     settings  the settings page over everything while it is open.
     popup     an extension's popup under its button. The mock runs no extension pages, so
               it is a card that names the page; a click outside it closes it.
+    outlines  with the Show window regions flag on, a 1px border around every rectangle
+              the window manager tracks, over everything and taking no presses, as the
+              real window's PBRegionOutlineView draws them (docs/windows.md).
 
   Go's mock engine says what to draw on /mock/window/events: the state on connecting,
   then each change, as WindowState in core/mockengine has it. This page tells Go its size
@@ -54,6 +57,10 @@
     box-shadow: 0 0 0 0.5px rgb(0 0 0 / 25%), 0 8px 24px rgb(0 0 0 / 20%);
   }
   .mock-popup .url { margin-top: 6px; opacity: 0.7; word-break: break-all; }
+  .outlines { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .outlines svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .outlines rect { fill: none; stroke-width: 1; }
+  .outlines .label { position: absolute; padding: 0 1px; background: rgb(255 255 255 / 85%); color: #16a34a; font: 10px system-ui; line-height: 12px; }
 </style>
 </head>
 <body>
@@ -62,6 +69,7 @@
   <iframe class="shell" title="Shell"></iframe>
   <div class="band"></div>
   <div class="controls"><i></i><i></i><i></i></div>
+  <div class="outlines" hidden><svg></svg></div>
 </div>
 <script>
   // Which of Go's windows this is.
@@ -72,6 +80,7 @@
   const pages = [win.querySelector('.mock-page')];
   const band = win.querySelector('.band');
   const controls = win.querySelector('.controls');
+  const outlines = win.querySelector('.outlines');
   let state = { pages: [], regions: [] };
   let pointer = null;
   let settings = null;
@@ -191,6 +200,56 @@
     win.append(popup);
   }
 
+  // drawOutlines draws what the real window's region outlines do, bottom to top: the frame
+  // band's inner edge, each shown tab's page with its id, the shell's areas, the drag
+  // areas, the window buttons, and the settings page while it is open. Each kind's border
+  // is data-kind on its rectangle.
+  const kinds = {
+    frame: { color: '#9ca3af', dash: '2 2' },
+    page: { color: '#16a34a' },
+    shell: { color: '#dc2626' },
+    drag: { color: '#2563eb', dash: '4 3' },
+    buttons: { color: '#a855f7' },
+    settings: { color: '#f97316' },
+  };
+  function drawOutlines(s) {
+    outlines.hidden = !s.showRegions;
+    const svg = outlines.querySelector('svg');
+    svg.replaceChildren();
+    outlines.querySelectorAll('.label').forEach((l) => l.remove());
+    if (!s.showRegions) return;
+    const stroke = (kind, r) => {
+      if (r.w <= 0 || r.h <= 0) return;
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      // Half a pixel in, so the 1px line lies on whole pixels inside the rectangle.
+      el.setAttribute('x', r.x + 0.5);
+      el.setAttribute('y', r.y + 0.5);
+      el.setAttribute('width', r.w - 1);
+      el.setAttribute('height', r.h - 1);
+      el.setAttribute('stroke', kinds[kind].color);
+      if (kinds[kind].dash) el.setAttribute('stroke-dasharray', kinds[kind].dash);
+      el.dataset.kind = kind;
+      svg.append(el);
+    };
+    const W = innerWidth;
+    const H = innerHeight;
+    const band = s.frameWidth;
+    stroke('frame', { x: band, y: band, w: W - 2 * band, h: H - 2 * band });
+    for (const p of s.pages) {
+      stroke('page', p.rect);
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = `tab ${p.tab}`;
+      Object.assign(label.style, { left: `${p.rect.x + 3}px`, top: `${p.rect.y + 2}px` });
+      outlines.append(label);
+    }
+    for (const kind of ['shell', 'drag']) {
+      for (const r of s.regions) if (r.area === kind) stroke(kind, r);
+    }
+    if (s.controls) stroke('buttons', s.controls);
+    if (s.settings) stroke('settings', { x: 0, y: 0, w: W, h: H });
+  }
+
   new EventSource(`/mock/window/events?window=${id}`).onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.t !== 'window') return;
@@ -201,6 +260,7 @@
     route();
     showSettings(msg.settings);
     showPopup(msg.popup);
+    drawOutlines(msg);
   };
 
   // The window's size, which Go hears as the real window reports its own.

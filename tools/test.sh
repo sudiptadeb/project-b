@@ -86,6 +86,7 @@ mock() {
     [ -n "$BUILT" ] && run "Go managers, with $BUILT" go -C core test -tags "$BUILT" ./...
     run "build the shell" npm --prefix shell run build
     run "the shell on the mock engine" node shell/e2e/first-app.cjs
+    run "the region outlines on the mock engine" node shell/e2e/outlines.cjs
     # What every shell does, for each shell in the registry, and each shell's own tests.
     for id in $(python3 -c 'import json; print(" ".join(s["id"] for s in json.load(open("core/shells/registry.json"))))'); do
         run "the $id shell keeps the shells' contract" node shell/e2e/shell-contract.cjs "$id"

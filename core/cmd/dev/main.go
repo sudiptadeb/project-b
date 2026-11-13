@@ -87,6 +87,9 @@ func main() {
 	}
 
 	e := mockengine.New()
+	// The flags saved in the profile reach the engine at launch, as the real engine's
+	// command line, so one turned on in settings takes effect on Relaunch, as it does there.
+	e.SetSwitches(flags.New(*profile).Switches())
 	list := profiles.New(rootOf(*root, *profile))
 	// A listed profile's update state is the root's, as in the real app; the mock starts no
 	// copies of itself, so a relaunch restarts this one alone.

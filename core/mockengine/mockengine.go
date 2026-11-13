@@ -86,6 +86,8 @@ type Engine struct {
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
 	unshownFocus []engine.TabID
+	// showRegions is the Show window regions flag, as the app launched with it.
+	showRegions bool
 
 	// The fake extension runtime, in a build with extensions.
 	extensions extensionRuntime
@@ -130,6 +132,13 @@ func (e *Engine) Run() {
 	for fn := range e.queue {
 		fn()
 	}
+}
+
+// SetSwitches takes the switches the app launches with, from the flags saved in the
+// profile, as the real engine finds them on its command line before content starts.
+// Call it before the app starts.
+func (e *Engine) SetSwitches(switches []string) {
+	e.showRegions = slices.Contains(switches, "--pb-show-regions")
 }
 
 // Feeds are window w's feeds, whether or not the window exists yet. Any goroutine.
@@ -479,7 +488,8 @@ func (e *Engine) CloseSettings(w engine.WindowID) {
 //	 "pages":[{"tab":id,"rect":{x,y,w,h}}] where each mock page goes, by slot,
 //	 "regions":[{x,y,w,h,"area":"drag"|"shell"}],
 //	 "frameColor":"#rrggbb", "frameWidth":px, "controls":the window buttons or null,
-//	 "cornerRadius":px, "settings":open, "popup":the extension popup or null}
+//	 "cornerRadius":px, "settings":open, "popup":the extension popup or null,
+//	 "showRegions":whether to outline every rectangle the window manager tracks}
 //
 // The rectangles are the layout's, in the shell's coordinates, which on
 // the mock are the dev window's. The regions are in order: the first that holds a point
@@ -514,7 +524,7 @@ func (e *Engine) WindowState(w engine.WindowID) []byte {
 	}
 	b, _ := json.Marshal(map[string]any{"t": "window", "shell": page.Shell(), "pages": pages, "regions": regions,
 		"frameColor": l.FrameColor, "frameWidth": l.FrameWidth, "controls": controls, "cornerRadius": s.CornerRadius,
-		"settings": settings, "popup": e.openPopup(w)})
+		"settings": settings, "popup": e.openPopup(w), "showRegions": e.showRegions})
 	return b
 }
 

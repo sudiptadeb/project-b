@@ -213,6 +213,14 @@ in a frame, and under it a mock page for each tab the layout shows, where the la
 it. A mock page has buttons that do what a real page can: navigate, change its title, open
 a tab, crash. Edits to the shell reload in place.
 
+**Seeing its regions.** Turn on Show window regions in settings, Flags, and start
+`go run ./cmd/dev` again: the mock window then outlines every rectangle the window manager
+tracks, as the real window does ([windows.md](windows.md#seeing-the-regions)): the shell's
+areas red, the controls in a drag bar among them, the drag areas blue and dashed, each
+shown tab's page green with its id, the window buttons purple. A gap that should drag and
+doesn't, or a control that isn't outlined red, shows at a glance. As in the real app the
+flag is read at launch, from the profile's `flags.json`.
+
 **The check.** `node shell/e2e/shell-contract.cjs <id>` runs "What every shell does"
 against one shell, in a real browser on the mock engine; with no id it runs every shell in
 the registry. It ends with one line per rule, `ok` or `FAIL`.

@@ -254,7 +254,8 @@ Store's public update endpoint, and one of ours: `tools/test-extension/`, a smal
 extension with an action popup, a content script, storage, tabs and messaging.
 `tools/pack-test-extension.py [version]` packs it as a CRX3 into the store's folder, signed with
 `tools/test-extension.pem`, a key that exists only so it keeps one id. Packing 1.0 and then 1.1
-gives the store an update to offer.
+gives the store an update to offer. `tools/drive_extensions.py` packs 1.0 again before it
+runs, so the store's copy is never older than the checks.
 
 To keep the store up, build it and hand it to amarit:
 

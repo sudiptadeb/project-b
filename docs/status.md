@@ -37,7 +37,7 @@ each group needs.
 
 ## Extensions
 
-    tools/fetch-extensions.sh && tools/pack-test-extension.py    # the mock store's folder, once
+    tools/fetch-extensions.sh && tools/pack-test-extension.py    # the mock store's folder, once (drive_extensions packs ours again each run)
     tools/test.sh mock app                                       # the extension checks are in both groups
 
 Every build has them; they run only with the Extensions flag on (Settings, Flags), which is

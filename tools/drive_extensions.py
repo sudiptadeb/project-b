@@ -493,6 +493,9 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(STORE_DIR, "catalogue.json")):
         print("no mock store in .tools/extensions: run tools/fetch-extensions.sh and tools/pack-test-extension.py", file=sys.stderr)
         sys.exit(2)
+    # The store's copy of the test extension is packed again from tools/test-extension, so
+    # a package older than the checks can't pass them without running what they test.
+    subprocess.check_call([sys.executable, os.path.join(ROOT, "tools/pack-test-extension.py")], stdout=subprocess.DEVNULL)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Pages)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     PAGE = f"http://127.0.0.1:{server.server_port}/"

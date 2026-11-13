@@ -1,0 +1,78 @@
+/* What the minimal shell's parts share: its type, and its two kinds of button. Square,
+   flat, hairlines; the colours are the tones the SDK puts on the root. Hover is the bar's
+   own on a bar, the accent's tint on a surface. */
+
+/* Space Grotesk and Space Mono, under the SIL Open Font License, from the Deb Design
+   System. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/space-grotesk-var.woff2') format('woff2');
+  font-weight: 300 700;
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  src: url('./fonts/space-mono-400.woff2') format('woff2');
+  font-weight: 400;
+}
+
+:root {
+  --sans: 'Space Grotesk', system-ui, sans-serif;
+  --mono: 'Space Mono', ui-monospace, monospace;
+  /* The tab bar and the side list: the bar's tone with a little of the frame in it. */
+  --tabbar: color-mix(in srgb, var(--frame) 12%, var(--bar));
+}
+
+/* An icon alone, 30px square, its name in aria-label. */
+.btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--icon);
+}
+
+.btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+}
+
+/* Words, 28px high, in a hairline. .primary is the one answer a prompt wants. */
+.words {
+  flex: none;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: 500 13px/1 var(--sans);
+  white-space: nowrap;
+}
+
+.words:hover {
+  background: var(--hover);
+}
+
+.words.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn:focus-visible,
+.words:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

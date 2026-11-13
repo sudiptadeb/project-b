@@ -1,4 +1,5 @@
 <script setup>
+import Field from '@/ui/Field.vue';
 import { send, state } from './state.js';
 
 // Flags, as core/flags/registry.json defines them, each drawn by its type: a switch for a
@@ -9,10 +10,35 @@ function set(flag, text) {
   send({ t: 'setFlag', id: flag.id, text });
 }
 
-// Go answers with the flags when it saves; a value it refuses goes back to the saved one.
-function setField(flag, e) {
-  set(flag, e.target.value.trim());
-  e.target.value = flag.value;
+// pattern is a flag's pattern as a JavaScript one. Go's syntax and JavaScript's agree on
+// the simple patterns the registry has; one they don't is left to Go to check.
+function pattern(flag) {
+  try {
+    return flag.pattern ? new RegExp(flag.pattern) : null;
+  } catch {
+    return null;
+  }
+}
+
+// error is what is wrong with a value typed for a flag, as Go's flags.normal checks it,
+// or ''. Empty is Off, and always good.
+function error(flag, text) {
+  if (!text) return '';
+  const list = flag.type === 'numbers' || flag.type === 'strings';
+  const items = list ? text.split(',').map((s) => s.trim()) : [text];
+  if (flag.type === 'number' || flag.type === 'numbers') {
+    const bad = items.find((s) => !/^[+-]?\d+$/.test(s) || (flag.min != null && +s < flag.min) || (flag.max != null && +s > flag.max));
+    if (bad === undefined) return '';
+    const n = list ? 'whole numbers' : 'a whole number';
+    if (flag.min != null && flag.max != null) return `Use ${n} from ${flag.min} to ${flag.max}`;
+    if (flag.min != null) return `Use ${n} of ${flag.min} or more`;
+    if (flag.max != null) return `Use ${n} up to ${flag.max}`;
+    return `Use ${n}`;
+  }
+  const p = pattern(flag);
+  const bad = items.find((s) => !s || (p && !p.test(s)));
+  if (bad === undefined) return '';
+  return bad ? `"${bad}" isn't a value this flag takes` : 'Leave no empty value between commas';
 }
 </script>
 
@@ -37,24 +63,20 @@ function setField(flag, e) {
           :aria-checked="String(f.value === 'on')"
           @change="set(f, $event.target.checked ? 'on' : '')"
         />
-        <select v-else-if="f.type === 'enum'" :id="'flag-' + f.id" :disabled="!f.built" :value="f.value" @change="set(f, $event.target.value)">
+        <select v-else-if="f.type === 'enum'" :id="'flag-' + f.id" class="value" :disabled="!f.built" :value="f.value" @change="set(f, $event.target.value)">
           <option value="">Off</option>
           <option v-for="c in f.choices" :key="c" :value="c">{{ c }}</option>
         </select>
-        <input
+        <!-- A flag the build left out can't be set, so its field is a plain disabled one. -->
+        <input v-else-if="!f.built" :id="'flag-' + f.id" class="field value" placeholder="Off" disabled :value="f.value" />
+        <Field
           v-else
-          :id="'flag-' + f.id"
-          :type="f.type === 'number' ? 'number' : 'text'"
-          :inputmode="f.type === 'numbers' ? 'numeric' : undefined"
-          :min="f.min"
-          :max="f.max"
-          class="field"
+          class="value"
+          :label="f.name"
           placeholder="Off"
-          spellcheck="false"
-          :disabled="!f.built"
           :value="f.value"
-          @change="setField(f, $event)"
-          @keydown.enter="$event.target.blur()"
+          :validate="(text) => error(f, text)"
+          @commit="set(f, $event)"
         />
       </div>
     </div>
@@ -69,32 +91,12 @@ function setField(flag, e) {
   color: var(--muted);
 }
 
-select {
+.value {
+  flex: none;
   width: 200px;
 }
 
-.field {
-  width: 200px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  box-sizing: border-box;
-  background: var(--surface);
-  color: inherit;
-  font: inherit;
-}
-
-.field::-webkit-inner-spin-button {
-  appearance: none;
-}
-
-.field::placeholder {
-  color: var(--muted);
-}
-
-.field:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+.touch .value {
+  width: 100%;
 }
 </style>

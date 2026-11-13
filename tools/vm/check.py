@@ -976,9 +976,10 @@ def update_checks(retry=False):
         held = until(lambda: js(f"{button}?.textContent.trim() || ''"), bool, 100)
         check(f"a refused {after} is held through the automatic rounds", held == "", held)
         js("document.querySelector('button.settings').click()")
-        find = "[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Check for updates')"
+        # After a refused release the button says Try again; otherwise Check for updates.
+        find = "[...document.querySelectorAll('button')].find(b => ['Check for updates', 'Try again'].includes(b.textContent.trim()))"
         shown = until(lambda: json.loads(ask("evalsettings", f"!!{find}") or "false"), bool, 15)
-        check("Settings, General shows Check for updates", shown)
+        check("Settings, General shows Check for updates, or Try again after a refused release", shown)
         ask("evalsettings", f"({find}.click(), 1)")
         shot("u0-checked")
         # Closed again, so the bubble's button is the shell's to press.

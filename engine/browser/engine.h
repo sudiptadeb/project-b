@@ -122,6 +122,9 @@ class Engine {
   // Takes a WebContents content made for a page's window.open or link, or for an
   // extension's page, and makes it a hidden tab, in the workspace content made it in.
   PageTab* AdoptTab(std::unique_ptr<content::WebContents> contents);
+  // The workspace a page is in, by the partition content made it in: Go's id for one, or
+  // "" for the default.
+  std::string WorkspaceOf(content::WebContents* contents) const;
   void CloseTab(int64_t tab);
   void LoadURL(int64_t tab, const char* url);
   void GoBack(int64_t tab);

@@ -1529,8 +1529,10 @@ def workspace_checks():
     """A workspace keeps its own cookies and site storage. What a page in workspace a sets,
     a cookie, a local storage value and an IndexedDB database, a second tab of a sees, and
     workspace b and the default workspace don't; a restart on the same profile keeps it. A
-    tab a page in a opens keeping its opener, by window.open or by a link opened in a new
-    tab, is in a too. The driver opens a tab in a workspace by its id, as Go does."""
+    tab a page in a opens is in a too: by window.open, with its opener or without, by a link
+    opened in a new tab, and by a target=_blank or rel=noopener link, which content would
+    put in the default workspace. The driver opens a tab in a workspace by its id, as Go
+    does."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile, ["--remote-debugging-port=0"])
     a = open_in(app, "a", STORE)
@@ -1581,6 +1583,15 @@ def workspace_checks():
     committed(app, blank)
     visit(app, STORE)
     check("a tab of a workspace on the blank page, as a new tab is, goes on in the workspace", stored(app, blank) == ["w=a", "a"], stored(app, blank))
+    targeted = opened_by(app, a, "document.getElementById('blank').click()")
+    check("and a target=_blank link's tab, which has no opener",
+          stored(app, targeted) == ["w=a", "a"] and app.js("window.opener===null", tab=targeted), stored(app, targeted))
+    check("whose session storage is its own, in the workspace",
+          app.js("sessionStorage.setItem('s','b');sessionStorage.getItem('s')", tab=targeted) == "b" and app.js("sessionStorage.getItem('s')", tab=a) is None)
+    noopener = opened_by(app, a, "document.getElementById('noopener').click()")
+    check("and a rel=noopener link's", stored(app, noopener) == ["w=a", "a"], stored(app, noopener))
+    severed = opened_by(app, a, f"window.open({json.dumps(STORE)},'','noopener')")
+    check("and a tab window.open opens without its opener", stored(app, severed) == ["w=a", "a"], stored(app, severed))
     app.close()
     check("a workspace's storage is in the profile's folder", os.path.isdir(os.path.join(profile, "chromium/Storage/ext/workspace")))
     app = App(profile)

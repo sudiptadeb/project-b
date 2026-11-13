@@ -160,7 +160,17 @@ content::WebContents* PageTab::OpenURLFromTab(
 }
 
 // target=_blank and window.open arrive here with a WebContents content already made.
-// Content loads it after this returns.
+// Content loads it after this returns, in the tab it is given back.
+//
+// The new tab is in this tab's workspace. Content makes a tab that keeps its opener in the
+// opener's SiteInstance, so in its workspace. One without, from target=_blank, rel=noopener
+// or a page that COOP cuts off from its opener, it makes in a SiteInstance of its own in
+// the default workspace. That one is dropped before it loads anything, and a tab made in
+// this tab's workspace takes its place: content loads the WebContents returned here when
+// its own is gone (kPwaNavigationCapturing, on by default), with the navigation it had for
+// its own, referrer and form data included. Its sessionStorage starts empty in the
+// workspace, as a tab's without an opener does anywhere, so no storage of the dropped one's
+// is left with it.
 content::WebContents* PageTab::AddNewContents(
     content::WebContents* source,
     std::unique_ptr<content::WebContents> new_contents,
@@ -169,7 +179,14 @@ content::WebContents* PageTab::AddNewContents(
     const blink::mojom::WindowFeatures& window_features,
     bool user_gesture,
     bool* was_blocked) {
-  PageTab* tab = Engine::Get()->AdoptTab(std::move(new_contents));
+  Engine* engine = Engine::Get();
+  PageTab* tab = nullptr;
+  if (engine->WorkspaceOf(new_contents.get()) == workspace_) {
+    tab = engine->AdoptTab(std::move(new_contents));
+  } else {
+    new_contents.reset();
+    tab = engine->CreateTab(workspace_);
+  }
   Engine::TabOpened(id_, tab->id(), target_url,
                     disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB,
                     /*new_window=*/false);

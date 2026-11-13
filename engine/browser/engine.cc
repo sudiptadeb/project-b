@@ -589,13 +589,17 @@ PageTab* Engine::CreateTab(const std::string& workspace) {
 }
 
 PageTab* Engine::AdoptTab(std::unique_ptr<content::WebContents> contents) {
+  const std::string workspace = WorkspaceOf(contents.get());
+  return Add(std::move(contents), workspace);
+}
+
+std::string Engine::WorkspaceOf(content::WebContents* contents) const {
   const content::StoragePartitionConfig& partition =
       browser_context_->GetStoragePartition(contents->GetSiteInstance())
           ->GetConfig();
-  const std::string workspace = partition.partition_domain() == kWorkspaceDomain
-                                    ? partition.partition_name()
-                                    : std::string();
-  return Add(std::move(contents), workspace);
+  return partition.partition_domain() == kWorkspaceDomain
+             ? partition.partition_name()
+             : std::string();
 }
 
 // A new tab starts hidden, whoever made it. A window's layout is the only way to the

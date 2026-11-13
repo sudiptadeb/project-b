@@ -104,9 +104,10 @@ How these are built is in [profiles-build.md](profiles-build.md).
 - *Go chooses.* A tab's workspace is given when the tab is made and never changes. The engine
   interface gains one value on creating a tab and on a tab opening. A tab a page opens takes
   its opener's workspace.
-- *Known hole to close:* a link that opens a new tab without an opener falls to the default
-  workspace in content (`content/browser/web_contents/web_contents_impl.cc`). Our own paths
-  for a link opened in a new tab and a tab made over DevTools are closed.
+- *The holes are closed:* a link that opens a new tab without an opener, which content puts
+  in the default workspace (`content/browser/web_contents/web_contents_impl.cc`), and our own
+  paths for a link opened in a new tab. A tab made over DevTools is in the default
+  workspace, as decided.
 - Not in this design: a throwaway workspace, rules that send a site to a workspace, and what
   extensions are told about a tab's workspace.
 

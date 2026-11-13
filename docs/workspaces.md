@@ -19,12 +19,16 @@ the order of building at the end says which steps are done.
   there for the tab's life, across every site and frame. The default workspace is the
   context's own partition: its tabs get no SiteInstance, as before
   (`engine/browser/engine.cc`).
-- A tab a page opens keeping its opener, by `window.open`, is in its opener's workspace:
-  content makes it in the opener's SiteInstance. So is a link opened in a new tab, which the
-  engine makes in the source tab's workspace (`OpenURLFromTab`,
-  `engine/browser/page_tab.cc`), and a copy of a tab (`DuplicateTab`). A link that opens a
-  new tab without an opener (`target=_blank`, `rel=noopener`) still lands in the default
-  workspace. A tab made over DevTools, and one an extension opens, is in the default.
+- A tab a page opens is in its opener's workspace, on every path. Content makes one that
+  keeps its opener, by `window.open`, in the opener's SiteInstance. A link opened in a new
+  tab the engine makes in the source tab's workspace (`OpenURLFromTab`,
+  `engine/browser/page_tab.cc`), and a copy of a tab is in its workspace (`DuplicateTab`).
+  A tab opened without an opener, by `target=_blank`, `rel=noopener`, `window.open` with
+  `noopener` or a page that COOP cuts off, content makes in the default workspace and hands
+  to `AddNewContents` before it loads anything; the engine drops it and makes the tab in the
+  opener's workspace instead, and content loads that one with the navigation it had for its
+  own. Its sessionStorage starts empty there, as such a tab's does anywhere. A tab made over
+  DevTools, and one an extension opens, is in the default.
 - The tab-opened event says which workspace the new tab is in (`PB_EVENT_TAB_OPENED`,
   `engine.Listener.TabOpened`); the engine reads it from the tab's partition. Go doesn't
   keep it yet, and nothing in the app opens a tab in a workspace yet: the driver does, by
@@ -88,7 +92,7 @@ Each commit builds, leaves a working app, and carries its tests.
 1. Done. The engine: a tab made in a workspace's partition, a tab a page opens taking its
    opener's, the tab-opened event saying which. A check that two workspaces don't share a
    cookie or local storage, and that one survives a restart.
-2. The link that opens a new tab without an opener stays in its workspace.
+2. Done. The link that opens a new tab without an opener stays in its workspace.
 3. Go: the workspace list in the profile, tabs carrying their workspace, the Tab menu's
    list.
 4. The shell: the dot on a tab.
@@ -115,6 +119,24 @@ Each commit builds, leaves a working app, and carries its tests.
   `Engine::LoadURL`, or content's own, with its opener's origin, for a tab a page opens. So
   `Engine::LoadURL` is the one place that needs it; no lower hook (a throttle, the
   delegate) can choose a navigation's SiteInstance.
+  a site in the workspace's partition from the start.
+- A tab opened without an opener stays in its workspace through the delegate, with no
+  Chromium patch: the repo builds Chromium unpatched and keeps no patches. In
+  `AddNewContents` the engine drops the WebContents content made in the default workspace
+  and returns one it made in the opener's; content then loads that one, because its own is
+  gone (`WebContentsImpl::CreateNewWindow`, under `kPwaNavigationCapturing`, which is on by
+  default), with the referrer, the initiator and a form's data as it had them. This leans
+  on that feature being on: with it off, content loads nothing in a WebContents it didn't
+  make, and the tab stays blank. A Chromium update that turns it off, or drops the branch,
+  shows as the three no-opener checks in `tools/drive_first_app.py workspaces` failing (the
+  `target=_blank` link's, the `rel=noopener` link's, and `window.open` with `noopener`):
+  each opened tab never loads the page. Overriding
+  the creation itself (`IsWebContentsCreationOverridden`) was the other way: content asks it
+  before it knows whether the opener is kept, so the engine would have had to build every
+  tab a workspace's page opens, opener and all, which content already does right. The
+  dropped WebContents never loaded anything, and the sessionStorage namespace content made
+  for it goes with it, so no tab is left with storage from one partition and pages in
+  another.
 
 ## Not in this step
 

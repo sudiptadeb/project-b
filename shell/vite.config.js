@@ -59,7 +59,7 @@ export default defineConfig(({ command }) => {
       },
     },
     server: {
-      proxy: { '/shell/events': dev, '/shell/send': dev, '/settings/events': dev, '/settings/send': dev, '/mock': dev },
+      proxy: { '/shell/events': dev, '/shell/send': dev, '/settings/events': dev, '/settings/send': dev, '/picker/events': dev, '/picker/send': dev, '/mock': dev },
     },
   };
 });

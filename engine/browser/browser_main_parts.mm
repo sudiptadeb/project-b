@@ -39,14 +39,23 @@ base::FilePath& Profile() {
   return *profile;
 }
 
+base::FilePath& Copy() {
+  static base::NoDestructor<base::FilePath> copy;
+  return *copy;
+}
+
 }  // namespace
 
 base::FilePath ProfileDir() {
   return Profile();
 }
 
-void SetProfileDir(const base::FilePath& dir) {
-  Profile() = dir;
+base::FilePath CopyDir() {
+  return Copy();
+}
+
+void SetCopyDir(const base::FilePath& dir) {
+  Copy() = dir;
 }
 
 base::FilePath ChromiumDataDir() {
@@ -62,29 +71,22 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   timeline::Mark("content.ready");
 
   screen_ = std::make_unique<display::ScopedNativeScreen>();
-  // Our pages' context comes first, and only it can load them.
+  // Our pages' context comes first, and only it can load them. The profile's comes when
+  // Go opens the profile: at once, or once the picker has chosen it.
   pages_context_ = std::make_unique<BrowserContext>();
   RegisterShellWebUI(pages_context_.get());
-  CHECK(base::CreateDirectory(ChromiumDataDir()));
-  browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
-#if BUILDFLAG(PB_EXTENSIONS)
-  // The extension runtime comes up with the profile and loads what is installed, so
-  // Go finds it ready when it starts.
-  if (ExtensionsOn()) {
-    extensions_ = std::make_unique<Extensions>(browser_context_.get());
-  }
-#endif
 
   // Quitting ends the run loop on a later task, so whatever asked for it returns first.
   engine_ = std::make_unique<Engine>(
-      pages_context_.get(), browser_context_.get(),
+      pages_context_.get(),
+      base::BindRepeating(&BrowserMainParts::OpenProfile, base::Unretained(this)),
       base::BindRepeating(
           [](base::RepeatingClosure* quit) {
             content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE, *quit);
           },
           &quit_));
 
-  Go().start(Engine::Calls(), ProfileDir().value().c_str(),
+  Go().start(Engine::Calls(),
              command_line->GetSwitchValueASCII("block").c_str(),
              hooks::kTableHash);
   WatchOSKeyBindings();
@@ -95,6 +97,21 @@ int BrowserMainParts::PreMainMessageLoopRun() {
     StartDriver(command_line->GetSwitchValuePath("pb-driver"));
   }
   return 0;
+}
+
+content::BrowserContext* BrowserMainParts::OpenProfile(
+    const base::FilePath& dir) {
+  Profile() = dir;
+  CHECK(base::CreateDirectory(ChromiumDataDir()));
+  browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
+#if BUILDFLAG(PB_EXTENSIONS)
+  // The extension runtime comes up with the profile and loads what is installed, so Go
+  // finds it ready when the profile's managers start.
+  if (ExtensionsOn()) {
+    extensions_ = std::make_unique<Extensions>(browser_context_.get());
+  }
+#endif
+  return browser_context_.get();
 }
 
 void BrowserMainParts::WillRunMainMessageLoop(

@@ -32,6 +32,11 @@ base::FilePath ChromiumDataDir() {
   return ProfileDir().Append("chromium");
 }
 
+// Android has one profile, and the copy keeps its files there.
+base::FilePath CopyDir() {
+  return ProfileDir();
+}
+
 BrowserMainParts::BrowserMainParts() {
   g_parts = this;
 }
@@ -55,11 +60,17 @@ int BrowserMainParts::PreMainMessageLoopRun() {
 
 void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
   // Android ends the app itself, with the activity.
-  // One context, for our pages and the tabs alike.
-  engine_ = std::make_unique<Engine>(browser_context_.get(),
-                                     browser_context_.get(), base::DoNothing());
-  Go().start(Engine::Calls(), ProfileDir().value().c_str(),
-             blocked_hosts.c_str(), hooks::kTableHash);
+  // One context, for our pages and the tabs alike, made with content: opening the profile
+  // finds it there.
+  engine_ = std::make_unique<Engine>(
+      browser_context_.get(),
+      base::BindRepeating(
+          [](content::BrowserContext* context, const base::FilePath& dir) {
+            return context;
+          },
+          browser_context_.get()),
+      base::DoNothing());
+  Go().start(Engine::Calls(), blocked_hosts.c_str(), hooks::kTableHash);
   child_processes_ = std::make_unique<ChildProcesses>();
 }
 

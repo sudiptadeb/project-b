@@ -86,6 +86,7 @@ type Engine struct {
 
 // window is one mock window.
 type window struct {
+	page   engine.Page
 	layout engine.WindowLayout
 	// visible are the tabs the layout shows; the mock page shows the first, shown.
 	visible           []engine.TabID
@@ -182,13 +183,13 @@ func (e *Engine) Reported(w engine.WindowID) engine.WindowState {
 
 // CreateWindow makes a window. The first one's colour is what the real window paints
 // when it first goes on screen.
-func (e *Engine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
+func (e *Engine) CreateWindow(w, near engine.WindowID, page engine.Page, l engine.WindowLayout) {
 	e.mu.Lock()
 	if len(e.windows) == 0 && e.shownColor == "" {
 		e.shownColor = l.FrameColor
 	}
 	// Every mock window starts where the real first one does.
-	e.windows[w] = &window{layout: l, w: Width, h: Height, bounds: engine.Rect{X: 80, Y: 60, W: Width, H: Height}}
+	e.windows[w] = &window{page: page, layout: l, w: Width, h: Height, bounds: engine.Rect{X: 80, Y: 60, W: Width, H: Height}}
 	e.mu.Unlock()
 	if e.listener != nil {
 		e.Post(func() { e.reportWindow(w) })
@@ -493,6 +494,16 @@ func (e *Engine) SetMenu(m engine.Menu) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.menu = m
+}
+
+// PageOf is which page covers window w, or "" for one that isn't open.
+func (e *Engine) PageOf(w engine.WindowID) engine.Page {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if win := e.windows[w]; win != nil {
+		return win.page
+	}
+	return ""
 }
 
 // Menu is the last menu the app gave the window.

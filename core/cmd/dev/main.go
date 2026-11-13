@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -52,6 +53,7 @@ func main() {
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
 	root := flag.String("root", "", "the folder of the profile list the Profiles menu reads; the profile's own folder's by default")
+	pick := flag.Bool("picker", false, "start as a copy that picks its profile from the list in -root, and becomes the one picked")
 	block := flag.String("block", "", "comma-separated blocked hosts")
 	// The updater runs for real against a manifest when given a version to be, the bundle
 	// it is "installed" as, and the manifest. Without a version it stays off, as it does
@@ -77,23 +79,38 @@ func main() {
 	}
 
 	e := mockengine.New()
-	var a *app.App
-	started := make(chan struct{})
-	e.Post(func() {
-		a = app.Start(e, app.Config{
-			ProfileDir:   *profile,
-			Profiles:     profiles.New(rootOf(*root, *profile)),
+	list := profiles.New(rootOf(*root, *profile))
+	start := func(dir, id string) *app.App {
+		return app.Start(e, app.Config{
+			ProfileDir:   dir,
+			Profiles:     list,
+			Profile:      id,
 			BlockedHosts: strings.Split(*block, ","),
 			Update: update.Config{
 				Project:  "project-b",
 				Version:  *version,
 				Releases: *releases,
-				StateDir: filepath.Join(*profile, "updates"),
+				StateDir: filepath.Join(dir, "updates"),
 				App:      *appPath,
 			},
 			CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 		})
-		e.SetListener(a)
+	}
+	// The app, or the picker in a picker copy, which opens a profile by naming it on
+	// /mock/regions, as the mock starts no copies of itself.
+	var a *app.App
+	var p *app.Picker
+	var opened atomic.Value
+	opened.Store("")
+	started := make(chan struct{})
+	e.Post(func() {
+		if *pick {
+			p = app.StartPicker(e, list, func(id string) { opened.Store(id) })
+			e.SetListener(p)
+		} else {
+			a = start(*profile, "")
+			e.SetListener(a)
+		}
 		close(started)
 	})
 	go e.Run()
@@ -104,7 +121,12 @@ func main() {
 	go func() {
 		<-sig
 		done := make(chan struct{})
-		e.Post(func() { a.Stop(); close(done) })
+		e.Post(func() {
+			if a != nil {
+				a.Stop()
+			}
+			close(done)
+		})
 		<-done
 		os.Exit(0)
 	}()
@@ -146,9 +168,26 @@ func main() {
 		}
 		win := windowOf(r)
 		e.Post(func() {
-			// As in the real engine, a page whose window closed speaks to no one.
-			if e.Open(win) {
+			// As in the real engine, a page whose window closed speaks to no one, and only
+			// a window's own page is its shell.
+			if e.Open(win) && e.PageOf(win) == engine.PageShell {
 				a.ShellMessage(win, msg)
+			}
+		})
+	})
+	// The picker page, in a picker copy: what the engine sends a window's page reaches it.
+	mux.Handle("GET /picker/", http.StripPrefix("/picker/", webUI(filepath.Join(*shellDir, "picker"))))
+	mux.HandleFunc("GET /picker/events", func(w http.ResponseWriter, r *http.Request) { stream(w, r, &e.Feeds(windowOf(r)).Shell) })
+	mux.HandleFunc("POST /picker/send", func(w http.ResponseWriter, r *http.Request) {
+		msg, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		win := windowOf(r)
+		e.Post(func() {
+			if e.Open(win) && e.PageOf(win) == engine.PagePicker {
+				p.Message(win, msg)
 			}
 		})
 	})
@@ -189,7 +228,7 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
+		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "page": e.PageOf(win), "dock": e.DockColor(), "opened": opened.Load(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)

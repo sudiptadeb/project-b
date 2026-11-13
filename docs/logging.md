@@ -147,7 +147,10 @@ In the order they happen on a Mac:
 
 `app.ready` is the line the test drivers wait for before they begin, as printed:
 `  290.512000 mark  go       app.ready`. Once Vue has drawn the snapshot, the shell sends its
-layout, so clicks reach the right view, then `shown`, and Go marks it the first time.
+layout, so clicks reach the right view, then `shown`, and Go marks it the first time. In a
+copy that picks its profile, the picker page has sent its layout as it loads, and sends
+`shown` once it shows the profiles; Go marks `app.ready` then. That copy's timeline is in
+the root, as it has no profile.
 
 The shell's first paint and the first tab race the lines around them. Android has no
 `window.shown`: its window is on screen before content starts.

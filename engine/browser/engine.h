@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
+#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "project_b/engine/abi/pb_abi.h"
@@ -49,10 +51,15 @@ class Engine {
     int64_t focused_tab = 0;
   };
 
-  // Our pages (the shells and settings pages) load in pages_context, and the tabs in the
-  // profile's browser_context. quit ends the app.
+  // Makes the profile's context, with Chromium's files in a folder of the profile's.
+  using OpenProfileCallback =
+      base::RepeatingCallback<content::BrowserContext*(const base::FilePath&)>;
+
+  // Our pages (the shells, the settings pages and the picker) load in pages_context, and
+  // the tabs in the profile's context, which open_profile makes when Go opens the profile.
+  // quit ends the app.
   Engine(content::BrowserContext* pages_context,
-         content::BrowserContext* browser_context,
+         OpenProfileCallback open_profile,
          base::RepeatingClosure quit);
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
@@ -71,6 +78,7 @@ class Engine {
   static const PBEngineCalls* Calls();
 
   content::BrowserContext* pages_context() const { return pages_context_; }
+  // The profile's context, or null before Go opens the profile.
   content::BrowserContext* browser_context() const { return browser_context_; }
   // A window by Go's id, or null for one that isn't open.
   AppWindow* window(int64_t id) const;
@@ -91,10 +99,12 @@ class Engine {
   void TabFocused(PageTab* tab);
   void TabTitleChanged(PageTab* tab);
 
-  // Makes window id with its shell page and puts it on screen with its first layout, a
-  // little down and right of window near, or where a first window goes for 0.
+  void OpenProfile(const char* dir);
+  // Makes window id with its page, chrome://<page>/, and puts it on screen with its first
+  // layout, a little down and right of window near, or where a first window goes for 0.
   void CreateWindow(int64_t id,
                     int64_t near,
+                    const std::string& page,
                     Window::Layout layout,
                     std::vector<VisibleTab> tabs);
   // Ends the app, every window at once.
@@ -145,7 +155,8 @@ class Engine {
   void WindowMinimised(int64_t id, bool minimised);
 
   const raw_ptr<content::BrowserContext> pages_context_;
-  const raw_ptr<content::BrowserContext> browser_context_;
+  const OpenProfileCallback open_profile_;
+  raw_ptr<content::BrowserContext> browser_context_ = nullptr;
   const base::RepeatingClosure quit_;
   std::map<int64_t, std::unique_ptr<AppWindow>> windows_;
 

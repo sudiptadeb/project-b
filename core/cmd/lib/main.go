@@ -11,7 +11,8 @@ package main
 
 static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
-static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, layout, regions, count, tabs, tab_count); }
+static inline void call_open_profile(const PBEngineCalls* c, const char* dir) { c->open_profile(dir); }
+static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const char* page, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, page, layout, regions, count, tabs, tab_count); }
 static inline void call_set_window_bounds(const PBEngineCalls* c, int64_t window, double x, double y, double w, double h) { c->set_window_bounds(window, x, y, w, h); }
 static inline void call_set_window_mode(const PBEngineCalls* c, int64_t window, int32_t mode) { c->set_window_mode(window, mode); }
 static inline void call_request_window(const PBEngineCalls* c, int64_t window, int32_t request) { c->request_window(window, request); }
@@ -59,6 +60,7 @@ import (
 	"projectb/flags"
 	"projectb/instance"
 	"projectb/profiles"
+	"projectb/relaunch"
 	"projectb/timeline"
 )
 
@@ -150,10 +152,20 @@ func (e *nativeEngine) SetWindowMode(w engine.WindowID, m engine.WindowMode) {
 	C.call_set_window_mode(e.calls, C.int64_t(w), C.int32_t(m))
 }
 
-func (e *nativeEngine) CreateWindow(w, near engine.WindowID, l engine.WindowLayout) {
+func (e *nativeEngine) CreateWindow(w, near engine.WindowID, page engine.Page, l engine.WindowLayout) {
+	p := C.CString(string(page))
+	defer C.free(unsafe.Pointer(p))
 	e.withLayout(l, func(layout *C.PBWindowLayout, regions *C.PBRegion, count C.size_t, tabs *C.PBVisibleTab, tabCount C.size_t) {
-		C.call_create_window(e.calls, C.int64_t(w), C.int64_t(near), layout, regions, count, tabs, tabCount)
+		C.call_create_window(e.calls, C.int64_t(w), C.int64_t(near), p, layout, regions, count, tabs, tabCount)
 	})
+}
+
+// OpenProfile makes the profile's context in the engine, with Chromium's files in its
+// folder dir. It is called once, as the copy becomes that profile's.
+func (e *nativeEngine) OpenProfile(dir string) {
+	c := C.CString(dir)
+	defer C.free(unsafe.Pointer(c))
+	C.call_open_profile(e.calls, c)
 }
 
 func (e *nativeEngine) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
@@ -218,19 +230,24 @@ func (e *nativeEngine) Post(fn func()) {
 var (
 	native  *nativeEngine
 	hooks   *content.Hooks
-	theApp  *app.App
-	owner   *instance.Owner
 	list    *profiles.Manager
+	blocked []string
+	// The profile this copy runs on, the folder it owns, and its managers. A copy started
+	// to pick has none of them.
 	profile profiles.Choice
+	owner   *instance.Owner
+	theApp  *app.App
 )
 
 // PBClaimProfile is the first call, before anything is written to the profile. It chooses
 // the profile from the command line's --root, --profile and --user-data-dir, each "" when
-// not given, and returns the profile's folder when this copy owns it. It returns nil when
-// another copy owns it and has been handed urls, one per line, so this copy quits.
+// not given, and --picker, and returns the folder this copy keeps its files in: the
+// profile's, once this copy owns it, or the root when the copy picks its profile later.
+// It returns nil when another copy owns the profile and has been handed urls, one per
+// line, so this copy quits.
 //
 //export PBClaimProfile
-func PBClaimProfile(root, id, userDataDir, urls *C.char) *C.char {
+func PBClaimProfile(root, id, userDataDir *C.char, picker C.int, urls *C.char) *C.char {
 	var handed []string
 	if s := C.GoString(urls); s != "" {
 		handed = strings.Split(s, "\n")
@@ -239,9 +256,16 @@ func PBClaimProfile(root, id, userDataDir, urls *C.char) *C.char {
 	var err error
 	if dir := C.GoString(userDataDir); dir != "" {
 		profile = profiles.Named(dir)
-	} else if profile, err = list.Choose(C.GoString(id)); err != nil {
+	} else if profile, err = list.Choose(C.GoString(id), picker != 0); err != nil {
 		fmt.Fprintf(os.Stderr, "the profile: %v\n", err)
 		os.Exit(1)
+	}
+	if profile.Pick {
+		if err := os.MkdirAll(list.Root(), 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "the root: %v\n", err)
+			os.Exit(1)
+		}
+		return C.CString(list.Root())
 	}
 	o, err := instance.Claim(profile.Dir, handed)
 	if err != nil {
@@ -264,8 +288,11 @@ func rootOf(root string) string {
 	return filepath.Join(home, ".project-b")
 }
 
+// PBStart starts what a copy has before and apart from its profile, the engine and the
+// list, then the profile's managers, or the picker when the copy has no profile yet.
+//
 //export PBStart
-func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char) {
+func PBStart(calls *C.PBEngineCalls, blockedHosts, hookTable *C.char) {
 	timeline.Mark("go.starting")
 	if table := C.GoString(hookTable); table != content.TableHash {
 		timeline.Errorf("the library's hook table is %s, Go's is %s: regenerate with tools/gen_hooks.py and rebuild", table, content.TableHash)
@@ -275,42 +302,56 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 	// The table is C memory that lives as long as the process.
 	native = &nativeEngine{calls: calls}
 	hooks = content.New(func(h content.Hook) { C.call_set_hook_subscribed(native.calls, C.int32_t(h), 1) })
-	var blocked []string
 	if s := C.GoString(blockedHosts); s != "" {
 		blocked = strings.Split(s, ",")
 	}
-	dir := C.GoString(profileDir)
-	if profile.ID != "" {
-		if err := list.MarkUsed(profile.ID); err != nil {
+	if profile.Pick {
+		content.WirePicker(hooks, app.StartPicker(native, list, func(id string) {
+			relaunch.Copy("--root="+list.Root(), "--profile="+id)
+		}))
+	} else {
+		startProfile(profile)
+	}
+	timeline.Mark("go.started")
+}
+
+// startProfile makes this copy the profile c's, whose folder it owns: the profile's
+// context in the engine, then its managers.
+func startProfile(c profiles.Choice) {
+	native.OpenProfile(c.Dir)
+	if c.ID != "" {
+		if err := list.MarkUsed(c.ID); err != nil {
 			timeline.Errorf("profiles: %v", err)
 		}
 	}
 	home, _ := os.UserHomeDir()
 	theApp = app.Start(native, app.Config{
-		ProfileDir:   dir,
+		ProfileDir:   c.Dir,
 		Profiles:     list,
-		Profile:      profile.ID,
+		Profile:      c.ID,
 		BlockedHosts: blocked,
-		Update:       updateConfig(dir),
+		Update:       updateConfig(c.Dir),
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)
 	owner.Serve(func(urls []string) { native.Post(func() { theApp.Handover(urls) }) })
-	timeline.Mark("go.started")
 }
 
 //export PBStop
 func PBStop() {
-	theApp.Stop()
-	owner.Close()
+	// A picker copy has no profile to stop.
+	if theApp != nil {
+		theApp.Stop()
+		owner.Close()
+	}
 	timeline.Close()
 }
 
 // The timeline's kinds as they cross, PBTimelineKind in pb_abi.h.
 var timelineKinds = []timeline.Kind{timeline.KindMark, timeline.KindBegin, timeline.KindEnd, timeline.KindInfo, timeline.KindWarn, timeline.KindError}
 
-// PBTimelineStart starts the timeline: its file goes in the profile, and time zero is
-// processAge nanoseconds ago.
+// PBTimelineStart starts the timeline: its file goes in the folder this copy keeps its
+// files in, and time zero is processAge nanoseconds ago.
 //
 //export PBTimelineStart
 func PBTimelineStart(profileDir *C.char, processAge C.int64_t) {

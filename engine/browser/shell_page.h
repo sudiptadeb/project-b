@@ -17,23 +17,29 @@ class WebContents;
 
 namespace project_b {
 
-// Makes our pages loadable in pages_context, and only there: chrome://shell/ and
-// chrome://settings/, each served from its own folder under shell/ beside the binary.
+// Makes our pages loadable in pages_context, and only there: chrome://shell/,
+// chrome://settings/ and chrome://picker/, each served from its own folder under shell/
+// beside the binary.
 // Call it once.
 void RegisterShellWebUI(content::BrowserContext* pages_context);
 
-// A window's shell: one transparent page covering the window. It talks to the Go core
-// with chrome.send, and the core answers by calling window.__shellReceive.
+// A window's page: one transparent page covering the window, the shell, or the picker in a
+// copy that hasn't chosen its profile. It talks to the Go core with chrome.send, and the
+// core answers by calling window.__shellReceive.
 class ShellPage : public content::WebContentsObserver,
                   public WebContentsDelegateHooks {
  public:
-  // window is Go's id for the window the shell is on.
-  ShellPage(content::BrowserContext* browser_context, int64_t window);
+  // window is Go's id for the window the page is on, and page its app: "shell" or
+  // "picker".
+  ShellPage(content::BrowserContext* browser_context,
+            int64_t window,
+            const std::string& page);
   ShellPage(const ShellPage&) = delete;
   ShellPage& operator=(const ShellPage&) = delete;
   ~ShellPage() override;
 
   content::WebContents* contents() const { return contents_.get(); }
+  const std::string& page() const { return page_; }
   void Load();
   void Send(const std::string& json);
 
@@ -51,6 +57,7 @@ class ShellPage : public content::WebContentsObserver,
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
   const int64_t window_;
+  const std::string page_;
   std::unique_ptr<content::WebContents> contents_;
   base::WeakPtrFactory<ShellPage> weak_factory_{this};
 };

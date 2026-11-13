@@ -869,7 +869,7 @@ func TestAppReadyOnceTheShellShowsItsState(t *testing.T) {
 func TestTheProfilesMenuAndTheProfilesColour(t *testing.T) {
 	root := t.TempDir()
 	list := profiles.New(root)
-	c, err := list.Choose("")
+	c, err := list.Choose("", false)
 	if err != nil {
 		t.Fatal(err)
 	}

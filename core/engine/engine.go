@@ -64,6 +64,15 @@ const (
 	SurfaceSettings
 )
 
+// Page is which of our pages covers a window: the shell, or the picker in a copy that
+// hasn't chosen its profile. Each is an app of its own, chrome://<page>/.
+type Page string
+
+const (
+	PageShell  Page = "shell"
+	PagePicker Page = "picker"
+)
+
 // MenuItem is one entry of the native menu bar. A submenu has Items; a separator has
 // none of the rest.
 type MenuItem struct {
@@ -134,10 +143,10 @@ type Engine interface {
 	// Edit runs a text-editing command in whichever page has the keyboard.
 	Edit(c EditCommand)
 
-	// CreateWindow makes window w, with its shell page, and puts it on screen with its
-	// first layout, a little down and right of window near, or where a first window goes
-	// when near is 0. It tells WindowChanged once this call has returned.
-	CreateWindow(w, near WindowID, l WindowLayout)
+	// CreateWindow makes window w, with its page, and puts it on screen with its first
+	// layout, a little down and right of window near, or where a first window goes when
+	// near is 0. It tells WindowChanged once this call has returned.
+	CreateWindow(w, near WindowID, page Page, l WindowLayout)
 
 	// RequestWindow asks a native window to close, minimise, zoom, go in or out of full
 	// screen, or come to the front. What follows arrives as WindowClosed or

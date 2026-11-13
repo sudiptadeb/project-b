@@ -86,6 +86,7 @@ mock() {
     run "build the shell" npm --prefix shell run build
     run "the shell on the mock engine" node shell/e2e/first-app.cjs
     run "the settings page on the mock engine" node shell/e2e/settings.cjs
+    run "the picker on the mock engine" node shell/e2e/picker.cjs
     built extensions || return
     need_store mock
     run "extensions on the mock engine" node shell/e2e/extensions.cjs

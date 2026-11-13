@@ -9,14 +9,15 @@ built so far, and the order of building at the end says which steps are done.
 - Go chooses the profile, in `PBClaimProfile` before content starts (`core/profiles`,
   `core/cmd/lib/main.go`): the folder `--user-data-dir` names, as it is and never listed;
   else the listed profile `--profile=<id>` names, refusing an id that isn't listed; else
-  the profile used last. The list is `profiles.json` in the root, `~/.project-b` unless
-  `--root=<dir>` names another, beside the profile folders: each profile's id (its folder's
-  name), name, a copy of its frame colour, and when a copy last started on it. A first
-  start, with no list, makes it holding `default`, named Personal, from the Personal
-  template; a `default` that already holds a `prefs.json` is left as it is. A list where no profile was used yet
-  starts the first listed. Every change to the list holds a lock on it
-  (`profiles.lock`), since several copies write it. Everything Go keeps for a profile
-  takes its one folder (`core/app/app.go`).
+  the picker, when the copy was started with `--picker`; else the profile used last; else,
+  when the list has no profile used yet, the picker. The list is `profiles.json` in the
+  root, `~/.project-b` unless `--root=<dir>` names another, beside the profile folders:
+  each profile's id (its folder's name), name, a copy of its frame colour, the name of the
+  template it was made from, and when a copy last started on it. A first start, with no
+  list, makes it holding `default`, named Personal, from the Personal template, and opens
+  it; a `default` that already holds a `prefs.json` is left as it is. Every change to the
+  list holds a lock on it (`profiles.lock`), since several copies write it. Everything Go
+  keeps for a profile takes its one folder (`core/app/app.go`).
 - Templates are files of values in `core/commands/templates/profile/`, beside the keymap
   and menu templates and built in the same way: a name and pref values, nothing else.
   Personal is today's defaults; Work has the tabs on top and the frame colour `#5b7fd6`.
@@ -36,6 +37,23 @@ built so far, and the order of building at the end says which steps are done.
   apart from this one (`relaunch.Copy`); a copy already running there takes the handover
   and comes to the front, and the new copy quits. Started from its binary, each copy is an
   app of its own, with its own Dock icon. Quit ends this profile's copy only.
+- The picker is a copy of the app that has no profile (`app.Picker`, `core/app/picker.go`).
+  Go's start is split: `PBStart` starts what every copy has, the engine, our pages and the
+  list, then either the profile's managers (`app.Start`) or the picker. The engine makes
+  only our pages' context at start; the profile's waits for Go (`open_profile`), so a
+  picker copy has none. It opens one window holding the picker page, an app of its own in
+  `shell/src/apps/picker/` at `chrome://picker/`, whose messages reach Go as
+  `PB_EVENT_PICKER_MESSAGE` (`create_window` names the page a window holds). The page lists
+  the profiles in their colours, and New Profile asks for a name and a template; Go makes
+  the folder, writes the template's values as its prefs and lists it
+  (`profiles.Manager.Create`; its id is eight hex digits). Choosing a profile, or making
+  one, starts a copy on it, as the Profiles menu does, and the picker copy quits: a copy
+  already running there takes the handover. The picker copy has the menu bar's app, Edit
+  and Window menus from the templates, with no keymap file (`commands.NewFromTemplates`),
+  and a Profiles menu whose items do what the page's do. Its Dock icon is the plain one.
+  "Profiles…" in a profile's Profiles menu starts a picker copy. A copy keeps its own files,
+  its timeline and `DevToolsActivePort`, in its profile's folder, and a picker copy in the
+  root (`CopyDir` in the engine).
 - Each copy draws its Dock icon as the app's with a small dot in its profile's colour,
   bottom right (`set_dock_color`, `engine.Engine.SetDockColor`). Go says the colour at
   start and when the frame colour changes, and keeps the list's copy of it the same.
@@ -125,9 +143,26 @@ Each commit builds, leaves a working app, and carries its tests.
    else used last, else a first one.
 3. Done. Templates, Personal and Work; the first profile is made from Personal.
 4. Done. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
-5. The picker: a copy that hasn't chosen, its page, New Profile from a template.
+5. Done. The picker: a copy that hasn't chosen, its page, New Profile from a template.
 6. The Profile section in settings: the name, and reset to a template.
 7. Updates app-wide: the shared state and setting, and the restart of every copy.
+
+## Decided while building
+
+- The start shows the picker by itself only when no profile is named and the list has no
+  profile used last. A first start, with no list, makes `default` and opens it.
+- Choosing a profile in the picker starts that profile's copy, and the picker copy quits,
+  where the note had the picker copy become the profile. Becoming it in the same process
+  doesn't hold up. Content forbids blocking work on the main thread once it runs, and
+  making a profile reads its folder there: Chromium's own code only gets past that as a
+  friend of the rule, which we are not. And the flags saved in a profile become switches
+  before content starts, so a picker copy runs without the chosen profile's, the
+  extensions flag among them. A copy started on the profile has both right, and the
+  handover already covers a profile that is running.
+- Go's gate still refuses the shell's address in a tab, as a second wall on the Mac and the
+  only one on Android, where the shell and the tabs share a context.
+- A copy started on a folder named outright (`--user-data-dir`) still draws its dot, in its
+  frame colour, and its Profiles menu lists the root's profiles with no tick.
 
 ## Not in this step
 

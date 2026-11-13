@@ -47,18 +47,18 @@ int ProjectBMain(int argc, const char** argv, const PBGoCalls* go) {
     // drive us the same way.
     const base::CommandLine* switches = base::CommandLine::ForCurrentProcess();
     std::string urls = base::JoinString(switches->GetArgs(), "\n");
-    char* profile_dir = go->claim_profile(
+    char* copy_dir = go->claim_profile(
         switches->GetSwitchValuePath("root").value().c_str(),
         switches->GetSwitchValueASCII("profile").c_str(),
         switches->GetSwitchValuePath("user-data-dir").value().c_str(),
-        urls.c_str());
-    if (!profile_dir) {
+        switches->HasSwitch("picker"), urls.c_str());
+    if (!copy_dir) {
       return 0;
     }
-    project_b::SetProfileDir(base::FilePath(profile_dir));
-    free(profile_dir);
+    project_b::SetCopyDir(base::FilePath(copy_dir));
+    free(copy_dir);
     project_b::timeline::Start(
-        project_b::ProfileDir(),
+        project_b::CopyDir(),
         base::Time::Now() - base::Process::Current().CreationTime());
     project_b::timeline::Mark("main.entered");
     // Go's runtime started when the binary loaded and handles SIGSEGV, SIGBUS and
@@ -70,7 +70,7 @@ int ProjectBMain(int argc, const char** argv, const PBGoCalls* go) {
         switches::kDisableInProcessStackTraces);
     // The flags saved in the profile, as switches. One given on the command line wins.
     base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-    char* flags = go->launch_switches(project_b::ProfileDir().value().c_str());
+    char* flags = go->launch_switches(project_b::CopyDir().value().c_str());
     for (std::string_view line : base::SplitStringPiece(
              flags, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
       line.remove_prefix(2);  // "--"

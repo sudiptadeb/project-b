@@ -251,6 +251,12 @@
       "items": [
         {
           "list": "profiles"
+        },
+        {
+          "separator": true
+        },
+        {
+          "action": "profile.picker"
         }
       ]
     },

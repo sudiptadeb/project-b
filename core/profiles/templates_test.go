@@ -46,7 +46,7 @@ func TestWorkHasItsTabsOnTopAndItsOwnColour(t *testing.T) {
 func TestTheFirstProfileIsMadeFromPersonal(t *testing.T) {
 	root := t.TempDir()
 	m := New(root)
-	if _, err := m.Choose(""); err != nil {
+	if _, err := m.Choose("", false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, First, "prefs.json")); err != nil {

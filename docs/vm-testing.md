@@ -205,11 +205,17 @@ real clicks: the Profiles menu, clicked open in the menu bar, lists the profiles
 tick on the copy's own; a second profile, Work, listed as New Profile lists one and opened
 as the menu opens one, runs as an app of its own beside Personal, with two Project B icons
 in the Dock, each with a dot in its profile's colour at its bottom right; and in Work's
-copy the menu lists both with the tick on Work. The menu's items are read through System
+copy the menu lists both with the tick on Work, with Profiles… under them. Then a copy
+started to pick shows the picker in a window of its own, listing the profiles; New Profile,
+by real clicks and typing, makes Office from the Work template and opens it in a copy of
+its own as the picker copy quits. The picker copy is started with its driver only to find
+its controls, as the layout's launch is. The menu's items are read through System
 Events while it is open, the Dock's icons as the Dock's own items, and the dots from the
 screen's pixels in each icon's corner. They run alone with
 
     tools/vm/run.sh <DMG path or URL> profiles
+
+On 2026-11-13 all seven passed on this branch's build.
 
 ### A second VM
 

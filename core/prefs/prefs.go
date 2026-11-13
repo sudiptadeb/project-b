@@ -32,7 +32,8 @@ type Prefs struct {
 	Theme      string `json:"theme"`
 }
 
-func defaults() Prefs {
+// Defaults are the settings before the user changes any.
+func Defaults() Prefs {
 	return Prefs{TabLayout: TabsVertical, AutoUpdate: true, FrameColor: "#4f9e9e", Theme: ThemeSystem}
 }
 
@@ -55,15 +56,15 @@ type Manager struct {
 // file doesn't hold, or holds a value for that isn't one, keeps its default. The file is a
 // few bytes, so it is read right here.
 func New(dir string) *Manager {
-	m := &Manager{path: filepath.Join(dir, "prefs.json"), prefs: defaults()}
+	m := &Manager{path: filepath.Join(dir, "prefs.json"), prefs: Defaults()}
 	if b, err := os.ReadFile(m.path); err == nil {
-		s := defaults()
+		s := Defaults()
 		if json.Unmarshal(b, &s) == nil {
 			if s.TabLayout != TabsVertical && s.TabLayout != TabsHorizontal {
 				s.TabLayout = TabsVertical
 			}
 			if !frameColor.MatchString(s.FrameColor) {
-				s.FrameColor = defaults().FrameColor
+				s.FrameColor = Defaults().FrameColor
 			}
 			if !isTheme(s.Theme) {
 				s.Theme = ThemeSystem

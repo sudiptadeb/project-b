@@ -186,7 +186,7 @@ func TestAMenuListIsReadWhenItsMenuOpens(t *testing.T) {
 			profiles = &e.Menu()[i]
 		}
 	}
-	if profiles == nil || len(profiles.Items) != 1 || profiles.Items[0].List != "profiles" {
+	if profiles == nil || len(profiles.Items) == 0 || profiles.Items[0].List != "profiles" {
 		t.Fatalf("the Profiles menu is %+v", profiles)
 	}
 	names = append(names, "Work")

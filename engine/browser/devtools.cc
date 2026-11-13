@@ -105,11 +105,11 @@ void StartRemoteDebugging() {
   }
   if (port) {
     // Content prints "DevTools listening on ws://..." to stderr. For a port the
-    // system picked, it also writes the port to DevToolsActivePort in the profile,
-    // which is where ChromeDriver looks.
+    // system picked, it also writes the port to DevToolsActivePort in the copy's folder,
+    // the profile's, which is where ChromeDriver looks.
     content::DevToolsAgentHost::StartRemoteDebuggingServer(
         std::make_unique<TCPServerSocketFactory>(*port),
-        *port == 0 ? ProfileDir() : base::FilePath(),
+        *port == 0 ? CopyDir() : base::FilePath(),
         /*debug_frontend_dir=*/base::FilePath());
   }
 }

@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"projectb/prefs"
 )
 
 func TestFirstStartMakesTheListHoldingPersonal(t *testing.T) {
 	root := t.TempDir()
 	m := New(root)
-	c, err := m.Choose("")
+	c, err := m.Choose("", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +34,7 @@ func TestAProfileFromBeforeTheListIsKeptAsItIs(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(root)
-	if _, err := m.Choose(""); err != nil {
+	if _, err := m.Choose("", false); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "prefs.json")); string(b) != string(prefs) {
@@ -46,23 +48,23 @@ func TestAProfileFromBeforeTheListIsKeptAsItIs(t *testing.T) {
 func TestTheStartChoosesTheNamedProfileElseTheOneUsedLast(t *testing.T) {
 	root := t.TempDir()
 	m := New(root)
-	m.Choose("")
+	m.Choose("", false)
 	m.change(func(list []Profile) []Profile {
 		return append(list, Profile{ID: "work", Name: "Work", Color: "#5b7fd6"})
 	})
-	if c, err := m.Choose("work"); err != nil || c.ID != "work" || c.Dir != filepath.Join(root, "work") {
+	if c, err := m.Choose("work", false); err != nil || c.ID != "work" || c.Dir != filepath.Join(root, "work") {
 		t.Fatalf("named work: %+v, %v", c, err)
 	}
-	if _, err := m.Choose("nobody"); err == nil {
+	if _, err := m.Choose("nobody", false); err == nil {
 		t.Fatal("a profile that isn't listed was chosen")
 	}
 	m.MarkUsed(First)
 	m.MarkUsed("work")
-	if c, _ := m.Choose(""); c.ID != "work" {
+	if c, _ := m.Choose("", false); c.ID != "work" {
 		t.Fatalf("used last is work, chose %+v", c)
 	}
 	m.MarkUsed(First)
-	if c, _ := m.Choose(""); c.ID != First {
+	if c, _ := m.Choose("", false); c.ID != First {
 		t.Fatalf("used last is default, chose %+v", c)
 	}
 }
@@ -80,7 +82,7 @@ func TestAFolderNamedOutrightIsNotListed(t *testing.T) {
 func TestChangesFromManyCopiesAreAllKept(t *testing.T) {
 	root := t.TempDir()
 	m := New(root)
-	m.Choose("")
+	m.Choose("", false)
 	var wg sync.WaitGroup
 	for i := range 20 {
 		wg.Add(1)
@@ -100,9 +102,50 @@ func TestChangesFromManyCopiesAreAllKept(t *testing.T) {
 
 func TestTheListKeepsTheProfilesColour(t *testing.T) {
 	m := New(t.TempDir())
-	m.Choose("")
+	m.Choose("", false)
 	m.SetColor(First, "#3470d0")
 	if p, _, _ := New(m.Root()).Get(First); p.Color != "#3470d0" {
 		t.Fatalf("colour = %q", p.Color)
+	}
+}
+
+func TestTheStartPicksWhenAskedOrWhenNoProfileWasUsed(t *testing.T) {
+	m := New(t.TempDir())
+	m.Choose("", false)
+	if c, _ := m.Choose("", true); !c.Pick {
+		t.Fatalf("started to pick, chose %+v", c)
+	}
+	if c, _ := m.Choose("default", true); c.Pick || c.ID != First {
+		t.Fatalf("a named profile comes first, chose %+v", c)
+	}
+	// A first start's profile has been used once its copy marks it; until then the list
+	// has none used, and the picker shows.
+	if c, _ := m.Choose("", false); !c.Pick {
+		t.Fatalf("no profile used yet, chose %+v", c)
+	}
+	m.MarkUsed(First)
+	if c, _ := m.Choose("", false); c.Pick || c.ID != First {
+		t.Fatalf("default was used, chose %+v", c)
+	}
+}
+
+func TestNewProfileFromATemplate(t *testing.T) {
+	m := New(t.TempDir())
+	m.Choose("", false)
+	p, err := m.Create("Office", "Work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ID == First || len(p.ID) != 8 || p.Name != "Office" || p.Color != "#5b7fd6" || p.Template != "Work" {
+		t.Fatalf("made %+v", p)
+	}
+	if got := prefs.New(m.Dir(p.ID)).TabLayout(); got != prefs.TabsHorizontal {
+		t.Fatalf("its tabs are %s", got)
+	}
+	if listed, ok, _ := m.Get(p.ID); !ok || listed != p {
+		t.Fatalf("listed %+v", listed)
+	}
+	if _, err := m.Create("Nope", "Nothing"); err == nil {
+		t.Fatal("a template that doesn't exist made a profile")
 	}
 }

@@ -26,6 +26,7 @@ const (
 	eventWindowClosed   Hook = 13
 	eventWindowFocused  Hook = 14
 	eventMenuList       Hook = 15
+	eventPickerMessage  Hook = 16
 )
 
 var eventNames = map[Hook]string{
@@ -44,6 +45,7 @@ var eventNames = map[Hook]string{
 	eventWindowClosed:   "engine.WindowClosed",
 	eventWindowFocused:  "engine.WindowFocused",
 	eventMenuList:       "engine.MenuList",
+	eventPickerMessage:  "engine.PickerMessage",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -69,6 +71,7 @@ type Events struct {
 	OnSettingsMessage func(w engine.WindowID, msg []byte)
 	OnMenuChosen      func(action string)
 	OnMenuList        func(name string) engine.Menu
+	OnPickerMessage   func(w engine.WindowID, msg []byte)
 	OnOSBindings      func(byTitle map[string]engine.Key)
 	OnModsChanged     func(m engine.Mods)
 	OnProcessCrashed  func(p engine.ProcessCrash)
@@ -83,6 +86,10 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 	case eventShellMessage:
 		if e.OnShellMessage != nil {
 			e.OnShellMessage(engine.WindowID(r.int()), []byte(r.str()))
+		}
+	case eventPickerMessage:
+		if e.OnPickerMessage != nil {
+			e.OnPickerMessage(engine.WindowID(r.int()), []byte(r.str()))
 		}
 	case eventTabOpened:
 		if e.OnTabOpened != nil {

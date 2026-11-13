@@ -11,6 +11,10 @@
 #include "project_b/engine/buildflags/buildflags.h"
 #include "ui/display/screen.h"
 
+namespace content {
+class BrowserContext;
+}
+
 namespace project_b {
 
 class BrowserContext;
@@ -18,12 +22,17 @@ class ChildProcesses;
 class Engine;
 class Extensions;
 
-// The profile folder, and the folder inside it that belongs to Chromium.
+// The profile folder, and the folder inside it that belongs to Chromium. Empty in a copy
+// that hasn't chosen its profile yet.
 base::FilePath ProfileDir();
 base::FilePath ChromiumDataDir();
+// The folder this copy keeps its own files in, its timeline and DevToolsActivePort: the
+// profile's, or the root for a copy that picks its profile after it starts. Every profile
+// it can run on is inside it.
+base::FilePath CopyDir();
 #if !BUILDFLAG(IS_ANDROID)
-// Go chooses the profile, before content starts.
-void SetProfileDir(const base::FilePath& dir);
+// Go says it, before content starts.
+void SetCopyDir(const base::FilePath& dir);
 #endif
 
 // Content calls this at fixed moments. PreMainMessageLoopRun is our startup.
@@ -41,6 +50,9 @@ class BrowserMainParts : public content::BrowserMainParts {
 #endif
 
  private:
+  // Makes the profile's context, and the extension runtime with it, when Go asks.
+  content::BrowserContext* OpenProfile(const base::FilePath& dir);
+
   int PreMainMessageLoopRun() override;
   void WillRunMainMessageLoop(
       std::unique_ptr<base::RunLoop>& run_loop) override;

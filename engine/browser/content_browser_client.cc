@@ -101,10 +101,12 @@ void ContentBrowserClient::ConfigureNetworkContextParams(
   file_paths->http_cache_directory = path.Append(FILE_PATH_LITERAL("Cache"));
 }
 
-// The sandboxed network process may only write under these folders.
+// The sandboxed network process may only write under these folders. It starts before a
+// copy that picks its profile has one, so it may write under the copy's folder, which
+// holds every profile it can run on.
 std::vector<base::FilePath>
 ContentBrowserClient::GetNetworkContextsParentDirectory() {
-  return {ChromiumDataDir()};
+  return {CopyDir()};
 }
 
 }  // namespace project_b

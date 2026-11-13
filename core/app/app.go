@@ -55,6 +55,7 @@ type App struct {
 	// lastWindow is the id of the window made last; Go numbers them from 1.
 	lastWindow engine.WindowID
 	quit       func()
+	profiles   *profiles.Manager
 }
 
 // starters are what a build tag adds to Start. A tagged file appends one when it loads,
@@ -64,7 +65,7 @@ var starters []func(a *App, e engine.Engine, cfg Config)
 // Start builds everything, on the main thread. The caller then gives the returned App
 // to the engine as its listener.
 func Start(e engine.Engine, cfg Config) *App {
-	a := &App{}
+	a := &App{profiles: cfg.Profiles}
 	a.Crash = crash.New(cfg.ProfileDir, cfg.CrashReports)
 	a.Policy = policy.New(cfg.BlockedHosts)
 	a.History = history.New(cfg.ProfileDir, e.Post)
@@ -72,7 +73,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
-	a.Window = window.New(e, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
+	a.Window = window.New(e, engine.PageShell, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
 	a.Tabs.OnMoved(a.Window.HandleTabMoved)
 	first := a.openWindow()

@@ -17,6 +17,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py bounds     # only a window's frame, set and read
     python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
     python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
+    python3 tools/drive_first_app.py picker     # only the picker
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -1277,7 +1278,7 @@ def copies_checks():
     check("two profiles run at once, each in a copy of its own", a.proc.poll() is None and b.proc.poll() is None and a.proc.pid != b.proc.pid)
     check("each copy's Dock icon has a dot in its profile's colour", (a.cmd("dockdot"), b.cmd("dockdot")) == ("#4f9e9e", "#5b7fd6"), (a.cmd("dockdot"), b.cmd("dockdot")))
     shown = lambda app: [(i["title"], i["checked"]) for m in json.loads(app.cmd("menu")) if m["title"] == "Profiles" for i in m["items"] if i != "-"]
-    check("the Profiles menu lists both, with a tick on this one", shown(a) == [("Personal", True), ("Work", False)] and shown(b) == [("Personal", False), ("Work", True)], (shown(a), shown(b)))
+    check("the Profiles menu lists both, with a tick on this one", shown(a) == [("Personal", True), ("Work", False), ("Profiles…", False)] and shown(b) == [("Personal", False), ("Work", True), ("Profiles…", False)], (shown(a), shown(b)))
     handed = lambda: [e for e in json.loads(b.cmd("timeline"))["result"]["entries"] if "handed over" in e.get("text", "")]
     before = len(handed())
     check("choosing Work in the other copy's menu works", a.cmd("choosemenu", "Profiles", "Work") == "ok")
@@ -1307,6 +1308,109 @@ def copies_checks():
     b.close()
 
 
+def picker_checks():
+    """A copy started to pick shows the picker page in one window, with the plain Dock icon.
+    Choosing a profile opens it in a copy of its own, which hands over to the copy already
+    running there, if any, and the picker copy quits. New Profile makes one from a template
+    and opens it the same way. Profiles… in the menu starts a picker copy, and the start
+    shows the picker by itself when no profile was used yet."""
+    root = tempfile.mkdtemp(prefix="pb-root-")
+    first = App(None, [f"--root={root}"])
+    first.wait("!!document.querySelector('input')", 30)
+    first.close()
+    listed = lambda: json.load(open(os.path.join(root, "profiles.json")))["profiles"]
+    rows = "[...document.querySelectorAll('.row')].map(r => r.textContent.trim())"
+
+    def started_on(profile):
+        """Waits for the copy a picker started on profile, and gives its pids."""
+        deadline = time.time() + 30
+        while not copies_on(root, profile) and time.time() < deadline:
+            time.sleep(0.1)
+        return copies_on(root, profile)
+
+    def stop(pids, profile):
+        for pid in pids:
+            os.kill(int(pid), signal.SIGTERM)
+        deadline = time.time() + 30
+        while copies_on(root, profile) and time.time() < deadline:
+            time.sleep(0.1)
+
+    picker = App(None, [f"--root={root}", "--picker"])
+    picker.wait(f"{rows}.length===1", 30)
+    check("a copy started to pick shows the picker page", picker.js("location.href") == "chrome://picker/" and picker.js(rows) == ["Personal"], picker.js("location.href"))
+    plain = picker.cmd("dockdot")
+    check("its Dock icon has no profile's dot", plain not in ("#4f9e9e", "#5b7fd6"), plain)
+    used = listed()[0]["lastUsed"]
+    picker.js("document.querySelector('.row').click(), 1")
+    check("choosing a profile quits the picker copy", picker.proc.wait(timeout=30) == 0)
+    App.running.remove(picker)
+    opened = started_on("default")
+    check("and opens the profile in a copy of its own", len(opened) == 1, opened)
+    deadline = time.time() + 30
+    while listed()[0]["lastUsed"] == used and time.time() < deadline:
+        time.sleep(0.1)
+    check("which starts on it: the list says it was used now", listed()[0]["lastUsed"] != used, (used, listed()[0]["lastUsed"]))
+    stop(opened, "default")
+
+    app = App(None, [f"--root={root}", "--profile=default"])
+    app.wait("!!document.querySelector('input')", 30)
+    profiles_menu = [(i["title"], i["checked"]) for m in json.loads(app.cmd("menu")) if m["title"] == "Profiles" for i in m["items"] if i != "-"]
+    check("a profile's Profiles menu has Profiles… under the list", profiles_menu == [("Personal", True), ("Profiles…", False)], profiles_menu)
+    handed = lambda: [e for e in json.loads(app.cmd("timeline"))["result"]["entries"] if "handed over" in e.get("text", "")]
+    before = len(handed())
+    other = App(None, [f"--root={root}", "--picker"])
+    other.wait(f"{rows}.length===1", 30)
+    other.js("document.querySelector('.row').click(), 1")
+    check("choosing a profile a copy runs on quits the picker copy", other.proc.wait(timeout=30) == 0)
+    App.running.remove(other)
+    deadline = time.time() + 30
+    while len(handed()) == before and time.time() < deadline:
+        time.sleep(0.1)
+    check("and the copy it started hands over to the running one", len(handed()) == before + 1, handed())
+
+    made = App(None, [f"--root={root}", "--picker"])
+    made.wait(f"{rows}.length===1", 30)
+    made.js("[...document.querySelectorAll('button')].find(b => b.textContent.trim()==='New Profile').click(), 1")
+    made.wait("!!document.querySelector('select')")
+    made.js("(() => { const i = document.querySelector('.field'); i.value = 'Office'; i.dispatchEvent(new Event('input')); const s = document.querySelector('select'); s.value = 'Work'; s.dispatchEvent(new Event('change')); return 1 })()")
+    made.js("document.querySelector('form').requestSubmit(), 1")
+    check("New Profile quits the picker copy", made.proc.wait(timeout=30) == 0)
+    App.running.remove(made)
+    office = [p for p in listed() if p["name"] == "Office"]
+    check("having made the profile from the template", len(office) == 1 and office[0]["template"] == "Work" and office[0]["color"] == "#5b7fd6", listed())
+    opened = started_on(office[0]["id"]) if office else []
+    check("and opened it in a copy of its own", len(opened) == 1, opened)
+    stop(opened, office[0]["id"] if office else "")
+
+    check("Profiles… in the menu works", app.cmd("choosemenu", "Profiles", "Profiles…") == "ok")
+    deadline = time.time() + 30
+    while not copies_picking(root) and time.time() < deadline:
+        time.sleep(0.1)
+    picking = copies_picking(root)
+    check("and starts a copy that picks", len(picking) == 1, picking)
+    for pid in picking:
+        os.kill(int(pid), signal.SIGTERM)
+    while copies_picking(root) and time.time() < deadline:
+        time.sleep(0.1)
+    app.close()
+
+    fresh = tempfile.mkdtemp(prefix="pb-root-")
+    with open(os.path.join(fresh, "profiles.json"), "w") as f:
+        json.dump({"profiles": [{"id": "default", "name": "Personal", "color": "#4f9e9e", "template": "Personal"}]}, f)
+    app = App(None, [f"--root={fresh}"])
+    app.wait(f"{rows}.length===1", 30)
+    check("with no profile named and none used yet, the start shows the picker", app.js("location.href") == "chrome://picker/")
+    app.cmd("key", "cmd+q")
+    check("and Quit there ends it, cleanly", app.proc.wait(timeout=20) == 0)
+    App.running.remove(app)
+
+
+def copies_picking(root):
+    """The pids of the picker copies on root that the app started, not the driver."""
+    out = subprocess.run(["pgrep", "-f", "--", f"--root={root} --picker"], capture_output=True, text=True).stdout
+    return [p for p in out.split() if int(p) not in {a.proc.pid for a in App.running}]
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1323,5 +1427,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, cookie_checks]))

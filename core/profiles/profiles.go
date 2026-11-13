@@ -5,11 +5,14 @@
 package profiles
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"time"
 
@@ -132,10 +135,12 @@ func (m *Manager) SetColor(id, color string) error {
 }
 
 // Choice is the profile a copy starts on: its folder, and its id in the list, which is ""
-// for a folder named outright.
+// for a folder named outright. Pick says the copy has no profile yet: it shows the
+// picker.
 type Choice struct {
-	Dir string
-	ID  string
+	Dir  string
+	ID   string
+	Pick bool
 }
 
 // Named is the folder --user-data-dir names: it is the profile as it is, and never in the
@@ -143,9 +148,10 @@ type Choice struct {
 func Named(dir string) Choice { return Choice{Dir: dir} }
 
 // Choose chooses the profile a copy starts on when no folder is named: the listed profile
-// id when it isn't "", else the profile used last. A first start, with no list, makes the
-// list holding the first profile and chooses it.
-func (m *Manager) Choose(id string) (Choice, error) {
+// id when it isn't "", else none when the copy was started to pick, else the profile used
+// last. A first start, with no list, makes the list holding the first profile and chooses
+// it. A list where no profile was used yet leaves the choice to the picker.
+func (m *Manager) Choose(id string, pick bool) (Choice, error) {
 	if id != "" {
 		_, ok, err := m.Get(id)
 		if err != nil {
@@ -155,6 +161,9 @@ func (m *Manager) Choose(id string) (Choice, error) {
 			return Choice{}, fmt.Errorf("no profile %q in %s", id, m.path())
 		}
 		return Choice{Dir: m.Dir(id), ID: id}, nil
+	}
+	if pick {
+		return Choice{Pick: true}, nil
 	}
 	list, err := m.List()
 	if err != nil {
@@ -166,13 +175,52 @@ func (m *Manager) Choose(id string) (Choice, error) {
 		}
 		return Choice{Dir: m.Dir(First), ID: First}, nil
 	}
-	last := list[0]
-	for _, p := range list[1:] {
+	var last Profile
+	for _, p := range list {
 		if p.LastUsed.After(last.LastUsed) {
 			last = p
 		}
 	}
+	if last.ID == "" {
+		return Choice{Pick: true}, nil
+	}
 	return Choice{Dir: m.Dir(last.ID), ID: last.ID}, nil
+}
+
+// Create makes a profile called name from the template called template: a folder of its
+// own, with an id Go makes, holding the template's values as its prefs, and an entry in
+// the list.
+func (m *Manager) Create(name, template string) (Profile, error) {
+	t, ok := TemplateNamed(template)
+	if !ok {
+		return Profile{}, fmt.Errorf("no profile template %q", template)
+	}
+	var made Profile
+	var err error
+	if e := m.change(func(list []Profile) []Profile {
+		id := newID(list)
+		if err = t.writePrefs(m.Dir(id)); err != nil {
+			return list
+		}
+		made = Profile{ID: id, Name: name, Color: prefs.New(m.Dir(id)).FrameColor(), Template: t.Name}
+		return append(list, made)
+	}); e != nil {
+		return Profile{}, e
+	}
+	return made, err
+}
+
+// newID is an id no listed profile has: eight hex digits, never a folder's name the
+// user chose, so a rename never moves files.
+func newID(list []Profile) string {
+	for {
+		b := make([]byte, 4)
+		rand.Read(b)
+		id := hex.EncodeToString(b)
+		if !slices.ContainsFunc(list, func(p Profile) bool { return p.ID == id }) {
+			return id
+		}
+	}
 }
 
 // makeFirst makes the list holding the first profile, from the Personal template. Its

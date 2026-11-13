@@ -208,15 +208,21 @@ std::vector<Engine::VisibleTab> TabsOf(const PBVisibleTab* tabs,
   return visible;
 }
 
+void CallOpenProfile(const char* dir) {
+  CheckMainThread();
+  g_engine->OpenProfile(dir);
+}
+
 void CallCreateWindow(int64_t window,
                       int64_t near,
+                      const char* page,
                       const PBWindowLayout* l,
                       const PBRegion* regions,
                       size_t region_count,
                       const PBVisibleTab* tabs,
                       size_t tab_count) {
   CheckMainThread();
-  g_engine->CreateWindow(window, near, LayoutOf(l, regions, region_count),
+  g_engine->CreateWindow(window, near, page, LayoutOf(l, regions, region_count),
                          TabsOf(tabs, tab_count));
 }
 
@@ -286,10 +292,10 @@ Engine::AppWindow::AppWindow(int64_t id) : id(id) {}
 Engine::AppWindow::~AppWindow() = default;
 
 Engine::Engine(content::BrowserContext* pages_context,
-               content::BrowserContext* browser_context,
+               OpenProfileCallback open_profile,
                base::RepeatingClosure quit)
     : pages_context_(pages_context),
-      browser_context_(browser_context),
+      open_profile_(std::move(open_profile)),
       quit_(std::move(quit)) {
   CHECK(!g_engine);
   g_engine = this;
@@ -322,6 +328,7 @@ void Engine::TabOpened(int64_t opener,
 // static
 const PBEngineCalls* Engine::Calls() {
   static const PBEngineCalls calls = {
+      .open_profile = CallOpenProfile,
       .create_tab = CallCreateTab,
       .close_tab = CallCloseTab,
       .load_url = CallLoadURL,
@@ -438,8 +445,14 @@ void Engine::UpdateTitle(AppWindow* window) {
   }
 }
 
+void Engine::OpenProfile(const char* dir) {
+  CHECK(!browser_context_);
+  browser_context_ = open_profile_.Run(base::FilePath(dir));
+}
+
 void Engine::CreateWindow(int64_t id,
                           int64_t near,
+                          const std::string& page,
                           Window::Layout layout,
                           std::vector<VisibleTab> tabs) {
   auto w = std::make_unique<AppWindow>(id);
@@ -458,7 +471,7 @@ void Engine::CreateWindow(int64_t id,
   if (AppWindow* other = window(near)) {
     w->window->PlaceNear(other->window.get());
   }
-  w->shell = std::make_unique<ShellPage>(pages_context_, id);
+  w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
   timeline::Mark("shell.created");
 #if BUILDFLAG(IS_ANDROID)
   w->window->SetShellContents(w->shell->contents());

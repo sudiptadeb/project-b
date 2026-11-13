@@ -60,6 +60,7 @@ struct App {
 constexpr App kApps[] = {
     {"shell", PB_EVENT_SHELL_MESSAGE},
     {"settings", PB_EVENT_SETTINGS_MESSAGE},
+    {"picker", PB_EVENT_PICKER_MESSAGE},
 };
 
 const App* AppFor(const GURL& url) {
@@ -74,14 +75,15 @@ const App* AppFor(const GURL& url) {
   return nullptr;
 }
 
-// The window whose page for app this WebContents is: its shell's, or its settings page's
-// while that is open. 0 when it is no window's.
+// The window whose page for app this WebContents is: the page covering it when that is
+// app's, or its settings page while that is open. 0 when it is no window's.
 int64_t HomeWindow(const App& app, content::WebContents* contents) {
   for (const auto& [id, w] : Engine::Get()->windows()) {
     content::WebContents* home =
-        app.event == PB_EVENT_SHELL_MESSAGE ? w->shell->contents()
-        : w->settings                       ? w->settings->contents()
-                                            : nullptr;
+        app.event == PB_EVENT_SETTINGS_MESSAGE
+            ? (w->settings ? w->settings->contents() : nullptr)
+        : w->shell->page() == app.host ? w->shell->contents()
+                                       : nullptr;
     if (home == contents) {
       return id;
     }
@@ -301,8 +303,11 @@ void RegisterShellWebUI(content::BrowserContext* pages_context) {
   }
 }
 
-ShellPage::ShellPage(content::BrowserContext* browser_context, int64_t window)
+ShellPage::ShellPage(content::BrowserContext* browser_context,
+                     int64_t window,
+                     const std::string& page)
     : window_(window),
+      page_(page),
       contents_(content::WebContents::Create(
           content::WebContents::CreateParams(browser_context))) {
   Observe(contents_.get());
@@ -316,7 +321,8 @@ ShellPage::~ShellPage() {
 
 void ShellPage::Load() {
   contents_->GetController().LoadURLWithParams(
-      content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
+      content::NavigationController::LoadURLParams(
+          GURL("chrome://" + page_ + "/")));
 }
 
 void ShellPage::Send(const std::string& json) {
@@ -342,7 +348,7 @@ void ShellPage::RenderFrameCreated(content::RenderFrameHost* frame) {
 }
 
 void ShellPage::DidFinishNavigation(content::NavigationHandle* handle) {
-  timeline::PageCommitted("shell", handle);
+  timeline::PageCommitted(page_, handle);
 }
 
 // Go's window manager takes back what a dead shell claimed, so the page keeps working

@@ -14,9 +14,9 @@ extern "C" {
 char* PBClaimProfile(const char* root,
                      const char* profile,
                      const char* user_data_dir,
+                     int picker,
                      const char* urls);
 void PBStart(const PBEngineCalls* calls,
-             const char* profile_dir,
              const char* blocked_hosts,
              const char* hook_table);
 void PBStop(void);

@@ -107,6 +107,14 @@ func New(eng engine.Engine, dir string, fullScreen func() bool) *Manager {
 	}
 }
 
+// NewFromTemplates returns a manager for a copy with no profile, the picker's: it follows
+// the templates and keeps no file.
+func NewFromTemplates(eng engine.Engine, fullScreen func() bool) *Manager {
+	m := New(eng, "", fullScreen)
+	m.keymapFile, m.menuFile = "", ""
+	return m
+}
+
 func platformOf(goos string) string {
 	switch goos {
 	case "darwin":
@@ -552,6 +560,9 @@ func (m *Manager) edit(change func(Keymap)) {
 }
 
 func (m *Manager) save() {
+	if m.keymapFile == "" {
+		return
+	}
 	if err := writeJSON(m.keymapFile, m.file); err != nil {
 		m.problem("keymap.json couldn't be saved: " + err.Error())
 	}

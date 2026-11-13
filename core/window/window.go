@@ -24,6 +24,7 @@ type ShellLayout struct {
 // Manager owns the windows.
 type Manager struct {
 	eng        engine.Engine
+	page       engine.Page
 	color      string
 	theme      engine.Theme
 	frameWidth float64
@@ -43,10 +44,11 @@ type window struct {
 	sent  engine.WindowLayout
 }
 
-// New returns a manager with no windows. Every window it opens has the frame, color,
-// "#rrggbb", 4px wide, and the theme. front says which window is in front.
-func New(eng engine.Engine, color string, theme engine.Theme, front func() engine.WindowID) *Manager {
-	return &Manager{eng: eng, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}, front: front}
+// New returns a manager with no windows. Every window it opens is covered by page and
+// has the frame, color, "#rrggbb", 4px wide, and the theme. front says which window is in
+// front.
+func New(eng engine.Engine, page engine.Page, color string, theme engine.Theme, front func() engine.WindowID) *Manager {
+	return &Manager{eng: eng, page: page, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}, front: front}
 }
 
 // Open makes window id, a little down and right of window near, or where a first window
@@ -56,7 +58,7 @@ func (m *Manager) Open(id, near engine.WindowID) {
 	w := &window{}
 	m.windows[id] = w
 	w.sent = m.layout(w)
-	m.eng.CreateWindow(id, near, w.sent)
+	m.eng.CreateWindow(id, near, m.page, w.sent)
 	m.event(Event{Kind: Opened, Window: id})
 }
 

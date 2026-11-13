@@ -770,8 +770,8 @@ def profile_checks():
     open_menu("Profiles")
     items, ticked = menu_items("Profiles")
     shot("p3-profiles-menu")
-    check("the Profiles menu lists the profiles, with a tick on this one",
-          items == ["Personal"] and ticked == ["Personal"], f"{items} {ticked}")
+    check("the Profiles menu lists the profiles, with a tick on this one, then Profiles…",
+          items == ["Personal", "Profiles…"] and ticked == ["Personal"], f"{items} {ticked}")
     desk.key("escape")
 
     root = "/Users/admin/.project-b"
@@ -797,8 +797,54 @@ def profile_checks():
     items, ticked = menu_items("Profiles")
     shot("p3-profiles-menu-work")
     check("in Work's copy, the Profiles menu lists both, with the tick on Work",
-          items == ["Personal", "Work"] and ticked == ["Work"], f"{items} {ticked}")
+          items == ["Personal", "Work", "Profiles…"] and ticked == ["Work"], f"{items} {ticked}")
     desk.key("escape")
+    guest("/usr/bin/killall", "project_b")
+
+
+PICK = "/tmp/pb-pick"  # In the guest: the picker's driver pipe and output, for picker_checks.
+
+
+def picker_checks():
+    """The picker on a real screen: a copy started to pick shows it in a window of its own,
+    and New Profile, by real clicks and typing, makes a profile from a template and opens it
+    in a copy of its own as the picker copy quits. The picker copy is started with its
+    driver only to find its controls."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    launch()
+    time.sleep(1.5)
+    window_or_stop("the app starts on its first profile")
+    guest("/usr/bin/killall", "project_b")
+    until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10)
+    ask = driven(PICK, None, ["--root=/Users/admin/.project-b", "--picker"])
+    js = lambda expr: json.loads(ask("eval", expr) or "null")
+    rows = until(lambda: js("[...document.querySelectorAll('.row')].map(r => r.textContent.trim())"), lambda r: r == ["Personal"])
+    picker = window_or_stop("a picker copy opens a window")
+    check("a picker copy opens a window of its own holding the picker, which lists the profiles",
+          len(windows()) == 1 and rows == ["Personal"] and js("location.href") == "chrome://picker/", f"{windows()} {rows}")
+    rect = lambda selector: js(f"(b => [b.x, b.y, b.width, b.height])(document.querySelector({json.dumps(selector)}).getBoundingClientRect())")
+    click_on(rect(".new-button"), picker)
+    until(lambda: js("!!document.querySelector('.field')"), bool)
+    click_on(rect(".field"), picker)
+    desk.type("Office")
+    js("(s => (s.value = 'Work', s.dispatchEvent(new Event('change')), 1))(document.querySelector('select'))")
+    time.sleep(0.4)
+    shot("p3-picker")
+    check("New Profile asks for a name and a template", js("document.querySelector('.field').value") == "Office")
+    click_on(rect("button.primary"), picker)
+    root = "/Users/admin/.project-b"
+    listed = until(lambda: json.loads(guest("/bin/cat", f"{root}/profiles.json") or "{}").get("profiles", []), lambda p: len(p) == 2)
+    office = [p for p in listed if p["name"] == "Office"]
+    opened = until(lambda: guest("/usr/bin/pgrep", "-f", "--", f"--profile={office[0]['id'] if office else ''}"), bool, 20)
+    # The picker copy is gone once the Dock holds the one app.
+    icons = until(dock_icons, lambda d: len(d) == 1, 20)
+    until(windows, lambda w: len(w) == 1)
+    time.sleep(2)
+    shot("p3-picker-opened")
+    check("Create lists the profile, from the template, and opens it in a copy of its own as the picker copy quits",
+          len(office) == 1 and office[0]["color"] == "#5b7fd6" and opened != "" and len(icons) == 1,
+          f"{listed} {opened} {icons}")
     guest("/usr/bin/killall", "project_b")
 
 
@@ -829,6 +875,7 @@ time.sleep(1)
 # "check.py profiles" runs only the checks of several profiles.
 if sys.argv[1:] == ["profiles"]:
     profile_checks()
+    picker_checks()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 
@@ -1297,5 +1344,6 @@ window_checks()
 move_checks()
 state_checks()
 profile_checks()
+picker_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

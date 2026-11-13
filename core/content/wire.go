@@ -2,6 +2,36 @@ package content
 
 import "projectb/engine"
 
+// Picker is the engine's listener in a copy that hasn't chosen its profile: the picker's
+// window, its page, the menu and the keys.
+type Picker interface {
+	Message(w engine.WindowID, msg []byte)
+	WindowChanged(w engine.WindowID, s engine.WindowState)
+	WindowClosed(w engine.WindowID)
+	WindowFocused(w engine.WindowID)
+	ShellCrashed(w engine.WindowID)
+	MenuChosen(action string)
+	MenuList(name string) engine.Menu
+	OSBindings(byTitle map[string]engine.Key)
+	ModsChanged(m engine.Mods)
+	Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool
+}
+
+// WirePicker gives the picker what it hears, until the choice: Wire then gives each of
+// these to the app.
+func WirePicker(h *Hooks, p Picker) {
+	h.Events.OnPickerMessage = p.Message
+	h.Events.OnWindowChanged = p.WindowChanged
+	h.Events.OnWindowClosed = p.WindowClosed
+	h.Events.OnWindowFocused = p.WindowFocused
+	h.Events.OnShellCrashed = p.ShellCrashed
+	h.Events.OnMenuChosen = p.MenuChosen
+	h.Events.OnMenuList = p.MenuList
+	h.Events.OnOSBindings = p.OSBindings
+	h.Events.OnModsChanged = p.ModsChanged
+	wireKeys(h, p.Key)
+}
+
 // netErrAborted is net::ERR_ABORTED: a navigation replaced by a newer one, not a failure.
 const netErrAborted = -3
 
@@ -101,16 +131,20 @@ func Wire(h *Hooks, l engine.Listener) {
 		}
 	})
 
-	// Every key press in any of our pages goes to the app before the page sees it, and
-	// again if the page didn't use it.
+	wireKeys(h, l.Key)
+}
+
+// wireKeys sends every key press in any of our pages to key before the page sees it, and
+// again if the page didn't use it.
+func wireKeys(h *Hooks, key func(engine.Key, engine.KeyPhase, engine.Surface) bool) {
 	h.Delegate.AnswerPreHandleKeyboardEvent(func(c, source WebContents, event NativeWebKeyboardEvent) (KeyboardEventProcessingResult, bool) {
-		if k, ok := keyOf(event); ok && l.Key(k, engine.KeyBeforePage, surfaceOf(source)) {
+		if k, ok := keyOf(event); ok && key(k, engine.KeyBeforePage, surfaceOf(source)) {
 			return KeyboardEventProcessingResultHandled, true
 		}
 		return 0, false
 	})
 	h.Delegate.AnswerHandleKeyboardEvent(func(c, source WebContents, event NativeWebKeyboardEvent) (bool, bool) {
-		if k, ok := keyOf(event); ok && l.Key(k, engine.KeyUnhandled, surfaceOf(source)) {
+		if k, ok := keyOf(event); ok && key(k, engine.KeyUnhandled, surfaceOf(source)) {
 			return true, true
 		}
 		return false, false

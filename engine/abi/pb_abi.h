@@ -59,6 +59,7 @@ typedef enum PBEvent {
   PB_EVENT_MENU_LIST = 15,              // s: a menu list's name, as Go's menu names it;
                                         // answers s: json, Go's engine.Menu, its items
                                         // now. Asked each time a menu holding it opens
+  PB_EVENT_PICKER_MESSAGE = 16,         // i: window, s: json, from its picker page
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.
@@ -152,6 +153,10 @@ typedef enum PBTimelineKind {
 // What Go can ask the adapter to do. Handed over once, at start. A window is named by
 // Go's id for it, 1 for the first.
 typedef struct PBEngineCalls {
+  // Makes the profile's context, with Chromium's files in the profile folder dir, and the
+  // extension runtime with it. Go calls it once, as the copy becomes that profile's, before
+  // anything asks for a tab.
+  void (*open_profile)(const char* dir);
   // Makes a hidden tab. A window's layout shows it.
   int64_t (*create_tab)(void);
   void (*close_tab)(int64_t tab);
@@ -168,11 +173,13 @@ typedef struct PBEngineCalls {
   int64_t (*duplicate_tab)(int64_t tab);
   // Runs a PBEditCommand in whichever of our pages has the keyboard.
   void (*edit)(int32_t command);
-  // Makes a window and its shell page, and puts it on screen with its first layout, a
+  // Makes a window and the page covering it, chrome://<page>/: "shell", or "picker" in a
+  // copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.
   // Its first state follows once this call has returned.
   void (*create_window)(int64_t window,
                         int64_t near,
+                        const char* page,
                         const PBWindowLayout* layout,
                         const PBRegion* regions,
                         size_t region_count,
@@ -223,18 +230,21 @@ typedef struct PBGoCalls {
   // The first call, before anything is written to the profile. Go chooses the profile
   // from the command line's switches, each "" when not given: root, the folder that holds
   // the profiles and their list (--root); profile, a listed profile's id (--profile);
-  // user_data_dir, a folder that is the profile as it is (--user-data-dir). It returns the
-  // profile's folder, malloc'd, when this copy owns it. It returns NULL when another copy
-  // owns it and has been handed urls, one per line, possibly none: this copy then quits.
+  // user_data_dir, a folder that is the profile as it is (--user-data-dir); picker, 1 for
+  // a copy started to pick its profile (--picker). It returns the folder this copy keeps
+  // its own files in, malloc'd: the profile's, once this copy owns it, or the root for a
+  // copy that picks its profile later, through open_profile. It returns NULL when another
+  // copy owns the profile and has been handed urls, one per line, possibly none: this
+  // copy then quits.
   char* (*claim_profile)(const char* root,
                          const char* profile,
                          const char* user_data_dir,
+                         int picker,
                          const char* urls);
 
   // hook_table is the hash of the generated hook list the adapter was built with; Go
   // refuses a library whose list differs from its own.
   void (*start)(const PBEngineCalls* calls,
-                const char* profile_dir,
                 const char* blocked_hosts,
                 const char* hook_table);
   void (*stop)(void);
@@ -258,14 +268,15 @@ typedef struct PBGoCalls {
   // What --version prints first, such as "Project B 0.2.17". The caller frees it.
   char* (*version)(void);
 
-  // The switches the flags saved in the profile ask for, one per line, such as
-  // "--pb-extensions". Called once, before content starts. The caller frees it.
+  // The switches the flags saved in dir ask for, one per line, such as "--pb-extensions".
+  // Called once, before content starts, with the folder claim_profile returned. The caller
+  // frees it.
   char* (*launch_switches)(const char* profile_dir);
 
   // The timeline, Go's record of what happened and when (core/timeline). The adapter
   // uses these through engine/browser/timeline.h. Times are nanoseconds since process
-  // start. timeline_start comes first: the file goes in the profile, and the process
-  // is already process_age old.
+  // start. timeline_start comes first: the file goes in the folder claim_profile returned,
+  // and the process is already process_age old.
   void (*timeline_start)(const char* profile_dir, int64_t process_age);
   int64_t (*timeline_now)(void);
   // kind is a PBTimelineKind; t is the entry's time, or -1 for now.

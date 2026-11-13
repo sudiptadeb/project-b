@@ -247,7 +247,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
     const k = keymapFile();
     return k && !k.follows && k.template === 'project-b' && k.actions['tab.new'].mac.some((b) => b.keys === 'Shift+Cmd+K');
   }), JSON.stringify(keymapFile()?.actions?.['tab.new']));
-  check('the page shows it', await until(async () => (await page.getByRole('region', { name: 'File' }).textContent()).includes('⇧⌘K')));
+  check('the page shows it', await until(async () => (await page.getByRole('region', { name: 'File', exact: true }).textContent()).includes('⇧⌘K')));
   await openRow('Quit Project B');
   check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked', { exact: true }).count()) === 1);
   check('Quit can\'t leave the menu', await page.getByRole('switch', { name: 'Quit Project B in the menu' }).isDisabled());
@@ -261,7 +261,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
 
   await page.getByLabel('Template').selectOption('chrome');
   check('picking a template resets to following it', await until(() => keymapFile()?.follows === 'chrome'), JSON.stringify(keymapFile()));
-  check('and the added key is gone', await until(async () => !(await page.getByRole('region', { name: 'File' }).textContent()).includes('⇧⌘K')));
+  check('and the added key is gone', await until(async () => !(await page.getByRole('region', { name: 'File', exact: true }).textContent()).includes('⇧⌘K')));
   await page.screenshot({ path: path.join(out, 'settings-keyboard.png'), fullPage: true });
 
   await page.keyboard.press('Escape');

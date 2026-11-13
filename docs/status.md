@@ -8,6 +8,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [first-app.md](first-app.md): pieces, the window, measurements, packaging.
 - [logging.md](logging.md): **follow it in every feature.** The one timeline for logs and timing: how to log in Go, C++ and JS, names, levels, what never goes in, and how start-up and each interaction are measured.
 - [window-manager.md](window-manager.md): one Go owner for how the window behaves, built for macOS, and how Windows and Linux map to it.
+- [profiles.md](profiles.md) and [profiles-build.md](profiles-build.md): profiles, each in a copy of the app of its own, the list beside their folders, templates, the Profiles menu and the picker.
 - [windows.md](windows.md): several windows, each with its own shell and settings, and the list of tabs each one shows.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.

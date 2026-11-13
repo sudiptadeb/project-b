@@ -6,6 +6,7 @@ import (
 	"projectb/commands"
 	"projectb/engine"
 	"projectb/prefs"
+	"projectb/relaunch"
 )
 
 // registerActions gives every action its title and the one manager call it makes. Which
@@ -18,16 +19,13 @@ func (a *App) registerActions(e engine.Engine) {
 	}
 	active := func() bool { return a.Tabs.Active().ID != 0 }
 
-	add("app.about", "About Project B", func() { e.AppCommand(engine.AppAbout) })
+	a.actions = append(a.actions, copyActions(e, a.quit, func(r engine.WindowRequest) { a.Window.Request(a.Tabs.Front(), r) })...)
 	add("app.settings", "Settings…", func() { a.Settings.Open(a.Tabs.Front()) })
 	add("app.checkUpdate", "Check for Updates…", func() {
 		a.Settings.Open(a.Tabs.Front())
 		a.Update.CheckNow()
 	})
-	add("app.hide", "Hide Project B", func() { e.AppCommand(engine.AppHide) })
-	add("app.hideOthers", "Hide Others", func() { e.AppCommand(engine.AppHideOthers) })
-	add("app.showAll", "Show All", func() { e.AppCommand(engine.AppShowAll) })
-	add("app.quit", "Quit Project B", a.quit)
+	add("profile.picker", "Profiles…", func() { relaunch.Copy("--root="+a.profiles.Root(), "--picker") })
 
 	add("tab.new", "New Tab", func() { a.Shell.Interaction(a.Tabs.Front(), "tab.new", func() { a.Tabs.Create() }) })
 	add("address.focus", "Open Location…", func() { a.Shell.FocusAddressBar(a.Tabs.Front()) })
@@ -42,22 +40,6 @@ func (a *App) registerActions(e engine.Engine) {
 		}
 		a.Shell.Interaction(a.Tabs.Front(), "tab.close", a.Tabs.CloseActive)
 	})
-
-	for _, c := range []struct {
-		id, title string
-		cmd       engine.EditCommand
-	}{
-		{"edit.undo", "Undo", engine.EditUndo},
-		{"edit.redo", "Redo", engine.EditRedo},
-		{"edit.cut", "Cut", engine.EditCut},
-		{"edit.copy", "Copy", engine.EditCopy},
-		{"edit.paste", "Paste", engine.EditPaste},
-		{"edit.pasteAndMatchStyle", "Paste and Match Style", engine.EditPasteAndMatchStyle},
-		{"edit.delete", "Delete", engine.EditDelete},
-		{"edit.selectAll", "Select All", engine.EditSelectAll},
-	} {
-		add(c.id, c.title, func() { e.Edit(c.cmd) })
-	}
 
 	side := add("view.tabsSide", "Tabs on Side", func() { a.Shell.SwitchTabLayout(prefs.TabsVertical) })
 	side.Checked = func() bool { return a.Prefs.TabLayout() == prefs.TabsVertical }
@@ -105,11 +87,41 @@ func (a *App) registerActions(e engine.Engine) {
 	}
 	add("tab.selectLast", "Last Tab", a.Tabs.ActivateLast)
 
-	add("window.minimize", "Minimize", func() { a.Window.Request(a.Tabs.Front(), engine.WindowMinimise) })
-	add("window.zoom", "Zoom", func() { a.Window.Request(a.Tabs.Front(), engine.WindowZoom) })
-	add("window.bringAllToFront", "Bring All to Front", func() { e.AppCommand(engine.AppBringAllToFront) })
-
 	for _, act := range a.actions {
 		a.Commands.Register(*act)
 	}
+}
+
+// copyActions are the actions every copy has, whether it is on a profile or picking one:
+// the app's own, text editing, and what the window in front's buttons do, which request
+// asks of it.
+func copyActions(e engine.Engine, quit func(), request func(engine.WindowRequest)) []*commands.Action {
+	var out []*commands.Action
+	add := func(id, title string, run func()) {
+		out = append(out, &commands.Action{ID: id, Title: title, Run: run})
+	}
+	add("app.about", "About Project B", func() { e.AppCommand(engine.AppAbout) })
+	add("app.hide", "Hide Project B", func() { e.AppCommand(engine.AppHide) })
+	add("app.hideOthers", "Hide Others", func() { e.AppCommand(engine.AppHideOthers) })
+	add("app.showAll", "Show All", func() { e.AppCommand(engine.AppShowAll) })
+	add("app.quit", "Quit Project B", quit)
+	for _, c := range []struct {
+		id, title string
+		cmd       engine.EditCommand
+	}{
+		{"edit.undo", "Undo", engine.EditUndo},
+		{"edit.redo", "Redo", engine.EditRedo},
+		{"edit.cut", "Cut", engine.EditCut},
+		{"edit.copy", "Copy", engine.EditCopy},
+		{"edit.paste", "Paste", engine.EditPaste},
+		{"edit.pasteAndMatchStyle", "Paste and Match Style", engine.EditPasteAndMatchStyle},
+		{"edit.delete", "Delete", engine.EditDelete},
+		{"edit.selectAll", "Select All", engine.EditSelectAll},
+	} {
+		add(c.id, c.title, func() { e.Edit(c.cmd) })
+	}
+	add("window.minimize", "Minimize", func() { request(engine.WindowMinimise) })
+	add("window.zoom", "Zoom", func() { request(engine.WindowZoom) })
+	add("window.bringAllToFront", "Bring All to Front", func() { e.AppCommand(engine.AppBringAllToFront) })
+	return out
 }

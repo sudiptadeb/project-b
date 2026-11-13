@@ -163,8 +163,10 @@ profile folders; a first start makes it holding `default`, named Personal, and l
 as the profile as it is, and never enters the list: ChromeDriver and the tests use it.
 
 The Profiles menu lists the profiles, read as it opens, and choosing one starts a copy of
-the app on it; each copy has its own Dock icon, with a dot in its profile's colour. See
-[profiles-build.md](profiles-build.md).
+the app on it; each copy has its own Dock icon, with a dot in its profile's colour.
+"Profiles…" there, `--picker`, or a list with no profile used yet starts a copy that shows
+the picker page instead, which opens the profile chosen, or a new one, in a copy of its
+own. See [profiles-build.md](profiles-build.md).
 
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
 started on the same profile writes nothing there: it hands the URLs

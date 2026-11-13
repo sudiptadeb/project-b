@@ -63,7 +63,8 @@ func (a *App) profileSettingsPart(list *profiles.Manager, id string) settings.Pa
 
 // resetProfile writes the template called name's values over the profile's prefs, through
 // the prefs manager, so the shell in every window, the Dock and the list follow as they do
-// a change by hand. History, cookies, logins and extensions stay as they are.
+// a change by hand, and drops the shells' own data. History, cookies, logins and extensions
+// stay as they are.
 func (a *App) resetProfile(list *profiles.Manager, id, name string) {
 	t, ok := profiles.TemplateNamed(name)
 	if !ok {
@@ -74,6 +75,7 @@ func (a *App) resetProfile(list *profiles.Manager, id, name string) {
 		timeline.Errorf("profiles: template %s: %v", t.Name, err)
 		return
 	}
+	a.Shell.ForgetData()
 	if err := list.SetTemplate(id, t.Name); err != nil {
 		timeline.Errorf("profiles: %v", err)
 	}

@@ -18,9 +18,10 @@ import (
 
 // command is what the shell sends us.
 type command struct {
-	T    string `json:"t"`
-	Text string `json:"text"`
-	ID   int64  `json:"id"`
+	T    string          `json:"t"`
+	Text string          `json:"text"`
+	ID   int64           `json:"id"`
+	Data json.RawMessage `json:"data"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -48,6 +49,10 @@ type Manager struct {
 	// its script isn't there to take a message, and the snapshot it asks for has it all,
 	// a new window's first tab included.
 	heard map[engine.WindowID]bool
+	// The shell's own data, by window: the latest it saved, which Go never reads. It
+	// outlives a shell that crashed and reloaded, and goes with the shell, the window, or
+	// a reset to a template.
+	data map[engine.WindowID]json.RawMessage
 	// Whether app.ready is marked: a shell first showed Go's state. Once a process.
 	ready bool
 	// moving is the span waiting for a shell's next layout report, or "".
@@ -68,7 +73,7 @@ func (m *Manager) AddPart(p Part) { m.parts = append(m.parts, p) }
 // New returns a manager. run runs an action by id, as a menu item would; keys says the key
 // each action shows, on platform os, for the shell's hints.
 func New(eng engine.Engine, t *tabs.Manager, s *suggest.Manager, w *window.Manager, p *prefs.Manager, u *update.Manager, c *crash.Manager, run func(action string), keys func() map[string]string, os string) *Manager {
-	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os, heard: map[engine.WindowID]bool{}}
+	return &Manager{eng: eng, tabs: t, suggest: s, window: w, prefs: p, update: u, crash: c, run: run, keys: keys, os: os, heard: map[engine.WindowID]bool{}, data: map[engine.WindowID]json.RawMessage{}}
 }
 
 // Interaction runs what one thing the user asked for in window w does, as a span on the
@@ -122,6 +127,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"crashReport":  m.crash.Report(),
 			"platform":     m.os,
 			"keys":         m.keys(),
+			"data":         m.data[w],
 		}
 		for _, p := range m.parts {
 			p.Snapshot(snapshot)
@@ -183,6 +189,8 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.eng.FocusTab(engine.TabID(c.ID))
 	case "focusShell":
 		m.eng.FocusShell(w)
+	case "data":
+		m.data[w] = c.Data
 	default:
 		for _, p := range m.parts {
 			if p.Handle(w, c.T, msg) {
@@ -272,8 +280,19 @@ func (m *Manager) send(w engine.WindowID, v any) {
 func (m *Manager) HandleShellCrashed(w engine.WindowID) { delete(m.heard, w) }
 
 // ShellChanged waits for every window's new shell to say it's ready, as after a crash: each
-// window is loading another one.
-func (m *Manager) ShellChanged() { clear(m.heard) }
+// window is loading another one, which starts from Go's data alone.
+func (m *Manager) ShellChanged() {
+	clear(m.heard)
+	m.ForgetData()
+}
 
-// WindowClosed forgets the shell of a window that closed: it went with the window.
-func (m *Manager) WindowClosed(w engine.WindowID) { delete(m.heard, w) }
+// ForgetData drops every window's shell's own data, so the next shell to load in each
+// starts from Go's data alone.
+func (m *Manager) ForgetData() { clear(m.data) }
+
+// WindowClosed forgets the shell of a window that closed, and its data: they went with the
+// window.
+func (m *Manager) WindowClosed(w engine.WindowID) {
+	delete(m.heard, w)
+	delete(m.data, w)
+}

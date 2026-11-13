@@ -49,6 +49,9 @@ export const state = reactive({
   crashLog: '',
   // macOS's report of that crash, or the folder it keeps its reports in.
   crashReport: '',
+  // The shell's own data, as it last saved it for this window, or null: what it needs to
+  // lay itself out again after a reload. It comes only in the snapshot.
+  data: null,
 });
 
 // The messages that are only state: each sets the fields it carries.
@@ -56,6 +59,13 @@ const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'wo
 
 // activeTab is the tab the address bar, back, forward and reload act on.
 export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
+
+// saveData keeps value, any JSON, as this window's copy of the shell's own data, in place
+// of what it was. Go keeps it and never reads it.
+export function saveData(value) {
+  state.data = value;
+  send({ t: 'data', data: value });
+}
 
 // focusPage gives the keyboard to the active tab's page. The layout goes first, so the
 // window already shows the tab when it gets the keyboard: once Vue has drawn the change

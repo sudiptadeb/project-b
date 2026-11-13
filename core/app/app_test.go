@@ -1049,3 +1049,41 @@ func TestViewShellSwitchesTheShellLive(t *testing.T) {
 	r.shell(`{"t":"ready"}`)
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
 }
+
+// A shell's own data is kept per window, as it last saved it, and comes back in the
+// snapshot: after its shell crashed and reloaded too. Another window's shell has none. It
+// goes when the shell changes.
+func TestAShellsOwnDataIsKeptPerWindow(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	snapshot := func() map[string]any {
+		r.e.Settle()
+		for len(r.got) > 0 {
+			<-r.got
+		}
+		r.shell(`{"t":"ready"}`)
+		return r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	}
+	if m := snapshot(); m["data"] != nil {
+		t.Fatalf("a new window's shell has data %v", m["data"])
+	}
+	r.shell(`{"t":"data","data":{"panes":[1]}}`)
+	r.shell(`{"t":"data","data":{"panes":[1,2]}}`)
+	r.e.Post(func() { r.a.ShellCrashed(1) })
+	if m := snapshot(); !reflect.DeepEqual(m["data"], map[string]any{"panes": []any{1.0, 2.0}}) {
+		t.Fatalf("after a crash the shell has %v", m["data"])
+	}
+	var w2 engine.WindowID
+	r.e.Post(func() { w2, _ = r.a.NewWindow("") })
+	r.e.Settle()
+	got, stop := r.e.Feeds(w2).Shell.Subscribe()
+	defer stop()
+	r.e.Post(func() { r.a.ShellMessage(w2, []byte(`{"t":"ready"}`)) })
+	if m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "snapshot" }); m["data"] != nil {
+		t.Fatalf("another window's shell has %v", m["data"])
+	}
+	r.e.Post(func() { r.a.MenuChosen("shells:example") })
+	if m := snapshot(); m["data"] != nil {
+		t.Fatalf("the next shell has %v", m["data"])
+	}
+}

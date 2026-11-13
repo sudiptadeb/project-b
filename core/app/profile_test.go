@@ -56,6 +56,7 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	r, list, c := startListed(t)
 	defer r.stop()
 	r.visit("https://example.com/docs")
+	r.shell(`{"t":"data","data":{"panes":[1]}}`)
 	got, _ := r.openSettings()
 
 	r.settings(`{"t":"resetProfile","text":"Work"}`)
@@ -77,6 +78,11 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	}
 	if items := r.suggestions("exam"); len(items) != 1 {
 		t.Fatalf("history after the reset: %v", items)
+	}
+	// The shell's own data goes: reloaded, it starts from Go's data alone.
+	r.shell(`{"t":"ready"}`)
+	if m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" }); m["data"] != nil {
+		t.Fatalf("the shell's data after the reset: %v", m["data"])
 	}
 }
 

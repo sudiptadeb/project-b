@@ -48,6 +48,8 @@ type Manager struct {
 	// its script isn't there to take a message, and the snapshot it asks for has it all,
 	// a new window's first tab included.
 	heard map[engine.WindowID]bool
+	// Whether app.ready is marked: a shell first showed Go's state. Once a process.
+	ready bool
 	// moving is the span waiting for a shell's next layout report, or "".
 	moving string
 }
@@ -126,6 +128,12 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		}
 		m.send(w, snapshot)
 		timeline.Mark("shell.ready")
+	case "shown":
+		// The shell shows the snapshot, so the app can be used. Tests wait for this line.
+		if !m.ready {
+			m.ready = true
+			timeline.Mark("app.ready")
+		}
 	case "timeline":
 		timeline.FromPage("shell", msg)
 	case "navigate":

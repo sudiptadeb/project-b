@@ -123,7 +123,6 @@ def start(extra=(), profile=None):
 
 
 def ready(app):
-    app.wait("!!" + INPUT, 30)
     time.sleep(0.5)
 
 

@@ -15,6 +15,7 @@ import (
 	"projectb/engine"
 	"projectb/mockengine"
 	"projectb/tabs"
+	"projectb/timeline"
 	"projectb/window"
 )
 
@@ -818,5 +819,45 @@ func TestADevToolsTargetInANewWindow(t *testing.T) {
 	r.e.Settle()
 	if req := r.e.Requests()[before:]; !slices.Equal(req, []engine.WindowRequest{engine.WindowFront}) {
 		t.Fatalf("requests %v", req)
+	}
+}
+
+// The app is ready once the shell shows its first snapshot: app.ready, the line tests wait
+// for, is marked then and only once, not again for a shell that comes back from a crash.
+func TestAppReadyOnceTheShellShowsItsState(t *testing.T) {
+	_, from := timeline.Since(^uint64(0) >> 1)
+	readies := func() int {
+		entries, _ := timeline.Since(from)
+		n := 0
+		for _, e := range entries {
+			if e.Kind == timeline.KindMark && e.Name == "app.ready" {
+				n++
+			}
+		}
+		return n
+	}
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	sync := func() {
+		done := make(chan struct{})
+		r.e.Post(func() { close(done) })
+		<-done
+	}
+	sync()
+	if n := readies(); n != 0 {
+		t.Fatalf("app.ready marked %d times before the shell showed anything", n)
+	}
+	r.shell(`{"t":"shown"}`)
+	sync()
+	if n := readies(); n != 1 {
+		t.Fatalf("app.ready marked %d times once the shell showed its state", n)
+	}
+	r.e.Post(func() { r.a.ShellCrashed(1) })
+	r.shell(`{"t":"ready"}`)
+	r.shell(`{"t":"shown"}`)
+	sync()
+	if n := readies(); n != 1 {
+		t.Fatalf("app.ready marked %d times after the shell came back", n)
 	}
 }

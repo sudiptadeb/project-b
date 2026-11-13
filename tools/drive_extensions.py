@@ -195,7 +195,6 @@ def pages_seen(app):
 def extension_checks():
     profile = new_profile()
     app = App(profile, MOCK_STORE)
-    app.wait("!!document.querySelector('input')", 30)
     check("the toolbar has the extensions button", app.js("!!document.querySelector('[aria-label=Extensions]')"))
 
     # Before any extension, the page gets its ad script.
@@ -298,7 +297,6 @@ def extension_checks():
     # Everything survives a restart: what is installed is the engine's to remember, the
     # pin is Go's.
     app = App(profile, MOCK_STORE)
-    app.wait("!!document.querySelector('input')", 30)
     app.wait("document.querySelectorAll('.pbx-action').length===1", 30)
     check("the pin survives a restart", buttons(app) == [UBOL_NAME], buttons(app))
     visit(app, PAGE)
@@ -342,7 +340,6 @@ def flag_off_checks():
     """The same build with the Extensions flag off: the code is there and none of it runs."""
     profile = new_profile(extensions=False)
     app = App(profile, MOCK_STORE)
-    app.wait("!!document.querySelector('input')", 30)
     check("with the flag off the toolbar has no extensions button", not app.js("!!document.querySelector('[aria-label=Extensions]')"))
     visit(app, STORE + "/")
     app.wait("!!document.querySelector('li[data-id]')", 20, page=True)
@@ -375,7 +372,6 @@ def flag_off_checks():
 def web_store_checks():
     """The app as it ships, with no store named: the store is the Chrome Web Store."""
     app = App(new_profile())
-    app.wait("!!document.querySelector('input')", 30)
     visit(app, PAGE)
     check("with no extension the ad host answers", fetch_ad(app) == "reached")
 
@@ -442,7 +438,6 @@ def limit(name, works, detail=""):
 def fonts_ninja_checks():
     """Fonts Ninja: a button with no popup, which messages the page."""
     app = App(new_profile(), MOCK_STORE)
-    app.wait("!!document.querySelector('input')", 30)
     install_from_store(app, FN_ID)
     pin(app, FN_NAME, True)
     visit(app, PAGE)

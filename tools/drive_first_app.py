@@ -90,6 +90,10 @@ def check(name, ok, detail=""):
         failures += 1
 
 
+# The line the app prints once it's ready to be used: docs/logging.md.
+READY = re.compile(r" mark +go +app\.ready$")
+
+
 class App:
     running = []  # Every app started and not yet closed.
 
@@ -109,6 +113,8 @@ class App:
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_reply("start", 60)
         self.writer = open(self.fifo, "w", buffering=1)
+        # The app prints app.ready once the shell shows Go's state: tests start there.
+        self.wait_reply("app.ready", 60)
 
     def _read(self):
         for line in self.proc.stdout:
@@ -118,6 +124,10 @@ class App:
             if m:
                 with self.cond:
                     self.replies[m.group(1)] = m.group(2)
+                    self.cond.notify_all()
+            elif READY.search(line):
+                with self.cond:
+                    self.replies["app.ready"] = ""
                     self.cond.notify_all()
         with self.cond:
             self.replies["exit"] = "exit"
@@ -288,7 +298,7 @@ def version_checks():
 # first tab's commit race the rest, so they are checked apart.
 STARTUP = ["process.start", "main.entered", "content.ready", "go.starting", "window.created", "shell.created",
            "shell.navigation_start", "window.shown", "go.started", "shell.committed",
-           "shell.script", "shell.mounted", "shell.ready", "shell.snapshot"]
+           "shell.script", "shell.mounted", "shell.ready", "shell.snapshot", "app.ready"]
 
 
 def timeline_checks():
@@ -299,7 +309,6 @@ def timeline_checks():
     log = os.path.join(OUT, "app.log")
     log_start = os.path.getsize(log) if os.path.exists(log) else 0
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
 
     def read():
         return json.loads(app.cmd("timeline", 0))["result"]["entries"]
@@ -388,7 +397,6 @@ def settings_checks():
     through Go, and the settings page, a page of its own over the whole window."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     time.sleep(0.5)
 
     def find(items, title):
@@ -476,7 +484,6 @@ def settings_checks():
 
     # After a restart the keymap is still the user's.
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     rows = app.js(ROWS)
     app.cmd("key", "cmd+shift+k")
     try:
@@ -496,7 +503,6 @@ def browsing_checks():
 
     t0 = time.time()
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     print(f"shell page answered {time.time() - t0:.2f}s after launch (includes driver polling)", flush=True)
     stats = json.loads(app.cmd("stats", timeout=60))
     print("stats", json.dumps(stats), flush=True)
@@ -1009,7 +1015,6 @@ def browsing_checks():
 
     # History survives a restart.
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     time.sleep(1)
     focus_bar(app)
     app.cmd("type", "exam")
@@ -1032,7 +1037,6 @@ def visible_tabs_checks():
     view where its rectangle is, each told it is shown, and one that leaves the list told
     it is hidden. The shell lists one tab, so the driver gives the window the layout."""
     app = App(tempfile.mkdtemp(prefix="pb-profile-"))
-    app.wait("!!document.querySelector('input')", 30)
     app.cmd("key", "cmd+t")
     app.wait(f"{ROWS}===2")
     deadline = time.time() + 10
@@ -1063,7 +1067,6 @@ def window_checks():
     on it would on a real desktop."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     windows = lambda: json.loads(app.cmd("windows"))
     first = windows()[0]
     app.cmd("key", "cmd+n")
@@ -1131,7 +1134,6 @@ def move_checks():
     move into a new window of its own, and a window whose last tab leaves closes. The move
     is Go's, asked for through our own DevTools command."""
     app = App(tempfile.mkdtemp(prefix="pb-profile-"))
-    app.wait("!!document.querySelector('input')", 30)
     windows = lambda: json.loads(app.cmd("windows"))
     move = lambda tab, window: json.loads(app.cmd("projectb", "moveTab", json.dumps({"tab": tab, "window": window, "index": 0})))
     visit(app, "data:text/html,<title>Kept</title><input id=f><script>n=0;setInterval(()=>n++,20)</script>")
@@ -1188,7 +1190,6 @@ def bounds_checks():
     """Go puts a window's frame where it is asked, and reads back where it is, as the engine
     reports it."""
     app = App(tempfile.mkdtemp(prefix="pb-profile-"))
-    app.wait("!!document.querySelector('input')", 30)
     want = {"x": 200, "y": 150, "w": 900, "h": 600}
     app.cmd("projectb", "setWindowBounds", json.dumps({"window": 1, "bounds": want}))
     frame = json.loads(app.cmd("windows"))[0]["frame"]
@@ -1205,13 +1206,11 @@ def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     visit(app, PAGES + "cookie")
     check("the first visit sends no cookie", app.js("document.title", page=True) == "none")
     app.close()
     check("the cookie is saved in the profile", os.path.exists(os.path.join(profile, "chromium/Network/Cookies")))
     app = App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     visit(app, PAGES + "cookie")
     check("the cookie is sent back after a restart", app.js("document.title", page=True) == "a=1", app.js("document.title", page=True))
     app.close()

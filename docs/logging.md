@@ -140,9 +140,14 @@ In the order they happen on a Mac:
 | `shell.mounted` | JS | Vue has mounted the app |
 | `shell.ready` | Go | Go heard the shell and sent it the snapshot |
 | `shell.snapshot` | JS | The shell has its first state from Go |
+| `app.ready` | Go | The shell shows that state, so the app can be used. Marked once a process |
 | `shell.first_paint` | JS | The renderer first painted the shell's content |
 | `shell.on_screen` | JS | That frame reached the screen: the compositor's presentation time |
 | `tab.committed`, `tab.first_paint` | C++ | Any tab's page committed; first painted something. `tab=1` is the first tab |
+
+`app.ready` is the line the test drivers wait for before they begin, as printed:
+`  290.512000 mark  go       app.ready`. The shell sends `shown` once Vue has drawn the
+snapshot, and Go marks it the first time.
 
 The shell's first paint and the first tab race the lines around them. Android has no
 `window.shown`: its window is on screen before content starts.

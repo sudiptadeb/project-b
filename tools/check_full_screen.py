@@ -30,7 +30,6 @@ TRANSITION = 1.0
 def full_screen_checks():
     """Into full screen and out again, three ways."""
     app = drive.App(tempfile.mkdtemp(prefix="pb-profile-"))
-    app.wait("!!document.querySelector('input')", 30)
     state = lambda: json.loads(app.cmd("state"))
     native = lambda: json.loads(app.cmd("frame"))  # The border the window itself draws.
     windowed = app.js(RADIUS)

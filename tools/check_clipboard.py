@@ -23,7 +23,6 @@ from drive_first_app import INPUT, VALUE, check  # noqa: E402
 def clipboard_checks():
     """Copy and paste go through Go to whichever page has the keyboard: here, the shell."""
     app = drive.App(tempfile.mkdtemp(prefix="pb-profile-"))
-    app.wait("!!document.querySelector('input')", 30)
     drive.focus_bar(app)
     app.cmd("type", "copied text")
     app.wait(f"{VALUE}==='copied text'")

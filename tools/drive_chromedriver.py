@@ -132,6 +132,9 @@ class Driver:
         if not self.lines.wait(lambda: "start" in self.lines.replies, timeout):
             raise TimeoutError("the app's driver never started")
         self.writer = open(self.fifo, "w", buffering=1)
+        # The app prints app.ready once the shell shows Go's state: docs/logging.md.
+        if not self.lines.wait(lambda: any(re.search(r" mark +go +app\.ready$", line) for line in self.lines.text), timeout):
+            raise TimeoutError("the app never said it was ready")
 
     def cmd(self, *parts, timeout=20):
         self.next += 1
@@ -252,7 +255,6 @@ def run_app(args, wait_for=None, log="app.log"):
     lines = Lines(proc, os.path.join(OUT, log))
     driver = Driver(lines, fifo)
     driver.start()
-    driver.wait("!!document.querySelector('input')", True, 30)
     if wait_for:
         lines.wait(lambda: lines.has(wait_for), 10)
     return proc, lines, driver

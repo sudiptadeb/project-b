@@ -13,6 +13,7 @@ import atexit
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -276,7 +277,7 @@ def driven(where, profile):
     """Opens the installed app with its driver (--pb-driver, as tools/drive_first_app.py uses
     it), on a profile of its own, keeping the driver's pipe and the app's output in where in
     the guest. Returns ask(*parts), which sends one driver command and returns its answer,
-    once the driver has started."""
+    once the app says it's ready."""
     guest("/bin/sh", "-c", f"rm -rf {where}; mkdir -p {where} && mkfifo {where}/fifo")
     fresh_profile(profile, profile)
     guest("/usr/bin/open", "-n", "--stdout", f"{where}/out", "--stderr", f"{where}/err", APP, "--args",
@@ -298,6 +299,12 @@ def driven(where, profile):
         return reply(asked[0])
 
     reply("start")
+    # The app prints app.ready once the shell shows Go's state: docs/logging.md.
+    end = time.time() + 30
+    while not re.search(r" mark +go +app\.ready$", guest("/bin/cat", f"{where}/err"), re.M):
+        if time.time() > end:
+            sys.exit(f"the app never said it was ready; its output: {guest('/bin/cat', f'{where}/out', f'{where}/err')[-2000:]}")
+        time.sleep(0.3)
     return ask
 
 
@@ -333,7 +340,6 @@ def layout():
         found["bounds"] = json.loads(ask("bounds"))
         return found
 
-    until("!!document.querySelector('input')")
     js("document.querySelector('.new-tab').click()")
     until("document.querySelectorAll('[role=tab]').length===2")
     side = measure()

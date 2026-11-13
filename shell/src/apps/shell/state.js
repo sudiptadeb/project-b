@@ -1,7 +1,7 @@
 // The shell's copy of the state. The managers own the truth: this is only ever replaced
 // by what they send, and a new shell starts from a snapshot.
 
-import { computed, reactive } from 'vue';
+import { computed, nextTick, reactive } from 'vue';
 import { end, listen, mark, painted, send } from '@/bridge.js';
 import { extensionsMessage } from '@extensions';
 
@@ -114,6 +114,8 @@ export function connect() {
           state.platform = m.platform;
           state.keys = m.keys;
           mark('shell.snapshot');
+          // Once the page shows it, Go marks the app ready.
+          nextTick(() => send({ t: 'shown' }));
           break;
         // Go asks for a span to end once what it just sent is drawn.
         case 'paint':

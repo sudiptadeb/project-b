@@ -34,7 +34,6 @@ def cpu_seconds(pids):
 def main():
     profile = tempfile.mkdtemp(prefix="pb-measure-")
     app = drive.App(profile)
-    app.wait("!!document.querySelector('input')", 30)
     drive.visit(app, "https://example.com/")
     time.sleep(1)
 
@@ -77,7 +76,6 @@ def main():
 
     print("== a C++ crash on the main thread, with Go's signal handlers present")
     app = drive.App(tempfile.mkdtemp(prefix="pb-segv-"))
-    app.wait("!!document.querySelector('input')", 30)
     log_start = os.path.getsize(os.path.join(drive.OUT, "app.log"))
     app.writer.write("x segv\n")
     app.writer.flush()

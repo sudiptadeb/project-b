@@ -562,3 +562,26 @@ func TestRelaunchQuitsTheOtherCopiesThenSwapsAndStartsEachProfile(t *testing.T) 
 		t.Fatalf("the steps were %q, want %q", got, want)
 	}
 }
+
+func TestCheckNowTriesARefusedReleaseAgain(t *testing.T) {
+	wrong := archive(t, fakeApp(t, t.TempDir(), "0.1.5"))
+	rs := release(t, "0.2.0", wrong, wrong)
+	r := start(t, "0.1.0", rs.url, nil)
+	r.check()
+	if rs.downloads.Load() != 1 || r.m.State().Phase != Failed {
+		t.Fatalf("the automatic check should refuse it: %d %+v", rs.downloads.Load(), r.m.State())
+	}
+	// The release is fixed in place; an automatic check still holds the refusal, a person's
+	// check takes it.
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs.set("0.2.0", good, good)
+	r.check()
+	if rs.downloads.Load() != 1 {
+		t.Fatalf("an automatic check must not download a refused release again: %d", rs.downloads.Load())
+	}
+	r.m.CheckNow()
+	s := eventually(t, r.m, func(s State) bool { return s.Phase == Ready })
+	if s.Version != "0.2.0" || rs.downloads.Load() != 2 {
+		t.Fatalf("state %+v, downloads %d", s, rs.downloads.Load())
+	}
+}

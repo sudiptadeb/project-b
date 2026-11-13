@@ -327,6 +327,7 @@ func (m *Manager) readStage() {
 // CheckNow checks at once, whether or not automatic checks are on, and says how it went in
 // State.Check. A newer release goes the way an automatic check's does: download, checks,
 // stage, and the bubble offers relaunch. While another copy checks, it waits for the lock.
+// A release refused earlier is tried again.
 func (m *Manager) CheckNow() {
 	if m.client == nil {
 		m.setCheck(CheckFailed, "a development build doesn't update")
@@ -340,6 +341,11 @@ func (m *Manager) CheckNow() {
 			return
 		}
 		defer lock.Close()
+		// A person asking means "try it": a release an earlier download refused is
+		// offered again. Automatic checks keep holding it.
+		if err := m.client.Unreject(); err != nil {
+			timeline.Errorf("update: %v", err)
+		}
 		m.readStage()
 		current, err := m.check(context.Background())
 		switch {

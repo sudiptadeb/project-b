@@ -57,7 +57,10 @@ and never touch the copies on the root or the installed app those relaunch.
    signing certificate, compiled into the main binary. These are the two checks
    `tools/package.sh` makes before a build ships. A bundle that fails them is refused for
    good on that install: `amarit.Client.Reject` records the version, so a bad release is
-   downloaded once, not every minute. A download that fails (network, or bytes that don't
+   downloaded once, not every minute, by the automatic checks. Check for updates in
+   settings tries it again (`amarit.Client.Unreject`): a person asking means "try it". When
+   the signature check fails, `codesign --verbose=4`'s answer goes to the timeline, naming
+   each file that differs from the seal. A download that fails (network, or bytes that don't
    match the manifest) is shown, and tried again next minute. A failure stays on show while
    the channel still points at that release; once it points elsewhere, the bubble goes.
    A bundle that passes is moved into `update/stage`, so the stage only ever holds a

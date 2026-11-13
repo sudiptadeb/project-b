@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"projectb/timeline"
 )
 
 // BundleOf returns the .app the executable runs from, or "" when it runs from a build
@@ -95,6 +97,10 @@ func unpack(archive, dir string) (string, error) {
 func SignedBy(leafSHA1 string) func(app string) error {
 	return func(app string) error {
 		if out, err := exec.Command("/usr/bin/codesign", "--verify", "--deep", "--strict", app).CombinedOutput(); err != nil {
+			// Verbose output names each file that differs from the seal, which the one
+			// line doesn't; it goes to the timeline.
+			detail, _ := exec.Command("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=4", app).CombinedOutput()
+			timeline.Errorf("update: codesign on %s:\n%s", app, strings.TrimSpace(string(detail)))
 			return fmt.Errorf("the signature is broken: %s", firstLine(out, err))
 		}
 		requirement := fmt.Sprintf(`certificate leaf = H"%s"`, leafSHA1)

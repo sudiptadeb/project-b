@@ -31,9 +31,10 @@ export const state = reactive({
   // the templates, the id of the shell it loads, and the shells to choose from, each with
   // its id and name. null in a copy on a folder named outright, which isn't listed.
   profile: null,
-  // The profile's workspaces, each with its id, name and colour, in the order they were
-  // made.
+  // The profile's workspaces, each with its id, name and colour, in the user's order.
   workspaces: [],
+  // The number of tabs open in each workspace, by its id; one with none isn't in it.
+  workspaceTabs: {},
 });
 
 export function connect() {
@@ -56,6 +57,7 @@ export function connect() {
             section: m.section,
             profile: m.profile || null,
             workspaces: m.workspaces,
+            workspaceTabs: m.workspaceTabs,
             ready: true,
           });
           mark('settings.snapshot');
@@ -92,6 +94,9 @@ export function connect() {
           break;
         case 'workspaces':
           state.workspaces = m.workspaces;
+          break;
+        case 'workspaceTabs':
+          state.workspaceTabs = m.workspaceTabs;
           break;
       }
     },

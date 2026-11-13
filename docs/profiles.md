@@ -58,6 +58,16 @@ Each process also has a context of its own for our pages, apart from the profile
   and pays for it with about 64 mode checks in C++ and 37 hard-coded mode numbers in its
   pages (`ulaa-modes.md`).
 
+- The first templates are Personal and Work, with different colours and tab positions.
+- The app starts by choosing its profile. A picker screen exists; the start either shows
+  it or opens the right profile itself. A master process will sit there later.
+- On the Mac, each running profile is its own app in the Dock: our logo with a small
+  accent in the profile's colour. A picture per profile comes later.
+- An update is app-wide: it restarts every running profile.
+- Deleting a profile comes later.
+
+How these are built is in [profiles-build.md](profiles-build.md).
+
 **Proposed.**
 
 - *Reset writes all of the template's values,* after a confirmation. Nothing tracks which
@@ -204,7 +214,7 @@ Each step is usable on its own.
 1. Cookies and the cache saved to the profile folder, and the lock with its handover.
 2. Several windows, and the list of visible tabs in place of the one page rectangle.
 3. Profiles: the list, creating one from a template, one process each, opening another,
-   reset.
+   reset. Its own note: [profiles-build.md](profiles-build.md).
 4. Workspaces.
 5. The shell as a pref, with the shell's own data blob.
 

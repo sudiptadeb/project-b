@@ -40,6 +40,19 @@
   BOOL _handlingSendEvent;
 }
 
+// A quit from outside the app, the Dock's Quit, logout, restart, shutdown or an
+// AppleScript quit, comes here as -terminate:. AppKit's own would call exit() from
+// inside the run loop, so Go never stops: the crash marker stays and the next start
+// says the app crashed. It quits the way Cmd+Q does instead, by ending the run loop.
+- (void)terminate:(id)sender {
+  project_b::Engine* engine = project_b::Engine::Get();
+  if (!engine) {
+    [super terminate:sender];
+    return;
+  }
+  engine->Quit();
+}
+
 - (BOOL)isHandlingSendEvent {
   return _handlingSendEvent;
 }

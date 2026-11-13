@@ -20,6 +20,7 @@ function initial(tab) {
         :class="{ active: tab.id === state.active }"
         type="button"
         role="tab"
+        :data-tab="tab.id"
         :aria-selected="tab.id === state.active"
         :aria-label="tabLabel(tab)"
         @click="send({ t: 'activateTab', id: tab.id })"

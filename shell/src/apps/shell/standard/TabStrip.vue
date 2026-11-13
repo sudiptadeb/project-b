@@ -15,6 +15,7 @@ import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/
       class="tab"
       :class="{ active: tab.id === state.active }"
       role="tab"
+      :data-tab="tab.id"
       tabindex="0"
       :aria-selected="tab.id === state.active"
       @click="send({ t: 'activateTab', id: tab.id })"

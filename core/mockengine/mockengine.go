@@ -84,6 +84,8 @@ type Engine struct {
 	edits      []engine.EditCommand
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
+	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
+	unshownFocus []engine.TabID
 
 	// The fake extension runtime, in a build with extensions.
 	extensions extensionRuntime
@@ -574,11 +576,31 @@ func (e *Engine) AppCommand(c engine.AppCommand) {
 	}
 }
 
-// FocusTab gives the tab the keyboard, which the mock only remembers.
+// FocusTab gives the tab the keyboard, which the mock only remembers. The real window
+// gives it only to a tab it shows: a page view it hides can't take it, and the keyboard
+// is left where no key reaches Go. So a tab no window shows doesn't get it here either,
+// and the mock remembers that it was asked.
 func (e *Engine) FocusTab(tab engine.TabID) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.tabs[tab] != nil {
+		shown := false
+		for _, win := range e.windows {
+			shown = shown || slices.Contains(win.visible, tab)
+		}
+		if !shown {
+			e.unshownFocus = append(e.unshownFocus, tab)
+			return
+		}
+	}
 	e.focused = tab
+}
+
+// UnshownFocus are the tabs FocusTab was asked for while no window showed them.
+func (e *Engine) UnshownFocus() []engine.TabID {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]engine.TabID{}, e.unshownFocus...)
 }
 
 // Focused is the tab last given the keyboard, by FocusTab or a press in its page.

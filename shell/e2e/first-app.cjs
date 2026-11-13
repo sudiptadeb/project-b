@@ -1,70 +1,30 @@
 // End-to-end test of the first app on the mock engine, in a real browser.
 // Run: node shell/e2e/first-app.cjs   (from the repo root; Playwright is preinstalled)
 
-const { spawn, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
+const lib = require('./lib.cjs');
+const { check, out, profile, regions, settle, until } = lib;
 
-const root = path.resolve(__dirname, '../..');
-const out = path.join(root, 'build/e2e');
-const port = 8799;
-const base = `http://127.0.0.1:${port}`;
-
-fs.mkdirSync(out, { recursive: true });
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-e2e-'));
-const bin = path.join(out, 'dev');
-execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
-
-let server;
-async function startServer(extra = []) {
-  // A server left over from another run would answer in ours' place.
-  if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
-    throw new Error(`port ${port} already has a server: stop it and run again`);
-  }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, '-block=blocked.test', ...extra], { stdio: 'ignore' });
-  for (let i = 0; i < 100; i++) {
-    try {
-      await fetch(base + '/mock/regions');
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
-  throw new Error('server did not start');
-}
-async function stopServer() {
-  const gone = new Promise((r) => server.once('exit', r));
-  server.kill('SIGTERM');
-  await gone;
-}
-
-let failed = 0;
-function check(name, ok, detail = '') {
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok || !detail ? '' : ' -> ' + detail}`);
-  if (!ok) failed++;
-}
-const regions = async (q = '') => (await fetch(`${base}/mock/regions${q}`)).json();
-const until = async (test, ms = 5000) => {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    if (await test()) return true;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  return false;
+// Each start has a port of its own, so the address follows the server.
+let base = '';
+const startServer = async (extra = []) => {
+  await lib.start(['-block=blocked.test', ...extra]);
+  base = lib.base;
 };
-const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60)))));
+const stopServer = lib.stop;
 
 (async () => {
   await startServer();
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, screen: { width: 1920, height: 1080 } });
   const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  lib.watch(page, errors);
 
   // The page is the OS window: the shell is in a frame of its own, over the mock page's,
   // both at the window's coordinates. Locators reach the shell through its frame, and
@@ -156,10 +116,10 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   r = await regions();
   check('the box becomes a third shell rectangle', r.regions.length === 3, JSON.stringify(r.regions));
   const box = await list.boundingBox();
-  const over = await regions(`?x=${box.x + 20}&y=${box.y + 10}`);
+  const over = await regions({ x: box.x + 20, y: box.y + 10 });
   check('the box extends over the page', box.y + box.height > r.bounds.y + 40, JSON.stringify({ box, bounds: r.bounds }));
   check('a click on the box goes to the shell', over.hit === 'shell');
-  const below = await regions(`?x=${box.x + 20}&y=${box.y + box.height + 40}`);
+  const below = await regions({ x: box.x + 20, y: box.y + box.height + 40 });
   check('a click below the box goes to the page', below.hit === 'page');
 
   // Bar and list behave as one UI.
@@ -270,11 +230,11 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   const toggle = ui.getByRole('button', { name: /sidebar/ });
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
-  r = await regions('?x=74&y=16');
+  r = await regions({ x: 74, y: 16 });
   check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 5 && r.hit === 'drag', JSON.stringify(r.drag));
-  check('the empty part of the sidebar is shell and never drags', (await regions('?x=100&y=600')).hit === 'shell');
-  check('the frame\'s left, right and bottom edges never drag', (await regions('?x=2&y=300')).hit !== 'drag' && (await regions('?x=1098&y=300')).hit !== 'drag' && (await regions('?x=600&y=698')).hit !== 'drag');
-  check('the control itself is shell, not drag', (await regions(`?x=${windowLeft + 12}&y=16`)).hit === 'shell');
+  check('the empty part of the sidebar is shell and never drags', (await regions({ x: 100, y: 600 })).hit === 'shell');
+  check('the frame\'s left, right and bottom edges never drag', (await regions({ x: 2, y: 300 })).hit !== 'drag' && (await regions({ x: 1098, y: 300 })).hit !== 'drag' && (await regions({ x: 600, y: 698 })).hit !== 'drag');
+  check('the control itself is shell, not drag', (await regions({ x: windowLeft + 12, y: 16 })).hit === 'shell');
   // The frame colour has one owner: Go gave it to the window and to the shell.
   const frame = await shellFrame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
   check('the window and the shell paint the frame colour Go owns', frame === '#4f9e9e' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
@@ -292,12 +252,12 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   await shellFrame().waitForFunction(() => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x < 20);
   check('in full screen the controls move into the buttons\' place', (await toggle.boundingBox()).x === 4 + 8, String((await toggle.boundingBox()).x));
   check('in full screen the corners are square', (await windowRadius()) === '0px', await windowRadius());
-  check('in full screen nothing drags: the empty top row is shell', (await regions('?x=600&y=2')).hit === 'shell' && (await regions()).drag.length === 0, JSON.stringify((await regions()).drag));
+  check('in full screen nothing drags: the empty top row is shell', (await regions({ x: 600, y: 2 })).hit === 'shell' && (await regions()).drag.length === 0, JSON.stringify((await regions()).drag));
   await mock.getByRole('button', { name: 'Full screen' }).click();
   await shellFrame().waitForFunction((x) => document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x === x, windowLeft);
   check('leaving full screen gives the buttons their space back', true);
   check('and the corners their curve', (await windowRadius()) === '26px', await windowRadius());
-  check('and the empty top row drags again', (await regions('?x=600&y=2')).hit === 'drag');
+  check('and the empty top row drags again', (await regions({ x: 600, y: 2 })).hit === 'drag');
 
   // The window draws its frame band over the shell and the page, and its controls where
   // the engine reports them; full screen has none.
@@ -440,8 +400,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   r = await regions();
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('and the dev window moves the page there', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
-  check('the empty strip drags the window', (await regions('?x=900&y=16')).hit === 'drag');
-  check('the bands beside the toolbar under the strip are shell, not drag', (await regions('?x=2&y=60')).hit === 'shell');
+  check('the empty strip drags the window', (await regions({ x: 900, y: 16 })).hit === 'drag');
+  check('the bands beside the toolbar under the strip are shell, not drag', (await regions({ x: 2, y: 60 })).hit === 'shell');
   await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
   await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   check('New Tab works from the strip', (await bar.inputValue()) === '');
@@ -554,8 +514,8 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   let bb = await bubble.boundingBox();
   check('the download shows as a bubble in the page\'s bottom-left corner', bb.x === r.bounds.x && bb.y + bb.height === r.bounds.y + r.bounds.h, JSON.stringify({ bb, bounds: r.bounds }));
   check('the bubble takes no layout space', JSON.stringify(r.bounds) === pageBounds, JSON.stringify(r.bounds));
-  check('the bubble is shell, so its click does not reach the page', r.regions.length === 3 && (await regions(`?x=${bb.x + 10}&y=${bb.y + 10}`)).hit === 'shell', JSON.stringify(r.regions));
-  check('just above the bubble is still the page', (await regions(`?x=${bb.x + 10}&y=${bb.y - 10}`)).hit === 'page');
+  check('the bubble is shell, so its click does not reach the page', r.regions.length === 3 && (await regions({ x: bb.x + 10, y: bb.y + 10 })).hit === 'shell', JSON.stringify(r.regions));
+  check('just above the bubble is still the page', (await regions({ x: bb.x + 10, y: bb.y - 10 })).hit === 'page');
   const relaunch = ui.getByRole('button', { name: /Relaunch to update/ });
   await relaunch.waitFor({ timeout: 10000 });
   await settle(page);
@@ -629,13 +589,6 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
 
   check('no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();
-  await stopServer();
-  fs.rmSync(profile, { recursive: true, force: true });
   fs.rmSync(releases, { recursive: true, force: true });
-  console.log(failed ? `\n${failed} FAILED` : '\nall passed');
-  process.exit(failed ? 1 : 0);
-})().catch(async (e) => {
-  console.error(e);
-  server?.kill('SIGKILL');
-  process.exit(1);
-});
+  await lib.done();
+})();

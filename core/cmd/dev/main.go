@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,6 +30,7 @@ import (
 	"projectb/mockengine"
 	"projectb/profiles"
 	"projectb/shells"
+	"projectb/tabs"
 	"projectb/timeline"
 	"projectb/update"
 )
@@ -49,7 +51,7 @@ func rootOf(root, profile string) string {
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
+	addr := flag.String("addr", "127.0.0.1:8765", "listen address; port 0 takes a free one, which the server prints")
 	shellDir := flag.String("shell", "../shell/dist", "the built pages, one folder each")
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
@@ -256,7 +258,17 @@ func main() {
 				shell = append(shell, g.Rect)
 			}
 		}
-		out := map[string]any{"regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": l.Tabs, "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "page": e.PageOf(win), "shell": e.PageOf(win).Shell(), "focused": e.Focused(), "dock": e.DockColor(), "opened": opened.Load(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
+		// Go's own state of the window: its tabs in order, and the active one.
+		goTabs, active := []tabs.Tab{}, engine.TabID(0)
+		done := make(chan struct{})
+		e.Post(func() {
+			if a != nil && e.Open(win) {
+				goTabs, active = a.Tabs.AllIn(win), a.Tabs.ActiveIn(win)
+			}
+			close(done)
+		})
+		<-done
+		out := map[string]any{"tabs": goTabs, "active": active, "regions": shell, "drag": drag, "bounds": mockengine.Page(l), "visible": append([]engine.VisibleTab{}, l.Tabs...), "closed": e.Closed(win), "quit": e.Quit(), "windows": e.Windows(), "hidden": e.Hidden(win), "windowColor": l.FrameColor, "shownColor": e.ShownColor(), "frameWidth": l.FrameWidth, "settingsOpen": e.SettingsOpen(win), "page": e.PageOf(win), "shell": e.PageOf(win).Shell(), "focused": e.Focused(), "unshownFocus": e.UnshownFocus(), "dock": e.DockColor(), "opened": opened.Load(), "menu": e.Menu(), "edits": e.Edits(), "window": e.Reported(win)}
 		if q := r.URL.Query(); q.Has("x") {
 			x, _ := strconv.ParseFloat(q.Get("x"), 64)
 			y, _ := strconv.ParseFloat(q.Get("y"), 64)
@@ -269,8 +281,13 @@ func main() {
 		add(mux, e)
 	}
 
-	log.Printf("mock engine on http://%s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	// The address it got, which a test that asked for port 0 reads from this line.
+	l, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("mock engine on http://%s", l.Addr())
+	log.Fatal(http.Serve(l, mux))
 }
 
 // serve answers with one of the server's own pages.

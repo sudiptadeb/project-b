@@ -125,7 +125,9 @@ The check holds every shell to these, knowing nothing else about it.
 
 1. It says `ready`, draws the snapshot, and says `shown`.
 2. **The active tab's page shows,** after every change: a new tab, another made active, a
-   close, a tab a page opened, a resize.
+   close, a tab a page opened, a resize. It asks for a page's keyboard (`focusTab`) only once
+   the layout it sent shows that page: the window can't give the keyboard to a page it
+   hides, and no key reaches Go until something takes it.
 3. The pages it shows lie inside the window's frame, don't overlap, and are all tabs of
    this window.
 4. **Each tab of the window is an element with `role="tab"` and `data-tab="<id>"`,** the
@@ -209,16 +211,22 @@ against one shell, in a real browser on the mock engine; with no id it runs ever
 the registry. It ends with one line per rule, `ok` or `FAIL`.
 
 **The shell's own tests.** `shell/e2e/shells/<id>.cjs`, for what only this shell does: its
-panes, its menus, its keys. `shell/e2e/lib.cjs` starts the mock and has the helpers the
-other tests use: `check`, `until`, `regions`, the frames.
+panes, its menus, its keys. `shell/e2e/lib.cjs` starts the mock on a port of its own and a
+profile of its own, so tests run side by side, and has the helpers the other tests use:
+`check`, `until`, `settle`, `regions`, `fire`, and the window with its frames
+(`openWindow`). A test starts the mock with `-use=<id>`, and ends with `done()`.
 
 `tools/test.sh mock` runs the check and every shell's own tests with the rest.
 
 **What the mock tells a test.** `/mock/regions?window=<n>` answers with the last layout:
 `regions` and `drag`, `visible` (each shown tab and its rectangle), `shell` (the id of the
-shell the window loads), `focused` (the tab last given the keyboard), and what it had
-before. `/mock/fire` does what a page or the user can: `kind=menu` with an action's id
-runs it, `kind=focusTab` is a press in a tab's page.
+shell the window loads), `focused` (the tab last given the keyboard), `unshownFocus` (the
+tabs a shell asked to give the keyboard while no window showed them), Go's `tabs` and
+`active`, and what it had before; with `x` and `y`, `hit` says what a press there does.
+`/mock/fire` does what a page or the user can: `kind=menu` with an action's id runs it,
+`kind=focusTab` is a press in a tab's page, and each button of the mock page is a kind,
+acting on the tab `tab` names. `go run ./cmd/dev -addr=127.0.0.1:0` takes a free port and
+prints the address it got.
 
 ## What the real app adds
 

@@ -11,6 +11,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [profiles.md](profiles.md) and [profiles-build.md](profiles-build.md): profiles, each in a copy of the app of its own, the list beside their folders, templates, the Profiles menu, the picker, the Profile section in settings, and updates shared by every copy.
 - [windows.md](windows.md): several windows, each with its own shell and settings, and the list of tabs each one shows.
 - [workspaces.md](workspaces.md): workspaces, sets of tabs inside a profile with cookies and site storage of their own.
+- [shells.md](shells.md): several shells, each a folder on a kit every shell shares, chosen per profile and switched live; how to build one, and the check every shell passes on the mock engine.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.
@@ -25,7 +26,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 ## Daily commands
 
     tools/build-and-wait.sh                    # incremental build of out/pb
-    tools/test.sh mock                         # Go's tests, and the shell on the mock engine in Playwright
+    tools/test.sh mock                         # Go's tests, and the shells on the mock engine in Playwright, the contract check for each
     tools/test.sh app                          # the real app, by its driver and by ChromeDriver; no display
     tools/test.sh basics                       # one check per checklist area; most fail today, a map of gaps
     tools/test.sh screen                       # full screen, the clipboard, first paint; NEEDS A PERSON logged in at the screen

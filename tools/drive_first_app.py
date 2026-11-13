@@ -19,6 +19,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
     python3 tools/drive_first_app.py picker     # only the picker
     python3 tools/drive_first_app.py workspaces # only workspaces: their storage, and New Tab in Workspace
+    python3 tools/drive_first_app.py shells     # only every shell: starting on it, and switching to it live
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -1655,6 +1656,48 @@ def workspace_menu_checks():
     app.close()
 
 
+def shell_checks():
+    """What the real app adds to a shell's contract, for every shell in the registry
+    (docs/shells.md): a profile whose pref names it starts on it and marks app.ready, and
+    switching to it live, as View, Shell does, leaves the tabs loaded and shows the active
+    tab. The checks speak to each shell only as Go does, on the shell channel."""
+    registry = json.load(open(os.path.join(ROOT, "core/shells/registry.json")))
+
+    def on(shell):
+        profile = tempfile.mkdtemp(prefix="pb-profile-")
+        with open(os.path.join(profile, "prefs.json"), "w") as f:
+            json.dump({"shell": shell}, f)
+        return App(profile)
+
+    send = lambda app, msg: app.js(f"(chrome.send('shell',[{json.dumps(json.dumps(msg))}]),1)")
+    for shell in (s["id"] for s in registry):
+        # App waits for app.ready, which the shell's shown marks.
+        app = on(shell)
+        check(f"{shell}: a profile whose shell it is starts on it and marks app.ready",
+              app.js("location.href") == f"chrome://shell/{shell}/" and app.js(ROWS) == 1, app.js("location.href"))
+        app.close()
+
+        app = on(next(s["id"] for s in registry if s["id"] != shell))
+        send(app, {"t": "navigate", "text": PAGES + "first"})
+        app.wait("location.pathname==='/first'&&document.readyState==='complete'", 30, tab=1)
+        send(app, {"t": "newTab"})
+        app.wait(f"{ROWS}===2")
+        active = tabs_of(app)["active"]
+        send(app, {"t": "navigate", "text": PAGES + "second"})
+        app.wait("location.pathname==='/second'&&document.readyState==='complete'", 30, tab=active)
+        for tab in (1, active):
+            app.js("window.kept=1,1", tab=tab)
+        send(app, {"t": "run", "text": f"shells:{shell}"})
+        app.wait(f"location.href==='chrome://shell/{shell}/'&&{ROWS}===2", 30)
+        check(f"{shell}: switching to it live leaves the tabs loaded", all(app.js("window.kept", tab=tab) == 1 for tab in (1, active)))
+        deadline = time.time() + 10
+        shown = lambda: [v["tab"] for v in json.loads(app.cmd("visible")) if v["shown"] and not v["hidden"]]
+        while active not in shown() and time.time() < deadline:
+            time.sleep(0.05)
+        check(f"{shell}: and it shows the active tab", tabs_of(app)["active"] == active and active in shown(), (tabs_of(app), app.cmd("visible")))
+        app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1671,5 +1714,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks], "shells": [shell_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, shell_checks]))

@@ -147,15 +147,11 @@ How these are built is in [profiles-build.md](profiles-build.md).
 - A concept moves into Go, and becomes a contract between shells, only when every shell is
   expected to have it. Tab groups are a likely first. Defined when it comes up.
 
-**Proposed.**
-
-- *A shell is an app of its own,* as settings is: a folder under `shell/src/apps/`, built on
-  its own, speaking the same messages. Which one a profile loads is a pref, so a template
-  can set it.
-- *Go stores a shell's own data and never reads it:* one blob per profile, handed to the
-  shell when it loads and cleared when the shell changes or the profile is reset.
-- No second shell is part of this design. It makes the choice a pref and the messages the
-  contract.
+**Built,** as [shells.md](shells.md) says, which is where the design now lives: each shell
+a folder of `shell/src/apps/shell/`, built on a kit every shell shares and speaking the same
+messages; the registry of shells; the `shell` pref, which a template sets; a shell's own
+data, which Go keeps per window and never reads; and the check every shell passes on the
+mock engine.
 
 ## Our own pages
 

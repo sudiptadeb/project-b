@@ -30,6 +30,7 @@ function open(msg) {
           class="row tab"
           :class="{ active: tab.id === state.active }"
           role="tab"
+          :data-tab="tab.id"
           tabindex="0"
           :aria-selected="tab.id === state.active"
           @click="open({ t: 'activateTab', id: tab.id })"

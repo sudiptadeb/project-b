@@ -212,6 +212,26 @@ async function onRecordKey(e, action) {
   backToAdd();
 }
 
+// Remove and Reset take away the button that had focus once Go sends the new list. Focus
+// then goes to the Remove now in the removed one's place, or else to Add key.
+let refocus = null;
+function removeKey(a, k, e) {
+  refocus = [...document.querySelectorAll('.editor .remove')].indexOf(e.currentTarget);
+  send({ t: 'removeKey', id: a.id, index: k.index });
+}
+function resetAction(a) {
+  refocus = -1;
+  send({ t: 'resetAction', id: a.id });
+}
+watch(kb, async () => {
+  if (refocus === null) return;
+  const at = refocus;
+  refocus = null;
+  await nextTick();
+  const next = at >= 0 ? document.querySelectorAll('.editor .remove')[at] : null;
+  (next || addButton)?.focus();
+});
+
 // Leaving the section ends a recording and takes this page's Escape layers off.
 onUnmounted(() => {
   stopRecording();
@@ -308,9 +328,9 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               <button
                 v-if="!k.locked && !k.fromOS"
                 type="button"
-                class="text-button quiet"
-                :aria-label="`Remove ${k.keys}`"
-                @click="send({ t: 'removeKey', id: a.id, index: k.index })"
+                class="text-button quiet remove"
+                :aria-label="`Remove ${shown(k.keys, platform)}`"
+                @click="removeKey(a, k, $event)"
               >Remove</button>
             </div>
             <div v-if="taken" class="key-row">
@@ -351,7 +371,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
                   @change="send({ t: 'setHidden', id: a.id, on: !$event.target.checked })"
                 />
               </label>
-              <button type="button" class="text-button quiet" :disabled="kb.following" @click="send({ t: 'resetAction', id: a.id })">Reset</button>
+              <button type="button" class="text-button quiet" :disabled="!a.changed" @click="resetAction(a)">Reset</button>
             </div>
           </div>
         </template>

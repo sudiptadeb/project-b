@@ -53,7 +53,7 @@ function error(flag, text) {
         <button type="button" class="text-button" @click="send({ t: 'relaunch' })">Relaunch</button>
       </div>
       <div v-for="f in state.flags" :key="f.id" class="row">
-        <label class="label" :for="f.type === 'boolean' || f.type === 'enum' || !f.built ? 'flag-' + f.id : undefined">
+        <label class="label" :for="f.type === 'boolean' || f.type === 'enum' ? 'flag-' + f.id : undefined">
           <span class="name">
             {{ f.name }}
             <span v-if="!f.built" class="tag">Not in this build</span>

@@ -38,8 +38,8 @@ function close() {
   send({ t: 'close' });
 }
 
-// Escape closes, unless something on the page took Escape for itself: a key being
-// recorded, or a dialog.
+// Escape closes the page when nothing inside took it: a menu or a dialog takes it first
+// (ui/escape.js), a field puts its value back, and a key being recorded stops.
 function onKey(e) {
   if (e.key === 'Escape' && !e.defaultPrevented) close();
 }
@@ -52,7 +52,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
     <header class="header" :style="{ paddingLeft: headerStart }">
       <h1>Settings</h1>
       <button class="icon-button" type="button" aria-label="Close settings" title="Close settings" @click="close">
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 1l8 8M9 1L1 9"/></svg>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
       </button>
     </header>
     <div class="body">
@@ -174,7 +174,7 @@ h2 {
   align-items: center;
   gap: 16px;
   min-height: 48px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   box-sizing: border-box;
 }
 
@@ -188,65 +188,7 @@ h2 {
   font-weight: 500;
 }
 
-.nav-item:focus-visible,
-select:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-select {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: inherit;
-  font: inherit;
-}
-
-/* A switch drawn on the checkbox, which keeps its keys and its meaning. */
-.switch {
-  appearance: none;
-  position: relative;
-  flex: none;
-  width: 36px;
-  height: 20px;
-  margin: 0;
-  border: 1px solid var(--muted);
-  border-radius: 10px;
-  box-sizing: border-box;
-  background: transparent;
-  cursor: pointer;
-}
-
-.switch::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--muted);
-  transition: transform 120ms;
-}
-
-.switch:checked {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.switch:checked::before {
-  background: #fff;
-  transform: translateX(16px);
-}
-
-.switch:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.switch:focus-visible {
+.nav-item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

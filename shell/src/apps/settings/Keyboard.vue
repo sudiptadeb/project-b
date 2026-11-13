@@ -12,24 +12,20 @@ const kb = computed(() => state.keyboard);
 const platform = computed(() => kb.value.platform);
 
 // Who wins a key. Page first is the default, so the list leaves it unmarked; a key the
-// browser wins gets a tag after the keys.
+// browser wins gets its priority as a tag after the keys, the same words as the select.
 const priorities = [
-  { value: 'page', label: 'Page first', short: '' },
-  { value: 'windowed', label: 'Browser, except in full screen', short: 'Browser · not full screen' },
-  { value: 'always', label: 'Browser, always', short: 'Browser' },
+  { value: 'page', label: 'Page first' },
+  { value: 'windowed', label: 'Browser first, not in full screen' },
+  { value: 'always', label: 'Browser first' },
 ];
-const shortOf = (r) => priorities.find((p) => p.value === r)?.short ?? '';
+const priorityOf = (k) => (k.reserve === 'page' ? '' : priorities.find((p) => p.value === k.reserve)?.label ?? '');
 
-// The tags a row shows: one after all its keys when they agree, else one after each key
-// the browser wins.
+// The tags after a row's keys: one for all of them when they agree, else one after each
+// key that has one. Locked is a tag of its own.
 function shared(a) {
   if (!a.keys.length) return null;
-  const first = a.keys[0].reserve;
-  return a.keys.every((k) => k.reserve === first) ? first : null;
-}
-function tagText(k) {
-  const t = shortOf(k.reserve);
-  return k.locked && t ? 'Locked · ' + t : t;
+  const first = a.keys[0];
+  return a.keys.every((k) => k.reserve === first.reserve && k.locked === first.locked) ? first : null;
 }
 
 const templateNames = { 'project-b': 'Project B', chrome: 'Chrome' };
@@ -102,7 +98,12 @@ function onFilterEscape(e) {
 }
 
 // Escape closes the open editor before it closes the page, and focus goes back to its row.
+// Escape in a filter with text empties it first, as it would with no editor open.
 async function closeEditor() {
+  if (filter.value && document.activeElement?.classList.contains('filter')) {
+    filter.value = '';
+    return;
+  }
   const id = open.value;
   toggle(id);
   await nextTick();
@@ -332,15 +333,21 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
         <template v-for="a in g.actions" :key="a.id">
           <button :id="'action-' + a.id" type="button" class="action" :aria-expanded="open === a.id" @click="toggle(a.id)">
             <span class="name">
-              {{ a.title }}
+              <span class="title" :title="a.title">{{ a.title }}</span>
               <span v-if="a.hidden" class="tag">Hidden</span>
             </span>
             <span class="keys">
               <template v-for="k in a.keys" :key="k.index + k.keys">
                 <kbd :class="{ clash: k.clash }" :title="k.clash ? `Also ${k.clash}'s, which wins it` : ''">{{ shown(k.keys, platform) }}</kbd>
-                <span v-if="shared(a) === null && tagText(k)" class="tag" :class="{ locked: k.locked }">{{ tagText(k) }}</span>
+                <template v-if="!shared(a)">
+                  <span v-if="k.locked" class="tag">Locked</span>
+                  <span v-if="priorityOf(k)" class="tag">{{ priorityOf(k) }}</span>
+                </template>
               </template>
-              <span v-if="shared(a) !== null && tagText(a.keys[0])" class="tag" :class="{ locked: a.keys[0].locked }">{{ tagText(a.keys[0]) }}</span>
+              <template v-if="shared(a)">
+                <span v-if="shared(a).locked" class="tag">Locked</span>
+                <span v-if="priorityOf(shared(a))" class="tag">{{ priorityOf(shared(a)) }}</span>
+              </template>
             </span>
             <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
           </button>
@@ -348,15 +355,15 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
           <div v-if="open === a.id" class="editor" :aria-label="`Edit ${a.title}`">
             <div v-for="k in a.keys" :key="'e' + k.index + k.keys" class="key-row">
               <kbd>{{ shown(k.keys, platform) }}</kbd>
-              <span v-if="k.locked" class="note">Locked</span>
-              <span v-else-if="k.fromOS" class="note">Set in macOS</span>
+              <span v-if="k.locked" class="tag">Locked</span>
+              <span v-else-if="k.fromOS" class="tag">Set in macOS</span>
               <span v-if="k.clash" class="note problem">
                 Also <button type="button" class="link" @click="goTo(k.clashID)">{{ k.clash }}</button>'s, which wins it
               </span>
               <span class="spacer"></span>
               <select
                 v-if="!k.locked"
-                :aria-label="`Priority of ${k.keys}`"
+                :aria-label="`Priority of ${shown(k.keys, platform)}`"
                 :value="k.reserve"
                 @change="send({ t: 'setReserve', id: a.id, index: k.index, reserve: $event.target.value })"
               >
@@ -379,7 +386,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               <button v-if="replaceable(taken)" id="taken-answer" type="button" class="text-button" @click="replace(a)">Replace</button>
               <button :id="replaceable(taken) ? undefined : 'taken-answer'" type="button" class="text-button" @click="backToAdd">Cancel</button>
             </div>
-            <div v-else class="key-row">
+            <div v-else class="key-row add">
               <template v-if="recording">
                 <input
                   :ref="(el) => (recorder = el)"
@@ -396,7 +403,8 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               </template>
               <button v-else :ref="(el) => (addButton = el)" type="button" class="text-button" @click="record">Add key</button>
               <span class="spacer"></span>
-              <label class="menu-switch">
+              <span v-if="a.locked" class="tag">Always in menu</span>
+              <label v-else class="menu-switch">
                 In menu
                 <input
                   type="checkbox"
@@ -404,7 +412,6 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
                   class="switch"
                   :aria-label="`${a.title} in the menu`"
                   :checked="!a.hidden"
-                  :disabled="a.locked"
                   @change="send({ t: 'setHidden', id: a.id, on: !$event.target.checked })"
                 />
               </label>
@@ -425,24 +432,37 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 </template>
 
 <style scoped>
-/* One grid for every row: the action, its keys with any tags, and the chevron. */
-.action {
-  display: grid;
-  grid-template-columns: 220px 1fr 16px;
-  align-items: center;
-  column-gap: 16px;
+/* The card clips its rows' hover and open colour to its corners, and its width decides
+   the columns below. */
+.card {
+  overflow: hidden;
+  container-type: inline-size;
 }
 
+/* One grid for every row: the action, its keys with any tags, and the chevron. The name
+   column gives way first, so a narrow page wraps the tags rather than overflowing. */
 .action {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 16px;
+  align-items: center;
+  column-gap: 16px;
   width: 100%;
   min-height: 40px;
-  padding: 6px 14px;
+  padding: 8px 16px;
+  box-sizing: border-box;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* On a narrow card the keys take the larger share, so a priority tag fits on its line. */
+@container (max-width: 560px) {
+  .action {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 16px;
+  }
 }
 
 .action + .action,
@@ -470,42 +490,37 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
   transform: rotate(90deg);
 }
 
-.card > .action:first-child {
-  border-radius: 8px 8px 0 0;
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
-.card > .action:last-child {
-  border-radius: 0 0 8px 8px;
+/* A long name is one line with an ellipsis, the whole of it in the tooltip. */
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .keys {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.keys .tag {
-  margin-left: 0;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--text);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.keys .tag.locked {
-  background: none;
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-
 kbd {
-  display: inline-block;
-  padding: 1px 7px;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 4px;
+  box-sizing: border-box;
   background: var(--bar);
   font: inherit;
   font-size: 13px;
@@ -516,14 +531,8 @@ kbd.clash {
   border-color: var(--danger);
 }
 
-.tag {
-  margin-left: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .editor {
-  padding: 4px 14px 10px 14px;
+  padding: 4px 16px 8px;
   border-top: 1px solid var(--line);
   background: var(--accent-tint);
 }
@@ -531,8 +540,20 @@ kbd.clash {
 .key-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
+  gap: 8px;
+  min-height: 40px;
+}
+
+/* On a narrow page the priority select gives way, so Remove stays on its key's line; the
+   last row wraps instead, its error under the recorder. */
+.key-row select {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.key-row.add {
+  flex-wrap: wrap;
 }
 
 .spacer {

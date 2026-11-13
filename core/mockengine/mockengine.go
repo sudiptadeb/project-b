@@ -623,6 +623,9 @@ func (e *Engine) Fire(w engine.WindowID, kind, value string) {
 			}
 		case "favicon":
 			e.listener.FaviconChanged(shown, value)
+		case "menu":
+			// A menu bar item chosen, by its action id, as the real menu bar says.
+			e.listener.MenuChosen(value)
 		case "open":
 			// What a page's target=_blank or window.open does: the engine makes the
 			// tab, in the page's workspace, tells the app, then loads it.

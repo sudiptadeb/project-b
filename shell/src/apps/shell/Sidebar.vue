@@ -1,7 +1,7 @@
 <script setup>
 import { send } from '@/bridge.js';
 import { shown } from '@/keys.js';
-import { state, tabLabel } from './state.js';
+import { state, tabLabel, workspaceOf } from './state.js';
 
 // As the phone's drawer, choosing a tab or opening a new one closes it; closing a tab
 // leaves it open for the next.
@@ -40,6 +40,7 @@ function open(msg) {
             <img v-if="tab.favicon" :src="tab.favicon" alt="" width="16" height="16" />
           </span>
           <span class="title" :class="{ muted: !tab.title }">{{ tabLabel(tab) }}</span>
+          <span v-if="workspaceOf(tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(tab).name}`" :title="workspaceOf(tab).name" :style="{ background: workspaceOf(tab).color }"></span>
           <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
           </button>
@@ -165,6 +166,15 @@ function open(msg) {
 
 .title.muted {
   color: var(--muted);
+}
+
+/* The workspace a tab is in, as a dot in its colour. */
+.workspace {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px;
+  border-radius: 50%;
 }
 
 .hint {

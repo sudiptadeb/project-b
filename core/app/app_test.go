@@ -954,3 +954,25 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 		t.Fatal("a visit in a workspace isn't in the history")
 	}
 }
+
+// Every shell has the workspaces from its snapshot on, and hears of one made or renamed at
+// once, so the dot on a tab in one is in its colour.
+func TestTheShellHearsTheWorkspaces(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 0 {
+		t.Fatalf("the snapshot's workspaces: %v", snap["workspaces"])
+	}
+	r.e.Post(func() { r.a.Workspaces.Create("Work", "#5b7fd6") })
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" })
+	w := m["workspaces"].([]any)[0].(map[string]any)
+	if w["name"] != "Work" || w["color"] != "#5b7fd6" || w["id"] == "" {
+		t.Fatalf("the shell heard %v", m)
+	}
+	r.e.Post(func() { r.a.Workspaces.SetName(w["id"].(string), "Office") })
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" })
+	if m["workspaces"].([]any)[0].(map[string]any)["name"] != "Office" {
+		t.Fatalf("after the rename the shell heard %v", m)
+	}
+}

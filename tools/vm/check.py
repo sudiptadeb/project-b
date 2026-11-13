@@ -805,6 +805,45 @@ def profile_checks():
     guest("/usr/bin/killall", "project_b")
 
 
+WORK_DOT = (194, 65, 12)  # The colour workspace_checks gives Work.
+
+
+def workspace_checks():
+    """Workspaces on a real screen: Tab, New Tab in Workspace opens on the workspaces the
+    profile lists, read as the menu opens, and a tab opened from it shows a dot in its
+    workspace's colour, with the tabs on the side and on top. The list is written as
+    Settings, Workspaces writes it."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    listed = {"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#c2410c"}, {"id": "4e5f6a7b", "name": "Shopping", "color": "#7c3aed"}]}
+    guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {PROFILE}/workspaces.json", "sh", json.dumps(listed))
+    launch()
+    time.sleep(1.5)
+    win = window_or_stop("the app starts on its first profile")
+    open_menu("Tab")
+    item = 'menu item "New Tab in Workspace" of menu "Tab" of menu bar item "Tab" of menu bar 1'
+    x, y, w, h = map(float, in_front(f"get {{position, size}} of {item}").split(","))
+    desk.click(x + w / 2, y + h / 2)
+    time.sleep(0.6)
+    names = [n.strip() for n in in_front(f'get name of every menu item of menu "New Tab in Workspace" of {item}').split(",")]
+    shot("p4-tab-menu-workspaces")
+    check("Tab, New Tab in Workspace lists the profile's workspaces", [n for n in names if n != "missing value"] == ["Work", "Shopping"], str(names))
+    x, y, w, h = map(float, in_front(f'get {{position, size}} of menu item "Work" of menu "New Tab in Workspace" of {item}').split(","))
+    desk.click(x + w / 2, y + h / 2)
+    time.sleep(1)
+    shot("p4-dots-side")
+    sidebar = crop(desk.image(), win[0], win[1] + 40, 220, 200)
+    check("a tab opened in Work shows Work's dot, with the tabs on the side", near(sidebar, WORK_DOT, 24).sum() > 4)
+    open_menu("View")
+    x, y, w, h = map(float, in_front('get {position, size} of menu item "Tabs on Top" of menu "View" of menu bar item "View" of menu bar 1').split(","))
+    desk.click(x + w / 2, y + h / 2)
+    time.sleep(1)
+    shot("p4-dots-top")
+    strip = crop(desk.image(), win[0], win[1], win[2], 40)
+    check("and with the tabs on top", near(strip, WORK_DOT, 24).sum() > 4)
+    guest("/usr/bin/killall", "project_b")
+
+
 PICK = "/tmp/pb-pick"  # In the guest: the picker's driver pipe and output, for picker_checks.
 
 
@@ -973,6 +1012,12 @@ if sys.argv[1:] == ["update"]:
         update_checks()
     finally:
         save_update_logs()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
+
+# "check.py workspaces" runs only the checks of workspaces.
+if sys.argv[1:] == ["workspaces"]:
+    workspace_checks()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 
@@ -1442,5 +1487,6 @@ move_checks()
 state_checks()
 profile_checks()
 picker_checks()
+workspace_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

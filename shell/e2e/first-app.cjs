@@ -573,6 +573,34 @@ const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimation
   check('the running release keeps working', (await bar.inputValue()) === 'https://example.org/');
   releaseServer.close();
 
+  // A tab in a workspace shows a dot in the workspace's colour, in both layouts; a tab in
+  // the default workspace shows none. The tab is opened as Tab, New Tab in Workspace does.
+  await stopServer();
+  fs.writeFileSync(path.join(profile, 'workspaces.json'), JSON.stringify({ workspaces: [{ id: '0a1b2c3d', name: 'Work', color: '#5b7fd6' }] }));
+  await startServer();
+  await page.goto(base + '/');
+  errors.length = 0;
+  await ui.locator('nav [role=tab]').first().waitFor();
+  await fetch(`${base}/mock/fire`, { method: 'POST', body: new URLSearchParams({ kind: 'menu', value: 'workspaces:0a1b2c3d' }) });
+  const sideRows = ui.locator('nav [role=tab]');
+  await until(async () => (await sideRows.count()) === 2);
+  const dotColor = (row) => row.locator('.workspace').evaluate((e) => getComputedStyle(e).backgroundColor);
+  check('a tab in a workspace shows a dot in its colour, with the tabs on the side',
+    (await sideRows.nth(1).locator('.workspace').count()) === 1 && (await dotColor(sideRows.nth(1))) === 'rgb(91, 127, 214)' &&
+      (await sideRows.nth(1).locator('.workspace').getAttribute('aria-label')) === 'In Work');
+  check('a tab in the default workspace shows none, with the tabs on the side', (await sideRows.first().locator('.workspace').count()) === 0);
+  await settle(page);
+  await page.screenshot({ path: path.join(out, '11-workspace-dot-side.png') });
+  await ui.getByRole('button', { name: 'Tabs on top' }).click();
+  await ui.locator('.strip').waitFor();
+  const topRows = ui.locator('.strip [role=tab]');
+  check('and with the tabs on top', (await topRows.nth(1).locator('.workspace').count()) === 1 && (await dotColor(topRows.nth(1))) === 'rgb(91, 127, 214)');
+  check('where the default workspace\'s tab shows none', (await topRows.first().locator('.workspace').count()) === 0);
+  await settle(page);
+  await page.screenshot({ path: path.join(out, '12-workspace-dot-top.png') });
+  await ui.getByRole('button', { name: 'Tabs on the side' }).click();
+  await ui.locator('nav').waitFor();
+
   check('no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();
   await stopServer();

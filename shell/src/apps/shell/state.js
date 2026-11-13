@@ -40,6 +40,9 @@ export const state = reactive({
   // The platform, as the keymap names it, and the key each action shows, by action id.
   platform: 'mac',
   keys: {},
+  // The profile's workspaces, each with its id, name and colour. A tab in one shows a dot
+  // in its colour; the default workspace isn't among them.
+  workspaces: [],
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
   // macOS's report of that crash, or the folder it keeps its reports in.
@@ -57,6 +60,11 @@ export const activeTab = computed(() => state.tabs.find((t) => t.id === state.ac
 export function focusPage() {
   measureNow();
   send({ t: 'focusTab', id: state.active });
+}
+
+// workspaceOf is the workspace a tab is in, or undefined for the default one.
+export function workspaceOf(tab) {
+  return state.workspaces.find((w) => w.id === tab.workspace);
 }
 
 // tabLabel is what a tab's row or strip entry says: the title, else the host while the
@@ -114,6 +122,7 @@ export function connect() {
           state.crashReport = m.crashReport;
           state.platform = m.platform;
           state.keys = m.keys;
+          state.workspaces = m.workspaces;
           mark('shell.snapshot');
           // Once the page shows it, and Go has its regions to route clicks, Go marks the
           // app ready.
@@ -147,6 +156,9 @@ export function connect() {
         }
         case 'theme':
           state.theme = m.theme;
+          break;
+        case 'workspaces':
+          state.workspaces = m.workspaces;
           break;
         case 'tabLayout':
           state.tabLayout = m.tabLayout;

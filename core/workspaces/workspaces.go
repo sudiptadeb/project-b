@@ -63,8 +63,9 @@ func New(dir string) *Manager {
 	return m
 }
 
-// List returns a copy of the workspaces, in the order they were made.
-func (m *Manager) List() []Workspace { return slices.Clone(m.list) }
+// List returns a copy of the workspaces, in the order they were made: none is an empty
+// list, never nil, so it goes to a page as [].
+func (m *Manager) List() []Workspace { return append([]Workspace{}, m.list...) }
 
 // OnChanged subscribes to a workspace being made or renamed.
 func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }

@@ -87,6 +87,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Commands.RegisterList(a.profileList(cfg))
 	a.Commands.RegisterList(a.workspaceList())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
+	a.Shell.AddPart(a.workspaceShellPart())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
 	a.registerActions(e)
@@ -114,6 +115,11 @@ func Start(e engine.Engine, cfg Config) *App {
 		})
 		a.Settings.AddPart(a.profileSettingsPart(cfg.Profiles, cfg.Profile))
 	}
+	// A workspace made or renamed reaches every shell at once, for the dots; the Tab menu
+	// reads the list as it opens.
+	a.Workspaces.OnChanged(func() {
+		a.Shell.Send(map[string]any{"t": "workspaces", "workspaces": a.Workspaces.List()})
+	})
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
 	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)

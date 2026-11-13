@@ -1,7 +1,7 @@
 <script setup>
 import { send } from '@/bridge.js';
 import { shown } from '@/keys.js';
-import { controlSpace as controls, state, tabLabel } from './state.js';
+import { controlSpace as controls, state, tabLabel, workspaceOf } from './state.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,
 // leaves the native window controls their space, and its empty parts drag the window.
@@ -28,6 +28,7 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
       </svg>
       <img v-if="tab.favicon" class="icon" :src="tab.favicon" alt="" width="16" height="16" />
       <span class="title">{{ tabLabel(tab) }}</span>
+      <span v-if="workspaceOf(tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(tab).name}`" :title="workspaceOf(tab).name" :style="{ background: workspaceOf(tab).color }"></span>
       <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
       </button>
@@ -105,8 +106,18 @@ import { controlSpace as controls, state, tabLabel } from './state.js';
 
 .icon,
 .title,
+.workspace,
 .close {
   position: relative;
+}
+
+/* The workspace a tab is in, as a dot in its colour. */
+.workspace {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px;
+  border-radius: 50%;
 }
 
 .icon {

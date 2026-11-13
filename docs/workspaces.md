@@ -52,6 +52,13 @@ the order of building at the end says which steps are done.
   front. With no workspaces the item is disabled: the engine reads a submenu's lists when
   the menu holding it opens, and disables the submenu while they hold nothing
   (`engine/browser/mac_app.mm`). Nothing in the app makes a workspace yet but the file.
+- A tab in a workspace shows a small dot in the workspace's colour after its title, in the
+  sidebar and in the strip on top, named for the workspace to a screen reader. A tab in the
+  default workspace, or in one the list doesn't hold, shows none. Every shell has the list
+  in its snapshot, and hears it again, `{"t": "workspaces", "workspaces": [...]}`, when a
+  workspace is made or renamed, so the dots follow at once (`core/app/workspaces.go`,
+  `shell/src/apps/shell/`). The mock's page fires a menu item by its action, as the menu
+  bar does (`/mock/fire`, kind `menu`).
 
 ## Decided
 
@@ -113,7 +120,7 @@ Each commit builds, leaves a working app, and carries its tests.
 2. Done. The link that opens a new tab without an opener stays in its workspace.
 3. Done. Go: the workspace list in the profile, tabs carrying their workspace, the Tab
    menu's list.
-4. The shell: the dot on a tab.
+4. Done. The shell: the dot on a tab.
 5. Settings: the Workspaces section.
 
 ## Decided while building

@@ -92,7 +92,7 @@ profile with no incognito, kiosk, guest or policy side, most answers are one lin
 | `browser/extensions.cc` | The runtime as Go sees it: every call of `PBExtensionCalls` lands here. It makes `//extensions`' prefs and services for the profile, loads what is installed at start, installs through `CrxInstaller` and `UnpackedInstaller`, and is the registrar's delegate |
 | `browser/extensions_browser_client.cc` | The main-process answers, and the small delegates: background pages, `chrome.runtime`, an extension's own pages |
 | `browser/extension_system.cc` | The services `//extensions` expects one object to own: stores, the service worker and user script managers, quotas |
-| `browser/content_hooks.cc` | The content hooks: an extension's pages in a process of their own, the `chrome-extension:` scheme's loader factories, the Mojo interfaces, and the place in front of the network that `declarativeNetRequest` and `webRequest` need |
+| `browser/content_hooks.cc` | The content hooks: an extension's pages in a process of their own, the `chrome-extension:` scheme's loader factories, the Mojo interfaces, and the place in front of the network that `declarativeNetRequest` and `webRequest` need. Each is for the profile's context only: our pages' context has no extensions |
 | `browser/go_function.cc` | The one extension function, below |
 | `browser/api_client.cc` | Which tab a message came from, and the count of blocked requests |
 | `browser/web_contents_observer.cc` | Per page: which extension a frame belongs to, and `chrome.scripting` in a tab |

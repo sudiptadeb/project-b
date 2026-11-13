@@ -1,8 +1,8 @@
 # Several profiles, and how the app starts on one
 
 A design note, 2026-11-13, for the third step of [profiles.md](profiles.md), with the
-owner's decisions. Built for macOS; Android keeps its one profile. Nothing here is built
-yet; "Today" is the app before this step.
+owner's decisions. Built for macOS; Android keeps its one profile. "Today" is the app as
+built so far, and the order of building at the end says which steps are done.
 
 ## Today
 
@@ -15,7 +15,13 @@ yet; "Today" is the app before this step.
   second copy on another folder, and nothing lists folders.
 - The update state lives in the profile folder, and "relaunch to update" swaps the
   installed app and restarts this one copy (`core/update`).
-- The shell, settings and every tab share the profile's one browser context.
+- Our pages, the shells and the settings pages, load in a context of their own, off the
+  record and with no folder, made before the profile's
+  (`engine/browser/browser_main_parts.mm`). They are registered only there, so in the
+  profile's context, where the tabs, extension pages and popups are, their addresses load
+  nothing; Go's gate still refuses the shell's address in a tab too. The extension hooks
+  serve the profile's context only. DevTools' front end is not one of our pages: the app
+  has none, only the endpoint. On Android the shell and the tabs keep one context.
 
 ## What changes
 
@@ -88,7 +94,7 @@ back with a new tab, as a relaunch does today.
 
 Each commit builds, leaves a working app, and carries its tests.
 
-1. Our own pages in the off-the-record context.
+1. Done. Our own pages in the off-the-record context.
 2. The profile list beside the folders, and the start choosing the profile: named, else
    used last, else a first one.
 3. Templates, Personal and Work; the first profile is made from Personal.

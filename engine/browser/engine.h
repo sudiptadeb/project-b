@@ -49,8 +49,11 @@ class Engine {
     int64_t focused_tab = 0;
   };
 
-  // quit ends the app.
-  Engine(content::BrowserContext* browser_context, base::RepeatingClosure quit);
+  // Our pages (the shells and settings pages) load in pages_context, and the tabs in the
+  // profile's browser_context. quit ends the app.
+  Engine(content::BrowserContext* pages_context,
+         content::BrowserContext* browser_context,
+         base::RepeatingClosure quit);
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
   ~Engine();
@@ -67,6 +70,7 @@ class Engine {
   // The table handed to Go. Lives as long as the process.
   static const PBEngineCalls* Calls();
 
+  content::BrowserContext* pages_context() const { return pages_context_; }
   content::BrowserContext* browser_context() const { return browser_context_; }
   // A window by Go's id, or null for one that isn't open.
   AppWindow* window(int64_t id) const;
@@ -140,6 +144,7 @@ class Engine {
   // back.
   void WindowMinimised(int64_t id, bool minimised);
 
+  const raw_ptr<content::BrowserContext> pages_context_;
   const raw_ptr<content::BrowserContext> browser_context_;
   const base::RepeatingClosure quit_;
   std::map<int64_t, std::unique_ptr<AppWindow>> windows_;

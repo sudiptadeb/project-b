@@ -8,9 +8,14 @@
 
 namespace project_b {
 
-// The profile content asks for. The first app says no to everything optional.
+// A context content asks for: a profile's, kept in its folder, or the one our own pages
+// load in, which has no folder and is off the record, so content keeps its storage in
+// memory. The first app says no to everything optional.
 class BrowserContext : public content::BrowserContext {
  public:
+  // Our pages' context.
+  BrowserContext();
+  // A profile's, with Chromium's files in path.
   explicit BrowserContext(const base::FilePath& path);
   BrowserContext(const BrowserContext&) = delete;
   BrowserContext& operator=(const BrowserContext&) = delete;

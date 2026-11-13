@@ -2,6 +2,8 @@
 
 namespace project_b {
 
+BrowserContext::BrowserContext() = default;
+
 BrowserContext::BrowserContext(const base::FilePath& path) : path_(path) {}
 
 BrowserContext::~BrowserContext() {
@@ -18,8 +20,9 @@ base::FilePath BrowserContext::GetPath() const {
   return path_;
 }
 
+// Only our pages' context has no folder.
 bool BrowserContext::IsOffTheRecord() {
-  return false;
+  return path_.empty();
 }
 
 content::DownloadManagerDelegate* BrowserContext::GetDownloadManagerDelegate() {

@@ -280,8 +280,9 @@ void Eval(const std::string& id, content::WebContents* contents, const std::stri
       /*world_id=*/0);
 }
 
-// A WebContents that is neither the shell nor a tab, holding chrome://shell/: a copy of
-// the shell that got past the gate, which only sees tabs.
+// A WebContents that is neither the shell nor a tab, asked for chrome://shell/: a copy of
+// the shell that got past the gate, which only sees tabs. It is in our pages' context, or
+// in the profile's, where the tabs are.
 std::unique_ptr<content::WebContents>& Stray() {
   static base::NoDestructor<std::unique_ptr<content::WebContents>> stray;
   return *stray;
@@ -676,8 +677,11 @@ void Run(const std::string& line) {
             },
             id));
   } else if (cmd == "strayshell") {
+    // "strayshell pages" or "strayshell tabs": which context it is in.
+    Engine* engine = Engine::Get();
     Stray() = content::WebContents::Create(content::WebContents::CreateParams(
-        Current()->shell->contents()->GetBrowserContext()));
+        parts.size() > 2 && parts[2] == "tabs" ? engine->browser_context()
+                                               : engine->pages_context()));
     Stray()->GetController().LoadURLWithParams(
         content::NavigationController::LoadURLParams(GURL("chrome://shell/")));
     AskStrayShell(id, 100);

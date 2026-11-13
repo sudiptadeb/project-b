@@ -57,6 +57,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   timeline::Mark("content.ready");
 
   screen_ = std::make_unique<display::ScopedNativeScreen>();
+  // Our pages' context comes first, and only it can load them.
+  pages_context_ = std::make_unique<BrowserContext>();
+  RegisterShellWebUI(pages_context_.get());
   CHECK(base::CreateDirectory(ChromiumDataDir()));
   browser_context_ = std::make_unique<BrowserContext>(ChromiumDataDir());
 #if BUILDFLAG(PB_EXTENSIONS)
@@ -66,16 +69,15 @@ int BrowserMainParts::PreMainMessageLoopRun() {
     extensions_ = std::make_unique<Extensions>(browser_context_.get());
   }
 #endif
-  RegisterShellWebUI(browser_context_.get());
 
   // Quitting ends the run loop on a later task, so whatever asked for it returns first.
   engine_ = std::make_unique<Engine>(
-      browser_context_.get(), base::BindRepeating(
-                                  [](base::RepeatingClosure* quit) {
-                                    content::GetUIThreadTaskRunner({})->PostTask(
-                                        FROM_HERE, *quit);
-                                  },
-                                  &quit_));
+      pages_context_.get(), browser_context_.get(),
+      base::BindRepeating(
+          [](base::RepeatingClosure* quit) {
+            content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE, *quit);
+          },
+          &quit_));
 
   Go().start(Engine::Calls(), ProfileDir().value().c_str(),
              command_line->GetSwitchValueASCII("block").c_str(),
@@ -104,6 +106,7 @@ void BrowserMainParts::PostMainMessageLoopRun() {
   extensions_.reset();
 #endif
   browser_context_.reset();
+  pages_context_.reset();
   screen_.reset();
 }
 

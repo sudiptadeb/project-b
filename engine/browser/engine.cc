@@ -278,9 +278,12 @@ void CallPostWakeup() {
 Engine::AppWindow::AppWindow(int64_t id) : id(id) {}
 Engine::AppWindow::~AppWindow() = default;
 
-Engine::Engine(content::BrowserContext* browser_context,
+Engine::Engine(content::BrowserContext* pages_context,
+               content::BrowserContext* browser_context,
                base::RepeatingClosure quit)
-    : browser_context_(browser_context), quit_(std::move(quit)) {
+    : pages_context_(pages_context),
+      browser_context_(browser_context),
+      quit_(std::move(quit)) {
   CHECK(!g_engine);
   g_engine = this;
 }
@@ -445,7 +448,7 @@ void Engine::CreateWindow(int64_t id,
   if (AppWindow* other = window(near)) {
     w->window->PlaceNear(other->window.get());
   }
-  w->shell = std::make_unique<ShellPage>(browser_context_, id);
+  w->shell = std::make_unique<ShellPage>(pages_context_, id);
   timeline::Mark("shell.created");
 #if BUILDFLAG(IS_ANDROID)
   w->window->SetShellContents(w->shell->contents());
@@ -725,7 +728,7 @@ void Engine::OpenSettings(int64_t window) {
   if (w->settings) {
     return;
   }
-  w->settings = std::make_unique<SettingsPage>(browser_context_);
+  w->settings = std::make_unique<SettingsPage>(pages_context_);
   timeline::Mark("settings.open.created");
 #if BUILDFLAG(IS_ANDROID)
   w->window->SetOverlayContents(w->settings->contents());

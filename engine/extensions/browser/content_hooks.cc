@@ -39,11 +39,23 @@ namespace project_b {
 
 namespace {
 
+// Extensions belong to the profile's context. Our pages' context has none, and nothing
+// of theirs is set up for its pages or processes.
+bool HasExtensions(content::BrowserContext* browser_context) {
+  return extensions::ExtensionsBrowserClient::Get()->IsValidContext(
+      browser_context);
+}
+
+bool HasExtensions(content::RenderProcessHost* process) {
+  return HasExtensions(process->GetBrowserContext());
+}
+
 // The enabled extension a site belongs to, or null.
 const extensions::Extension* ExtensionFor(
     content::BrowserContext* browser_context,
     const content::SecurityPrincipal& security_principal) {
-  if (!security_principal.SchemeIs(extensions::kExtensionScheme)) {
+  if (!HasExtensions(browser_context) ||
+      !security_principal.SchemeIs(extensions::kExtensionScheme)) {
     return nullptr;
   }
   return extensions::ExtensionRegistry::Get(browser_context)
@@ -72,9 +84,10 @@ void ExtensionsContentBrowserClient::SiteInstanceGotProcessAndSite(
 bool ExtensionsContentBrowserClient::DoesSiteRequireDedicatedProcess(
     content::BrowserContext* browser_context,
     const GURL& effective_site_url) {
-  return extensions::ExtensionRegistry::Get(browser_context)
-             ->enabled_extensions()
-             .GetExtensionOrAppByURL(effective_site_url) != nullptr ||
+  return (HasExtensions(browser_context) &&
+          extensions::ExtensionRegistry::Get(browser_context)
+                  ->enabled_extensions()
+                  .GetExtensionOrAppByURL(effective_site_url) != nullptr) ||
          ContentBrowserClientHooks::DoesSiteRequireDedicatedProcess(
              browser_context, effective_site_url);
 }
@@ -91,6 +104,10 @@ bool ExtensionsContentBrowserClient::IsSuitableHost(
     content::RenderProcessHost* process_host,
     const content::SecurityPrincipal& security_principal) {
   content::BrowserContext* context = process_host->GetBrowserContext();
+  if (!HasExtensions(context)) {
+    return ContentBrowserClientHooks::IsSuitableHost(process_host,
+                                                     security_principal);
+  }
   extensions::ProcessMap* process_map = extensions::ProcessMap::Get(context);
   const extensions::Extension* extension =
       ExtensionFor(context, security_principal);
@@ -103,6 +120,9 @@ bool ExtensionsContentBrowserClient::IsSuitableHost(
 bool ExtensionsContentBrowserClient::CanCommitURL(content::RenderProcessHost* process_host,
                                         const GURL& url) {
   content::BrowserContext* context = process_host->GetBrowserContext();
+  if (!HasExtensions(context)) {
+    return ContentBrowserClientHooks::CanCommitURL(process_host, url);
+  }
   const extensions::Extension* extension =
       extensions::ExtensionRegistry::Get(context)
           ->enabled_extensions()
@@ -140,14 +160,17 @@ bool ExtensionsContentBrowserClient::ShouldUseSpareRenderProcessHost(
 void ExtensionsContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
+  content::RenderProcessHost* process =
+      content::RenderProcessHost::FromID(child_process_id);
+  if (process && !HasExtensions(process)) {
+    return;
+  }
   // A renderer has to know which origin is the store to give its page the store's API.
   static const char* const kStoreSwitches[] = {
       extensions::switches::kAppsGalleryURL};
   command_line->AppendSwitch(kExtensionsSwitch);
   command_line->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
                                  kStoreSwitches);
-  content::RenderProcessHost* process =
-      content::RenderProcessHost::FromID(child_process_id);
   if (process &&
       extensions::ProcessMap::Get(process->GetBrowserContext())
           ->GetEnabledExtensionByProcessID(process->GetID())) {
@@ -159,6 +182,9 @@ void ExtensionsContentBrowserClient::ExposeInterfacesToRenderer(
     service_manager::BinderRegistry* registry,
     blink::AssociatedInterfaceRegistry* associated_registry,
     content::RenderProcessHost* render_process_host) {
+  if (!HasExtensions(render_process_host)) {
+    return;
+  }
   associated_registry->AddInterface<extensions::mojom::RendererHost>(
       base::BindRepeating(&extensions::RendererStartupHelper::BindForRenderer,
                           render_process_host->GetID()));
@@ -173,6 +199,9 @@ void ExtensionsContentBrowserClient::RegisterAssociatedInterfaceBindersForRender
   ContentBrowserClientHooks::
       RegisterAssociatedInterfaceBindersForRenderFrameHost(render_frame_host,
                                                            associated_registry);
+  if (!HasExtensions(render_frame_host.GetProcess())) {
+    return;
+  }
   const content::ChildProcessId process =
       render_frame_host.GetProcess()->GetID();
   associated_registry.AddInterface<extensions::mojom::RendererHost>(
@@ -265,6 +294,11 @@ void ExtensionsContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFacto
     int render_frame_id,
     const std::optional<url::Origin>& request_initiator_origin,
     NonNetworkURLLoaderFactoryMap* factories) {
+  content::RenderProcessHost* process = content::RenderProcessHost::FromID(
+      content::ChildProcessId::FromUnsafeValue(render_process_id));
+  if (!HasExtensions(process)) {
+    return;
+  }
   factories->emplace(
       extensions::kExtensionScheme,
       extensions::CreateExtensionURLLoaderFactory(
@@ -291,6 +325,9 @@ void ExtensionsContentBrowserClient::WillCreateURLLoaderFactory(
     network::mojom::URLLoaderFactoryOverridePtr* factory_override,
     scoped_refptr<base::SequencedTaskRunner> navigation_response_task_runner,
     bool is_for_network_service) {
+  if (!HasExtensions(browser_context)) {
+    return;
+  }
   const bool proxied =
       extensions::BrowserContextKeyedAPIFactory<extensions::WebRequestAPI>::Get(
           browser_context)
@@ -311,6 +348,9 @@ void ExtensionsContentBrowserClient::OverrideURLLoaderFactoryParams(
     bool is_for_isolated_world,
     bool is_for_service_worker,
     network::mojom::URLLoaderFactoryParams* factory_params) {
+  if (!HasExtensions(browser_context)) {
+    return;
+  }
   extensions::URLLoaderFactoryManager::OverrideURLLoaderFactoryParams(
       browser_context, origin, is_for_isolated_world, is_for_service_worker,
       factory_params);

@@ -10,12 +10,14 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/ref_counted_memory.h"
+#include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_controller.h"
@@ -161,8 +163,13 @@ class AppController : public content::WebUIController {
 
 WEB_UI_CONTROLLER_TYPE_IMPL(AppController)
 
+// Our pages are WebUI only in our pages' context. Anywhere else, as in a tab, their
+// address is no page at all. The factory lives as long as the process, past the context.
 class AppControllerFactory : public content::WebUIControllerFactory {
  public:
+  explicit AppControllerFactory(content::BrowserContext* pages_context)
+      : pages_context_(pages_context->GetWeakPtr()) {}
+
   std::unique_ptr<content::WebUIController> CreateWebUIControllerForURL(
       content::WebUI* web_ui,
       const GURL& url) override {
@@ -172,15 +179,23 @@ class AppControllerFactory : public content::WebUIControllerFactory {
 
   content::WebUI::TypeID GetWebUIType(content::BrowserContext* browser_context,
                                       const GURL& url) override {
-    const App* app = AppFor(url);
+    const App* app = AppIn(browser_context, url);
     return app ? reinterpret_cast<content::WebUI::TypeID>(app)
                : content::WebUI::kNoWebUI;
   }
 
   bool UseWebUIForURL(content::BrowserContext* browser_context,
                       const GURL& url) override {
-    return AppFor(url) != nullptr;
+    return AppIn(browser_context, url) != nullptr;
   }
+
+ private:
+  const App* AppIn(content::BrowserContext* browser_context,
+                   const GURL& url) const {
+    return browser_context == pages_context_.get() ? AppFor(url) : nullptr;
+  }
+
+  const base::WeakPtr<content::BrowserContext> pages_context_;
 };
 
 // Serves one app's built files from disk. No remote content ever reaches its page.
@@ -277,11 +292,11 @@ class AppDataSource : public content::URLDataSource {
 
 }  // namespace
 
-void RegisterShellWebUI(content::BrowserContext* browser_context) {
-  static base::NoDestructor<AppControllerFactory> factory;
+void RegisterShellWebUI(content::BrowserContext* pages_context) {
+  static base::NoDestructor<AppControllerFactory> factory(pages_context);
   content::WebUIControllerFactory::RegisterFactory(factory.get());
   for (const App& app : kApps) {
-    content::URLDataSource::Add(browser_context,
+    content::URLDataSource::Add(pages_context,
                                 std::make_unique<AppDataSource>(app.host));
   }
 }

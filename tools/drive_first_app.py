@@ -373,7 +373,7 @@ def timeline_checks():
           all(0 <= s["stages"].get(s["name"] + ".window", -1) <= s["dur"] < 5e9 for s in inputs), inputs[:4])
 
     # A LOG in the engine's C++ is an entry.
-    app.cmd("strayshell")
+    app.cmd("strayshell pages")
     logged = lambda es, src, kind: [e for e in es if e["src"] == src and e["kind"] == kind]
     wait_for(lambda es: logged(es, "engine", "warn"), 5)
     entries = read()
@@ -727,10 +727,14 @@ def browsing_checks():
     # chrome.send, and Go hears nothing from it.
     shell_messages = lambda: json.loads(app.cmd("stats", timeout=60))["go"]["hooks"].get("engine.ShellMessage", 0)
     before = shell_messages()
-    stray = app.cmd("strayshell", timeout=30)
+    stray = app.cmd("strayshell pages", timeout=30)
     time.sleep(1)
     check("a chrome://shell/ page outside the shell gets no bridge", stray == "chrome://shell/ undefined", stray)
     check("and Go receives no shell message from it", shell_messages() == before, (before, shell_messages()))
+    # Our pages load only in their own context. In the profile's, where every tab is, the
+    # shell's address is no page at all, even with no gate in the way.
+    stray = app.cmd("strayshell tabs", timeout=30)
+    check("chrome://shell/ in the tabs' context doesn't load the shell: it ends on an error page", stray == "chrome-error://chromewebdata/ undefined", stray)
     click(app, "[aria-label='Tabs on top']")
     try:
         app.wait("!!document.querySelector('.strip')", 5)

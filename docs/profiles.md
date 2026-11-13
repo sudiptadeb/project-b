@@ -148,7 +148,7 @@ How these are built is in [profiles-build.md](profiles-build.md).
   expected to have it. Tab groups are a likely first. Defined when it comes up.
 
 **Built,** as [shells.md](shells.md) says, which is where the design now lives: each shell
-a folder of `shell/src/apps/shell/`, built on a kit every shell shares and speaking the same
+a folder of `shell/src/apps/shell/`, built on an SDK every shell may use and speaking the same
 messages; the registry of shells; the `shell` pref, which a template sets; a shell's own
 data, which Go keeps per window and never reads; and the check every shell passes on the
 mock engine.

@@ -11,7 +11,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [profiles.md](profiles.md) and [profiles-build.md](profiles-build.md): profiles, each in a copy of the app of its own, the list beside their folders, templates, the Profiles menu, the picker, the Profile section in settings, and updates shared by every copy.
 - [windows.md](windows.md): several windows, each with its own shell and settings, and the list of tabs each one shows.
 - [workspaces.md](workspaces.md): workspaces, sets of tabs inside a profile with cookies and site storage of their own.
-- [shells.md](shells.md): several shells, each a folder on a kit every shell shares, chosen per profile and switched live; how to build one, and the check every shell passes on the mock engine.
+- [shells.md](shells.md): several shells, each a folder, on an SDK with no framework in it and adapters for Vue and Svelte, chosen per profile and switched live; the messages a shell is held to, how to build one, the check every shell passes on the mock engine, and the proposal for the shell API without Vue.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.

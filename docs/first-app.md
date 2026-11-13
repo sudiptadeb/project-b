@@ -54,7 +54,7 @@ holder, each where the layout puts it, with every other page view the window hol
 hidden; a full-window transparent shell on top. Shell components mark themselves with
 `v-shell`, the top row's bars that move the window wherever they have no control mark
 themselves with `v-drag`, and `<PageView>` says where the active tab's page goes; the shell
-sends all of it as one `layout` message, with the controls the kit found in the drag bars,
+sends all of it as one `layout` message, with the controls the SDK found in the drag bars,
 and `tabs`, each visible tab with its rectangle. The shell shows one tab, so the list has
 one entry. Go's window manager (`core/window`) owns the window: it takes that report and
 the engine's `WindowState` (size, buttons, corner radius, full screen), decides what each

@@ -41,6 +41,8 @@ class ShellPage : public content::WebContentsObserver,
 
   content::WebContents* contents() const { return contents_.get(); }
   const std::string& page() const { return page_; }
+  // Loads page in place of the one there.
+  void SetPage(const std::string& page);
   // The app the page is, whose channel it speaks on: "shell" for every shell, or
   // "picker".
   std::string_view app() const;
@@ -61,7 +63,7 @@ class ShellPage : public content::WebContentsObserver,
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
   const int64_t window_;
-  const std::string page_;
+  std::string page_;
   std::unique_ptr<content::WebContents> contents_;
   base::WeakPtrFactory<ShellPage> weak_factory_{this};
 };

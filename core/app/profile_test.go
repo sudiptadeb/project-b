@@ -72,7 +72,7 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	if listed, _, _ := list.Get(c.ID); listed.Color != "#5b7fd6" || listed.Template != "Work" || listed.Name != "Personal" {
 		t.Fatalf("listed %+v", listed)
 	}
-	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsHorizontal, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem}) {
+	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsHorizontal, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem, Shell: "standard"}) {
 		t.Fatalf("the prefs are %+v", got)
 	}
 	if items := r.suggestions("exam"); len(items) != 1 {

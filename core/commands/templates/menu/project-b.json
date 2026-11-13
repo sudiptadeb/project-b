@@ -118,6 +118,14 @@
           "action": "view.tabsTop"
         },
         {
+          "title": "Shell",
+          "items": [
+            {
+              "list": "shells"
+            }
+          ]
+        },
+        {
           "separator": true
         },
         {

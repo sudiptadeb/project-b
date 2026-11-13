@@ -14,6 +14,7 @@ type recorder struct {
 	to       []engine.WindowID // The window each layout went to.
 	created  []engine.WindowID // Each window made, and the one it was put near.
 	requests []engine.WindowRequest
+	pages    []engine.Page // Each page a window was given after it was made.
 }
 
 func (r *recorder) CreateWindow(w, near engine.WindowID, page engine.Page, l engine.WindowLayout) {
@@ -26,6 +27,9 @@ func (r *recorder) SetWindowLayout(w engine.WindowID, l engine.WindowLayout) {
 }
 func (r *recorder) RequestWindow(w engine.WindowID, q engine.WindowRequest) {
 	r.requests = append(r.requests, q)
+}
+func (r *recorder) SetWindowPage(w engine.WindowID, page engine.Page) {
+	r.pages = append(r.pages, page)
 }
 func (r *recorder) last() engine.WindowLayout { return r.layouts[len(r.layouts)-1] }
 
@@ -248,5 +252,20 @@ func TestWhatAnotherManagerReadsAndHears(t *testing.T) {
 		{Kind: TabMoved, Window: 2, Tab: 7, From: 1, FromIndex: 3}, {Kind: Closed, Window: 1}}
 	if !reflect.DeepEqual(events, wantEvents) {
 		t.Fatalf("events %+v", events)
+	}
+}
+
+// Another page in every window drops what the old one claimed, and leaves the tabs where
+// they were; a window opened after it gets the new page too.
+func TestAnotherPageDropsWhatTheOldOneClaimed(t *testing.T) {
+	e := &recorder{}
+	m := one(e)
+	m.HandleShellLayout(1, report)
+	m.SetPage(engine.ShellPage("example"))
+	if l := e.last(); !reflect.DeepEqual(e.pages, []engine.Page{"shell/example"}) || len(l.Regions) != 0 || !reflect.DeepEqual(l.Tabs, report.Tabs) {
+		t.Fatalf("pages %v, layout %+v", e.pages, l)
+	}
+	if m.page != "shell/example" {
+		t.Fatalf("a new window gets %q", m.page)
 	}
 }

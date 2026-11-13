@@ -359,6 +359,11 @@ void ShellPage::Load() {
           GURL("chrome://" + page_ + "/")));
 }
 
+void ShellPage::SetPage(const std::string& page) {
+  page_ = page;
+  Load();
+}
+
 void ShellPage::Send(const std::string& json) {
   if (content::WebUI* web_ui = contents_->GetWebUI()) {
     std::vector<base::ValueView> args = {json};

@@ -187,6 +187,9 @@ typedef struct PBEngineCalls {
                         size_t region_count,
                         const PBVisibleTab* tabs,
                         size_t tab_count);
+  // Loads another page in the window in place of the one covering it, as create_window
+  // names one. The tabs stay where its layout last put them.
+  void (*set_window_page)(int64_t window, const char* page);
   void (*request_window)(int64_t window, int32_t request);  // PBWindowRequest
   // Puts the window's frame on screen there, y down from the top of the main screen.
   void (*set_window_bounds)(int64_t window, double x, double y, double w, double h);

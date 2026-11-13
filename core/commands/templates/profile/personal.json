@@ -3,6 +3,7 @@
   "prefs": {
     "tabLayout": "vertical",
     "frameColor": "#4f9e9e",
-    "theme": "system"
+    "theme": "system",
+    "shell": "standard"
   }
 }

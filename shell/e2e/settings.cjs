@@ -14,6 +14,8 @@ const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
+// The names of the shells the user can choose, as the registry lists them.
+const listedShells = JSON.parse(fs.readFileSync(path.join(root, 'core/shells/registry.json'), 'utf8')).filter((s) => !s.example).map((s) => s.name);
 const port = 8797;
 const base = `http://127.0.0.1:${port}`;
 
@@ -245,6 +247,15 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await nameField.fill('Home');
   await nameField.press('Enter');
   check('a new name is the list\'s', await until(() => listed().name === 'Home'), JSON.stringify(listed()));
+  // The shell it loads: the ones the user can choose, the example not among them. A choice
+  // is the profile's pref, and every window loads that shell at once.
+  const shellChoice = page.getByLabel('Shell', { exact: true });
+  check('Profile shows the shell in use, and offers only the listed shells', (await shellChoice.inputValue()) === 'standard' &&
+    JSON.stringify(await shellChoice.locator('option').allTextContents()) === JSON.stringify(listedShells));
+  await fetch(`${base}/settings/send`, { method: 'POST', body: JSON.stringify({ t: 'setShell', text: 'example' }) });
+  check('choosing a shell saves it and the window loads it', await until(async () => prefsFile().shell === 'example' && (await regions()).shell === 'example'));
+  await shellChoice.selectOption('standard');
+  check('and choosing the standard one loads it again', await until(async () => prefsFile().shell === 'standard' && (await regions()).shell === 'standard' && (await ui.getByRole('button', { name: 'Settings', exact: true }).count()) === 1));
   await page.getByLabel('Reset to').selectOption('Work');
   await page.getByRole('button', { name: 'Reset…' }).click();
   const confirm = page.getByRole('dialog', { name: 'Reset to Work' });

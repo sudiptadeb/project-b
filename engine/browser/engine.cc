@@ -235,6 +235,11 @@ void CallCreateWindow(int64_t window,
                          TabsOf(tabs, tab_count));
 }
 
+void CallSetWindowPage(int64_t window, const char* page) {
+  CheckMainThread();
+  g_engine->window(window)->shell->SetPage(page);
+}
+
 void CallSetWindowLayout(int64_t window,
                          const PBWindowLayout* l,
                          const PBRegion* regions,
@@ -352,6 +357,7 @@ const PBEngineCalls* Engine::Calls() {
       .duplicate_tab = CallDuplicateTab,
       .edit = CallEdit,
       .create_window = CallCreateWindow,
+      .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,
       .set_window_bounds = CallSetWindowBounds,
       .set_window_mode = CallSetWindowMode,

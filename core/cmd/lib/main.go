@@ -12,6 +12,7 @@ package main
 static inline int64_t call_create_tab(const PBEngineCalls* c, const char* workspace) { return c->create_tab(workspace); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_open_profile(const PBEngineCalls* c, const char* dir) { c->open_profile(dir); }
+static inline void call_set_window_page(const PBEngineCalls* c, int64_t window, const char* page) { c->set_window_page(window, page); }
 static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const char* page, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, page, layout, regions, count, tabs, tab_count); }
 static inline void call_set_window_bounds(const PBEngineCalls* c, int64_t window, double x, double y, double w, double h) { c->set_window_bounds(window, x, y, w, h); }
 static inline void call_set_window_mode(const PBEngineCalls* c, int64_t window, int32_t mode) { c->set_window_mode(window, mode); }
@@ -160,6 +161,12 @@ func (e *nativeEngine) CreateWindow(w, near engine.WindowID, page engine.Page, l
 	e.withLayout(l, func(layout *C.PBWindowLayout, regions *C.PBRegion, count C.size_t, tabs *C.PBVisibleTab, tabCount C.size_t) {
 		C.call_create_window(e.calls, C.int64_t(w), C.int64_t(near), p, layout, regions, count, tabs, tabCount)
 	})
+}
+
+func (e *nativeEngine) SetWindowPage(w engine.WindowID, page engine.Page) {
+	p := C.CString(string(page))
+	defer C.free(unsafe.Pointer(p))
+	C.call_set_window_page(e.calls, C.int64_t(w), p)
 }
 
 // OpenProfile makes the profile's context in the engine, with Chromium's files in its

@@ -349,7 +349,7 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
   Shift+Cmd+W*; Close Tab, Cmd+W*.
 - **Edit** (locked): Undo, Cmd+Z; Redo, Shift+Cmd+Z; Cut, Copy, Paste; Paste and Match
   Style, Shift+Cmd+V and Option+Shift+Cmd+V; Delete; Select All, Cmd+A.
-- **View**: Tabs on Side, Tabs on Top (checked); Stop, Cmd+.; Reload This Page, Cmd+R;
+- **View**: Tabs on Side, Tabs on Top (checked); Shell, the list `shells` (checked); Stop, Cmd+.; Reload This Page, Cmd+R;
   Force Reload This Page, Shift+Cmd+R; Full Screen, Ctrl+Cmd+F, `always` (checked); Actual
   Size, Cmd+0; Zoom In, Cmd+= and Shift+Cmd+=; Zoom Out, Cmd+-; Developer: View Source,
   Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;

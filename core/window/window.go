@@ -132,6 +132,17 @@ func (m *Manager) HandleShellCrashed(id engine.WindowID) {
 	m.update(id)
 }
 
+// SetPage covers every window with page from now on, in place of the one there. As after
+// a crash, what the old one claimed goes, and the pages stay where they were until the new
+// one reports.
+func (m *Manager) SetPage(page engine.Page) {
+	m.page = page
+	for _, id := range m.Windows() {
+		m.eng.SetWindowPage(id, page)
+		m.HandleShellCrashed(id)
+	}
+}
+
 // HandleWindowChanged takes the engine's report about a window.
 func (m *Manager) HandleWindowChanged(id engine.WindowID, s engine.WindowState) {
 	w := m.windows[id]

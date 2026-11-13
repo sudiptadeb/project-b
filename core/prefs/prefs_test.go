@@ -2,6 +2,8 @@ package prefs
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -61,7 +63,34 @@ func TestApplySetsWhatTheValuesHoldThroughTheSetters(t *testing.T) {
 	if strings.Join(heard, " ") != "horizontal #5b7fd6" {
 		t.Fatalf("heard %v", heard)
 	}
-	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark}) {
+	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark, Shell: "standard"}) {
 		t.Fatalf("saved %+v", got)
+	}
+}
+
+// The shell is a shell's id, standard by default; one the registry doesn't have keeps the
+// default, as a value that isn't one does for every setting.
+func TestTheShellIsAShellsIDAndSurvivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir)
+	if m.Shell() != "standard" {
+		t.Fatalf("default = %q", m.Shell())
+	}
+	var got []string
+	m.OnShellChanged(func(id string) { got = append(got, id) })
+	m.SetShell("no-such-shell")
+	m.SetShell("example")
+	m.SetShell("example")
+	if len(got) != 1 || got[0] != "example" || New(dir).Shell() != "example" {
+		t.Fatalf("changes %v, saved %q", got, New(dir).Shell())
+	}
+	if err := m.Apply(json.RawMessage(`{"shell":"standard"}`)); err != nil || m.Shell() != "standard" || len(got) != 2 {
+		t.Fatalf("apply: %v, shell %q, changes %v", err, m.Shell(), got)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "prefs.json"), []byte(`{"shell":"gone"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if New(dir).Shell() != "standard" {
+		t.Fatalf("a shell that isn't one loads as %q", New(dir).Shell())
 	}
 }

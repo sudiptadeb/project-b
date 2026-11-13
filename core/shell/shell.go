@@ -271,5 +271,9 @@ func (m *Manager) send(w engine.WindowID, v any) {
 // did. Every other window's shell goes on hearing.
 func (m *Manager) HandleShellCrashed(w engine.WindowID) { delete(m.heard, w) }
 
+// ShellChanged waits for every window's new shell to say it's ready, as after a crash: each
+// window is loading another one.
+func (m *Manager) ShellChanged() { clear(m.heard) }
+
 // WindowClosed forgets the shell of a window that closed: it went with the window.
 func (m *Manager) WindowClosed(w engine.WindowID) { delete(m.heard, w) }

@@ -19,7 +19,8 @@ the real app; "What the real app adds" lists the little the mock can't show.
 
 - **A shell is one folder,** `shell/src/apps/shell/<id>/`, with an `index.html` and a
   `main.js`, and **one line in `core/shells/registry.json`:** its id and the name the user
-  sees. The id is lower-case letters, digits and dashes.
+  sees, and `"example": true` for a shell that is built but offered nowhere. The id is
+  lower-case letters, digits and dashes.
 - Each shell builds into `shell/<id>/` beside the other pages, and loads at
   `chrome://shell/<id>/` in the real app and at `/shell/<id>/` on the mock. Nothing in the
   engine names a shell: it serves `chrome://shell/<id>/` from that folder.
@@ -146,18 +147,21 @@ install prompt have nowhere to show.
 
 1. Make `shell/src/apps/shell/<id>/` with `index.html` and `main.js`, and add the line to
    `core/shells/registry.json`.
-2. In `main.js`: import `@/design.css`, mount the app with the three directives, call
-   `connect()`.
+2. In `main.js`: import `@/design.css` and mount the app with the three directives. The
+   app calls `connect()` as it is made.
 3. Draw `state.tabs`; mark what is the shell's with `v-shell`, the empty top space with
    `v-drag`, and each place a page shows with `v-page`.
 4. Run it on the mock (below) and make the check pass.
 
-The smallest shell, to show the shape:
+The smallest shell is the example, `shell/src/apps/shell/example/`: the one to copy. It is
+built with the others and offered nowhere (`"example": true` in the registry); `go run
+./cmd/dev -use example` loads it. Beside an `index.html` and a `main.js` of a few lines,
+its `App.vue` is the whole of it:
 
 ```vue
 <script setup>
 import { ref } from 'vue';
-import { connect, send, state, tabLabel } from '@/kit/shell.js';
+import { connect, controlSpace, send, state, tabLabel } from '@/kit/shell.js';
 import { ExtensionsToolbar } from '@extensions';
 import { useTheme } from '@/theme.js';
 
@@ -168,7 +172,7 @@ connect({ focusAddressBar: () => address.value.focus() });
 
 <template>
   <header v-shell>
-    <div v-drag class="space"></div>
+    <div v-drag class="space" :style="{ width: controlSpace.left }"></div>
     <button
       v-for="tab in state.tabs" :key="tab.id"
       role="tab" :data-tab="tab.id" :aria-selected="tab.id === state.active"
@@ -177,10 +181,19 @@ connect({ focusAddressBar: () => address.value.focus() });
     <button aria-label="New Tab" @click="send({ t: 'newTab' })">+</button>
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
-    <ExtensionsToolbar />
+    <div v-drag class="space rest"></div>
+    <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
   </header>
-  <main v-page="state.active"></main>
+  <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>
 </template>
+
+<style>
+#app { display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 4px; height: 44px; padding-right: 8px; background: var(--bar); color: var(--text); }
+.space { flex: none; align-self: stretch; }
+.rest { flex: 1; }
+main { flex: 1; }
+</style>
 ```
 
 ## Testing one

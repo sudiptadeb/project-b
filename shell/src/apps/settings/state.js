@@ -28,7 +28,8 @@ export const state = reactive({
   // relaunch.
   flags: [],
   // This profile in the list: its name, the template it was made from or last reset to,
-  // and the templates. null in a copy on a folder named outright, which isn't listed.
+  // the templates, the id of the shell it loads, and the shells to choose from, each with
+  // its id and name. null in a copy on a folder named outright, which isn't listed.
   profile: null,
   // The profile's workspaces, each with its id, name and colour, in the order they were
   // made.

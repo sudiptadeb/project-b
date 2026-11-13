@@ -6,6 +6,7 @@ import (
 	"projectb/engine"
 	"projectb/profiles"
 	"projectb/settings"
+	"projectb/shells"
 	"projectb/timeline"
 )
 
@@ -15,8 +16,9 @@ type profileCommand struct {
 }
 
 // profileSettingsPart is the settings page's Profile section, in a copy on a listed
-// profile id: its name in the list, the template it was made from or last reset to, and
-// a reset to a template. A folder named outright has no entry in the list, so no section.
+// profile id: its name in the list, the template it was made from or last reset to, a
+// reset to a template, and the shell it loads. A folder named outright has no entry in the
+// list, so no section.
 func (a *App) profileSettingsPart(list *profiles.Manager, id string) settings.Part {
 	view := func() map[string]any {
 		p, _, err := list.Get(id)
@@ -27,8 +29,14 @@ func (a *App) profileSettingsPart(list *profiles.Manager, id string) settings.Pa
 		for _, t := range profiles.Templates() {
 			templates = append(templates, t.Name)
 		}
-		return map[string]any{"name": p.Name, "template": p.Template, "templates": templates}
+		listed := []map[string]string{}
+		for _, s := range shells.Listed() {
+			listed = append(listed, map[string]string{"id": s.ID, "name": s.Name})
+		}
+		return map[string]any{"name": p.Name, "template": p.Template, "templates": templates, "shell": a.Prefs.Shell(), "shells": listed}
 	}
+	// The shell changes from View, Shell too.
+	a.Prefs.OnShellChanged(func(string) { a.Settings.Send(map[string]any{"t": "profile", "profile": view()}) })
 	return settings.Part{
 		Snapshot: func(into map[string]any) { into["profile"] = view() },
 		Handle: func(w engine.WindowID, t string, msg []byte) bool {
@@ -41,6 +49,9 @@ func (a *App) profileSettingsPart(list *profiles.Manager, id string) settings.Pa
 				}
 			case "resetProfile":
 				a.resetProfile(list, id, c.Text)
+			case "setShell":
+				a.Prefs.SetShell(c.Text)
+				return true
 			default:
 				return false
 			}

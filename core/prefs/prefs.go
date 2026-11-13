@@ -1,5 +1,5 @@
-// Package prefs owns the profile's settings: where the tabs go, the frame colour and the
-// theme. They live in one small JSON file in the profile, read when the app starts and
+// Package prefs owns the profile's settings: where the tabs go, the frame colour, the
+// theme and the shell. They live in one small JSON file in the profile, read when the app starts and
 // written when one changes. Automatic updates are the app's, not a profile's
 // (core/update).
 package prefs
@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"projectb/shells"
 	"projectb/timeline"
 	"regexp"
 )
@@ -30,11 +31,13 @@ type Prefs struct {
 	TabLayout  string `json:"tabLayout"`
 	FrameColor string `json:"frameColor"`
 	Theme      string `json:"theme"`
+	// Shell is the id of the shell every window loads.
+	Shell string `json:"shell"`
 }
 
 // Defaults are the settings before the user changes any.
 func Defaults() Prefs {
-	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem}
+	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem, Shell: "standard"}
 }
 
 func isTheme(t string) bool { return t == ThemeSystem || t == ThemeLight || t == ThemeDark }
@@ -49,6 +52,7 @@ type Manager struct {
 	onLayout     []func(string)
 	onFrameColor []func(string)
 	onTheme      []func(string)
+	onShell      []func(string)
 }
 
 // New returns a manager with the settings saved under dir, or the defaults. A setting the
@@ -67,6 +71,9 @@ func New(dir string) *Manager {
 			}
 			if !isTheme(s.Theme) {
 				s.Theme = ThemeSystem
+			}
+			if !shells.Has(s.Shell) {
+				s.Shell = Defaults().Shell
 			}
 			m.prefs = s
 		}
@@ -134,6 +141,24 @@ func (m *Manager) SetTheme(theme string) {
 	}
 }
 
+// Shell is the id of the shell every window loads.
+func (m *Manager) Shell() string { return m.prefs.Shell }
+
+// OnShellChanged subscribes to the shell changing.
+func (m *Manager) OnShellChanged(f func(string)) { m.onShell = append(m.onShell, f) }
+
+// SetShell changes the shell. Anything but a shell's id is ignored.
+func (m *Manager) SetShell(id string) {
+	if !shells.Has(id) || id == m.prefs.Shell {
+		return
+	}
+	m.prefs.Shell = id
+	m.save()
+	for _, f := range m.onShell {
+		f(id)
+	}
+}
+
 // Apply sets each setting values holds, in the form the file has them, through its own
 // setter, so every listener hears of it as of a change by hand. A setting values doesn't
 // hold keeps its value. A profile reset to a template takes the template's values so.
@@ -145,6 +170,7 @@ func (m *Manager) Apply(values json.RawMessage) error {
 	m.SetTabLayout(p.TabLayout)
 	m.SetFrameColor(p.FrameColor)
 	m.SetTheme(p.Theme)
+	m.SetShell(p.Shell)
 	return nil
 }
 

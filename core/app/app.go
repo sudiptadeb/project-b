@@ -14,6 +14,7 @@ import (
 	"projectb/relaunch"
 	"projectb/settings"
 	"projectb/shell"
+	"projectb/shells"
 	"projectb/suggest"
 	"projectb/tabs"
 	"projectb/timeline"
@@ -77,7 +78,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Workspaces = workspaces.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
-	a.Window = window.New(e, engine.ShellPage("standard"), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
+	a.Window = window.New(e, engine.ShellPage(a.Prefs.Shell()), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
 	a.Tabs.OnMoved(a.Window.HandleTabMoved)
 	first := a.openWindow()
@@ -86,6 +87,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
 	a.Commands.RegisterList(a.profileList(cfg))
 	a.Commands.RegisterList(a.workspaceList())
+	a.Commands.RegisterList(a.shellList())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Shell.AddPart(a.workspaceShellPart())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
@@ -126,6 +128,12 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
 	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)
+	// Another shell loads in every window at once. The old one's regions go, as after a
+	// crash, and the tabs stay where they were until the new one reports.
+	a.Prefs.OnShellChanged(func(id string) {
+		a.Shell.ShellChanged()
+		a.Window.SetPage(engine.ShellPage(id))
+	})
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
 	a.Update.OnAutoChanged(a.Settings.AutoUpdateChanged)
@@ -169,6 +177,22 @@ func (a *App) profileList(cfg Config) commands.List {
 			return items
 		},
 		Choose: func(id string) { relaunch.Copy("--root="+cfg.Profiles.Root(), "--profile="+id) },
+	}
+}
+
+// shellList is View, Shell: every shell the user can choose, with a tick on the one in use.
+// Choosing one makes it the profile's, and every window loads it.
+func (a *App) shellList() commands.List {
+	return commands.List{
+		ID: "shells",
+		Items: func() []commands.ListItem {
+			var items []commands.ListItem
+			for _, s := range shells.Listed() {
+				items = append(items, commands.ListItem{Key: s.ID, Title: s.Name, Checked: s.ID == a.Prefs.Shell()})
+			}
+			return items
+		},
+		Choose: a.Prefs.SetShell,
 	}
 }
 

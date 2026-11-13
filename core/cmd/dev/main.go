@@ -28,6 +28,7 @@ import (
 	"projectb/flags"
 	"projectb/mockengine"
 	"projectb/profiles"
+	"projectb/shells"
 	"projectb/timeline"
 	"projectb/update"
 )
@@ -65,7 +66,11 @@ func main() {
 	appPath := flag.String("app", "", "the installed bundle to replace on relaunch")
 	// A test can add flags of its own, in registry.json's form, to see every type drawn.
 	moreFlags := flag.String("flags", "", "a file of flags to add to the registry's")
+	use := flag.String("use", "", "the shell to choose at start, by its id, as the settings page would")
 	flag.Parse()
+	if *use != "" && !shells.Has(*use) {
+		log.Fatalf("-use: no shell %q in core/shells/registry.json", *use)
+	}
 	if *moreFlags != "" {
 		b, err := os.ReadFile(*moreFlags)
 		if err == nil {
@@ -117,6 +122,9 @@ func main() {
 		} else {
 			a = start(*profile, *id)
 			e.SetListener(a)
+			if *use != "" {
+				a.Prefs.SetShell(*use)
+			}
 		}
 		close(started)
 	})

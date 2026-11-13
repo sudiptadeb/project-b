@@ -14,7 +14,9 @@ import (
 	"projectb/app"
 	"projectb/engine"
 	"projectb/mockengine"
+	"projectb/prefs"
 	"projectb/profiles"
+	"projectb/shells"
 	"projectb/tabs"
 	"projectb/timeline"
 	"projectb/update"
@@ -1006,4 +1008,44 @@ func TestTheSettingsPageMakesAndRenamesWorkspaces(t *testing.T) {
 	if l := workspaces.New(dir).List(); len(l) != 1 || l[0].ID != w["id"] || l[0].Name != "Office" {
 		t.Fatalf("the profile's list holds %+v", l)
 	}
+}
+
+// View, Shell lists the shells the user can choose, with a tick on the one in use. Choosing
+// another makes it the profile's and loads it in the window, which hears nothing until it
+// says it's ready; what the old shell claimed of the window goes, and the tab stays shown.
+func TestViewShellSwitchesTheShellLive(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	r.shell(`{"t":"layout","shell":[{"x":0,"y":0,"w":800,"h":48}],"tabs":[{"tab":1,"rect":{"x":0,"y":48,"w":800,"h":552}}],"viewW":800,"viewH":600}`)
+	var items engine.Menu
+	r.e.Post(func() { items = r.a.MenuList("shells") })
+	r.e.Settle()
+	listed := shells.Listed()
+	if len(items) != len(listed) {
+		t.Fatalf("View, Shell lists %+v", items)
+	}
+	for i, s := range listed {
+		if items[i].Title != s.Name || items[i].Action != "shells:"+s.ID || items[i].Checked != (s.ID == "standard") {
+			t.Fatalf("View, Shell lists %+v", items)
+		}
+	}
+	for len(r.got) > 0 {
+		<-r.got
+	}
+	r.e.Post(func() { r.a.MenuChosen("shells:example") })
+	r.e.Settle()
+	l := r.e.Layout(1)
+	if r.e.PageOf(1) != "shell/example" || prefs.New(dir).Shell() != "example" || len(l.Regions) != 0 || len(l.Tabs) != 1 {
+		t.Fatalf("the window loads %q, the pref is %q, the layout %+v", r.e.PageOf(1), prefs.New(dir).Shell(), l)
+	}
+	r.e.Post(func() { r.a.Shell.TabsChanged() })
+	r.e.Settle()
+	select {
+	case b := <-r.got:
+		t.Fatalf("the new shell heard %s before it said it's ready", b)
+	default:
+	}
+	r.shell(`{"t":"ready"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
 }

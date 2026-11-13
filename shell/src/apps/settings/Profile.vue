@@ -2,9 +2,10 @@
 import { nextTick, onUnmounted, ref } from 'vue';
 import { send, state } from './state.js';
 
-// This profile: its name in the list, and the template it was made from or last reset to.
-// Reset writes the chosen template's values over the profile's settings, after a
-// confirmation; Go owns all of it and answers with the profile as the list now has it.
+// This profile: its name in the list, the template it was made from or last reset to, and
+// the shell it loads. Reset writes the chosen template's values over the profile's
+// settings, after a confirmation; Go owns all of it and answers with the profile as the
+// list now has it. Another shell loads in every window at once.
 
 // Go answers with the name it saved; an empty one goes back to it.
 function setName(e) {
@@ -64,6 +65,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
           <option v-for="t in state.profile.templates" :key="t" :value="t">{{ t }}</option>
         </select>
         <button type="button" class="text-button" @click="confirm">Reset…</button>
+      </div>
+      <div class="row">
+        <label class="label" for="profile-shell">Shell</label>
+        <select id="profile-shell" :value="state.profile.shell" @change="send({ t: 'setShell', text: $event.target.value })">
+          <option v-for="s in state.profile.shells" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
       </div>
     </div>
     <dialog v-if="confirming" ref="dialog" class="confirm" :aria-label="`Reset to ${chosen}`">

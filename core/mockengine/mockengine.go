@@ -202,6 +202,15 @@ func (e *Engine) CreateWindow(w, near engine.WindowID, page engine.Page, l engin
 	}
 }
 
+// SetWindowPage loads another page in the window. Its dev window loads the shell its state
+// names.
+func (e *Engine) SetWindowPage(w engine.WindowID, page engine.Page) {
+	e.mu.Lock()
+	e.windows[w].page = page
+	e.mu.Unlock()
+	e.Feeds(w).Window.Publish(e.WindowState(w))
+}
+
 func (e *Engine) CreateTab(workspace string) engine.TabID {
 	e.nextTab++
 	e.tabs[e.nextTab] = &tab{pos: -1, state: "empty", workspace: workspace}

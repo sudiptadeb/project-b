@@ -164,6 +164,10 @@ type Engine interface {
 	// layout, a little down and right of window near, or where a first window goes when
 	// near is 0. It tells WindowChanged once this call has returned.
 	CreateWindow(w, near WindowID, page Page, l WindowLayout)
+	// SetWindowPage loads another page in window w in place of the one covering it, which
+	// is gone with all it had. The new page starts as a new window's does. The tabs stay
+	// where the window's layout last put them.
+	SetWindowPage(w WindowID, page Page)
 
 	// RequestWindow asks a native window to close, minimise, zoom, go in or out of full
 	// screen, or come to the front. What follows arrives as WindowClosed or

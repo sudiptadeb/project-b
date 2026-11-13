@@ -143,8 +143,7 @@ defineExpose({ open });
 
 .ui-menu-item:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--accent-soft);
-  background: var(--accent-tint);
+  box-shadow: var(--focus-ring-inset);
 }
 
 .ui-menu-item:disabled {

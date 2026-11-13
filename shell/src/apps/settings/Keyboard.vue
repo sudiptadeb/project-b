@@ -478,7 +478,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 /* --focus-ring drawn inward, so the card's edge can't clip it. */
 .action:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring-inset);
 }
 
 .chevron {
@@ -589,25 +589,6 @@ kbd.clash {
 }
 
 /* A link to another action, in running text. */
-.link {
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  cursor: pointer;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
-.link:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
 .filter-section {
   margin-top: 16px;
 }

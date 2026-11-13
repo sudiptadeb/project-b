@@ -9,6 +9,8 @@
   /* Anything that floats over the rest: a menu, the suggestions, a dialog. */
   --shadow-float: 0 8px 28px rgba(16, 24, 40, 0.14), 0 1px 3px rgba(16, 24, 40, 0.08);
   --focus-ring: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
+  /* The same ring drawn inside, for what fills its container: a menu item, a row. */
+  --focus-ring-inset: inset 0 0 0 1px var(--accent), inset 0 0 0 3px var(--accent-soft);
 }
 
 /* An icon alone: a flat 28px square with a 6px radius. */
@@ -214,7 +216,8 @@ select:disabled {
   height: 20px;
   padding: 0 8px;
   border-radius: 4px;
-  background: var(--accent-tint);
+  /* A hairline, not a fill, so a tag keeps its shape on a hovered or open row. */
+  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
@@ -246,4 +249,24 @@ select:disabled {
 
 .text-button.danger:hover:not(:disabled) {
   filter: brightness(1.08);
+}
+
+/* A link in a line of text that opens something on the page: an action's editor. */
+.link {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }

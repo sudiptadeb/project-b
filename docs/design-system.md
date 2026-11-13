@@ -98,8 +98,8 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 - **Card:** `--surface`, a `--line` hairline, radius 8, rows divided by hairlines.
 - **Floating:** a menu, the address bar's suggestions, a dialog. `--surface`, a `--line`
   hairline, radius 8, and `var(--shadow-float)`. A modal dialog's backdrop is `--bar` at 70%.
-- **Focus:** `var(--focus-ring)` on `:focus-visible`, never the browser's outline. Inside a menu
-  the ring is inset, `inset 0 0 0 2px var(--accent-soft)`.
+- **Focus:** `var(--focus-ring)` on `:focus-visible`, never the browser's outline. On a menu
+  item or a row it is `var(--focus-ring-inset)`.
 
 ## Controls
 
@@ -117,7 +117,8 @@ Use these; never leave a `<button>`, `<select>`, `<input>` or radio to the brows
 | A colour | `Swatches`: presets, and with `custom` the system's picker behind a + | a bare colour input |
 | A name, a number, a value | `Field` (`.field`); empty means Off where Off makes sense | a section's own input style |
 | A row's actions | `RowMenu`: a ⋯ button and its menu | a row of quiet buttons |
-| A label on an item (Hidden, Locked, Not in this build) | `.tag` | |
+| A label on an item (Hidden, Locked, Not in this build) | `.tag`, a hairline outline | a filled pill |
+| A link in a line of text that opens something on the page | `.link` | |
 | A second line under a label | `.secondary` | a section's own class |
 | A question | `Dialog` | `confirm()`, or a section's own `<dialog>` |
 
@@ -183,7 +184,8 @@ From the settings audit of 2026-11-13 (owner approved). Every section follows th
 
 ### Keyboard and focus
 
-- **One focus ring,** `--focus-ring`; inside a menu, the inset one.
+- **One focus ring,** `--focus-ring`; on what fills its container (a menu item, a row),
+  the same ring inside, `--focus-ring-inset`.
 - **A group of choices** (`Segmented`, `Swatches`) is one Tab stop, and the arrow keys move
   in it.
 - **When an action removes what had focus,** focus goes to a stated place: the next row, or

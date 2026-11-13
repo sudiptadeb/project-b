@@ -62,6 +62,10 @@ const askTitle = computed(() => {
   return `Discard ${n} changed shortcut${n === 1 ? '' : 's'} and use ${templateLabel(asking.value)}'s?`;
 });
 
+// "Its ⌘N is already in use", or "Its ⌘N, ⌘⇧N are" for more than one.
+const takenText = (keys) =>
+  `Its ${keys.map((k) => shown(k, platform.value)).join(', ')} ${keys.length === 1 ? 'is' : 'are'} already in use`;
+
 const titleOf = (id) => {
   for (const g of kb.value.groups) {
     const a = g.actions.find((x) => x.id === id);
@@ -244,23 +248,23 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
           </select>
           <button type="button" class="text-button" :disabled="!changedCount" @click="useTemplate(kb.template)">Reset all…</button>
         </div>
+        <div v-for="p in kb.problems" :key="p" class="row">
+          <span class="label problem" :title="p">{{ p }}</span>
+        </div>
       </div>
     </section>
 
-    <section v-if="kb.missing.length || kb.problems.length" class="notice" role="status">
+    <section v-if="kb.missing.length" class="notice" role="status" aria-labelledby="notice">
+      <div class="heading-row">
+        <h2 id="notice">New actions</h2>
+        <button type="button" class="text-button quiet" @click="send({ t: 'dismissMissing' })">Dismiss</button>
+      </div>
       <div class="card">
-        <div v-for="p in kb.problems" :key="p" class="row">
-          <span class="label problem">{{ p }}</span>
-        </div>
         <div v-for="m in kb.missing" :key="m.id" class="row">
           <span class="label">
-            New: {{ titleOf(m.id) }}
-            <span class="sub">Its {{ m.taken.map((k) => shown(k, platform)).join(', ') }} is already in use</span>
+            <button type="button" class="link" @click="goTo(m.id)">{{ titleOf(m.id) }}</button>
+            <span class="secondary">{{ takenText(m.taken) }}</span>
           </span>
-        </div>
-        <div v-if="kb.missing.length" class="row">
-          <span class="label"></span>
-          <button type="button" class="text-button" @click="send({ t: 'dismissMissing' })">Dismiss</button>
         </div>
       </div>
     </section>
@@ -289,7 +293,9 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               <kbd>{{ shown(k.keys, platform) }}</kbd>
               <span v-if="k.locked" class="note">Locked</span>
               <span v-else-if="k.fromOS" class="note">Set in macOS</span>
-              <span v-if="k.clash" class="note problem">Also {{ k.clash }}'s, which wins it</span>
+              <span v-if="k.clash" class="note problem">
+                Also <button type="button" class="link" @click="goTo(k.clashID)">{{ k.clash }}</button>'s, which wins it
+              </span>
               <span class="spacer"></span>
               <select
                 v-if="!k.locked"
@@ -524,11 +530,13 @@ kbd.clash {
   box-shadow: var(--focus-ring);
 }
 
-.sub {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
+/* A heading with one action on its right, 30px high. */
+.heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 30px;
 }
 
 .problem {

@@ -134,7 +134,17 @@ func (e *Engine) SetExtensionEnabled(id string, on bool) {
 
 func (e *Engine) Extensions() []engine.Extension { return slices.Clone(e.extensions.list) }
 
+// events are the events the real engine can send, as engine/extensions/browser/extensions.cc
+// lists them: it stops on any other, and so does the mock.
+var events = []string{
+	"action.onClicked", "commands.onCommand",
+	"tabs.onActivated", "tabs.onCreated", "tabs.onRemoved", "tabs.onUpdated",
+}
+
 func (e *Engine) DispatchExtensionEvent(id, event, args string) {
+	if !slices.Contains(events, event) {
+		panic("the engine has no event " + event)
+	}
 	e.extensions.mu.Lock()
 	defer e.extensions.mu.Unlock()
 	e.extensions.events = append(e.extensions.events, Event{id, event, json.RawMessage(args)})

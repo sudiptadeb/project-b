@@ -10,15 +10,17 @@ import (
 	"projectb/engine"
 )
 
-// ShellLayout is what the shell reports about itself: the rectangles its controls take,
-// the empty spaces in the top row that drag the window, the tabs it shows and where,
-// and the window size it measured against.
+// ShellLayout is what the shell reports about itself: the rectangles that are its own,
+// the bars and empty spaces in the top row that drag the window, the controls inside
+// those that stay the shell's, the tabs it shows and where, and the window size it
+// measured against.
 type ShellLayout struct {
-	Shell []engine.Rect       `json:"shell"`
-	Drag  []engine.Rect       `json:"drag"`
-	Tabs  []engine.VisibleTab `json:"tabs"`
-	ViewW float64             `json:"viewW"`
-	ViewH float64             `json:"viewH"`
+	Shell    []engine.Rect       `json:"shell"`
+	Controls []engine.Rect       `json:"controls"`
+	Drag     []engine.Rect       `json:"drag"`
+	Tabs     []engine.VisibleTab `json:"tabs"`
+	ViewW    float64             `json:"viewW"`
+	ViewH    float64             `json:"viewH"`
 }
 
 // Manager owns the windows.
@@ -75,7 +77,8 @@ func (m *Manager) Windows() []engine.WindowID {
 	return ids
 }
 
-// layout is the one decision: drag areas first, then the shell's, and the pages under
+// layout is the one decision: the controls in the drag areas first, as they are the
+// shell's, then the drag areas, then the rest of the shell's, and the pages under
 // everything else. In full screen there is no window to move, so nothing drags.
 func (m *Manager) layout(w *window) engine.WindowLayout {
 	l := engine.WindowLayout{
@@ -85,6 +88,9 @@ func (m *Manager) layout(w *window) engine.WindowLayout {
 		FrameColor: m.color,
 		FrameWidth: m.frameWidth,
 		Theme:      m.theme,
+	}
+	for _, r := range w.shell.Controls {
+		l.Regions = append(l.Regions, engine.Region{Rect: r, Area: engine.AreaShell})
 	}
 	if !w.state.FullScreen {
 		for _, r := range w.shell.Drag {
@@ -128,6 +134,7 @@ func (m *Manager) HandleShellLayout(id engine.WindowID, l ShellLayout) {
 func (m *Manager) HandleShellCrashed(id engine.WindowID) {
 	w := m.windows[id]
 	w.shell.Shell = nil
+	w.shell.Controls = nil
 	w.shell.Drag = nil
 	m.update(id)
 }

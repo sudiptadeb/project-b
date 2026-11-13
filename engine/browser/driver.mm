@@ -419,6 +419,24 @@ void Run(const std::string& line) {
     // Who would get a mouse event here: shell, page, container, frame (AppKit drags the
     // window), or a native view such as a window button.
     Reply(id, Classify(HitFromFrame(number(2), number(3))));
+  } else if (cmd == "press") {
+    // What a press here does to the window: "moves" when the window hands it to the
+    // window server to move, below the title bar; "titlebar" when it falls through to
+    // the frame inside the title bar, where the window server moves the window by itself
+    // from what "dragregion" lists; otherwise who gets it, as "hit" says.
+    NSWindow* window = TheWindow();
+    NSView* content = window.contentView;
+    const NSPoint p = [content
+        convertPoint:NSMakePoint(number(2), content.bounds.size.height - number(3))
+              toView:nil];
+    const std::string kind = Classify(HitFromFrame(number(2), number(3)));
+    if (Current()->window->MovesFromApp(gfx::PointF(p.x, p.y))) {
+      Reply(id, "moves");
+    } else if (kind == "frame" && !NSPointInRect(p, window.contentLayoutRect)) {
+      Reply(id, "titlebar");
+    } else {
+      Reply(id, kind);
+    }
   } else if (cmd == "dragregion") {
     // What AppKit last told the window server it may drag by itself, as AppKit
     // describes it: rectangles in window points, y from the bottom.

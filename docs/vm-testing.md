@@ -62,7 +62,7 @@ Project B bugs, worst first:
    those was the same lag; the live resize of bug 7 still runs past the frame in 2 to 4 of 30
    frames.
 6. **The empty sidebar doesn't drag the window**, though double-clicking it zooms. Since then
-   this is the design: only the empty spaces in the top row drag, and the sidebar is shell, so it
+   this is the design: only the top row drags, wherever it has no control, and the sidebar is shell, so it
    neither drags nor zooms ([window-manager.md](window-manager.md)). `check.py` expects that.
 7. **Stale pictures after resizes.** A resize from outside the app, as window managers and tiling
    do it, shows the old window for 0.8 to 2 s: the whole old frame stays on screen, and after
@@ -236,7 +236,7 @@ The Show window regions flag ([windows.md](windows.md#seeing-the-regions)) gets 
 own: the app started with `--pb-show-regions` shows the drag, shell, page and window-button
 outlines in their colours with the tabs on the side, the drag, shell and page ones with the
 tabs on top, and the settings page's only while it is open. With the outlines over
-everything, the window still drags from the top row's empty spaces and the top edge, not
+everything, the window still drags from the top row's gaps and the top edge, not
 from the empty sidebar, and a click on the layout button still reaches the shell. Each colour counts as
 seen at more than 20 pixels within 24 of it. The shots `regions-side`, `regions-top` and
 `regions-settings` are for a person to look at.

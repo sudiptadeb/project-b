@@ -10,8 +10,7 @@ connect({ focusAddressBar: () => address.value.focus() });
 </script>
 
 <template>
-  <header v-shell>
-    <div v-drag class="space" :style="{ width: controlSpace.left }"></div>
+  <header v-shell v-drag :style="{ paddingLeft: controlSpace.left }">
     <button
       v-for="tab in state.tabs" :key="tab.id"
       role="tab" :data-tab="tab.id" :aria-selected="tab.id === state.active"
@@ -20,7 +19,6 @@ connect({ focusAddressBar: () => address.value.focus() });
     <button aria-label="New Tab" @click="send({ t: 'newTab' })">+</button>
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
-    <div v-drag class="space rest"></div>
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
   </header>
   <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>
@@ -29,7 +27,6 @@ connect({ focusAddressBar: () => address.value.focus() });
 <style>
 #app { display: flex; flex-direction: column; }
 header { display: flex; align-items: center; gap: 4px; height: 44px; padding-right: 8px; background: var(--bar); color: var(--text); }
-.space { flex: none; align-self: stretch; }
-.rest { flex: 1; }
+input { flex: 1; }
 main { flex: 1; }
 </style>

@@ -20,15 +20,17 @@ const rules = [
   "The pages it shows lie inside the window's frame, don't overlap, and are all tabs of this window",
   'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active',
   'focusAddressBar puts the keyboard in a text field where an address and Enter take the active tab there',
-  'Every button, field and tab it draws lies in a region it marked v-shell',
+  'Every control it draws is the shell\'s: a press on it reaches the shell',
   'A press in the middle of a page it shows reaches that page',
-  'Some empty space is marked v-drag, and no page lies under the native window buttons',
+  'Some space is marked v-drag, and no page lies under the native window buttons',
   'Reloaded, it comes back showing the same pages',
   'Switched to and away from, it starts from Go\'s data alone',
   'It logs no errors',
 ];
 
 (async () => {
+  // What a control is, as the kit has it: the same selector it finds them in a drag bar by.
+  const { controls: control } = await import('../src/kit/controls.js');
   const browser = await chromium.launch();
   const summary = [];
   for (const id of ids) {
@@ -144,20 +146,26 @@ const rules = [
         rule(5, 'an address and Enter take the active tab there', await until(async () => (await regions()).tabs.find((t) => t.id === other)?.url === 'https://contract.test/typed'), JSON.stringify((await regions()).tabs.find((t) => t.id === other)));
         await activeShows('after a navigation');
 
-        // 6. What the shell draws to be pressed lies in its own regions.
+        // 6. What the shell draws to be pressed is the shell's.
         current = 6;
-        await settle(page);
-        const controls = await w.shell().evaluate(() => [...document.querySelectorAll('button, input, select, textarea, a[href], [role=tab], [tabindex]')]
-          .filter((el) => el.checkVisibility({ visibilityProperty: true, opacityProperty: true }))
-          .map((el) => ({ what: el.outerHTML.slice(0, 60), rect: el.getBoundingClientRect().toJSON() }))
-          .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight));
-        const outsideShell = [];
-        for (const c of controls) {
-          const x = Math.min(Math.max(c.rect.x + c.rect.width / 2, 0), 1099);
-          const y = Math.min(Math.max(c.rect.y + c.rect.height / 2, 0), 699);
-          if ((await regions({ x, y })).hit !== 'shell') outsideShell.push(c.what);
-        }
-        rule(6, `every one of the ${controls.length} buttons, fields and tabs lies in a v-shell region`, controls.length > 0 && outsideShell.length === 0, outsideShell.join(' | '));
+        // The layout follows what the shell draws a frame or more later, so this looks
+        // until every control is the shell's.
+        let controls = [];
+        let outsideShell = [];
+        await until(async () => {
+          controls = await w.shell().evaluate((control) => [...document.querySelectorAll(control)]
+            .filter((el) => el.checkVisibility({ visibilityProperty: true, opacityProperty: true }))
+            .map((el) => ({ what: el.outerHTML.slice(0, 60), rect: el.getBoundingClientRect().toJSON() }))
+            .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight), control);
+          outsideShell = [];
+          for (const c of controls) {
+            const x = Math.min(Math.max(c.rect.x + c.rect.width / 2, 0), 1099);
+            const y = Math.min(Math.max(c.rect.y + c.rect.height / 2, 0), 699);
+            if ((await regions({ x, y })).hit !== 'shell') outsideShell.push(c.what);
+          }
+          return controls.length > 0 && outsideShell.length === 0;
+        });
+        rule(6, `every one of the ${controls.length} controls is the shell's`, controls.length > 0 && outsideShell.length === 0, outsideShell.join(' | '));
 
         // 7. A press in the middle of each page it shows.
         current = 7;
@@ -179,7 +187,7 @@ const rules = [
         // 8. Drag space, and the native buttons over no page.
         current = 8;
         r = await regions();
-        rule(8, 'some empty space is marked v-drag', r.drag.length > 0, JSON.stringify(r.drag));
+        rule(8, 'some space is marked v-drag', r.drag.length > 0, JSON.stringify(r.drag));
         const c = r.window.Controls;
         const under = r.visible.filter(({ rect: p }) => c.w > 0 && p.x < c.x + c.w && c.x < p.x + p.w && p.y < c.y + c.h && c.y < p.y + p.h);
         rule(8, 'no page lies under the native window buttons', under.length === 0, JSON.stringify({ controls: c, under }));

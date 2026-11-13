@@ -48,12 +48,20 @@ its own.
 | From | What |
 |---|---|
 | `@/kit/shell.js` | `connect(handlers)`: says `ready`, keeps `state` as Go sends it, reports the layout and says `shown` once the snapshot is drawn. `state`: the reactive copy of everything Go sends. `send(msg)`. `activeTab`. `saveData(value)`. `focusPage()`. `tabLabel(tab)`, `workspaceOf(tab)`, `controlSpace`. |
-| `@/kit/regions.js` | The directives a shell marks itself with. `v-shell`: this element is the shell's, so presses on it reach the shell. `v-drag`: this empty space moves the window. `v-page="tab.id"`: this tab's page shows here; an element with no tab shows none. |
+| `@/kit/regions.js` | The directives a shell marks itself with. `v-shell`: this element is the shell's, so presses on it reach the shell. `v-drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `v-shell`, stay the shell's. `v-page="tab.id"`: this tab's page shows here; an element with no tab shows none. |
+| `@/kit/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The kit finds a drag bar's controls by it, and the check reads it for rule 6. |
 | `@/theme.js`, `@/tones.js`, `@/design.css` | The colours, made from the frame colour, and the shared controls ([design-system.md](design-system.md)). |
 | `@extensions` | `ExtensionsToolbar`: the extensions' buttons, their menu and the install prompt. |
 
 The kit measures the marked elements and sends the layout by itself, once a frame and only
-when it changed. A shell never sends `layout`.
+when it changed. It watches each `v-drag` element's subtree, so a control that comes or goes
+in a bar, such as a tab added to a strip, is measured with nothing from the shell. A shell
+never sends `layout`.
+
+Go's window manager orders the regions, and the first that holds a point decides: the
+controls in the drag bars (the shell's), then the drag bars, then the rest of the shell's,
+and the pages under everything. In full screen nothing drags, so a bar that is also `v-shell`
+is the shell's there.
 
 ## The messages
 
@@ -88,7 +96,7 @@ canGoForward, workspace}`. The snapshot also has `frameWidth`, `running` (the ve
 |---|---|---|
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
-| `layout` | `shell`, `drag`, `tabs`, `viewW`, `viewH` | The regions, and the tabs shown with their rectangles. The kit sends it |
+| `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH` | The regions: the shell's, the controls inside the drag bars, and the drag bars; and the tabs shown with their rectangles. The kit sends it |
 | `newTab` | | Opens a tab in this window and makes it active |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
@@ -134,10 +142,11 @@ The check holds every shell to these, knowing nothing else about it.
    active one with `aria-selected="true"`. A click on it makes that tab active.
 5. **`focusAddressBar` puts the keyboard in a text field** where an address and Enter take
    the active tab there.
-6. Every button, field and tab it draws lies in a region it marked `v-shell`, so a press
-   reaches it and not the page beneath.
+6. **Every control it draws is the shell's,** a control as `@/kit/controls.js` says: it
+   lies in a region it marked `v-shell`, or in a `v-drag` bar, so a press reaches it and not
+   the page beneath, nor the window's drag.
 7. A press in the middle of a page it shows reaches that page.
-8. Some empty space is marked `v-drag`, and no page lies under the native window buttons.
+8. Some space is marked `v-drag`, and no page lies under the native window buttons.
 9. Reloaded, it comes back showing the same pages: what it needs to do so it saved.
 10. Switched to and away from, it starts from Go's data alone.
 11. It logs no errors.
@@ -151,8 +160,9 @@ install prompt have nowhere to show.
    `core/shells/registry.json`.
 2. In `main.js`: import `@/design.css` and mount the app with the three directives. The
    app calls `connect()` as it is made.
-3. Draw `state.tabs`; mark what is the shell's with `v-shell`, the empty top space with
-   `v-drag`, and each place a page shows with `v-page`.
+3. Draw `state.tabs`; mark what is the shell's with `v-shell`, the top bar with `v-drag`
+   (its gaps move the window, its controls stay the shell's), and each place a page shows
+   with `v-page`.
 4. Run it on the mock (below) and make the check pass.
 
 The smallest shell is the example, `shell/src/apps/shell/example/`: the one to copy. It is
@@ -173,8 +183,7 @@ connect({ focusAddressBar: () => address.value.focus() });
 </script>
 
 <template>
-  <header v-shell>
-    <div v-drag class="space" :style="{ width: controlSpace.left }"></div>
+  <header v-shell v-drag :style="{ paddingLeft: controlSpace.left }">
     <button
       v-for="tab in state.tabs" :key="tab.id"
       role="tab" :data-tab="tab.id" :aria-selected="tab.id === state.active"
@@ -183,7 +192,6 @@ connect({ focusAddressBar: () => address.value.focus() });
     <button aria-label="New Tab" @click="send({ t: 'newTab' })">+</button>
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
-    <div v-drag class="space rest"></div>
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
   </header>
   <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>
@@ -192,8 +200,7 @@ connect({ focusAddressBar: () => address.value.focus() });
 <style>
 #app { display: flex; flex-direction: column; }
 header { display: flex; align-items: center; gap: 4px; height: 44px; padding-right: 8px; background: var(--bar); color: var(--text); }
-.space { flex: none; align-self: stretch; }
-.rest { flex: 1; }
+input { flex: 1; }
 main { flex: 1; }
 </style>
 ```
@@ -219,7 +226,7 @@ profile of its own, so tests run side by side, and has the helpers the other tes
 `tools/test.sh mock` runs the check and every shell's own tests with the rest.
 
 **What the mock tells a test.** `/mock/regions?window=<n>` answers with the last layout:
-`regions` and `drag`, `visible` (each shown tab and its rectangle), `shell` (the id of the
+`regions` (the shell's, a drag bar's controls among them) and `drag`, `visible` (each shown tab and its rectangle), `shell` (the id of the
 shell the window loads), `focused` (the tab last given the keyboard), `unshownFocus` (the
 tabs a shell asked to give the keyboard while no window showed them), Go's `tabs` and
 `active`, and what it had before; with `x` and `y`, `hit` says what a press there does.

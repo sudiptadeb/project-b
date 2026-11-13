@@ -52,13 +52,14 @@ content hook is a Go change only; see [content-hooks.md](content-hooks.md).
 Stacked views: the page views of the tabs the window shows at the bottom, inside one
 holder, each where the layout puts it, with every other page view the window holds
 hidden; a full-window transparent shell on top. Shell components mark themselves with
-`v-shell`, the empty spaces in the top row that move the window mark themselves with
-`v-drag`, and `<PageView>` says where the active tab's page goes; the shell sends all of
-it as one `layout` message, whose `tabs` list each visible tab with its rectangle. The
-shell shows one tab, so the list has one entry. Go's window manager (`core/window`)
-owns the window: it takes that report and the engine's `WindowState` (size, buttons,
-corner radius, full screen), decides what each point does, and gives the engine one
-`WindowLayout` through `SetWindowLayout`: drag areas first, then shell areas, the
+`v-shell`, the top row's bars that move the window wherever they have no control mark
+themselves with `v-drag`, and `<PageView>` says where the active tab's page goes; the shell
+sends all of it as one `layout` message, with the controls the kit found in the drag bars,
+and `tabs`, each visible tab with its rectangle. The shell shows one tab, so the list has
+one entry. Go's window manager (`core/window`) owns the window: it takes that report and
+the engine's `WindowState` (size, buttons, corner radius, full screen), decides what each
+point does, and gives the engine one `WindowLayout` through `SetWindowLayout`: the drag
+bars' controls first, as shell areas, then the drag areas, then the other shell areas, the
 visible tabs, and the frame. The engine puts each listed tab's view at its rectangle,
 tells a tab that joins the list it is shown and one that leaves it that it is hidden,
 and titles the window after the visible tab that has the keyboard. In full screen it sends no drag areas. Close, minimise, zoom and full screen
@@ -94,7 +95,12 @@ part of the title bar that AppKit says no view needs (`_opaqueRectForWindowMoveW
 and a transparent view needs none. So the container covers everything but the drag areas
 with empty views that each claim all of themselves: the window server moves the window
 from the drag areas, as it does any app's title bar, and every other press goes through
-the hit test, so a drag across the address field selects text.
+the hit test, so a drag across the address field selects text. A drag area gives up the
+part an earlier region holds, as the hit test does, so a control in a bar that drags stays
+the app's. The window server only looks at the title bar, 66 points with the unified
+toolbar, so a drag area below it, such as the toolbar row under the tab strip, moves the
+window because the window hands a press there to the server itself
+(`performWindowDragWithEvent:` in `PBNSWindow`'s `sendEvent:`).
 
 The window goes on screen once Go has given it its first layout, frame included, so even its
 first frame has them. Until the shell's first frame, content paints the shell's view

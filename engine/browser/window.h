@@ -171,6 +171,10 @@ class Window {
   // Development only, for the driver.
   // Makes the window say it is the key window, or stop saying so.
   void ForceKeyForDriver(bool key);
+  // Whether the window moves itself from a press at this point in its own coordinates, y
+  // from the bottom: a drag area below the title bar, where the window server never
+  // moves the window by itself.
+  bool MovesFromApp(const gfx::PointF& in_window) const;
   size_t ignored_stale_bounds() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;

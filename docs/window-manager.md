@@ -93,8 +93,9 @@ On `Engine`, `SetWindowLayout(w WindowID, l WindowLayout)` replaces `SetPageBoun
 `SetShellRegions`, `SetDragRegions` and `SetWindowFrame`. On `Listener`,
 `WindowChanged(w WindowID, s WindowState)` replaces `WindowControlsChanged`. Each names
 the window by Go's id for it ([windows.md](windows.md)). The order of `Regions`
-is the decision: the manager puts drag areas first, then shell areas. Every engine only
-walks the list, so none of them knows the rule.
+is the decision: the manager puts the controls inside the drag bars first, as shell areas,
+then the drag areas, then the other shell areas. Every engine only walks the list, so none
+of them knows the rule.
 
 ## Per platform
 
@@ -102,9 +103,14 @@ walks the list, so none of them knows the rule.
   so the press falls through to AppKit's frame; a shell area answers the shell's view;
   anything else answers the page. The window server moves the window by itself from the
   parts of the title bar no view claims (`_opaqueRectForWindowMoveWhenInTitlebar`), so
-  the container claims everything but the drag areas, with one empty view per rectangle
-  of the rest: the shell and the page are the app's, the drag areas the system's.
-  Double-click to zoom and the resize edges stay with AppKit. `ReportControls` grows into the `WindowState` report.
+  the container claims everything but the drag areas, less what an earlier region holds,
+  with one empty view per rectangle of the rest: the shell and the page are the app's, the
+  drag areas the system's. The server looks only at the title bar, so below it, as in the
+  toolbar under a tab strip, a press that falls through to the frame would do nothing:
+  there the window hands the press to the server with `performWindowDragWithEvent:`, as
+  Chrome's frame does, so a drag area moves the window wherever it is. Double-click to
+  zoom and the resize edges stay with AppKit, and a drag area below the title bar zooms
+  on a double-click as the title bar does. `ReportControls` grows into the `WindowState` report.
 - **Windows.** The window procedure answers WM_NCHITTEST from the same walk: HTCAPTION
   for a drag area, which tells Windows "this is title bar", so it moves the window, snaps
   it and maximises on a double-click by itself; HTCLIENT for the shell and the page.
@@ -151,7 +157,8 @@ walks the list, so none of them knows the rule.
   layout, so the mock and the tests use the same rule the real engines mirror. Its
   full-screen button reports a `WindowState`.
 - **Tests:** `core/window` tests the decisions with a recording engine and no shell:
-  drag areas come before shell areas, the first layout carries the frame, an unchanged
+  a drag bar's controls come before the drag areas and those before the other shell areas,
+  the first layout carries the frame, an unchanged
   layout isn't sent twice, and full screen sends no drag areas. `core/engine` tests `At`.
   `core/app`'s hit-test test sends one `layout` message and checks the same points.
 

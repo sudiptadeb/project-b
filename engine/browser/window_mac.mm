@@ -185,18 +185,25 @@ NSColor* Hex(uint32_t rgb) {
   [self updateAppAreas];
 }
 
-// The app's areas are everything but the drag areas. The overlay takes every press, so
-// while it is there the whole window is the app's.
+// The app's areas are everything but the drag areas, as hitTest: answers them: the
+// regions are in order, so the part of a drag area an earlier region holds, such as a
+// control in a bar that drags, stays the app's. The overlay takes every press, so while
+// it is there the whole window is the app's.
 - (void)updateAppAreas {
   const NSSize size = self.bounds.size;
   SkRegion app(SkIRect::MakeWH(std::ceil(size.width), std::ceil(size.height)));
   if (!self.overlayView) {
+    SkRegion earlier;
     for (const project_b::Window::Region& r : _regions) {
       if (r.area == project_b::Window::Area::kDrag) {
         const gfx::Rect drag = gfx::ToEnclosedRect(r.rect);
-        app.op(SkIRect::MakeXYWH(drag.x(), drag.y(), drag.width(), drag.height()),
-               SkRegion::kDifference_Op);
+        SkRegion moves(SkIRect::MakeXYWH(drag.x(), drag.y(), drag.width(), drag.height()));
+        moves.op(earlier, SkRegion::kDifference_Op);
+        app.op(moves, SkRegion::kDifference_Op);
       }
+      const gfx::Rect held = gfx::ToEnclosingRect(r.rect);
+      earlier.op(SkIRect::MakeXYWH(held.x(), held.y(), held.width(), held.height()),
+                 SkRegion::kUnion_Op);
     }
   }
   for (PBAppAreaView* view in _appAreas) {
@@ -249,10 +256,16 @@ NSColor* Hex(uint32_t rgb) {
 
 @end
 
+// Private: the resize edge AppKit would resize from at a point in the window, or -1.
+@interface NSWindow (PBPrivate)
+- (long long)_resizeDirectionForMouseLocation:(CGPoint)location;
+@end
+
 // In a session with no real GUI the OS never makes us the key window. The driver can
 // say we are, so focus behaves as it does on a real desktop. Never set otherwise.
 @interface PBNSWindow : NSWindow
 @property(nonatomic) BOOL forceKeyForDriver;
+- (BOOL)movesFromAppAt:(NSPoint)point;
 @end
 
 @implementation PBNSWindow
@@ -267,13 +280,28 @@ NSColor* Hex(uint32_t rgb) {
   return _forceKeyForDriver || [super isMainWindow];
 }
 
-// AppKit zooms on a double-click in the title bar by itself. A drag area below the
-// title bar gets the same, following the user's "double-click a window's title bar to"
-// setting, as Chrome does (native_widget_mac_nswindow.mm).
+// Whether the app itself moves the window from a press here, a point in the window: a
+// drag area below the title bar, outside the edges AppKit resizes from. The window server
+// moves the window by itself from the drag areas in the title bar, but only there: below
+// it the press falls through to the frame, which does nothing with it.
+- (BOOL)movesFromAppAt:(NSPoint)point {
+  return NSPointInRect(point, self.contentLayoutRect) &&
+         [self.contentView hitTest:point] == nil &&
+         [self _resizeDirectionForMouseLocation:point] == -1;
+}
+
+// A drag area below the title bar is title bar too. A press there hands the window to
+// the window server to move, as Chrome's frame does (cr_mouseDownOnFrameView: in
+// native_widget_mac_nswindow.mm). AppKit zooms on a double-click in the title bar by
+// itself; a drag area below it gets the same, following the user's "double-click a
+// window's title bar to" setting.
 - (void)sendEvent:(NSEvent*)event {
+  if (event.type == NSEventTypeLeftMouseDown &&
+      [self movesFromAppAt:event.locationInWindow]) {
+    [self performWindowDragWithEvent:event];
+  }
   if (event.type == NSEventTypeLeftMouseUp && event.clickCount == 2 &&
-      NSPointInRect(event.locationInWindow, self.contentLayoutRect) &&
-      [self.contentView hitTest:event.locationInWindow] == nil) {
+      [self movesFromAppAt:event.locationInWindow]) {
     NSString* action = [NSUserDefaults.standardUserDefaults
         stringForKey:@"AppleActionOnDoubleClick"];
     if (!action || [action isEqualToString:@"Maximize"] ||
@@ -863,6 +891,10 @@ void Window::ForceKeyForDriver(bool key) {
 
 gfx::NativeWindow Window::native_window() const {
   return gfx::NativeWindow(impl_->window);
+}
+
+bool Window::MovesFromApp(const gfx::PointF& in_window) const {
+  return [impl_->window movesFromAppAt:NSMakePoint(in_window.x(), in_window.y())];
 }
 
 size_t Window::ignored_stale_bounds() const {

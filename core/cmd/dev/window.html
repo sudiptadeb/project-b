@@ -26,8 +26,8 @@
   then each change, as WindowState in core/mockengine has it. This page tells Go its size
   on /mock/window/size, as the real window reports its own.
 
-  Each press goes where the real window sends it: the layout's regions decide, drag first,
-  then shell, otherwise the page. The pointer is watched in this document and in every
+  Each press goes where the real window sends it: the layout's regions decide in their
+  order, the first that holds it, otherwise the page. The pointer is watched in this document and in every
   frame's, and the shell lets the pointer through to the pages while it is over a page's
   part. The shell never knows it runs here.
 -->
@@ -79,7 +79,7 @@
   pages[0].src = `/mock/page?window=${id}&slot=0`;
 
   // What a press at x, y does, as engine.WindowLayout.At decides it: the first region
-  // that holds the point, which lists the drag areas before the shell's.
+  // that holds the point, in the order Go's window manager gave them.
   function areaAt(x, y) {
     const r = state.regions.find((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
     return r ? r.area : 'page';

@@ -123,6 +123,60 @@ func TestFullScreenSendsNoDragAreas(t *testing.T) {
 	}
 }
 
+// A bar of controls that drags: its controls come first and are the shell's, then the bar
+// drags wherever it has none, then the rest of the shell; in full screen nothing drags and
+// the bar is the shell's like the rest.
+func TestTheControlsInADragBarComeFirst(t *testing.T) {
+	e := &recorder{}
+	m := one(e)
+	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, Controls: mac, CornerRadius: 26})
+	bar := engine.Rect{X: 0, Y: 0, W: 1100, H: 48}
+	field := engine.Rect{X: 300, Y: 8, W: 500, H: 32}
+	button := engine.Rect{X: 1050, Y: 10, W: 28, H: 28}
+	m.HandleShellLayout(1, ShellLayout{
+		Shell:    []engine.Rect{bar, {X: 0, Y: 48, W: 220, H: 652}},
+		Controls: []engine.Rect{field, button},
+		Drag:     []engine.Rect{bar},
+		ViewW:    1100,
+		ViewH:    700,
+	})
+	l := e.last()
+	want := []engine.Region{{Rect: field, Area: engine.AreaShell}, {Rect: button, Area: engine.AreaShell}, {Rect: bar, Area: engine.AreaDrag},
+		{Rect: bar, Area: engine.AreaShell}, {Rect: engine.Rect{X: 0, Y: 48, W: 220, H: 652}, Area: engine.AreaShell}}
+	if !reflect.DeepEqual(l.Regions, want) {
+		t.Fatalf("regions %+v", l.Regions)
+	}
+	for _, c := range []struct {
+		x, y float64
+		want engine.Area
+	}{
+		{400, 20, engine.AreaShell},  // The field.
+		{1060, 20, engine.AreaShell}, // A button.
+		{900, 20, engine.AreaDrag},   // The gap between them.
+		{100, 20, engine.AreaDrag},   // The bar's empty start.
+		{100, 600, engine.AreaShell}, // The sidebar.
+		{600, 300, engine.AreaPage},  // The page.
+	} {
+		if got := l.At(c.x, c.y); got != c.want {
+			t.Errorf("At(%v, %v) = %v, want %v", c.x, c.y, got, c.want)
+		}
+	}
+	m.HandleWindowChanged(1, engine.WindowState{W: 1100, H: 700, FullScreen: true})
+	l = e.last()
+	for _, g := range l.Regions {
+		if g.Area == engine.AreaDrag {
+			t.Fatalf("a drag area in full screen: %+v", l.Regions)
+		}
+	}
+	if l.At(900, 20) != engine.AreaShell || l.At(400, 20) != engine.AreaShell {
+		t.Fatalf("in full screen the gap is %v and the field %v", l.At(900, 20), l.At(400, 20))
+	}
+	m.HandleShellCrashed(1)
+	if len(e.last().Regions) != 0 {
+		t.Fatalf("after a crash the controls are still claimed: %+v", e.last().Regions)
+	}
+}
+
 func TestAnUnchangedLayoutIsNotSentTwice(t *testing.T) {
 	e := &recorder{}
 	m := one(e)

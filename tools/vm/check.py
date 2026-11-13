@@ -320,7 +320,8 @@ def layout():
     A launch of its own, with its own profile, so the checks after it still start from a fresh
     app. Returns the shell's rectangles as (x, y, w, h) in window points from the top left for
     the window size it opened at, with two tabs open, and AppKit's own report of the window
-    buttons and the page ("bounds").
+    buttons and the page ("bounds"). "gap" is the toolbar's gap between the address field and
+    the button after it.
     """
     ask = driven(CAL, f"{CAL}/profile")
 
@@ -340,7 +341,10 @@ def layout():
                    "const q=s=>r(document.querySelector(s));"
                    "return {w:innerWidth,h:innerHeight,field:q('form.field'),back:q('[aria-label=Back]'),"
                    "forward:q('[aria-label=Forward]'),toggle:q('[aria-label$=sidebar]'),layout:q('button.layout'),"
-                   "settings:q('button.settings'),sidebar:q('nav.sidebar'),rest:q('.strip .rest'),"
+                   "settings:q('button.settings'),sidebar:q('nav.sidebar'),strip:q('.strip'),"
+                   "gap:(()=>{const f=document.querySelector('form.field').getBoundingClientRect(),"
+                   "n=document.querySelector('form.field').nextElementSibling.getBoundingClientRect();"
+                   "return [f.right,f.y,n.left-f.right,f.height]})(),"
                    "tabs:[...document.querySelectorAll('[role=tab]')].map(r)}})()")
         found["bounds"] = json.loads(ask("bounds"))
         return found
@@ -1290,14 +1294,16 @@ if not closed_two and changed(now, two) < changed(now, one):
     desk.key("cmd+w")
     time.sleep(1)
 
-# Dragging and double-clicking, tabs on the side. Only the empty spaces in the top row drag;
-# the sidebar never does. The outer 3 points of the left and right edges are AppKit's resize
-# zone.
+# Dragging and double-clicking, tabs on the side. The top row drags wherever it has no
+# control, the toolbar's gaps too; the sidebar never does. The outer 3 points of the left and
+# right edges are AppKit's resize zone. The address field flexes, so the toolbar's gap keeps
+# its distance from the window's right edge.
 gap = L["zoom"][0] + L["zoom"][2] / 2 + 4
 TOP_EDGE = ("the top frame edge", W / 2, 2)
+SIDE_GAP = ("the toolbar's gap after the address field", W - (V["w"] - middle(V["gap"])[0]), middle(V["gap"])[1])
 RESIZE_EDGES = (("the left edge", 1, H / 2), ("the right edge", W - 1, H / 2))
 SIDE_PLACES = (("the gap right of the buttons", gap, 14), ("the end of the top row", W - 6, TOP))
-for place in SIDE_PLACES + (TOP_EDGE,):
+for place in SIDE_PLACES + (TOP_EDGE, SIDE_GAP):
     drags(*place, home)
 drags("the empty sidebar", 100, H - 40, home, "leaves the window alone")
 for place in RESIZE_EDGES:
@@ -1528,12 +1534,14 @@ check("a click reaches the address bar, tabs on top", changed(page_until(lambda 
 click_on(T["back"])
 check("a click reaches the back button, tabs on top", changed(page_until(lambda p: changed(p, on_top) < 0.01), on_top) < 0.01 and still())
 
-STRIP = ("the empty strip", W - (T["w"] - T["rest"][0] - T["rest"][2]) - 60, middle(T["rest"])[1])
-for place in (STRIP, TOP_EDGE):
+STRIP = ("the empty strip", W - (T["w"] - T["strip"][0] - T["strip"][2]) - 60, middle(T["strip"])[1])
+TOP_GAP = ("the toolbar's gap after the address field, under the strip", W - (T["w"] - middle(T["gap"])[0]), middle(T["gap"])[1])
+for place in (STRIP, TOP_EDGE, TOP_GAP):
     drags(*place, home)
 for place in RESIZE_EDGES:
     drags(*place, home, "resizes the window")
 zooms(*STRIP, home)
+zooms(*TOP_GAP, home)
 full_screen("tabs on top, green button", lambda: desk.click(PX + L["zoom"][0], PY + L["zoom"][1]), home, BAR, on_top=True)
 
 switch_layout(T["layout"], False, "brings the tabs back to the side")

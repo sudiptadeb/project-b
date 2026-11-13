@@ -41,6 +41,21 @@ const stopServer = lib.stop;
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   };
   const bar =ui.getByRole('combobox', { name: 'Address' });
+  // The toolbar row moves the window in its gaps and nowhere else: the gap between the
+  // address field and the buttons after it drags, the field and a button are shell, and
+  // the page is the page's.
+  const toolbarDrags = async (layout) => {
+    const { gap, field, back: b } = await shellFrame().evaluate(() => {
+      const middle = (r) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+      const f = document.querySelector('form.field').getBoundingClientRect();
+      const after = document.querySelector('form.field').nextElementSibling.getBoundingClientRect();
+      return { gap: { x: (f.right + after.left) / 2, y: f.y + f.height / 2 }, field: middle(f), back: middle(document.querySelector('[aria-label=Back]').getBoundingClientRect()) };
+    });
+    const hit = async (at) => (await regions(at)).hit;
+    check(`${layout}: the gap between the address field and the buttons drags`, (await hit(gap)) === 'drag', JSON.stringify({ gap, hit: await hit(gap) }));
+    check(`${layout}: the address field and the back button are shell`, (await hit(field)) === 'shell' && (await hit(b)) === 'shell', JSON.stringify([await hit(field), await hit(b)]));
+    check(`${layout}: the page is the page's`, (await hit({ x: 600, y: 400 })) === 'page');
+  };
   const list = ui.locator('#suggestions');
   const options = ui.getByRole('option');
   const mock = page.frameLocator('iframe.mock-page');
@@ -54,7 +69,7 @@ const stopServer = lib.stop;
   check('opens with nothing to go back to or reload', (await back.isDisabled()) && (await forward.isDisabled()) && (await reload.isDisabled()));
 
   let r = await regions();
-  check('opens empty with the top bar and the sidebar as shell', r.regions.length === 2 && (await bar.inputValue()) === '', JSON.stringify(r));
+  check('opens empty with the top bar and the sidebar as shell', r.regions.some((g) => g.x === 0 && g.y === 0 && g.w === 1100) && (await regions({ x: 100, y: 600 })).hit === 'shell' && (await bar.inputValue()) === '', JSON.stringify(r));
   check('the window loads the standard shell', r.shell === 'standard', r.shell);
   check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   // The dev window places the mock page where the layout puts it, as the real window does.
@@ -114,8 +129,9 @@ const stopServer = lib.stop;
   check('titles arrive after the visit', /Mock example/.test(await options.first().innerText()));
 
   r = await regions();
-  check('the box becomes a third shell rectangle', r.regions.length === 3, JSON.stringify(r.regions));
   const box = await list.boundingBox();
+  const boxRegion = (r) => r.regions.some((g) => g.x === box.x && g.y === box.y && g.w === box.width && g.h === box.height);
+  check('the box becomes a shell rectangle', boxRegion(r), JSON.stringify(r.regions));
   const over = await regions({ x: box.x + 20, y: box.y + 10 });
   check('the box extends over the page', box.y + box.height > r.bounds.y + 40, JSON.stringify({ box, bounds: r.bounds }));
   check('a click on the box goes to the shell', over.hit === 'shell');
@@ -133,7 +149,7 @@ const stopServer = lib.stop;
   await page.keyboard.press('Escape');
   await settle(page);
   r = await regions();
-  check('escape closes the box and its rectangle goes', (await list.count()) === 0 && r.regions.length === 2, JSON.stringify(r.regions));
+  check('escape closes the box and its rectangle goes', (await list.count()) === 0 && !boxRegion(r), JSON.stringify(r.regions));
 
   // Clicking a suggestion.
   await bar.fill('');
@@ -231,10 +247,11 @@ const stopServer = lib.stop;
   const windowLeft = (await toggle.boundingBox()).x;
   check('the first control starts after the window controls the engine reported', windowLeft === 19 + 60 + 8, String(windowLeft));
   r = await regions({ x: 74, y: 16 });
-  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 5 && r.hit === 'drag', JSON.stringify(r.drag));
+  check('the empty strip between the window buttons and the controls drags the window', r.drag.length === 1 && r.hit === 'drag', JSON.stringify(r.drag));
   check('the empty part of the sidebar is shell and never drags', (await regions({ x: 100, y: 600 })).hit === 'shell');
   check('the frame\'s left, right and bottom edges never drag', (await regions({ x: 2, y: 300 })).hit !== 'drag' && (await regions({ x: 1098, y: 300 })).hit !== 'drag' && (await regions({ x: 600, y: 698 })).hit !== 'drag');
   check('the control itself is shell, not drag', (await regions({ x: windowLeft + 12, y: 16 })).hit === 'shell');
+  await toolbarDrags('tabs on the side');
   // The frame colour has one owner: Go gave it to the window and to the shell.
   const frame = await shellFrame().evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--frame').trim());
   check('the window and the shell paint the frame colour Go owns', frame === '#4f9e9e' && (await regions()).windowColor === frame, `${frame} ${(await regions()).windowColor}`);
@@ -401,10 +418,34 @@ const stopServer = lib.stop;
   check('without a sidebar the page spans the width below two rows', r.bounds.x === 4 && r.bounds.y === 92 && r.bounds.w === 1100 - 8, JSON.stringify(r.bounds));
   check('and the dev window moves the page there', await until(placed), JSON.stringify(await page.locator('iframe.mock-page').boundingBox()));
   check('the empty strip drags the window', (await regions({ x: 900, y: 16 })).hit === 'drag');
-  check('the bands beside the toolbar under the strip are shell, not drag', (await regions({ x: 2, y: 60 })).hit === 'shell');
+  check('the bands beside the toolbar under the strip drag too, as the row they are in', (await regions({ x: 2, y: 60 })).hit === 'drag');
+  await toolbarDrags('tabs on top');
+  const firstTab = await rows.first().boundingBox();
+  check('a tab in the strip is shell', (await regions({ x: firstTab.x + firstTab.width / 2, y: firstTab.y + firstTab.height / 2 })).hit === 'shell');
+  // Where the next tab goes is the strip's empty end until it comes; the kit sees it come
+  // and measures it, with nothing from the shell.
+  const newTab = await ui.locator('.strip .new-tab').boundingBox();
+  const next = { x: newTab.x + 100, y: newTab.y + newTab.height / 2 };
+  check('the strip\'s empty end drags', (await regions(next)).hit === 'drag');
+  // With nothing else changing at all, a button put into the strip's empty end by
+  // hand is shell, and the end drags again once it is gone.
+  const end = await shellFrame().evaluate(() => {
+    const strip = document.querySelector('.strip');
+    const b = document.createElement('button');
+    b.id = 'by-hand';
+    b.style.cssText = 'position: absolute; top: 10px; right: 120px; width: 40px; height: 28px';
+    strip.append(b);
+    const r = b.getBoundingClientRect();
+    return { x: r.x + 20, y: r.y + 14 };
+  });
+  check('a control that comes into a drag bar is shell, measured by the kit alone', await until(async () => (await regions(end)).hit === 'shell'), (await regions(end)).hit);
+  await shellFrame().evaluate(() => document.getElementById('by-hand').remove());
+  check('and where it went drags again', await until(async () => (await regions(end)).hit === 'drag'), (await regions(end)).hit);
   await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
   await shellFrame().waitForFunction(() => document.querySelectorAll('[role=tab]').length === 3);
   check('New Tab works from the strip', (await bar.inputValue()) === '');
+  const added = await rows.nth(2).boundingBox();
+  check('the tab that came is shell where the empty end was', added.x < next.x && next.x < added.x + added.width && await until(async () => (await regions(next)).hit === 'shell'), JSON.stringify({ added, next, hit: (await regions(next)).hit }));
   await rows.first().click();
   await shellFrame().waitForFunction(() => document.querySelector('[role=tab]').getAttribute('aria-selected') === 'true');
   check('clicking a strip tab activates it', true);
@@ -514,7 +555,7 @@ const stopServer = lib.stop;
   let bb = await bubble.boundingBox();
   check('the download shows as a bubble in the page\'s bottom-left corner', bb.x === r.bounds.x && bb.y + bb.height === r.bounds.y + r.bounds.h, JSON.stringify({ bb, bounds: r.bounds }));
   check('the bubble takes no layout space', JSON.stringify(r.bounds) === pageBounds, JSON.stringify(r.bounds));
-  check('the bubble is shell, so its click does not reach the page', r.regions.length === 3 && (await regions({ x: bb.x + 10, y: bb.y + 10 })).hit === 'shell', JSON.stringify(r.regions));
+  check('the bubble is shell, so its click does not reach the page', r.regions.some((g) => g.x === bb.x && g.y === bb.y) && (await regions({ x: bb.x + 10, y: bb.y + 10 })).hit === 'shell', JSON.stringify(r.regions));
   check('just above the bubble is still the page', (await regions({ x: bb.x + 10, y: bb.y - 10 })).hit === 'page');
   const relaunch = ui.getByRole('button', { name: /Relaunch to update/ });
   await relaunch.waitFor({ timeout: 10000 });

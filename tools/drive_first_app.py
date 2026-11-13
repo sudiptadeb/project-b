@@ -228,6 +228,31 @@ def click(app, selector):
     return app.cmd("click", x, y)
 
 
+def toolbar_gap(app):
+    """The middle of the gap between the address field and the button after it, in shell
+    coordinates: empty toolbar, which drags the window."""
+    return app.js("(()=>{const f=document.querySelector('form.field').getBoundingClientRect();"
+                  "const n=document.querySelector('form.field').nextElementSibling.getBoundingClientRect();"
+                  "return [(f.right+n.left)/2,f.y+f.height/2]})()")
+
+
+def served(app):
+    """What AppKit last told the window server it may drag by itself: (x, y, w, h)
+    rectangles in window points, y from the bottom."""
+    return [tuple(map(float, r)) for r in re.findall(r"\{\{([\d.]+), ([\d.]+)\}, \{([\d.]+), ([\d.]+)\}\}", app.cmd("dragregion"))]
+
+
+def moves_window(app, x, y):
+    """What a real drag from this point in shell coordinates does: whether the window
+    moves. Inside the title bar the window server moves it by itself from what AppKit
+    gives it; below, only the window can hand the press to the server."""
+    press = app.cmd("press", x, y)
+    if press == "titlebar":
+        height = json.loads(app.cmd("bounds"))["content"][1]
+        return any(r[0] <= x < r[0] + r[2] and r[1] <= height - y < r[1] + r[3] for r in served(app))
+    return press == "moves"
+
+
 def box(app):
     return app.js("(()=>{const r=document.querySelector('#suggestions').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()")
 
@@ -567,12 +592,20 @@ def browsing_checks():
     # AppKit gives it, without asking the app. Given the address bar, it moved the window
     # on a drag there instead of selecting text; given nothing, no drag moved it.
     region = app.cmd("dragregion")
-    served = [tuple(map(float, r)) for r in re.findall(r"\{\{([\d.]+), ([\d.]+)\}, \{([\d.]+), ([\d.]+)\}\}", region)]
+    rects = served(app)
     def given(x, y):
-        return any(r[0] <= x < r[0] + r[2] and r[1] <= window["content"][1] - y < r[1] + r[3] for r in served)
+        return any(r[0] <= x < r[0] + r[2] and r[1] <= window["content"][1] - y < r[1] + r[3] for r in rects)
     check("the window server isn't given the address bar to drag by itself", region != "unknown" and not given(bar_x, bar_y), region)
     gap_x = window["buttonsEnd"] + 4
     check("the window server is given the gap right of the window buttons", given(gap_x, BAR_Y), (gap_x, region))
+    # The toolbar drags wherever it has no control: its gaps are the frame's, and the
+    # window server's, and the controls in it stay the shell's.
+    tool_x, tool_y = toolbar_gap(app)
+    tool = app.cmd("hit", tool_x, tool_y)
+    check("the toolbar's gap between the address field and the buttons falls through to the frame", tool == "frame", (tool_x, tool_y, tool))
+    check("a drag from that gap moves the window", moves_window(app, tool_x, tool_y), (tool_x, tool_y, app.cmd("press", tool_x, tool_y), region))
+    back_x, back_y = center(app, "[aria-label=Back]")
+    check("the back button in the toolbar belongs to the shell", app.cmd("hit", back_x, back_y) == "shell", app.cmd("hit", back_x, back_y))
     # An empty tab holds the blank page, so its page area is a page in content's own
     # colours, never the frame colour showing through. The frame colour used to take
     # over a few seconds in, so this looks after ten.
@@ -947,6 +980,15 @@ def browsing_checks():
     check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")
     strip_empty = app.cmd("hit", 1000, BAR_Y)
     check("the empty strip falls through to the frame, which drags", strip_empty == "frame", strip_empty)
+    tool_x, tool_y = toolbar_gap(app)
+    tool = app.cmd("hit", tool_x, tool_y)
+    check("under the strip, the toolbar's gap falls through to the frame too", tool == "frame", (tool_x, tool_y, tool))
+    check("a drag from the empty strip moves the window", moves_window(app, 1000, BAR_Y), app.cmd("press", 1000, BAR_Y))
+    check("and a drag from the toolbar's gap under the strip moves it too, below the title bar", moves_window(app, tool_x, tool_y), (tool_x, tool_y, app.cmd("press", tool_x, tool_y)))
+    left_x = app.js("(()=>{const r=document.querySelector('[aria-label=Reload]').getBoundingClientRect();return r.right+(document.querySelector('form.field').getBoundingClientRect().x-r.right)/2})()")
+    check("and from the gap before the address field", moves_window(app, left_x, tool_y), (left_x, tool_y, app.cmd("press", left_x, tool_y)))
+    field_x, field_y = center(app, "input")
+    check("and the address field under the strip belongs to the shell", app.cmd("hit", field_x, field_y) == "shell", app.cmd("hit", field_x, field_y))
     joint = app.js("(()=>{const a=document.querySelector('.strip .shape').getBoundingClientRect();const b=document.querySelector('.strip').getBoundingClientRect();return [a.bottom,b.bottom]})()")
     check("the active tab's shape runs under the bar, so no line shows between them", joint[0] > joint[1], joint)
     n = app.js(ROWS)
@@ -956,6 +998,8 @@ def browsing_checks():
     # The shell re-reports its drag rectangles a frame after the strip changed. A click
     # inside that frame would still hit the old empty space.
     time.sleep(0.3)
+    added_x, added_y = center(app, "[role=tab][aria-selected=true]")
+    check("the tab Cmd+T added to the strip belongs to the shell", app.cmd("hit", added_x, added_y) == "shell", (added_x, added_y, app.cmd("hit", added_x, added_y)))
     click(app, "[role=tab][aria-selected=true] .close")
     app.wait(f"{ROWS}==={n}", 10)
     check("the close button on a strip tab closes it", True)

@@ -7,8 +7,8 @@ import { activeTab, controlSpace as controls, send, state } from '@/kit/shell.js
 import { phone, tabsOnTop, view } from './state.js';
 
 // With the tabs on the side this row is the title bar: it holds the space for the native
-// window controls, and its empty parts drag the window. With the tabs on top the strip
-// above is the title bar and this row is an ordinary toolbar.
+// window controls. With the tabs on top the strip above is the title bar and this row is
+// a toolbar. Either way the row moves the window wherever it has no control.
 const titleBar = computed(() => !tabsOnTop.value);
 
 function switchLayout() {
@@ -17,16 +17,15 @@ function switchLayout() {
 </script>
 
 <template>
-  <header v-shell class="top" :class="{ toolbar: !titleBar }">
-    <!-- As the title bar, the frame's bands around the bar are empty spaces in the top row,
-         so they drag the window. Under the tab strip they are just shell. -->
-    <div v-if="titleBar" v-drag class="band top"></div>
+  <!-- The bar and the frame's bands around it drag the window in their gaps. It stays the
+       shell's too, so in full screen, where nothing drags, a press there reaches no page. -->
+  <header v-shell v-drag class="top" :class="{ toolbar: !titleBar }">
+    <div v-if="titleBar" class="band top"></div>
     <div class="row">
-    <div v-if="titleBar" v-drag class="band side"></div>
-    <div v-else class="band side"></div>
+    <div class="band side"></div>
     <div class="bar">
     <template v-if="titleBar">
-      <div v-drag class="space" :style="{ width: controls.left }"></div>
+      <div class="space" :style="{ width: controls.left }"></div>
       <button
         class="icon-button"
         type="button"
@@ -57,13 +56,11 @@ function switchLayout() {
     <button class="icon-button settings" type="button" aria-label="Settings" title="Settings" @click="send({ t: 'run', text: 'app.settings' })">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
-    <div v-if="titleBar" v-drag class="space" :style="{ width: controls.right }"></div>
-    <div v-else class="space" style="width: 8px"></div>
+    <div class="space" :style="{ width: titleBar ? controls.right : '8px' }"></div>
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>
     </div>
-    <div v-if="titleBar" v-drag class="band side"></div>
-    <div v-else class="band side"></div>
+    <div class="band side"></div>
     </div>
   </header>
 </template>

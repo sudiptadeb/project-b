@@ -1,49 +1,60 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 // A colour from a row of presets, and with custom set, any colour from the system's
 // picker behind the last swatch, which keeps a + on it so it reads as a picker. It is one
-// Tab stop; the arrow keys move the choice, as a radio group's do. Colours are '#rrggbb'.
+// Tab stop; the arrow keys move the choice, as a radio group's do. colors holds '#rrggbb'
+// strings, or { color, name } where a preset has a name to be read out.
 const props = defineProps({ modelValue: String, colors: Array, label: String, custom: Boolean });
 const emit = defineEmits(['update:modelValue']);
 
 const group = ref(null);
-const isCustom = computed(() => !props.colors.includes(props.modelValue));
+const list = computed(() => props.colors.map((c) => (typeof c === 'string' ? { color: c, name: c } : c)));
+// The choice as the user last made it, ahead of the owner's answer, so quick presses
+// count from it and focus follows it at once.
+const current = ref(props.modelValue);
+watch(() => props.modelValue, (v) => (current.value = v));
+const isCustom = computed(() => !list.value.some((c) => c.color === current.value));
 
-function onKey(e) {
+function choose(c) {
+  current.value = c;
+  emit('update:modelValue', c);
+}
+
+async function onKey(e) {
   const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
   if (!step || e.target.type === 'color') return;
   e.preventDefault();
-  const i = props.colors.indexOf(props.modelValue);
-  const next = props.colors[(i + step + props.colors.length) % props.colors.length];
-  emit('update:modelValue', next);
-  requestAnimationFrame(() => group.value?.querySelector('[aria-checked="true"]')?.focus());
+  const i = list.value.findIndex((c) => c.color === current.value);
+  choose(list.value[(i + step + list.value.length) % list.value.length].color);
+  await nextTick();
+  group.value?.querySelector('[aria-checked="true"]')?.focus();
 }
 </script>
 
 <template>
   <div ref="group" class="ui-swatches" role="radiogroup" :aria-label="label" @keydown="onKey">
     <button
-      v-for="c in colors"
-      :key="c"
+      v-for="c in list"
+      :key="c.color"
       type="button"
       role="radio"
       class="ui-swatch"
-      :aria-checked="c === modelValue"
-      :aria-label="c"
-      :title="c"
-      :tabindex="c === modelValue || (isCustom && c === colors[0]) ? 0 : -1"
-      :style="{ background: c }"
-      @click="emit('update:modelValue', c)"
+      :aria-checked="c.color === current"
+      :aria-label="c.name"
+      :title="c.name"
+      :tabindex="c.color === current || (isCustom && c === list[0]) ? 0 : -1"
+      :style="{ background: c.color }"
+      @click="choose(c.color)"
     ></button>
     <label
       v-if="custom"
       class="ui-swatch custom"
       :class="{ on: isCustom }"
       title="Custom colour"
-      :style="isCustom ? { background: modelValue } : null"
+      :style="isCustom ? { background: current } : null"
     >
-      <input type="color" :value="modelValue" aria-label="Custom colour" @input="emit('update:modelValue', $event.target.value)" />
+      <input type="color" :value="current" aria-label="Custom colour" @input="choose($event.target.value)" />
     </label>
   </div>
 </template>

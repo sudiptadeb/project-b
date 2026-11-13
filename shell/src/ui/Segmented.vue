@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 // Two to four short choices side by side, one of them on: Theme's System, Light and Dark.
 // It is one Tab stop; the arrow keys move the choice, as a radio group's do. options is a
@@ -8,15 +8,24 @@ const props = defineProps({ modelValue: String, options: Array, label: String })
 const emit = defineEmits(['update:modelValue']);
 
 const group = ref(null);
+// The choice as the user last made it, ahead of the owner's answer, so quick presses
+// count from it and focus follows it at once.
+const current = ref(props.modelValue);
+watch(() => props.modelValue, (v) => (current.value = v));
 
-function onKey(e) {
+function choose(v) {
+  current.value = v;
+  emit('update:modelValue', v);
+}
+
+async function onKey(e) {
   const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
   if (!step) return;
   e.preventDefault();
-  const i = props.options.findIndex((o) => o.value === props.modelValue);
-  const next = props.options[(i + step + props.options.length) % props.options.length];
-  emit('update:modelValue', next.value);
-  requestAnimationFrame(() => group.value?.querySelector('[aria-checked="true"]')?.focus());
+  const i = props.options.findIndex((o) => o.value === current.value);
+  choose(props.options[(i + step + props.options.length) % props.options.length].value);
+  await nextTick();
+  group.value?.querySelector('[aria-checked="true"]')?.focus();
 }
 </script>
 
@@ -27,9 +36,9 @@ function onKey(e) {
       :key="o.value"
       type="button"
       role="radio"
-      :aria-checked="o.value === modelValue"
-      :tabindex="o.value === modelValue ? 0 : -1"
-      @click="emit('update:modelValue', o.value)"
+      :aria-checked="o.value === current"
+      :tabindex="o.value === current ? 0 : -1"
+      @click="choose(o.value)"
     >{{ o.label }}</button>
   </div>
 </template>

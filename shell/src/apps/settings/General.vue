@@ -12,7 +12,14 @@ import { send, state } from './state.js';
 // Ulaa design's modes: Personal, Work, Kids, Open Season and Incognito, with Work's blue
 // the one the Work profile template sets, so a profile made from it shows a preset. The
 // shell derives its other tones from whichever is picked.
-const presets = ['#4f9e9e', '#0faaaa', '#5b7fd6', '#faa804', '#d82b1f', '#384562'];
+const presets = [
+  { name: 'Dusty teal', color: '#4f9e9e' },
+  { name: 'Teal', color: '#0faaaa' },
+  { name: 'Blue', color: '#5b7fd6' },
+  { name: 'Amber', color: '#faa804' },
+  { name: 'Red', color: '#d82b1f' },
+  { name: 'Slate', color: '#384562' },
+];
 
 const themes = [
   { value: 'system', label: 'System' },

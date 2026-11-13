@@ -11,6 +11,7 @@ const props = defineProps({
   validate: { type: Function, default: () => '' },
   label: String,
   placeholder: String,
+  disabled: Boolean,
 });
 const emit = defineEmits(['commit', 'cancel']);
 
@@ -70,6 +71,7 @@ defineExpose({ focus: () => input.value.focus(), select: () => input.value.selec
       :aria-label="label"
       :aria-invalid="error ? 'true' : undefined"
       :placeholder="placeholder"
+      :disabled="disabled"
       @input="onInput"
       @keydown.enter.prevent="onEnter"
       @keydown.esc="onEscape"

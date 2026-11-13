@@ -76,11 +76,10 @@ function error(flag, text) {
           <option value="">Off</option>
           <option v-for="c in f.choices" :key="c" :value="c">{{ c }}</option>
         </select>
-        <!-- A flag the build left out can't be set, so its field is a plain disabled one. -->
-        <input v-else-if="!f.built" :id="'flag-' + f.id" class="field value" placeholder="Off" disabled :value="f.value" />
         <Field
           v-else
           class="value"
+          :disabled="!f.built"
           :label="f.name"
           placeholder="Off"
           :value="f.value"

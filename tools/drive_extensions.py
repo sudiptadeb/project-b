@@ -99,6 +99,26 @@ def settings_click(app, selector):
     app.cmd("click", x, y)
 
 
+def settings_click_found(app, find):
+    """Clicks the element the JavaScript expression find returns, once it is there: a menu
+    item or a dialog's button, which the page draws a frame after it is asked for."""
+    expr = f"(()=>{{const e=({find});if(!e)return null;const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()"
+    deadline = time.time() + 5
+    while (at := settings(app, expr)) is None:
+        if time.time() > deadline:
+            raise TimeoutError(f"nothing found by {find}")
+        time.sleep(0.1)
+    app.cmd("click", *at)
+
+
+def remove_in_settings(app, name):
+    """Removes an extension as a person does: its row's menu, Remove…, then the dialog's
+    Remove, which asks first."""
+    settings_click(app, f"[aria-label={json.dumps('Actions for ' + name)}]")
+    settings_click_found(app, "[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.trim()==='Remove…')")
+    settings_click_found(app, "[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='Remove')")
+
+
 def menu_click(app, selector):
     """Clicks something in the extensions menu, once the window knows the menu is the
     shell's: its rectangle reaches the window a frame or two after it is drawn."""
@@ -331,7 +351,7 @@ def extension_checks():
     check("and it stops blocking", fetch_ad(app) == "reached")
 
     open_extension_settings(app)
-    settings_click(app, f"[aria-label={json.dumps('Remove ' + UBOL_NAME)}]")
+    remove_in_settings(app, UBOL_NAME)
     settings_wait(app, f"!({INSTALLED}).includes({json.dumps(UBOL_NAME)})", 30)
     check("Remove uninstalls it", True)
 
@@ -341,7 +361,7 @@ def extension_checks():
     before = pages_seen(app)
     open_extension_settings(app)
     for left in (1, 0):
-        settings_click(app, f"[aria-label={json.dumps('Remove ' + TEST_NAME)}]")
+        remove_in_settings(app, TEST_NAME)
         settings_wait(app, f"({INSTALLED}).length==={left}||{left}===0&&({INSTALLED}).length===0", 30)
     close_settings(app)
     install_from_store(app, TEST_ID)
@@ -364,12 +384,13 @@ def flag_off_checks():
     click(app, "[aria-label='Settings']")
     settings_wait(app, "!!document.querySelector('.nav')", 30)
     settings(app, "[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Flags').click()")
-    settings_wait(app, "!!document.querySelector('#flags')")
+    settings_wait(app, "!!document.querySelector('section[aria-label=Flags]')")
     settings_click(app, "[role=switch]")
-    settings_wait(app, "!!document.querySelector('.row .primary')")
+    relaunch = "[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Relaunch')"
+    settings_wait(app, f"!!{relaunch}")
     with open(os.path.join(profile, "flags.json")) as f:
         check("the Extensions switch saves the flag, and Relaunch shows", json.load(f) == {"extensions": "on"})
-    settings_click(app, ".row .primary")
+    settings_click_found(app, relaunch)
     app.proc.wait(timeout=30)
     App.running.remove(app)
     again = []

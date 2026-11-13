@@ -15,6 +15,18 @@ set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/chromium/src
+# One build at a time: every build re-points chromium/src/project_b at its own checkout and
+# shares out/, so build.sh holds out/.pb-build.lock for its whole run. A caller that already
+# holds it around several builds (the release) says so with PB_BUILD_LOCKED=1.
+if [ "${PB_BUILD_LOCKED:-}" != 1 ]; then
+  mkdir -p "$SRC/out"
+  exec python3 -I -c 'import fcntl, os, sys
+f = open(sys.argv[1], "a")
+fcntl.flock(f, fcntl.LOCK_EX)
+os.set_inheritable(f.fileno(), True)
+os.environ["PB_BUILD_LOCKED"] = "1"
+os.execv("/bin/bash", ["/bin/bash"] + sys.argv[2:])' "$SRC/out/.pb-build.lock" "$0" "$@"
+fi
 OUT=${OUT:-out/pb}
 RELEASE=${RELEASE:-0}
 export WITHOUT=${WITHOUT:-}

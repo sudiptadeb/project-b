@@ -204,15 +204,20 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await until(() => manifests > 0);
   const counted = manifests;
   await page.getByRole('radio', { name: 'Blue' }).click();
-  check('a frame colour recolours the window and the shell, and is saved', await until(async () => (await root('--frame')) === '#3470d0' && (await regions()).windowColor === '#3470d0' && prefsFile().frameColor === '#3470d0'));
+  check('a frame colour recolours the window and the shell, and is saved', await until(async () => (await root('--frame')) === '#5b7fd6' && (await regions()).windowColor === '#5b7fd6' && prefsFile().frameColor === '#5b7fd6'));
+  const swatch = page.getByRole('radio', { name: 'Blue' });
+  await swatch.press('ArrowRight');
+  check('an arrow key moves the colour, and focus with it', await until(async () => prefsFile().frameColor === '#faa804' && (await page.getByRole('radio', { name: 'Amber' }).evaluate((e) => e === document.activeElement))));
+  await page.getByRole('radio', { name: 'Blue' }).click();
   await page.getByRole('button', { name: 'Check for updates' }).click();
-  check('Check asks the update manager, which says it is up to date', await until(async () => (await page.locator('.status').textContent()) === 'Up to date'));
+  const updateStatus = page.getByRole('region', { name: 'Updates' }).getByRole('status');
+  check('Check asks the update manager, which says it is up to date', await until(async () => (await updateStatus.textContent()).trim() === 'Up to date'));
   check('one check reached the release server', manifests === counted + 1, `${counted} -> ${manifests}`);
   await autoUpdate.click();
   check('the switch turns automatic updates off and saves it in the root\'s update folder, for every copy', await until(() => updateSettings()?.autoUpdate === false));
 
   // A dialog's answer reads on its fill in every preset colour, light and dark: its words
-  // reach WCAG's 4.5 for text, by the colours the page computes. Profile's reset dialog
+  // reach WCAG's 4.5 for text, by the colours the page computes. New workspace's dialog
   // has one.
   const presets = await page.getByRole('radiogroup', { name: 'Frame colour' }).getByRole('radio')
     .evaluateAll((els) => els.map((e) => ({ name: e.getAttribute('aria-label'), rgb: getComputedStyle(e).backgroundColor })));
@@ -224,9 +229,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
       await page.getByRole('radio', { name: theme }).check();
       await page.getByRole('radio', { name: p.name, exact: true }).click();
       const shown = await until(async () => (await rootOf(page, '--frame')) === toHex(p.rgb) && (await rootOf(page, '--text')) === (theme === 'Dark' ? '#e8eaed' : '#1f1f1f'));
-      await page.getByRole('button', { name: 'Profile', exact: true }).click();
-      await page.getByRole('button', { name: 'Reset…' }).click();
-      const answer = page.getByRole('dialog').getByRole('button', { name: 'Reset', exact: true });
+      await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
+      await page.getByRole('button', { name: 'New workspace…' }).click();
+      const answer = page.getByRole('dialog').getByRole('button', { name: 'Create', exact: true });
       const [fg, bg] = await answer.evaluate((b) => [getComputedStyle(b).color, getComputedStyle(b).backgroundColor]);
       const ratio = contrast(fg, bg);
       check(`a primary button reads in ${p.name}, ${theme.toLowerCase()}: ${ratio.toFixed(2)}`, shown && ratio >= 4.5, `${fg} on ${bg}`);
@@ -235,15 +240,21 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   }
   await page.getByRole('button', { name: 'General', exact: true }).click();
   await page.getByRole('radio', { name: 'System' }).check();
-  await page.getByRole('radio', { name: 'Blue' }).click();
-  await until(() => prefsFile().theme === 'system' && prefsFile().frameColor === '#3470d0');
+  await page.getByRole('radio', { name: 'Slate' }).click();
+  await until(() => prefsFile().theme === 'system' && prefsFile().frameColor === '#384562');
 
   // Profile: the name in the list, and reset to a template, which takes its values and
   // nothing else.
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
-  const profileSection = page.getByRole('region', { name: 'Profile' });
+  const profileSection = page.locator('main');
   const nameField = page.getByLabel('Name', { exact: true });
-  check('Profile shows the name and the template', (await nameField.inputValue()) === 'Personal' && (await profileSection.locator('.note').textContent()).trim() === 'Personal');
+  const templateNow = () => profileSection.locator('.row', { hasText: 'Template' }).locator('.secondary').textContent();
+  check('Profile shows the name and the template', (await nameField.inputValue()) === 'Personal' && (await templateNow()).trim() === 'Personal');
+  await nameField.fill('');
+  await nameField.press('Enter');
+  check('a blank name is refused under the field, and nothing is saved', await until(async () => (await page.getByRole('alert').textContent()) === 'A profile needs a name') && listed().name === 'Personal');
+  await nameField.press('Escape');
+  check('Escape puts the name back, and the page stays open', await until(async () => (await nameField.inputValue()) === 'Personal') && (await regions()).settingsOpen === true);
   await nameField.fill('Home');
   await nameField.press('Enter');
   check('a new name is the list\'s', await until(() => listed().name === 'Home'), JSON.stringify(listed()));
@@ -256,19 +267,22 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('choosing a shell saves it and the window loads it', await until(async () => prefsFile().shell === 'example' && (await regions()).shell === 'example'));
   await shellChoice.selectOption('standard');
   check('and choosing the standard one loads it again', await until(async () => prefsFile().shell === 'standard' && (await regions()).shell === 'standard' && (await ui.getByRole('button', { name: 'Settings', exact: true }).count()) === 1));
-  await page.getByLabel('Reset to').selectOption('Work');
-  await page.getByRole('button', { name: 'Reset…' }).click();
-  const confirm = page.getByRole('dialog', { name: 'Reset to Work' });
-  check('reset asks first', await confirm.isVisible());
+  const resetButton = page.getByRole('button', { name: 'Reset to template…' });
+  await resetButton.click();
+  const confirm = page.getByRole('dialog', { name: "Reset this profile's settings?" });
+  check('reset asks first, with the template to reset to in the question', await confirm.isVisible());
+  await confirm.getByLabel('Template').selectOption('Work');
   await page.screenshot({ path: path.join(out, 'settings-profile-reset.png') });
   await page.keyboard.press('Escape');
-  check('Escape answers Cancel and leaves the page open', await until(async () => (await confirm.count()) === 0) && (await regions()).settingsOpen === true && prefsFile().frameColor === '#3470d0');
-  await page.getByRole('button', { name: 'Reset…' }).click();
+  check('Escape answers Cancel, gives focus back and leaves the page open', await until(async () => (await confirm.count()) === 0) && (await regions()).settingsOpen === true && prefsFile().frameColor === '#384562' &&
+    (await resetButton.evaluate((e) => e === document.activeElement)));
+  await resetButton.click();
+  await confirm.getByLabel('Template').selectOption('Work');
   await confirm.getByRole('button', { name: 'Reset', exact: true }).click();
   check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
   check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.strip').count()) > 0));
   check('and the Dock and the list', await until(async () => (await regions()).dock === '#5b7fd6' && listed().color === '#5b7fd6'), JSON.stringify(listed()));
-  check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await profileSection.locator('.note').textContent()).trim() === 'Work'));
+  check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await templateNow()).trim() === 'Work'));
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-profile.png') });
 
@@ -284,21 +298,35 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   };
   await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
   const workspacesSection = page.getByRole('region', { name: 'Workspaces' });
-  check('Workspaces lists none at first, and New Workspace waits for a name',
-    (await workspacesSection.locator('.row').count()) === 1 && (await page.getByRole('button', { name: 'New Workspace' }).isDisabled()));
-  await page.getByLabel('New workspace\'s name').fill('Work');
-  await page.getByLabel('New workspace\'s colour').fill('#c2410c');
-  await page.getByRole('button', { name: 'New Workspace' }).click();
-  check('New Workspace makes one with its name and colour, kept in the profile', await until(() => workspacesFile().length === 1 && workspacesFile()[0].name === 'Work' && workspacesFile()[0].color === '#c2410c'), JSON.stringify(workspacesFile()));
-  check('and lists it', await until(async () => (await page.getByLabel('Name of Work').count()) === 1 && (await page.getByLabel('New workspace\'s name').inputValue()) === ''));
+  check('Workspaces lists none at first, and says so', (await workspacesSection.locator('.row').textContent()).trim() === 'No workspaces yet');
+  await page.getByRole('button', { name: 'New workspace…' }).click();
+  const wsDialog = page.getByRole('dialog', { name: 'New workspace' });
+  const wsName = wsDialog.getByLabel('Name', { exact: true });
+  check('New workspace… opens a dialog with the name ready to type', await until(async () => await wsName.evaluate((e) => e === document.activeElement)));
+  await wsDialog.getByLabel('Custom colour').fill('#c2410c');
+  await wsName.fill('Work');
+  await wsName.press('Enter');
+  check('Create makes one with its name and colour, kept in the profile', await until(() => workspacesFile().length === 1 && workspacesFile()[0].name === 'Work' && workspacesFile()[0].color === '#c2410c'), JSON.stringify(workspacesFile()));
+  check('and lists it as a row with its menu', await until(async () => (await page.getByRole('button', { name: 'Actions for Work' }).count()) === 1 && (await wsDialog.count()) === 0));
+  await page.getByRole('button', { name: 'New workspace…' }).click();
+  await wsName.fill('work');
+  await wsName.press('Enter');
+  check('a name the list has is refused under the field', await until(async () => (await wsDialog.getByRole('alert').textContent()).includes('already') && workspacesFile().length === 1));
+  await page.keyboard.press('Escape');
+  check('Escape cancels the dialog and leaves the page open', await until(async () => (await wsDialog.count()) === 0) && (await regions()).settingsOpen === true);
   const made = workspacesFile()[0].id;
   await fetch(`${base}/mock/fire`, { method: 'POST', body: new URLSearchParams({ kind: 'menu', value: 'workspaces:' + made }) });
   const dot = ui.locator('[role=tab] .workspace');
   check('a tab opened in it shows its dot in the shell at once', await until(async () => (await dot.count()) === 1 && (await dot.getAttribute('aria-label')) === 'In Work' &&
     (await dot.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(194, 65, 12)'));
-  await page.getByLabel('Name of Work').fill('Office');
-  await page.getByLabel('Name of Work').press('Enter');
-  check('a new name is kept, under the same id', await until(() => workspacesFile()[0].name === 'Office' && workspacesFile()[0].id === made), JSON.stringify(workspacesFile()));
+  check('and the row counts it', await until(async () => (await workspacesSection.locator('.row', { hasText: 'Work' }).textContent()).includes('1 tab')));
+  await workspacesSection.locator('.row', { hasText: 'Work' }).click({ button: 'right' });
+  check('a right-click opens the row\'s menu', await until(async () => (await page.getByRole('menu', { name: 'Actions for Work' }).count()) === 1));
+  await page.getByRole('menuitem', { name: 'Edit…' }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Edit workspace' });
+  await editDialog.getByLabel('Name', { exact: true }).fill('Office');
+  await editDialog.getByRole('button', { name: 'Save' }).click();
+  check('Edit renames it, under the same id', await until(() => workspacesFile()[0].name === 'Office' && workspacesFile()[0].id === made), JSON.stringify(workspacesFile()));
   check('and the dot in the shell says it at once', await until(async () => (await dot.getAttribute('aria-label')) === 'In Office'));
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-workspaces.png') });
@@ -313,17 +341,17 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   };
   await page.getByRole('button', { name: 'Flags' }).click();
   const relaunch = page.getByRole('button', { name: 'Relaunch' });
-  check('Flags lists the flags, none waiting', await page.getByRole('region', { name: 'Flags' }).getByText('Chromium features').isVisible() && (await relaunch.count()) === 0);
+  check('Flags lists the flags, none waiting', await page.getByRole('region', { name: 'Flags' }).getByText('Chromium features', { exact: true }).isVisible() && (await relaunch.count()) === 0);
   check('Extensions is off and can\'t be turned on in a build without them', await page.getByRole('switch', { name: /Extensions/ }).isDisabled());
   check('and says so', (await page.locator('.row', { hasText: 'Extensions' }).textContent()).includes('Not in this build'));
   const port = page.getByLabel('Remote debugging port');
   await port.fill('80');
   await port.press('Enter');
-  check('a port it can\'t use is refused', await until(async () => (await port.inputValue()) === '') && flagsFile() === null);
+  check('a port it can\'t use is refused under the field, and what was typed stays', await until(async () => (await port.inputValue()) === '80' && (await page.locator('.row', { has: port }).getByRole('alert').count()) === 1) && flagsFile() === null);
   await port.fill('9333');
   await port.press('Enter');
   check('a port is saved, and Relaunch shows', await until(async () => flagsFile()?.remoteDebugging === '9333' && await relaunch.isVisible()), JSON.stringify(flagsFile()));
-  check('beside that flag only', (await relaunch.count()) === 1 && (await page.locator('.row', { has: port }).getByRole('button', { name: 'Relaunch' }).count()) === 1);
+  check('once, at the top, with the flag tagged', (await relaunch.count()) === 1 && (await page.getByText('Relaunch to apply 1 change').isVisible()) && (await page.locator('.row', { has: port }).getByText('Relaunch to apply').count()) === 1);
   check('each flag says what it does', await page.getByText('Let DevTools clients connect on this port').isVisible());
   await page.screenshot({ path: path.join(out, 'settings-flags.png') });
   await port.fill('');
@@ -334,19 +362,21 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   const mode = page.getByLabel('Mode');
   check('an enum is a select, Off first', (await mode.evaluate((s) => [...s.options].map((o) => o.text).join())) === 'Off,fast,slow');
   await mode.selectOption('slow');
-  check('picking a choice saves it', await until(async () => flagsFile()?.mode === 'slow' && (await page.locator('.row', { has: mode }).getByRole('button', { name: 'Relaunch' }).count()) === 1));
+  check('picking a choice saves it', await until(async () => flagsFile()?.mode === 'slow' && (await page.locator('.row', { has: mode }).getByText('Relaunch to apply').count()) === 1));
   await mode.selectOption('');
   const label = page.getByLabel('Label');
   await label.fill('Not Lower');
   await label.press('Enter');
-  check('a string the pattern refuses is not saved', await until(async () => (await label.inputValue()) === '') && !('label' in (flagsFile() || {})));
+  check('a string the pattern refuses is not saved, and says why', await until(async () => (await page.locator('.row', { has: label }).getByRole('alert').count()) === 1) && !('label' in (flagsFile() || {})));
+  await label.press('Escape');
   const sizes = page.getByLabel('Sizes');
   await sizes.fill('1, 2 ,3');
   await sizes.press('Enter');
   check('a list of numbers is saved without the spaces', await until(async () => flagsFile()?.sizes === '1,2,3' && (await sizes.inputValue()) === '1,2,3'), JSON.stringify(flagsFile()));
   await sizes.fill('1,0');
   await sizes.press('Enter');
-  check('and refused when one is out of range', await until(async () => (await sizes.inputValue()) === '1,2,3'));
+  check('and refused when one is out of range', await until(async () => (await page.locator('.row', { has: sizes }).getByRole('alert').count()) === 1) && flagsFile()?.sizes === '1,2,3');
+  await sizes.press('Escape');
   await page.screenshot({ path: path.join(out, 'settings-flags-types.png') });
   await sizes.fill('');
   await sizes.press('Enter');
@@ -356,7 +386,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await page.getByRole('button', { name: 'Keyboard' }).click();
   // The list only shows; clicking an action opens its editor.
   const openRow = (title) => page.locator('button.action').filter({ has: page.locator('.name', { hasText: new RegExp('^\\s*' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$') }) }).click();
-  check('a key the browser wins carries a tag, and a page-first key none', await until(async () => (await page.locator('button.action', { hasText: 'Close Tab' }).textContent()).includes('Browser · not full screen') && !(await page.locator('button.action', { hasText: 'Open Location' }).textContent()).includes('Browser')));
+  check('a key the browser wins carries a tag, and a page-first key none', await until(async () => (await page.locator('button.action', { hasText: 'Close Tab' }).textContent()).includes('Browser first, not in full screen') && !(await page.locator('button.action', { hasText: 'Open Location' }).textContent()).includes('Browser first')));
   check('the list has no buttons of its own: no plus, remove or reset', (await page.getByRole('button', { name: /^(Add a key for|Remove |Reset (?!all))/ }).count()) === 0);
   check('the keymap follows its template until an edit', keymapFile() === null);
   await openRow('New Tab');
@@ -368,8 +398,8 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   }), JSON.stringify(keymapFile()?.actions?.['tab.new']));
   check('the page shows it', await until(async () => (await page.getByRole('region', { name: 'File', exact: true }).textContent()).includes('⇧⌘K')));
   await openRow('Quit Project B');
-  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked', { exact: true }).count()) === 1);
-  check('Quit can\'t leave the menu', await page.getByRole('switch', { name: 'Quit Project B in the menu' }).isDisabled());
+  check('Quit\'s key is locked: no remove button', (await page.getByRole('button', { name: 'Remove Cmd+Q' }).count()) === 0 && (await page.getByText('Locked', { exact: true }).count()) >= 1);
+  check('Quit is always in the menu, said by a tag rather than a dead switch', (await page.getByRole('switch', { name: 'Quit Project B in the menu' }).count()) === 0 && (await page.getByText('Always in menu', { exact: true }).count()) === 1);
 
   await openRow('Reload This Page');
   await page.getByRole('switch', { name: 'Reload This Page in the menu', exact: true }).click();
@@ -378,11 +408,20 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await page.getByRole('button', { name: 'Reset', exact: true }).click();
   check('reset puts it back', await until(async () => menuHas((await regions()).menu, 'Reload This Page')));
 
-  await page.getByLabel('Template').selectOption('chrome');
-  check('picking a template resets to following it', await until(() => keymapFile()?.follows === 'chrome'), JSON.stringify(keymapFile()));
+  await page.getByRole('combobox', { name: 'Template' }).selectOption('chrome');
+  const discard = page.getByRole('dialog', { name: /^Discard 1 changed shortcut and use/ });
+  check('picking a template with a changed shortcut asks first, saying how many', await until(async () => (await discard.count()) === 1) && keymapFile()?.follows === undefined);
+  await page.keyboard.press('Escape');
+  check('Escape keeps the shortcuts and the page', await until(async () => (await discard.count()) === 0) && keymapFile()?.follows === undefined && (await regions()).settingsOpen === true);
+  await page.getByRole('combobox', { name: 'Template' }).selectOption('chrome');
+  await discard.getByRole('button', { name: 'Discard' }).click();
+  check('Discard resets to following the template', await until(() => keymapFile()?.follows === 'chrome'), JSON.stringify(keymapFile()));
   check('and the added key is gone', await until(async () => !(await page.getByRole('region', { name: 'File', exact: true }).textContent()).includes('⇧⌘K')));
   await page.screenshot({ path: path.join(out, 'settings-keyboard.png'), fullPage: true });
 
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Escape');
+  check('Escape closes the open editor first, and leaves the page', await until(async () => (await page.locator('.editor').count()) === 0) && (await regions()).settingsOpen === true);
   await page.keyboard.press('Escape');
   check('Escape closes it', await until(async () => (await regions()).settingsOpen === false));
   check('and the dev window takes it off the shell', await until(async () => (await shell.locator('iframe.mock-settings').count()) === 0));

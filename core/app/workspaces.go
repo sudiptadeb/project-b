@@ -2,13 +2,16 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"maps"
+	"slices"
 
 	"projectb/commands"
 	"projectb/engine"
 	"projectb/settings"
 	"projectb/shell"
 	"projectb/timeline"
+	"projectb/workspaces"
 )
 
 // workspaceList is the list in the Tab menu's New Tab in Workspace: every workspace, by
@@ -82,6 +85,16 @@ func (a *App) workspaceSettingsPart() settings.Part {
 				}
 			case "moveWorkspace":
 				err = a.Workspaces.Move(c.ID, c.By)
+			// New tab in workspace: a tab in it at the end of the page's own window, and the
+			// page closes so the tab is what the user sees, as choosing it in the Tab menu
+			// does.
+			case "openInWorkspace":
+				if !slices.ContainsFunc(a.Workspaces.List(), func(x workspaces.Workspace) bool { return x.ID == c.ID }) {
+					err = errors.New("no workspace " + c.ID)
+					break
+				}
+				a.Shell.Interaction(w, "tab.new", func() { a.Tabs.CreateIn(w, c.ID) })
+				a.Settings.Close(w)
 			default:
 				return false
 			}

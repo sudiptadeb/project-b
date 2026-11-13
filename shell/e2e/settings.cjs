@@ -328,6 +328,14 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await editDialog.getByRole('button', { name: 'Save' }).click();
   check('Edit renames it, under the same id', await until(() => workspacesFile()[0].name === 'Office' && workspacesFile()[0].id === made), JSON.stringify(workspacesFile()));
   check('and the dot in the shell says it at once', await until(async () => (await dot.getAttribute('aria-label')) === 'In Office'));
+  await page.getByRole('button', { name: 'Actions for Office' }).click();
+  await page.getByRole('menuitem', { name: 'New tab in workspace' }).click();
+  check('New tab in workspace opens a tab in it and closes the page', await until(async () => (await dot.count()) === 2 && (await regions()).settingsOpen === false));
+  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+  await until(async () => (await regions()).settingsOpen === true);
+  await page.close();
+  page = await open();
+  await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-workspaces.png') });
 

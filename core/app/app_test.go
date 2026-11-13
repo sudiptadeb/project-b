@@ -1096,6 +1096,42 @@ func TestTheSettingsPageEditsMovesAndCountsWorkspaces(t *testing.T) {
 	}
 }
 
+// New tab in workspace, from a workspace's row menu, opens a tab in it in the page's own
+// window and closes the page, so the tab is what shows. An id the list doesn't hold opens
+// nothing.
+func TestTheSettingsPageOpensATabInAWorkspace(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var work string
+	r.e.Post(func() {
+		w, _ := r.a.Workspaces.Create("Work", "#5b7fd6")
+		work = w.ID
+	})
+	r.e.Settle()
+	r.openSettings()
+	var before int
+	r.e.Post(func() { before = len(r.a.Tabs.All()) })
+	r.e.Settle()
+	r.settings(`{"t":"openInWorkspace","id":"nothere"}`)
+	r.settings(`{"t":"openInWorkspace","id":"` + work + `"}`)
+	r.e.Settle()
+	var in []string
+	var open bool
+	r.e.Post(func() {
+		for _, tab := range r.a.Tabs.All()[before:] {
+			in = append(in, tab.Workspace)
+		}
+		open = r.a.Settings.IsOpen(r.a.Tabs.Front())
+	})
+	r.e.Settle()
+	if len(in) != 1 || in[0] != work {
+		t.Fatalf("new tabs are in %q, want one in %s", in, work)
+	}
+	if open {
+		t.Fatal("the settings page is still open")
+	}
+}
+
 // View, Shell lists the shells the user can choose, with a tick on the one in use. Choosing
 // another makes it the profile's and loads it in the window, which hears nothing until it
 // says it's ready; what the old shell claimed of the window goes, and the tab stays shown.

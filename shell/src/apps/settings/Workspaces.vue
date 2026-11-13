@@ -23,6 +23,7 @@ const menus = {};
 
 function items(w, i) {
   return [
+    { label: 'New tab in workspace', run: () => send({ t: 'openInWorkspace', id: w.id }) },
     { label: 'Edit…', run: () => edit(w) },
     { label: 'Move up', run: () => move(w, -1), disabled: i === 0 },
     { label: 'Move down', run: () => move(w, 1), disabled: i === state.workspaces.length - 1 },

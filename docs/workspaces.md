@@ -65,7 +65,9 @@ the order of building at the end says which steps are done.
   bar does (`/mock/fire`, kind `menu`).
 - Settings has a Workspaces section, after Profile: a list of rows, each with the
   workspace's colour, its name and the number of tabs open in it, and a menu (the ⋯
-  button, or a right-click on the row) with Edit…, Move up and Move down. New workspace…
+  button, or a right-click on the row) with New tab in workspace, Edit…, Move up and Move
+  down. New tab in workspace opens a tab in it in the page's window and closes the page
+  (`openInWorkspace`). New workspace…
   on the heading's right and Edit… open one dialog with the name and the colour (the
   presets, or any other). A new one starts on the first preset no workspace has. Names are
   unique whatever their case: the dialog says so under the name, and Go refuses one too.

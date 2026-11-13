@@ -57,6 +57,17 @@ built so far, and the order of building at the end says which steps are done.
 - Each copy draws its Dock icon as the app's with a small dot in its profile's colour,
   bottom right (`set_dock_color`, `engine.Engine.SetDockColor`). Go says the colour at
   start and when the frame colour changes, and keeps the list's copy of it the same.
+- Settings has a Profile section in a copy on a listed profile, after General: its name,
+  which changes the list (`profiles.Manager.SetName`), so the Profiles menu and the picker
+  show it the next time they read the list; and its template, by name, with "Reset…", which
+  after a confirmation writes the chosen template's values over the profile's prefs
+  (`prefs.Manager.Apply`, through each pref's own setter, so every window's shell, the
+  window, the Dock dot and the list's colour follow as they do a change by hand) and makes
+  the list's template name the one reset to (`profiles.Manager.SetTemplate`). A pref the
+  template doesn't hold keeps its value; history, cookies, logins and extensions are not
+  touched. It is a `settings.Part` that `app.Start` adds only when the copy's profile is
+  listed, so a copy on a folder named outright has no Profile section
+  (`core/app/profile.go`, `shell/src/apps/settings/Profile.vue`).
 - The update state lives in the profile folder, and "relaunch to update" swaps the
   installed app and restarts this one copy (`core/update`).
 - Our pages, the shells and the settings pages, load in a context of their own, off the
@@ -144,7 +155,7 @@ Each commit builds, leaves a working app, and carries its tests.
 3. Done. Templates, Personal and Work; the first profile is made from Personal.
 4. Done. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
 5. Done. The picker: a copy that hasn't chosen, its page, New Profile from a template.
-6. The Profile section in settings: the name, and reset to a template.
+6. Done. The Profile section in settings: the name, and reset to a template.
 7. Updates app-wide: the shared state and setting, and the restart of every copy.
 
 ## Decided while building
@@ -163,6 +174,10 @@ Each commit builds, leaves a working app, and carries its tests.
   only one on Android, where the shell and the tabs share a context.
 - A copy started on a folder named outright (`--user-data-dir`) still draws its dot, in its
   frame colour, and its Profiles menu lists the root's profiles with no tick.
+- The Profile section comes after General, so settings still opens on General. Reset asks
+  in a dialog of the page's own, as the extension prompt does, naming the template; Escape
+  answers Cancel. The mock's dev server takes `-id` to start on a listed profile, which
+  `shell/e2e/settings.cjs` now does.
 
 ## Not in this step
 

@@ -31,6 +31,12 @@ type rig struct {
 
 func start(t *testing.T, dir string, blocked ...string) *rig {
 	t.Helper()
+	return startWith(t, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), BlockedHosts: blocked})
+}
+
+// startWith starts the app as start does, on cfg.
+func startWith(t *testing.T, cfg app.Config) *rig {
+	t.Helper()
 	e := mockengine.New()
 	got, stop := e.Feeds(1).Shell.Subscribe()
 	t.Cleanup(stop)
@@ -39,7 +45,7 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	r := &rig{t: t, e: e, got: got, pages: pages}
 	ready := make(chan struct{})
 	e.Post(func() {
-		r.a = app.Start(e, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), BlockedHosts: blocked})
+		r.a = app.Start(e, cfg)
 		e.SetListener(r.a)
 		close(ready)
 	})

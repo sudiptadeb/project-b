@@ -156,6 +156,21 @@ func (m *Manager) SetTheme(theme string) {
 	}
 }
 
+// Apply sets each setting values holds, in the form the file has them, through its own
+// setter, so every listener hears of it as of a change by hand. A setting values doesn't
+// hold keeps its value. A profile reset to a template takes the template's values so.
+func (m *Manager) Apply(values json.RawMessage) error {
+	p := m.prefs
+	if err := json.Unmarshal(values, &p); err != nil {
+		return err
+	}
+	m.SetTabLayout(p.TabLayout)
+	m.SetAutoUpdate(p.AutoUpdate)
+	m.SetFrameColor(p.FrameColor)
+	m.SetTheme(p.Theme)
+	return nil
+}
+
 func (m *Manager) save() {
 	b, _ := json.Marshal(m.prefs)
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o700); err != nil {

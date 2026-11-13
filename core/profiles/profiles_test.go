@@ -149,3 +149,14 @@ func TestNewProfileFromATemplate(t *testing.T) {
 		t.Fatal("a template that doesn't exist made a profile")
 	}
 }
+
+func TestARenameAndAResetChangeOnlyTheList(t *testing.T) {
+	m := New(t.TempDir())
+	m.Choose("", false)
+	m.SetName(First, "Home")
+	m.SetTemplate(First, "Work")
+	p, _, _ := New(m.Root()).Get(First)
+	if p.ID != First || p.Name != "Home" || p.Template != "Work" {
+		t.Fatalf("listed %+v", p)
+	}
+}

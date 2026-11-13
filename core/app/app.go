@@ -108,6 +108,7 @@ func Start(e engine.Engine, cfg Config) *App {
 				timeline.Errorf("profiles: %v", err)
 			}
 		})
+		a.Settings.AddPart(a.profileSettingsPart(cfg.Profiles, cfg.Profile))
 	}
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)

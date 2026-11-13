@@ -18,7 +18,13 @@ const port = 8797;
 const base = `http://127.0.0.1:${port}`;
 
 fs.mkdirSync(out, { recursive: true });
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-settings-'));
+// A listed profile, as a copy started on one has: its folder in a root beside the list.
+const profilesRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-settings-'));
+const profileID = 'a1b2c3d4';
+const profile = path.join(profilesRoot, profileID);
+fs.mkdirSync(profile);
+fs.writeFileSync(path.join(profilesRoot, 'profiles.json'), JSON.stringify({ profiles: [{ id: profileID, name: 'Personal', color: '#4f9e9e', template: 'Personal' }] }));
+const listed = () => JSON.parse(fs.readFileSync(path.join(profilesRoot, 'profiles.json'), 'utf8')).profiles[0];
 const bin = path.join(out, 'dev');
 execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
@@ -47,7 +53,7 @@ async function startServer() {
   if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
     throw new Error(`port ${port} already has a server: stop it and run again`);
   }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-flags=${moreFlags}`,
+  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-root=${profilesRoot}`, `-id=${profileID}`, `-flags=${moreFlags}`,
     '-version=0.2.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`], { stdio: 'ignore' });
   for (let i = 0; i < 100; i++) {
     try {
@@ -183,6 +189,32 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('one check reached the release server', manifests === counted + 1, `${counted} -> ${manifests}`);
   await autoUpdate.click();
   check('the switch turns automatic updates off and saves it', await until(() => prefsFile().autoUpdate === false));
+
+  // Profile: the name in the list, and reset to a template, which takes its values and
+  // nothing else.
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  const profileSection = page.getByRole('region', { name: 'Profile' });
+  const nameField = page.getByLabel('Name', { exact: true });
+  check('Profile shows the name and the template', (await nameField.inputValue()) === 'Personal' && (await profileSection.locator('.note').textContent()).trim() === 'Personal');
+  await nameField.fill('Home');
+  await nameField.press('Enter');
+  check('a new name is the list\'s', await until(() => listed().name === 'Home'), JSON.stringify(listed()));
+  await page.getByLabel('Reset to').selectOption('Work');
+  await page.getByRole('button', { name: 'Reset…' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Reset to Work' });
+  check('reset asks first', await confirm.isVisible());
+  await page.screenshot({ path: path.join(out, 'settings-profile-reset.png') });
+  await page.keyboard.press('Escape');
+  check('Escape answers Cancel and leaves the page open', await until(async () => (await confirm.count()) === 0) && (await regions()).settingsOpen === true && prefsFile().frameColor === '#3470d0');
+  await page.getByRole('button', { name: 'Reset…' }).click();
+  await confirm.getByRole('button', { name: 'Reset', exact: true }).click();
+  check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
+  check('and keeps automatic updates, which no template holds', prefsFile().autoUpdate === false);
+  check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.strip').count()) > 0));
+  check('and the Dock and the list', await until(async () => (await regions()).dock === '#5b7fd6' && listed().color === '#5b7fd6'), JSON.stringify(listed()));
+  check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await profileSection.locator('.note').textContent()).trim() === 'Work'));
+  await settle(page);
+  await page.screenshot({ path: path.join(out, 'settings-profile.png') });
 
   // Flags: saved for the next launch, with Relaunch offered until they are what runs.
   const flagsFile = () => {

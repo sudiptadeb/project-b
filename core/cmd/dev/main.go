@@ -53,6 +53,7 @@ func main() {
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
 	root := flag.String("root", "", "the folder of the profile list the Profiles menu reads; the profile's own folder's by default")
+	id := flag.String("id", "", "the id -profile has in the list in -root, for a listed profile; none for a folder named outright")
 	pick := flag.Bool("picker", false, "start as a copy that picks its profile from the list in -root, and becomes the one picked")
 	block := flag.String("block", "", "comma-separated blocked hosts")
 	// The updater runs for real against a manifest when given a version to be, the bundle
@@ -108,7 +109,7 @@ func main() {
 			p = app.StartPicker(e, list, func(id string) { opened.Store(id) })
 			e.SetListener(p)
 		} else {
-			a = start(*profile, "")
+			a = start(*profile, *id)
 			e.SetListener(a)
 		}
 		close(started)

@@ -27,6 +27,9 @@ export const state = reactive({
   // Every flag with its saved value, whether its build has it, and whether it waits for a
   // relaunch.
   flags: [],
+  // This profile in the list: its name, the template it was made from or last reset to,
+  // and the templates. null in a copy on a folder named outright, which isn't listed.
+  profile: null,
 });
 
 export function connect() {
@@ -47,6 +50,7 @@ export function connect() {
             keyboard: m.keyboard,
             flags: m.flags,
             section: m.section,
+            profile: m.profile || null,
             ready: true,
           });
           mark('settings.snapshot');
@@ -77,6 +81,9 @@ export function connect() {
           break;
         case 'flags':
           state.flags = m.flags;
+          break;
+        case 'profile':
+          state.profile = m.profile;
           break;
       }
     },

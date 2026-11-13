@@ -1,8 +1,10 @@
 package prefs
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,5 +66,27 @@ func TestFrameColorIsDustyTealByDefaultAndSurvivesARestart(t *testing.T) {
 	}
 	if New(dir).FrameColor() != "#3470d0" {
 		t.Fatal("colour not saved")
+	}
+}
+
+// A template's values go through the setters, so each listener hears as of a change by
+// hand; a setting the values don't hold keeps its value.
+func TestApplySetsWhatTheValuesHoldThroughTheSetters(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir)
+	m.SetAutoUpdate(false)
+	var heard []string
+	m.OnTabLayoutChanged(func(l string) { heard = append(heard, l) })
+	m.OnFrameColorChanged(func(c string) { heard = append(heard, c) })
+	m.OnThemeChanged(func(th string) { heard = append(heard, th) })
+	m.OnAutoUpdateChanged(func(bool) { heard = append(heard, "autoUpdate") })
+	if err := m.Apply(json.RawMessage(`{"tabLayout":"horizontal","frameColor":"#5b7fd6","theme":"system"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(heard, " ") != "horizontal #5b7fd6" {
+		t.Fatalf("heard %v", heard)
+	}
+	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, AutoUpdate: false, FrameColor: "#5b7fd6", Theme: ThemeSystem}) {
+		t.Fatalf("saved %+v", got)
 	}
 }

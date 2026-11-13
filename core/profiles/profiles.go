@@ -134,6 +134,17 @@ func (m *Manager) SetColor(id, color string) error {
 	return m.update(id, func(p *Profile) { p.Color = color })
 }
 
+// SetName renames the listed profile id. Its folder keeps its id.
+func (m *Manager) SetName(id, name string) error {
+	return m.update(id, func(p *Profile) { p.Name = name })
+}
+
+// SetTemplate keeps the name of the template the listed profile id was reset to, in the
+// place of the one it was made from.
+func (m *Manager) SetTemplate(id, template string) error {
+	return m.update(id, func(p *Profile) { p.Template = template })
+}
+
 // Choice is the profile a copy starts on: its folder, and its id in the list, which is ""
 // for a folder named outright. Pick says the copy has no profile yet: it shows the
 // picker.

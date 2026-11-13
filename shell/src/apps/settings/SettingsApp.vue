@@ -6,17 +6,19 @@ import { useTheme } from '@/theme.js';
 import Flags from './Flags.vue';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
+import Profile from './Profile.vue';
 import { send, state } from './state.js';
 
 // The settings page: a page of its own over the whole window. Its colours come from the
 // frame colour and the theme, as the shell's do.
 useTheme(state);
 
-// The page shows state.section when it is one of these, else the first. Extensions is
-// there when the build has them and their flag is on.
+// The page shows state.section when it is one of these, else the first. Profile is there
+// in a copy on a listed profile; Extensions when the build has them and their flag is on.
 const sections = computed(() =>
   [
     { id: 'general', label: 'General', component: General },
+    state.profile && { id: 'profile', label: 'Profile', component: Profile },
     { id: 'keyboard', label: 'Keyboard', component: Keyboard },
     extensionsSection?.shown() && extensionsSection,
     { id: 'flags', label: 'Flags', component: Flags },

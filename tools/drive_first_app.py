@@ -1441,7 +1441,7 @@ def picker_checks():
     made.wait(f"{rows}.length===1", 30)
     made.js("[...document.querySelectorAll('button')].find(b => b.textContent.trim()==='New Profile').click(), 1")
     made.wait("!!document.querySelector('select')")
-    made.js("(() => { const i = document.querySelector('.field'); i.value = 'Office'; i.dispatchEvent(new Event('input')); const s = document.querySelector('select'); s.value = 'Work'; s.dispatchEvent(new Event('change')); return 1 })()")
+    made.js("(() => { const i = document.querySelector('input[aria-label=Name]'); i.value = 'Office'; i.dispatchEvent(new Event('input')); const s = document.querySelector('select'); s.value = 'Work'; s.dispatchEvent(new Event('change')); return 1 })()")
     made.js("document.querySelector('form').requestSubmit(), 1")
     check("New Profile quits the picker copy", made.proc.wait(timeout=30) == 0)
     App.running.remove(made)

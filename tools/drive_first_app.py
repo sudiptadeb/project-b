@@ -1767,7 +1767,36 @@ def cookie_checks():
     app.close()
 
 
+# Asks one process to quit as the Dock's Quit, logging out and AppleScript do: the quit Apple
+# Event, aimed at its pid so no other copy hears it.
+TERMINATE = 'ObjC.import("AppKit"); $.NSRunningApplication.runningApplicationWithProcessIdentifier(Number(%d)).terminate'
+
+
+def quit_checks():
+    """Quitting from the Dock is a clean stop: crash.log, which says the app is running, is
+    gone, and the next start has no crash to report."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile)
+    running = os.path.exists(os.path.join(profile, "crash.log"))
+    subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", TERMINATE % app.proc.pid], capture_output=True, timeout=20)
+    try:
+        app.proc.wait(timeout=30)
+        ended = True
+    except subprocess.TimeoutExpired:
+        ended = False
+    App.running.remove(app)
+    left = sorted(n for n in os.listdir(profile) if n.startswith("crash"))
+    check("a quit from the Dock ends the app and leaves no crash.log", running and ended and left == [], (running, ended, left))
+    if not ended:
+        app.proc.kill()
+        return
+    app = App(profile)
+    kept = sorted(n for n in os.listdir(profile) if n.startswith("crash-"))
+    check("and the next start has no crash to report", kept == [], kept)
+    app.close()
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks], "shells": [shell_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, shell_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks], "shells": [shell_checks], "quit": [quit_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, shell_checks, quit_checks]))

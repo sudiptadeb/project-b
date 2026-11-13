@@ -9,7 +9,7 @@ package main
 #include <stdlib.h>
 #include "pb_abi.h"
 
-static inline int64_t call_create_tab(const PBEngineCalls* c) { return c->create_tab(); }
+static inline int64_t call_create_tab(const PBEngineCalls* c, const char* workspace) { return c->create_tab(workspace); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_open_profile(const PBEngineCalls* c, const char* dir) { c->open_profile(dir); }
 static inline void call_create_window(const PBEngineCalls* c, int64_t window, int64_t near, const char* page, const PBWindowLayout* layout, const PBRegion* regions, size_t count, const PBVisibleTab* tabs, size_t tab_count) { c->create_window(window, near, page, layout, regions, count, tabs, tab_count); }
@@ -80,8 +80,10 @@ type nativeEngine struct {
 	posted []func()
 }
 
-func (e *nativeEngine) CreateTab() engine.TabID {
-	return engine.TabID(C.call_create_tab(e.calls))
+func (e *nativeEngine) CreateTab(workspace string) engine.TabID {
+	c := C.CString(workspace)
+	defer C.free(unsafe.Pointer(c))
+	return engine.TabID(C.call_create_tab(e.calls, c))
 }
 
 func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.int64_t(tab)) }

@@ -139,7 +139,7 @@ content::BrowserContext* DevToolsManagerDelegate::GetDefaultBrowserContext() {
 
 // The same way a link with target=_blank opens a tab: the adapter makes it, Go hears
 // of it before its first navigation and shows it, then it loads. new_window puts it in a
-// window of its own.
+// window of its own. It is in the default workspace: DevTools can't name another.
 scoped_refptr<content::DevToolsAgentHost>
 DevToolsManagerDelegate::CreateNewTarget(const GURL& url,
                                          TargetType target_type,
@@ -148,8 +148,7 @@ DevToolsManagerDelegate::CreateNewTarget(const GURL& url,
   if (!engine) {
     return nullptr;
   }
-  PageTab* tab = engine->AdoptTab(content::WebContents::Create(
-      content::WebContents::CreateParams(engine->browser_context())));
+  PageTab* tab = engine->CreateTab(/*workspace=*/"");
   Engine::TabOpened(/*opener=*/0, tab->id(), url, /*foreground=*/true,
                     new_window);
   content::NavigationController::LoadURLParams params(url);

@@ -18,6 +18,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
     python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
     python3 tools/drive_first_app.py picker     # only the picker
+    python3 tools/drive_first_app.py workspaces # only workspaces' storage, apart from each other
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -35,9 +36,11 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import timeline  # noqa: E402
+from drive_chromedriver import cdp, ws_open  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
@@ -71,6 +74,9 @@ class Pages(http.server.BaseHTTPRequestHandler):
         body = {
             # Counts the clicks that reach the page, in its title.
             "/clicks": b'<!doctype html><title>0</title><body style="height:100vh;margin:0" onclick="document.title=+document.title+1">',
+            # Links to itself: in this tab, in a new tab without its opener, as target=_blank
+            # is by default and rel=noopener says outright.
+            "/store": b'<!doctype html><title>Store</title><a id=link href=/store>Here</a> <a id=blank target=_blank href=/store>Blank</a> <a id=noopener target=_blank rel=noopener href=/store>No opener</a>',
         }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/">The shell</a>')
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
@@ -161,18 +167,21 @@ class App:
         self.writer.flush()
         return self.wait_reply(key, timeout)
 
-    def js(self, expr, page=False, timeout=20):
-        r = self.cmd("evalpage" if page else "eval", expr.replace("\n", " "), timeout=timeout)
+    def js(self, expr, page=False, timeout=20, tab=None):
+        """Runs expr in the shell, the focused tab's page with page, or tab's page, by Go's
+        id for it."""
+        where = ["evaltab", tab] if tab else ["evalpage" if page else "eval"]
+        r = self.cmd(*where, expr.replace("\n", " "), timeout=timeout)
         return json.loads(r) if r != "" else None
 
-    def wait(self, expr, timeout=15, page=False):
+    def wait(self, expr, timeout=15, page=False, tab=None):
         """Polls until expr is truthy. A navigation that swaps the page's frame drops the
         answer to an eval sent just before, so a lost answer is tried again."""
         deadline = time.time() + timeout
         last = None
         while time.time() < deadline:
             try:
-                last = self.js(expr, page, timeout=5)
+                last = self.js(expr, page, timeout=5, tab=tab)
             except TimeoutError:
                 last = "no answer"
                 continue
@@ -1465,6 +1474,121 @@ def relaunch_checks():
     shutil.rmtree(os.path.dirname(installed))
 
 
+STORE = PAGES + "store"
+
+
+def open_in(app, workspace, url):
+    """Opens url in a new tab in a workspace, by its id, as the driver can without Go's
+    list, and returns Go's id for the tab once its page has loaded."""
+    tab = int(app.cmd("opentab", workspace, url))
+    app.wait(f"document.readyState==='complete'&&location.href==={json.dumps(url)}", tab=tab)
+    return tab
+
+
+def opened_by(app, opener, script):
+    """Runs script in opener's page, which opens one tab on the store page in front, and
+    returns Go's id for that tab once its page has loaded."""
+    rows = app.js(ROWS)
+    app.js(script, tab=opener)
+    app.wait(f"{ROWS}==={rows + 1}")
+    tab = max(t["id"] for t in json.loads(app.cmd("projectb", "getTabs", "{}"))["result"]["tabs"])
+    app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=tab)
+    return tab
+
+
+def stored(app, tab):
+    """The cookie and the local storage value the workspace checks set, as a tab's page
+    sees them."""
+    return app.js("[document.cookie, localStorage.getItem('w')]", tab=tab)
+
+
+def databases(app, tab):
+    """The names of the IndexedDB databases a tab's page sees."""
+    app.js("indexedDB.databases().then(d=>document.title='databases:'+d.map(x=>x.name).join())", tab=tab)
+    return app.wait("document.title.startsWith('databases:')&&document.title", tab=tab)[len("databases:"):]
+
+
+def committed(app, tab, times=1):
+    """Waits for a tab's page to have committed a navigation so many times, as the engine
+    marks each on the timeline."""
+    deadline = time.time() + 20
+    while len([e for e in json.loads(app.cmd("timeline"))["result"]["entries"] if e.get("name") == "tab.committed" and e.get("text") == f"tab={tab}"]) < times:
+        if time.time() > deadline:
+            raise TimeoutError(f"tab {tab} never committed")
+        time.sleep(0.05)
+
+
+def attach(profile, url):
+    """A DevTools connection to the page at url, through the port the app was started with."""
+    port = open(os.path.join(profile, "DevToolsActivePort")).read().split()[0]
+    target = next(t for t in json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list")) if t["type"] == "page" and t["url"] == url)
+    return ws_open(target["webSocketDebuggerUrl"])[0]
+
+
+def workspace_checks():
+    """A workspace keeps its own cookies and site storage. What a page in workspace a sets,
+    a cookie, a local storage value and an IndexedDB database, a second tab of a sees, and
+    workspace b and the default workspace don't; a restart on the same profile keeps it. A
+    tab a page in a opens keeping its opener, by window.open or by a link opened in a new
+    tab, is in a too. The driver opens a tab in a workspace by its id, as Go does."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile, ["--remote-debugging-port=0"])
+    a = open_in(app, "a", STORE)
+    app.js("document.cookie='w=a; max-age=3600';localStorage.setItem('w','a');indexedDB.open('w').onsuccess=()=>document.title='stored'", tab=a)
+    app.wait("document.title==='stored'", tab=a)
+    second = open_in(app, "a", STORE)
+    check("a second tab of a workspace sees its cookie and local storage", stored(app, second) == ["w=a", "a"], stored(app, second))
+    b = open_in(app, "b", STORE)
+    check("a tab of another workspace sees neither", stored(app, b) == ["", None], stored(app, b))
+    app.js(f"location.href={json.dumps(STORE)}", tab=1)
+    app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=1)
+    check("nor does a tab of the default workspace", stored(app, 1) == ["", None], stored(app, 1))
+    check("an IndexedDB database made in a workspace is seen there, and not in another or the default",
+          (databases(app, second), databases(app, b), databases(app, 1)) == ("w", "", ""))
+    # The blank page in a workspace tab, reached by every way but the one Go loads it by:
+    # a reload, history, and DevTools. Content would stop the app on the next navigation
+    # if it left the tab without a site there. Go reloads no blank tab, so DevTools does.
+    reloaded = int(app.cmd("opentab", "a", "about:blank"))
+    committed(app, reloaded)
+    s = attach(profile, "about:blank")
+    cdp(s, 1, "Page.reload")
+    s.close()
+    committed(app, reloaded, 2)
+    visit(app, STORE)
+    check("a workspace tab reloaded on the blank page goes on in the workspace", stored(app, reloaded) == ["w=a", "a"], stored(app, reloaded))
+    went_back = int(app.cmd("opentab", "a", "about:blank"))
+    committed(app, went_back)
+    visit(app, STORE)
+    app.cmd("key", "cmd+[")
+    app.wait("location.href==='about:blank'&&document.readyState==='complete'", tab=went_back)
+    app.cmd("key", "cmd+]")
+    app.wait("location.pathname==='/store'&&document.readyState==='complete'", tab=went_back)
+    check("so does one gone back to the blank page and forward again", stored(app, went_back) == ["w=a", "a"], stored(app, went_back))
+    attached = open_in(app, "a", STORE + "?devtools")
+    s = attach(profile, STORE + "?devtools")
+    cdp(s, 1, "Page.navigate", {"url": "about:blank"})
+    app.wait("location.href==='about:blank'&&document.readyState==='complete'", tab=attached)
+    cdp(s, 2, "Page.navigate", {"url": STORE})
+    app.wait("location.href===" + json.dumps(STORE) + "&&document.readyState==='complete'", tab=attached)
+    s.close()
+    check("and one DevTools takes to the blank page and on to another, with the app still running",
+          app.proc.poll() is None and stored(app, attached) == ["w=a", "a"], stored(app, attached))
+    popup = opened_by(app, a, f"window.open({json.dumps(STORE)})")
+    check("a tab a page opens with window.open is in its workspace", stored(app, popup) == ["w=a", "a"], stored(app, popup))
+    linked = opened_by(app, a, "document.getElementById('link').dispatchEvent(new MouseEvent('click',{metaKey:true,bubbles:true,cancelable:true}))")
+    check("so is a link it opens in a new tab", stored(app, linked) == ["w=a", "a"], stored(app, linked))
+    blank = int(app.cmd("opentab", "a", "about:blank"))
+    committed(app, blank)
+    visit(app, STORE)
+    check("a tab of a workspace on the blank page, as a new tab is, goes on in the workspace", stored(app, blank) == ["w=a", "a"], stored(app, blank))
+    app.close()
+    check("a workspace's storage is in the profile's folder", os.path.isdir(os.path.join(profile, "chromium/Storage/ext/workspace")))
+    app = App(profile)
+    check("a workspace's cookie and local storage are there after a restart", stored(app, open_in(app, "a", STORE)) == ["w=a", "a"])
+    check("and still only there", stored(app, open_in(app, "b", STORE)) == ["", None])
+    app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1481,5 +1605,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks]))

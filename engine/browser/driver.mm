@@ -501,6 +501,14 @@ void Run(const std::string& line) {
     } else {
       Reply(id, "ERR no tab");
     }
+  } else if (cmd == "opentab") {
+    // "opentab <workspace> <url>" opens a tab in a workspace, by Go's id for it, as a page
+    // opens one: Go hears of it and shows it, then it loads. Replies with the tab's id.
+    PageTab* tab = Engine::Get()->CreateTab(parts[2]);
+    Engine::TabOpened(/*opener=*/0, tab->id(), GURL(rest(3)), /*foreground=*/true,
+                      /*new_window=*/false);
+    Engine::Get()->LoadURL(tab->id(), rest(3).c_str());
+    Reply(id, base::NumberToString(tab->id()));
   } else if (cmd == "showtabs") {
     // Shows these tabs in the window as a layout from Go would, without Go: "showtabs
     // <tab> <x> <y> <w> <h> ..." in shell coordinates. Go's next layout replaces it.

@@ -10,12 +10,16 @@
 #include "base/location.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/reload_type.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/site_instance.h"
+#include "content/public/browser/storage_partition.h"
+#include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
@@ -45,14 +49,19 @@ namespace {
 
 Engine* g_engine = nullptr;
 
+// Every workspace's partition is in this domain of the profile's context, named by the
+// workspace's id and kept on disk, in chromium/Storage/ext/workspace/ in the profile's
+// folder.
+constexpr char kWorkspaceDomain[] = "workspace";
+
 // Every call from Go except post_wakeup must already be on the main thread.
 void CheckMainThread() {
   CHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
 }
 
-int64_t CallCreateTab() {
+int64_t CallCreateTab(const char* workspace) {
   CheckMainThread();
-  return g_engine->CreateTab();
+  return g_engine->CreateTab(workspace)->id();
 }
 
 void CallCloseTab(int64_t tab) {
@@ -320,6 +329,7 @@ void Engine::TabOpened(int64_t opener,
   args.Int(opener);
   args.Int(tab);
   args.Str(url.spec());
+  args.Str(Get()->tab(tab)->workspace());
   args.Bool(foreground);
   args.Bool(new_window);
   hooks::Fire(PB_EVENT_TAB_OPENED, args);
@@ -563,21 +573,37 @@ void Engine::FocusPageForTraversal(int64_t window, bool reverse) {
   }
 }
 
-int64_t Engine::CreateTab() {
+// The default workspace is the context's own partition, which content refuses as a fixed
+// one, so its tabs get no SiteInstance and take the default as any page does.
+PageTab* Engine::CreateTab(const std::string& workspace) {
   content::WebContents::CreateParams params(browser_context_);
+  if (!workspace.empty()) {
+    params.site_instance = content::SiteInstance::CreateForFixedStoragePartition(
+        browser_context_, GURL(),
+        content::StoragePartitionConfig::Create(browser_context_,
+                                                kWorkspaceDomain, workspace,
+                                                /*in_memory=*/false));
+  }
   params.initially_hidden = true;
-  return Add(content::WebContents::Create(params))->id();
+  return Add(content::WebContents::Create(params), workspace);
 }
 
 PageTab* Engine::AdoptTab(std::unique_ptr<content::WebContents> contents) {
-  return Add(std::move(contents));
+  const content::StoragePartitionConfig& partition =
+      browser_context_->GetStoragePartition(contents->GetSiteInstance())
+          ->GetConfig();
+  const std::string workspace = partition.partition_domain() == kWorkspaceDomain
+                                    ? partition.partition_name()
+                                    : std::string();
+  return Add(std::move(contents), workspace);
 }
 
 // A new tab starts hidden, whoever made it. A window's layout is the only way to the
 // screen.
-PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents) {
+PageTab* Engine::Add(std::unique_ptr<content::WebContents> contents,
+                     const std::string& workspace) {
   const int64_t id = next_tab_++;
-  auto tab = std::make_unique<PageTab>(id, std::move(contents));
+  auto tab = std::make_unique<PageTab>(id, std::move(contents), workspace);
   PageTab* raw = tab.get();
   tab->contents()->WasHidden();
 #if BUILDFLAG(PB_EXTENSIONS)
@@ -627,6 +653,14 @@ void Engine::LoadURL(int64_t tab, const char* url) {
   content::NavigationController::LoadURLParams params((GURL(url)));
   params.transition_type = ui::PageTransitionFromInt(
       ui::PAGE_TRANSITION_TYPED | ui::PAGE_TRANSITION_FROM_ADDRESS_BAR);
+  // In a workspace the blank page stays in the tab's own SiteInstance. Content would give
+  // it one of its own, and the blank page leaves a SiteInstance with no site: for the tab's
+  // next navigation content then reads the partition from that empty site, the default,
+  // and stops on the mismatch with the fixed one (BrowsingInstance::ComputeSiteInfoForURL).
+  // The tab's own SiteInstance has a site in the workspace's partition already.
+  if (!it->second->workspace().empty() && params.url.IsAboutBlank()) {
+    params.source_site_instance = it->second->contents()->GetSiteInstance();
+  }
   it->second->contents()->GetController().LoadURLWithParams(params);
 }
 
@@ -691,7 +725,8 @@ int64_t Engine::DuplicateTab(int64_t tab) {
   if (!contents) {
     return 0;
   }
-  PageTab* copy = Add(contents->Clone());
+  // The copy has the tab's SiteInstance, so it is in the same workspace.
+  PageTab* copy = Add(contents->Clone(), this->tab(tab)->workspace());
   copy->contents()->GetController().LoadIfNecessary();
   return copy->id();
 }

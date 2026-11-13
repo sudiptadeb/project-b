@@ -121,8 +121,11 @@ const (
 
 // Engine is what the app can ask a browser engine to do.
 type Engine interface {
-	// CreateTab makes a hidden tab. A window's layout shows it.
-	CreateTab() TabID
+	// CreateTab makes a hidden tab in a workspace, by the app's id for it, or in the
+	// default workspace, the profile's own storage, for "". A window's layout shows it. A
+	// workspace keeps its own cookies and site storage, and a tab stays in its workspace for
+	// its life, as does every tab it opens.
+	CreateTab(workspace string) TabID
 	CloseTab(tab TabID)
 	LoadURL(tab TabID, url string)
 
@@ -138,7 +141,7 @@ type Engine interface {
 	// for the page's host, as browsers do. ZoomOf says what it is now.
 	Zoom(tab TabID, factor float64)
 	ZoomOf(tab TabID) float64
-	// DuplicateTab makes a hidden copy of the tab, its history included.
+	// DuplicateTab makes a hidden copy of the tab, its history included, in its workspace.
 	DuplicateTab(tab TabID) TabID
 	// Edit runs a text-editing command in whichever page has the keyboard.
 	Edit(c EditCommand)
@@ -210,10 +213,11 @@ type Listener interface {
 	FaviconChanged(tab TabID, dataURL string)
 
 	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
-	// has already created it, hidden; the app decides whether to show it.
-	// A client of the debugging port can ask for it in a window of its own, newWindow;
-	// a page's never does, so its tab goes in its window.
-	TabOpened(opener, tab TabID, url string, foreground, newWindow bool)
+	// has already created it, hidden, in workspace, its opener's; the app decides whether
+	// to show it. A tab a client of the debugging port asks for is in the default
+	// workspace, and may be in a window of its own, newWindow; a page's never is, so its
+	// tab goes in its window.
+	TabOpened(opener, tab TabID, url, workspace string, foreground, newWindow bool)
 
 	// TabFocused says the keyboard went into a visible tab's page: a click, Tab from the
 	// shell, or FocusTab.

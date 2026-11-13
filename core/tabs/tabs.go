@@ -171,7 +171,7 @@ func (m *Manager) Create() engine.TabID { return m.CreateIn(m.Front()) }
 
 // CreateIn opens a new tab at the end of window w, on the blank page, and makes it active.
 func (m *Manager) CreateIn(w engine.WindowID) engine.TabID {
-	id := m.eng.CreateTab()
+	id := m.eng.CreateTab("")
 	m.add(id, w)
 	m.eng.LoadURL(id, BlankURL)
 	m.Activate(id)
@@ -453,7 +453,7 @@ func (m *Manager) Open(u string) { m.OpenIn(u, true) }
 // OpenIn opens a URL in a new last tab of the window in front, shown or behind the
 // active one.
 func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
-	id := m.eng.CreateTab()
+	id := m.eng.CreateTab("")
 	m.HandleTabOpened(m.ActiveID(), id, u, foreground)
 	m.eng.LoadURL(id, u)
 	return id

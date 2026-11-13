@@ -14,9 +14,9 @@ type fakeEngine struct {
 	closed []engine.TabID
 }
 
-func (f *fakeEngine) CreateTab() engine.TabID      { f.next++; return f.next }
-func (f *fakeEngine) CloseTab(id engine.TabID)     { f.closed = append(f.closed, id) }
-func (f *fakeEngine) LoadURL(engine.TabID, string) {}
+func (f *fakeEngine) CreateTab(string) engine.TabID { f.next++; return f.next }
+func (f *fakeEngine) CloseTab(id engine.TabID)      { f.closed = append(f.closed, id) }
+func (f *fakeEngine) LoadURL(engine.TabID, string)  {}
 
 // oneWindow is a manager with window 1.
 func oneWindow(e engine.Engine) *Manager {

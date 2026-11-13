@@ -96,7 +96,7 @@ How these are built is in [profiles-build.md](profiles-build.md).
   across the profile: extensions, permissions, downloads, settings and history. Firefox and
   Brave share the same things.
 
-**Proposed.**
+**Being built,** as [workspaces.md](workspaces.md) says, which also says what is done.
 
 - *A workspace is a storage partition inside the profile's one browser context.* Content
   keeps a tab in its partition for the tab's life, across sites, frames and popups
@@ -104,10 +104,9 @@ How these are built is in [profiles-build.md](profiles-build.md).
 - *Go chooses.* A tab's workspace is given when the tab is made and never changes. The engine
   interface gains one value on creating a tab and on a tab opening. A tab a page opens takes
   its opener's workspace.
-- *Known holes to close,* from reading the code, not from a test: a link that opens a new tab
-  without an opener falls to the default workspace in content
-  (`content/browser/web_contents/web_contents_impl.cc`), and so do our own paths for
-  ctrl-click, a new tab, and a tab made over DevTools.
+- *Known hole to close:* a link that opens a new tab without an opener falls to the default
+  workspace in content (`content/browser/web_contents/web_contents_impl.cc`). Our own paths
+  for a link opened in a new tab and a tab made over DevTools are closed.
 - Not in this design: a throwaway workspace, rules that send a site to a workspace, and what
   extensions are told about a tab's workspace.
 

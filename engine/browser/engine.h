@@ -67,7 +67,7 @@ class Engine {
 
   static Engine* Get();
   // Tells Go a page or a client opened a tab, which the adapter already made, in a window
-  // of its own when new_window.
+  // of its own when new_window, and which workspace it is in.
   static void TabOpened(int64_t opener,
                         int64_t tab,
                         const GURL& url,
@@ -115,9 +115,12 @@ class Engine {
   void FocusShellForTraversal(int64_t from_tab, bool reverse);
   void FocusPageForTraversal(int64_t window, bool reverse);
 
-  int64_t CreateTab();
-  // Takes a WebContents content made for a page's target=_blank or window.open and
-  // makes it a hidden tab.
+  // Makes a hidden tab in a workspace: Go's id for one, or "" for the default, the
+  // profile's own storage. A workspace is a storage partition of the profile's context,
+  // which the tab keeps for its life, across every site it visits and every tab it opens.
+  PageTab* CreateTab(const std::string& workspace);
+  // Takes a WebContents content made for a page's window.open or link, or for an
+  // extension's page, and makes it a hidden tab, in the workspace content made it in.
   PageTab* AdoptTab(std::unique_ptr<content::WebContents> contents);
   void CloseTab(int64_t tab);
   void LoadURL(int64_t tab, const char* url);
@@ -142,7 +145,8 @@ class Engine {
   content::WebContents* Contents(int64_t tab) const;
 
  private:
-  PageTab* Add(std::unique_ptr<content::WebContents> contents);
+  PageTab* Add(std::unique_ptr<content::WebContents> contents,
+               const std::string& workspace);
   // Whichever of our pages has the keyboard: a settings page, a shell or a tab's.
   content::WebContents* FocusedContents() const;
   void UpdateTitle(AppWindow* window);

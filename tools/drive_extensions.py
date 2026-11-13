@@ -229,6 +229,11 @@ def extension_checks():
     app.wait("!!document.documentElement.dataset.pbTabMessages", 20, page=True)
     back = json.loads(app.js("document.documentElement.dataset.pbTabMessages", page=True))
     check("the service worker messages the tab with tabs.sendMessage and tabs.connect", back["sent"] == back["got"] == app.js("location.href", page=True), back)
+    # Extensions see every tab, a workspace's too, without being told which it is in.
+    tab = int(app.cmd("opentab", "0a1b2c3d", drive_first_app.URL_A))
+    app.wait("!!document.documentElement.dataset.pbTestExtension", 30, tab=tab)
+    answer = json.loads(app.js("document.documentElement.dataset.pbTestExtension", tab=tab))
+    check("a content script runs in a workspace's tab too, and its service worker answers", answer["tab"] == tab, answer)
 
     # uBlock Origin Lite blocks the ad host.
     visit(app, PAGE)

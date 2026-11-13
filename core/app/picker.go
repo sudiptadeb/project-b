@@ -174,23 +174,23 @@ func (p *Picker) OSBindings(byTitle map[string]engine.Key) { p.commands.OSBindin
 
 // A picker copy has no tabs, no shell and no settings page, so it hears nothing of them.
 
-func (p *Picker) ShellMessage(engine.WindowID, []byte)                     {}
-func (p *Picker) SettingsMessage(engine.WindowID, []byte)                  {}
-func (p *Picker) NavigationStarting(engine.TabID, string) bool             { return false }
-func (p *Picker) NavigationFinished(engine.TabID, string)                  {}
-func (p *Picker) NavigationFailed(engine.TabID, string, string)            {}
-func (p *Picker) HistoryChanged(engine.TabID, bool, bool)                  {}
-func (p *Picker) TitleChanged(engine.TabID, string)                        {}
-func (p *Picker) LoadingChanged(engine.TabID, bool)                        {}
-func (p *Picker) LoadProgressChanged(engine.TabID, float64)                {}
-func (p *Picker) PageCrashed(engine.TabID)                                 {}
-func (p *Picker) FaviconChanged(engine.TabID, string)                      {}
-func (p *Picker) TabOpened(engine.TabID, engine.TabID, string, bool, bool) {}
-func (p *Picker) TabFocused(engine.TabID)                                  {}
-func (p *Picker) CloseRequested(engine.TabID)                              {}
-func (p *Picker) ActivateRequested(engine.TabID)                           {}
-func (p *Picker) ProcessCrashed(engine.ProcessCrash)                       {}
-func (p *Picker) DevToolsCommand(string, []byte) (any, error)              { return nil, engine.ErrUnknownCommand }
+func (p *Picker) ShellMessage(engine.WindowID, []byte)                             {}
+func (p *Picker) SettingsMessage(engine.WindowID, []byte)                          {}
+func (p *Picker) NavigationStarting(engine.TabID, string) bool                     { return false }
+func (p *Picker) NavigationFinished(engine.TabID, string)                          {}
+func (p *Picker) NavigationFailed(engine.TabID, string, string)                    {}
+func (p *Picker) HistoryChanged(engine.TabID, bool, bool)                          {}
+func (p *Picker) TitleChanged(engine.TabID, string)                                {}
+func (p *Picker) LoadingChanged(engine.TabID, bool)                                {}
+func (p *Picker) LoadProgressChanged(engine.TabID, float64)                        {}
+func (p *Picker) PageCrashed(engine.TabID)                                         {}
+func (p *Picker) FaviconChanged(engine.TabID, string)                              {}
+func (p *Picker) TabOpened(engine.TabID, engine.TabID, string, string, bool, bool) {}
+func (p *Picker) TabFocused(engine.TabID)                                          {}
+func (p *Picker) CloseRequested(engine.TabID)                                      {}
+func (p *Picker) ActivateRequested(engine.TabID)                                   {}
+func (p *Picker) ProcessCrashed(engine.ProcessCrash)                               {}
+func (p *Picker) DevToolsCommand(string, []byte) (any, error)                      { return nil, engine.ErrUnknownCommand }
 
 // Handover is the request of a copy started to pick while this one runs: the picker comes
 // to the front.

@@ -233,7 +233,7 @@ func (a *App) FaviconChanged(tab engine.TabID, dataURL string) {
 	a.Tabs.HandleFaviconChanged(tab, dataURL)
 }
 
-func (a *App) TabOpened(opener, tab engine.TabID, url string, foreground, newWindow bool) {
+func (a *App) TabOpened(opener, tab engine.TabID, url, workspace string, foreground, newWindow bool) {
 	// A tab nothing opened goes in the window in front, which a new one is.
 	if newWindow {
 		a.openWindow()

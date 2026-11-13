@@ -10,6 +10,7 @@ Where the project stands, for the next person or agent. Last updated 2026-11-10.
 - [window-manager.md](window-manager.md): one Go owner for how the window behaves, built for macOS, and how Windows and Linux map to it.
 - [profiles.md](profiles.md) and [profiles-build.md](profiles-build.md): profiles, each in a copy of the app of its own, the list beside their folders, templates, the Profiles menu, the picker, the Profile section in settings, and updates shared by every copy.
 - [windows.md](windows.md): several windows, each with its own shell and settings, and the list of tabs each one shows.
+- [workspaces.md](workspaces.md): workspaces, sets of tabs inside a profile with cookies and site storage of their own.
 - [architecture-review.md](architecture-review.md): an independent verdict from building tabs.
 - [content-hooks.md](content-hooks.md): every content hook, carried or left, and what to do about the rest.
 - [updates.md](updates.md): how an installed copy updates itself, and how to publish a release.

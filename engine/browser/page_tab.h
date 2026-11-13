@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "base/memory/weak_ptr.h"
@@ -16,13 +17,17 @@ namespace project_b {
 // overridden here needs content's objects first, and still calls the base after.
 class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks {
  public:
-  PageTab(int64_t id, std::unique_ptr<content::WebContents> contents);
+  PageTab(int64_t id,
+          std::unique_ptr<content::WebContents> contents,
+          const std::string& workspace);
   PageTab(const PageTab&) = delete;
   PageTab& operator=(const PageTab&) = delete;
   ~PageTab() override;
 
   int64_t id() const { return id_; }
   content::WebContents* contents() const { return contents_.get(); }
+  // Go's id for the workspace the tab is in, or "" for the default. It never changes.
+  const std::string& workspace() const { return workspace_; }
   // Go's id for the window whose layout last showed this tab, 0 before any has.
   int64_t window() const { return window_; }
   void set_window(int64_t window) { window_ = window; }
@@ -68,6 +73,7 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
   bool TakeFocus(content::WebContents* source, bool reverse) override;
 
   const int64_t id_;
+  const std::string workspace_;
   int64_t window_ = 0;
   std::unique_ptr<content::WebContents> contents_;
   // Counts favicon fetches, so a slow one for an earlier page is dropped.

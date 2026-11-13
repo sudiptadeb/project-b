@@ -811,8 +811,8 @@ func TestADevToolsTargetInANewWindow(t *testing.T) {
 	defer r.stop()
 	var tab engine.TabID
 	r.e.Post(func() {
-		tab = r.e.CreateTab()
-		r.a.TabOpened(0, tab, "https://n.test/", true, true)
+		tab = r.e.CreateTab("")
+		r.a.TabOpened(0, tab, "https://n.test/", "", true, true)
 	})
 	r.e.Settle()
 	var inSecond []tabs.Tab

@@ -19,9 +19,12 @@
 
 namespace project_b {
 
-PageTab::PageTab(int64_t id, std::unique_ptr<content::WebContents> contents)
+PageTab::PageTab(int64_t id,
+                 std::unique_ptr<content::WebContents> contents,
+                 const std::string& workspace)
     : WebContentsObserverHooks(contents.get()),
       id_(id),
+      workspace_(workspace),
       contents_(std::move(contents)) {
   hooks::TagTab(contents_.get(), id_);
   contents_->SetDelegate(this);
@@ -139,10 +142,9 @@ content::WebContents* PageTab::OpenURLFromTab(
     base::OnceCallback<void(content::NavigationHandle&)> callback) {
   content::WebContents* target = source;
   if (params.disposition != WindowOpenDisposition::CURRENT_TAB) {
-    // A link asked for another tab. Go hears about the tab before its first
-    // navigation, so the gate finds it.
-    PageTab* tab = Engine::Get()->AdoptTab(content::WebContents::Create(
-        content::WebContents::CreateParams(source->GetBrowserContext())));
+    // A link asked for another tab, which is in this tab's workspace. Go hears about
+    // the tab before its first navigation, so the gate finds it.
+    PageTab* tab = Engine::Get()->CreateTab(workspace_);
     Engine::TabOpened(id_, tab->id(), params.url,
                       params.disposition != WindowOpenDisposition::NEW_BACKGROUND_TAB,
                       /*new_window=*/false);

@@ -56,6 +56,8 @@ type tab struct {
 	state   string // What the mock page shows: empty, loading, loaded, blocked, crashed.
 	current string
 	zoom    float64
+	// workspace is the app's id for the workspace the tab is in, or "" for the default.
+	workspace string
 }
 
 // Engine implements engine.Engine. Run is the main thread: everything happens there,
@@ -196,10 +198,18 @@ func (e *Engine) CreateWindow(w, near engine.WindowID, page engine.Page, l engin
 	}
 }
 
-func (e *Engine) CreateTab() engine.TabID {
+func (e *Engine) CreateTab(workspace string) engine.TabID {
 	e.nextTab++
-	e.tabs[e.nextTab] = &tab{pos: -1, state: "empty"}
+	e.tabs[e.nextTab] = &tab{pos: -1, state: "empty", workspace: workspace}
 	return e.nextTab
+}
+
+// Workspace is the workspace a tab is in, or "" for the default. Main thread.
+func (e *Engine) Workspace(id engine.TabID) string {
+	if t := e.tabs[id]; t != nil {
+		return t.workspace
+	}
+	return ""
 }
 
 func (e *Engine) CloseTab(id engine.TabID) {
@@ -398,9 +408,9 @@ func (e *Engine) ZoomOf(id engine.TabID) float64 {
 	return 1
 }
 
-// DuplicateTab copies the tab's history into a new hidden tab.
+// DuplicateTab copies the tab's history into a new hidden tab, in its workspace.
 func (e *Engine) DuplicateTab(id engine.TabID) engine.TabID {
-	n := e.CreateTab()
+	n := e.CreateTab(e.Workspace(id))
 	if t := e.tabs[id]; t != nil {
 		c := *t
 		c.history = append([]string(nil), t.history...)
@@ -615,9 +625,9 @@ func (e *Engine) Fire(w engine.WindowID, kind, value string) {
 			e.listener.FaviconChanged(shown, value)
 		case "open":
 			// What a page's target=_blank or window.open does: the engine makes the
-			// tab, tells the app, then loads it.
-			id := e.CreateTab()
-			e.listener.TabOpened(shown, id, value, true, false)
+			// tab, in the page's workspace, tells the app, then loads it.
+			id := e.CreateTab(e.Workspace(shown))
+			e.listener.TabOpened(shown, id, value, e.Workspace(shown), true, false)
 			e.navigate(id, value)
 		case "key":
 			// A key pressed in the page, which uses none of them.

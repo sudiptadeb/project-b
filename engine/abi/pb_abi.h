@@ -32,8 +32,9 @@ typedef struct PBValue {
 // beside each. Matches core/content/events.go.
 typedef enum PBEvent {
   PB_EVENT_SHELL_MESSAGE = 1,           // i: window, s: json
-  PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, i: foreground,
-                                        // i: in a new window of its own
+  PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, s: its workspace,
+                                        // "" for the default; i: foreground, i: in a new
+                                        // window of its own
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
   PB_EVENT_WINDOW_CHANGED = 4,          // i: window; d: w, d: h, the content area; d: x,
                                         // d: y, d: w, d: h, the window buttons; d: corner
@@ -157,8 +158,9 @@ typedef struct PBEngineCalls {
   // extension runtime with it. Go calls it once, as the copy becomes that profile's, before
   // anything asks for a tab.
   void (*open_profile)(const char* dir);
-  // Makes a hidden tab. A window's layout shows it.
-  int64_t (*create_tab)(void);
+  // Makes a hidden tab in a workspace, by Go's id for it, or in the default workspace for
+  // "". A window's layout shows it.
+  int64_t (*create_tab)(const char* workspace);
   void (*close_tab)(int64_t tab);
   void (*load_url)(int64_t tab, const char* url);
   void (*go_back)(int64_t tab);

@@ -14,6 +14,12 @@ to our code having it.
     python3 tools/measure.py --save              # also writes the baseline, tools/baseline/<where>.json
     python3 tools/measure.py --compare           # against that baseline; or --compare FILE
     python3 tools/measure.py --trace build/measure/trace.json   # the last start, for ui.perfetto.dev
+    python3 tools/measure.py --shell minimal-js --out build/measure/minimal-js.json   # another shell
+
+On a Mac every start can load another shell, by its id in core/shells/registry.json, and the
+run finds the controls by role and name (docs/shells.md, "What every shell does"), so the
+same run measures any shell. Only the standard shell can move its tabs, so only its runs
+have tabs.layout.
 
 PB_BIN picks another Mac binary; PB_APK and ADB_SERIAL another APK and device. On a Mac
 an agent's or ssh session has no screen, and AppKit has at times taken seconds to start
@@ -44,12 +50,28 @@ ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 STARTED = ("shell.snapshot", "shell.on_screen", "tab.committed")
 
 
+# A shell's button by its accessible name, aria-label else its text, which may end with its
+# key, as the contract matches it: "New Tab" finds "New Tab ⌘T", "Close" finds "Close Tab".
+FIND = """(() => {
+  const want = new RegExp('^' + %s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '\\\\b');
+  const name = (e) => (e.getAttribute('aria-label') || e.textContent || '').trim();
+  const at = (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; };
+  const found = [...document.querySelectorAll('button, [role=button]')]
+    .filter((e) => e.checkVisibility({ visibilityProperty: true }) && want.test(name(e)));
+  const tab = document.querySelector('[role=tab][aria-selected=true]');
+  const off = (e) => { if (!tab) return 0; const [x, y] = at(e), [tx, ty] = at(tab); return Math.hypot(x - tx, y - ty); };
+  found.sort((a, b) => off(a) - off(b));
+  return found.length ? at(found[0]) : null;
+})()"""
+
+
 class Mac:
     """The Mac app through its driver (--pb-driver), each start on a fresh profile."""
 
-    def __init__(self):
+    def __init__(self, shell=None):
         import drive_first_app
         self.d = drive_first_app
+        self.shell = shell
         # A session without a screen has numbers of its own, and a baseline of its own.
         self.session = subprocess.run(["launchctl", "managername"], capture_output=True, text=True).stdout.strip()
         self.name = "mac" if self.session == "Aqua" else "mac-headless"
@@ -59,7 +81,11 @@ class Mac:
 
     def start(self):
         self.entries, self.last = [], 0
-        self.app = self.d.App(tempfile.mkdtemp(prefix="pb-measure-"))
+        profile = tempfile.mkdtemp(prefix="pb-measure-")
+        if self.shell:
+            with open(os.path.join(profile, "prefs.json"), "w") as f:
+                json.dump({"shell": self.shell}, f)
+        self.app = self.d.App(profile)
 
     def read(self):
         reply = json.loads(self.app.cmd("timeline", self.last))["result"]
@@ -69,22 +95,23 @@ class Mac:
 
     def interact(self):
         d, app = self.d, self.app
-        d.click(app, "button.settings")
+        self.press("Settings")
         ended(self, "settings.open")
         app.cmd("key", "cmd+w")
         until(lambda: app.cmd("evalsettings", "1").startswith("ERR"))
 
-        d.click(app, ".new-tab")
+        self.press("New Tab")
         ended(self, "tab.new")
-        # A tab's close button shows under the pointer.
+        # A tab's close button may show only under the pointer.
         x, y = d.center(app, "[role=tab][aria-selected=true]")
         app.cmd("move", x, y)
-        d.click(app, "[role=tab][aria-selected=true] .close")
+        self.press("Close")
         ended(self, "tab.close")
 
-        for _ in range(2):
-            d.click(app, "button[aria-label^='Tabs on']")
-            ended(self, "tabs.layout")
+        if self.find("Tabs on"):
+            for _ in range(2):
+                self.press("Tabs on")
+                ended(self, "tabs.layout")
 
         # The same from the keyboard, and a click on the tab behind.
         app.cmd("key", "cmd+t")
@@ -93,6 +120,16 @@ class Mac:
         ended(self, "tab.activate")
         app.cmd("key", "cmd+w")
         ended(self, "tab.close")
+
+    def find(self, name):
+        """The middle of the shell's shown button whose accessible name starts with the
+        words name; of several, the one nearest the active tab, as a tab's close button is.
+        None when there is none."""
+        return self.app.js(FIND % json.dumps(name))
+
+    def press(self, name):
+        x, y = self.find(name)
+        self.d.click_at(self.app, x, y, name)
 
     def stop(self):
         self.app.close()
@@ -218,9 +255,11 @@ def main():
     p.add_argument("--save", action="store_true", help="write the baseline")
     p.add_argument("--compare", nargs="?", const="", metavar="FILE", help="compare with the baseline, or with FILE")
     p.add_argument("--trace", metavar="FILE", help="write the last start as a Chrome trace")
+    p.add_argument("--shell", metavar="ID", help="the shell each start loads (Mac only)")
+    p.add_argument("--out", metavar="FILE", help="also write the result, as a baseline is written, to FILE")
     args = p.parse_args()
 
-    target = Android() if args.android else Mac()
+    target = Android() if args.android else Mac(args.shell)
     baseline_path = os.path.join(ROOT, "tools/baseline", target.name + ".json")
     runs = []
     for i in range(args.n):
@@ -238,16 +277,16 @@ def main():
         with open(args.trace, "w") as f:
             json.dump(timeline.trace(runs[-1]["entries"]), f)
         print("\nthe last start's trace: " + args.trace)
-    if args.save:
+    for path in ([baseline_path] if args.save else []) + ([args.out] if args.out else []):
         with open(os.path.join(ROOT, "VERSION")) as f:
             version = f.read().strip()
         commit = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-        os.makedirs(os.path.dirname(baseline_path), exist_ok=True)
-        with open(baseline_path, "w") as f:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w") as f:
             json.dump({"platform": target.name, "date": datetime.date.today().isoformat(), "version": version, "commit": commit,
-                       "starts": args.n, **target.describe(), **result}, f, indent=1, sort_keys=True)
+                       "starts": args.n, "shell": args.shell or "standard", **target.describe(), **result}, f, indent=1, sort_keys=True)
             f.write("\n")
-        print("\nbaseline saved: " + baseline_path)
+        print("\nsaved: " + path)
 
 
 if __name__ == "__main__":

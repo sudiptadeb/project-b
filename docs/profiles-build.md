@@ -26,8 +26,19 @@ built so far, and the order of building at the end says which steps are done.
   (`core/profiles/templates.go`).
 - Prefs are four values in `<profile>/prefs.json`: where the tabs go, automatic updates,
   the frame colour, the theme (`core/prefs`).
-- One copy of the app per folder, with a handover (`core/instance`). Nothing starts a
-  second copy on another folder, and nothing lists folders.
+- One copy of the app per folder, with a handover (`core/instance`).
+- Opening another profile starts another copy. The menu bar has a Profiles menu, from the
+  menu template, listing the profiles with a tick on this one. A menu template places a
+  list that changes by its id (`{"list": "profiles"}`, `commands.List`); the engine asks
+  Go for its items each time the menu opens (`PB_EVENT_MENU_LIST`, `engine.Listener.MenuList`),
+  so the menu shows the list as `profiles.json` has it then, whichever copy changed it.
+  Choosing one starts a copy of the app on it, `--root=<root> --profile=<id>`, at once and
+  apart from this one (`relaunch.Copy`); a copy already running there takes the handover
+  and comes to the front, and the new copy quits. Started from its binary, each copy is an
+  app of its own, with its own Dock icon. Quit ends this profile's copy only.
+- Each copy draws its Dock icon as the app's with a small dot in its profile's colour,
+  bottom right (`set_dock_color`, `engine.Engine.SetDockColor`). Go says the colour at
+  start and when the frame colour changes, and keeps the list's copy of it the same.
 - The update state lives in the profile folder, and "relaunch to update" swaps the
   installed app and restarts this one copy (`core/update`).
 - Our pages, the shells and the settings pages, load in a context of their own, off the
@@ -113,7 +124,7 @@ Each commit builds, leaves a working app, and carries its tests.
 2. Done. The profile list beside the folders, and the start choosing the profile: named,
    else used last, else a first one.
 3. Done. Templates, Personal and Work; the first profile is made from Personal.
-4. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
+4. Done. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
 5. The picker: a copy that hasn't chosen, its page, New Profile from a template.
 6. The Profile section in settings: the name, and reset to a template.
 7. Updates app-wide: the shared state and setting, and the restart of every copy.

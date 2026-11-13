@@ -1,5 +1,6 @@
-// Package relaunch starts the app again once this process has gone. Starting it any
-// earlier would run two copies on one profile.
+// Package relaunch starts copies of the app: this one again once this process has gone,
+// since starting it any earlier would run two copies on one profile, or another copy now,
+// on another profile.
 package relaunch
 
 import (
@@ -19,6 +20,23 @@ func After(executable string, args []string) {
 	if err := cmd.Start(); err != nil {
 		timeline.Errorf("relaunch: %v", err)
 	}
+}
+
+// Copy starts another copy of this program now, with args, apart from this process: it
+// goes on when this one ends.
+func Copy(args ...string) {
+	exe, err := os.Executable()
+	if err != nil {
+		timeline.Errorf("relaunch: %v", err)
+		return
+	}
+	cmd := exec.Command(exe, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		timeline.Errorf("relaunch: %v", err)
+		return
+	}
+	cmd.Process.Release()
 }
 
 // Self starts this program again, with the arguments it was started with.

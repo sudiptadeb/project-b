@@ -33,6 +33,22 @@ type Action struct {
 	Release func()
 }
 
+// List is a part of a menu that changes while the app runs, such as the profiles. Its
+// items are read when the menu opens, so they are as they are then. Each item is a key
+// the list knows; choosing it runs Choose with the key.
+type List struct {
+	ID     string
+	Items  func() []ListItem
+	Choose func(key string)
+}
+
+// ListItem is one item of a List.
+type ListItem struct {
+	Key     string
+	Title   string
+	Checked bool
+}
+
 // Missing is an action an update brought that the user's own keymap doesn't have yet,
 // with the keys it couldn't take because the keymap already uses them.
 type Missing struct {
@@ -61,6 +77,7 @@ type Manager struct {
 	fullScreen func() bool
 
 	actions map[string]*Action
+	lists   map[string]*List
 	tree    []Node
 	locked  Keymap
 	file    Keymap // keymap.json as it is on disk
@@ -85,6 +102,7 @@ func New(eng engine.Engine, dir string, fullScreen func() bool) *Manager {
 		menuFile:   filepath.Join(dir, "menu.json"),
 		fullScreen: fullScreen,
 		actions:    map[string]*Action{},
+		lists:      map[string]*List{},
 		locked:     lockedKeys(),
 	}
 }
@@ -104,6 +122,23 @@ func (m *Manager) Platform() string { return m.platform }
 
 // Register adds an action. Call it for every action before Load.
 func (m *Manager) Register(a Action) { m.actions[a.ID] = &a }
+
+// RegisterList adds a list, which a menu template places by its id. Call it before Load.
+func (m *Manager) RegisterList(l List) { m.lists[l.ID] = &l }
+
+// ListItems is a list's items as they are now, as menu items. Choosing one runs its
+// action, "<list>:<key>". A list nothing registered has none.
+func (m *Manager) ListItems(id string) engine.Menu {
+	l, ok := m.lists[id]
+	if !ok {
+		return nil
+	}
+	var out engine.Menu
+	for _, it := range l.Items() {
+		out = append(out, engine.MenuItem{Title: it.Title, Action: id + ":" + it.Key, Enabled: true, Checked: it.Checked})
+	}
+	return out
+}
 
 // OnChanged subscribes to the keymap or the actions' state changing.
 func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }
@@ -267,6 +302,10 @@ func (m *Manager) order() []string {
 // Run runs an action by id, if it exists and can run now, as a menu item or a button
 // does: with nothing held.
 func (m *Manager) Run(id string) {
+	if list, key, ok := strings.Cut(id, ":"); ok && m.lists[list] != nil {
+		m.lists[list].Choose(key)
+		return
+	}
 	a, ok := m.actions[id]
 	if !ok {
 		timeline.Warnf("commands: no action %q", id)
@@ -364,6 +403,10 @@ func (m *Manager) menu(nodes []Node) engine.Menu {
 		switch {
 		case n.Separator:
 			out = append(out, engine.MenuItem{Separator: true})
+		case n.List != "":
+			if _, ok := m.lists[n.List]; ok {
+				out = append(out, engine.MenuItem{List: n.List})
+			}
 		case n.Action != "":
 			a, ok := m.actions[n.Action]
 			if !ok || m.hidden(n) {

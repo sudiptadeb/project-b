@@ -92,7 +92,9 @@ type Node struct {
 	Title     string `json:"title,omitempty"`
 	Action    string `json:"action,omitempty"`
 	Separator bool   `json:"separator,omitempty"`
-	Locked    bool   `json:"locked,omitempty"`
+	// List places a list of items that changes while the app runs, by its id.
+	List   string `json:"list,omitempty"`
+	Locked bool   `json:"locked,omitempty"`
 	// Role names a menu the OS knows: "app", "window", "services".
 	Role string `json:"role,omitempty"`
 	// Only limits the entry to one platform.

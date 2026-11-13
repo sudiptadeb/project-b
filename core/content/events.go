@@ -25,6 +25,7 @@ const (
 	eventDevTools       Hook = 12
 	eventWindowClosed   Hook = 13
 	eventWindowFocused  Hook = 14
+	eventMenuList       Hook = 15
 )
 
 var eventNames = map[Hook]string{
@@ -42,6 +43,7 @@ var eventNames = map[Hook]string{
 	eventDevTools:       "engine.DevToolsCommand",
 	eventWindowClosed:   "engine.WindowClosed",
 	eventWindowFocused:  "engine.WindowFocused",
+	eventMenuList:       "engine.MenuList",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -66,6 +68,7 @@ type Events struct {
 	OnWindowFocused   func(w engine.WindowID)
 	OnSettingsMessage func(w engine.WindowID, msg []byte)
 	OnMenuChosen      func(action string)
+	OnMenuList        func(name string) engine.Menu
 	OnOSBindings      func(byTitle map[string]engine.Key)
 	OnModsChanged     func(m engine.Mods)
 	OnProcessCrashed  func(p engine.ProcessCrash)
@@ -148,6 +151,17 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 				URL:      r.str(),
 			})
 		}
+	case eventMenuList:
+		// The answer is the list's items now, as the menu bar's JSON has them.
+		if e.OnMenuList == nil {
+			return Value{}, false
+		}
+		b, err := json.Marshal(e.OnMenuList(r.str()))
+		if err != nil {
+			timeline.Errorf("content: a menu list: %v", err)
+			return Value{}, false
+		}
+		return Value{S: string(b)}, true
 	case eventDevTools:
 		// The answer is the reply's body as DevTools has it: its result or its error.
 		if e.OnDevTools == nil {

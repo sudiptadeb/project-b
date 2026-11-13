@@ -26,6 +26,7 @@ import (
 	"projectb/engine"
 	"projectb/flags"
 	"projectb/mockengine"
+	"projectb/profiles"
 	"projectb/timeline"
 	"projectb/update"
 )
@@ -36,11 +37,21 @@ var pages embed.FS
 // routes are what a build tag adds to the server for its tests.
 var routes []func(mux *http.ServeMux, e *mockengine.Engine)
 
+// rootOf is the root -root names, else the profile folder's: the mock's profile is a
+// folder named outright, as --user-data-dir names one.
+func rootOf(root, profile string) string {
+	if root != "" {
+		return root
+	}
+	return filepath.Dir(profile)
+}
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
 	shellDir := flag.String("shell", "../shell/dist", "the built pages, one folder each")
 	home, _ := os.UserHomeDir()
 	profile := flag.String("profile", filepath.Join(home, ".project-b", "dev"), "profile directory")
+	root := flag.String("root", "", "the folder of the profile list the Profiles menu reads; the profile's own folder's by default")
 	block := flag.String("block", "", "comma-separated blocked hosts")
 	// The updater runs for real against a manifest when given a version to be, the bundle
 	// it is "installed" as, and the manifest. Without a version it stays off, as it does
@@ -71,6 +82,7 @@ func main() {
 	e.Post(func() {
 		a = app.Start(e, app.Config{
 			ProfileDir:   *profile,
+			Profiles:     profiles.New(rootOf(*root, *profile)),
 			BlockedHosts: strings.Split(*block, ","),
 			Update: update.Config{
 				Project:  "project-b",

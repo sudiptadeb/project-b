@@ -161,3 +161,41 @@ func TestOSBindingsJoinTheKeymap(t *testing.T) {
 		t.Fatal("an OS key the OS dropped stayed")
 	}
 }
+
+// A list's items are read each time its menu opens, and choosing one hands its key back.
+func TestAMenuListIsReadWhenItsMenuOpens(t *testing.T) {
+	e := mockengine.New()
+	m := New(e, t.TempDir(), func() bool { return false })
+	names := []string{"Personal"}
+	var chosen []string
+	m.RegisterList(List{
+		ID: "profiles",
+		Items: func() []ListItem {
+			var items []ListItem
+			for i, n := range names {
+				items = append(items, ListItem{Key: strings.ToLower(n), Title: n, Checked: i == 0})
+			}
+			return items
+		},
+		Choose: func(key string) { chosen = append(chosen, key) },
+	})
+	m.Load()
+	var profiles *engine.MenuItem
+	for i, top := range e.Menu() {
+		if top.Title == "Profiles" {
+			profiles = &e.Menu()[i]
+		}
+	}
+	if profiles == nil || len(profiles.Items) != 1 || profiles.Items[0].List != "profiles" {
+		t.Fatalf("the Profiles menu is %+v", profiles)
+	}
+	names = append(names, "Work")
+	items := m.ListItems("profiles")
+	if len(items) != 2 || items[1].Title != "Work" || !items[0].Checked || items[1].Checked {
+		t.Fatalf("items = %+v", items)
+	}
+	m.Run(items[1].Action)
+	if len(chosen) != 1 || chosen[0] != "work" {
+		t.Fatalf("chose %v", chosen)
+	}
+}

@@ -16,6 +16,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py move       # only moving a tab between windows
     python3 tools/drive_first_app.py bounds     # only a window's frame, set and read
     python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
+    python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -26,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -100,7 +102,10 @@ class App:
 
     def __init__(self, profile, extra=()):
         """Starts the app on the folder profile, as it is, or with profile None on whatever
-        the start chooses from extra."""
+        the start chooses from extra. The root is a new one unless extra names one, so the
+        app never reads the real list."""
+        if not any(x.startswith("--root=") for x in extra):
+            extra = [f"--root={tempfile.mkdtemp(prefix='pb-root-')}", *extra]
         self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
         os.mkfifo(self.fifo)
         self.log = open(os.path.join(OUT, "app.log"), "a")
@@ -1239,6 +1244,69 @@ def profile_checks():
     app.close()
 
 
+def add_work_profile(root):
+    """Lists a second profile, work, made from the Work template, as New Profile makes one."""
+    path = os.path.join(root, "profiles.json")
+    listed = json.load(open(path))
+    listed["profiles"].append({"id": "work", "name": "Work", "color": "#5b7fd6", "template": "Work"})
+    with open(path, "w") as f:
+        json.dump(listed, f)
+    os.makedirs(os.path.join(root, "work"))
+    with open(os.path.join(root, "work", "prefs.json"), "w") as f:
+        json.dump({"tabLayout": "horizontal", "frameColor": "#5b7fd6", "theme": "system"}, f)
+
+
+def copies_on(root, profile):
+    """The pids of the copies running on a listed profile of root that the app started,
+    not the driver."""
+    out = subprocess.run(["pgrep", "-f", "--", f"--root={root} --profile={profile}"], capture_output=True, text=True).stdout
+    return [p for p in out.split() if int(p) not in {a.proc.pid for a in App.running}]
+
+
+def copies_checks():
+    """Two copies on two profiles of one root: each is an app of its own, with its profile's
+    colour in a dot on its Dock icon. The Profiles menu in each lists both, with a tick on its
+    own. Choosing a running profile starts a copy that hands over to it; choosing a stopped
+    one starts it. Quit ends one profile's copy only."""
+    root = tempfile.mkdtemp(prefix="pb-root-")
+    a = App(None, [f"--root={root}"])
+    a.wait("!!document.querySelector('input')", 30)
+    add_work_profile(root)
+    b = App(None, [f"--root={root}", "--profile=work"])
+    b.wait("!!document.querySelector('input')", 30)
+    check("two profiles run at once, each in a copy of its own", a.proc.poll() is None and b.proc.poll() is None and a.proc.pid != b.proc.pid)
+    check("each copy's Dock icon has a dot in its profile's colour", (a.cmd("dockdot"), b.cmd("dockdot")) == ("#4f9e9e", "#5b7fd6"), (a.cmd("dockdot"), b.cmd("dockdot")))
+    shown = lambda app: [(i["title"], i["checked"]) for m in json.loads(app.cmd("menu")) if m["title"] == "Profiles" for i in m["items"] if i != "-"]
+    check("the Profiles menu lists both, with a tick on this one", shown(a) == [("Personal", True), ("Work", False)] and shown(b) == [("Personal", False), ("Work", True)], (shown(a), shown(b)))
+    handed = lambda: [e for e in json.loads(b.cmd("timeline"))["result"]["entries"] if "handed over" in e.get("text", "")]
+    before = len(handed())
+    check("choosing Work in the other copy's menu works", a.cmd("choosemenu", "Profiles", "Work") == "ok")
+    deadline = time.time() + 30
+    while len(handed()) == before and time.time() < deadline:
+        time.sleep(0.1)
+    check("it starts a copy on Work, which hands over to the copy running there", len(handed()) == before + 1, handed())
+    while len(copies_on(root, "work")) > 0 and time.time() < deadline:
+        time.sleep(0.1)
+    check("and that copy quits", copies_on(root, "work") == [], copies_on(root, "work"))
+    b.close()
+    a.cmd("choosemenu", "Profiles", "Work")
+    deadline = time.time() + 30
+    while not copies_on(root, "work") and time.time() < deadline:
+        time.sleep(0.1)
+    started = copies_on(root, "work")
+    check("choosing a profile that isn't running starts a copy on it", len(started) == 1, started)
+    for pid in started:
+        os.kill(int(pid), signal.SIGTERM)
+    while copies_on(root, "work") and time.time() < deadline:
+        time.sleep(0.1)
+    b = App(None, [f"--root={root}", "--profile=work"])
+    b.wait("!!document.querySelector('input')", 30)
+    a.cmd("key", "cmd+q")
+    check("Quit ends this profile's copy only", a.proc.wait(timeout=20) == 0 and b.proc.poll() is None)
+    App.running.remove(a)
+    b.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1255,5 +1323,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, cookie_checks]))

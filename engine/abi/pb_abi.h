@@ -56,6 +56,9 @@ typedef enum PBEvent {
   PB_EVENT_WINDOW_CLOSED = 13,          // i: window; it closed, asked by Go or by its own
                                         // close button, and its pages went with it
   PB_EVENT_WINDOW_FOCUSED = 14,         // i: window; it became the key window
+  PB_EVENT_MENU_LIST = 15,              // s: a menu list's name, as Go's menu names it;
+                                        // answers s: json, Go's engine.Menu, its items
+                                        // now. Asked each time a menu holding it opens
 } PBEvent;
 
 // Modifier bits, as Go's engine.Mods has them.
@@ -199,6 +202,9 @@ typedef struct PBEngineCalls {
   // Replaces the native menu bar: json is Go's engine.Menu.
   void (*set_menu)(const char* json, size_t length);
   void (*app_command)(int32_t command);  // PBAppCommand
+  // Draws the app's Dock icon with a small dot in the profile's colour, 0xRRGGBB, at its
+  // bottom right. Null on Android, where nothing calls it.
+  void (*set_dock_color)(int32_t rgb);
   // Lets a content hook cross to Go, or stops it. Unsubscribed hooks never cross.
   void (*set_hook_subscribed)(int32_t hook, int on);
   // Asks the main thread to call run_posted soon.

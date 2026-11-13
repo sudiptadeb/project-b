@@ -198,6 +198,19 @@ By hand, a step at a time:
     ~/PW_TOOLS/macos-vm/venv/bin/python tools/vm/check.py
     tools/vm/stop.sh
 
+### Several profiles
+
+Then come several profiles ([profiles-build.md](profiles-build.md)), on a fresh root, with
+real clicks: the Profiles menu, clicked open in the menu bar, lists the profiles with a
+tick on the copy's own; a second profile, Work, listed as New Profile lists one and opened
+as the menu opens one, runs as an app of its own beside Personal, with two Project B icons
+in the Dock, each with a dot in its profile's colour at its bottom right; and in Work's
+copy the menu lists both with the tick on Work. The menu's items are read through System
+Events while it is open, the Dock's icons as the Dock's own items, and the dots from the
+screen's pixels in each icon's corner. They run alone with
+
+    tools/vm/run.sh <DMG path or URL> profiles
+
 ### A second VM
 
 `PB_VM` names the VM every script here works on, `pb-test` by default. Each VM is a deskrig

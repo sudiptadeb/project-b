@@ -288,6 +288,8 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 	home, _ := os.UserHomeDir()
 	theApp = app.Start(native, app.Config{
 		ProfileDir:   dir,
+		Profiles:     list,
+		Profile:      profile.ID,
 		BlockedHosts: blocked,
 		Update:       updateConfig(dir),
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),

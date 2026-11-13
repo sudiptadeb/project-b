@@ -565,6 +565,28 @@ void Run(const std::string& line) {
     Reply(id, "ok");
   } else if (cmd == "menu") {
     Reply(id, MenuJson(NSApp.mainMenu));
+  } else if (cmd == "choosemenu") {
+    // "choosemenu <menu> <item>": chooses the item, as a click on it does, its menu read
+    // as it opens.
+    NSMenu* menu = [NSApp.mainMenu itemWithTitle:base::SysUTF8ToNSString(parts[2])].submenu;
+    [menu.delegate menuNeedsUpdate:menu];
+    NSMenuItem* item = [menu itemWithTitle:base::SysUTF8ToNSString(rest(3))];
+    [NSApp sendAction:item.action to:item.target from:item];
+    Reply(id, item ? "ok" : "no such item");
+  } else if (cmd == "dockdot") {
+    // The colour at the middle of the Dock icon's dot, or of where it goes: a tenth in from
+    // the right and the bottom, and half the dot's quarter across. The bitmap counts y
+    // down from the top. Its pixels are sRGB already, so they are read as they are.
+    NSRect rect = NSMakeRect(0, 0, 200, 200);
+    NSBitmapImageRep* rep = [[NSBitmapImageRep alloc]
+        initWithCGImage:[NSApp.applicationIconImage CGImageForProposedRect:&rect
+                                                                   context:nil
+                                                                     hints:nil]];
+    NSColor* c = [rep colorAtX:rep.pixelsWide * 155 / 200
+                             y:rep.pixelsHigh * 155 / 200];
+    Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
+                                 int(c.greenComponent * 255 + 0.5),
+                                 int(c.blueComponent * 255 + 0.5)));
   } else if (cmd == "capture") {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {
@@ -828,9 +850,16 @@ void StartDriver(const base::FilePath& fifo) {
 
 namespace {
 
+// A menu's items as it shows them when it opens: its lists read then, and nothing hidden.
 base::ListValue MenuItems(NSMenu* menu) {
+  if ([menu.delegate respondsToSelector:@selector(menuNeedsUpdate:)]) {
+    [menu.delegate menuNeedsUpdate:menu];
+  }
   base::ListValue items;
   for (NSMenuItem* item in menu.itemArray) {
+    if (item.hidden) {
+      continue;
+    }
     if (item.separatorItem) {
       items.Append("-");
       continue;

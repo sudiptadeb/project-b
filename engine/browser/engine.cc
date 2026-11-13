@@ -143,6 +143,13 @@ void CallAppCommand(int32_t command) {
 #endif
 }
 
+#if !BUILDFLAG(IS_ANDROID)
+void CallSetDockColor(int32_t rgb) {
+  CheckMainThread();
+  SetDockColor(static_cast<uint32_t>(rgb));
+}
+#endif
+
 // Go only names windows it opened and the engine hasn't closed.
 Window* NativeWindow(int64_t window) {
   Engine::AppWindow* w = g_engine->window(window);
@@ -340,6 +347,9 @@ const PBEngineCalls* Engine::Calls() {
       .send_to_settings = CallSendToSettings,
       .set_menu = CallSetMenu,
       .app_command = CallAppCommand,
+#if !BUILDFLAG(IS_ANDROID)
+      .set_dock_color = CallSetDockColor,
+#endif
       .set_hook_subscribed = CallSetHookSubscribed,
       .post_wakeup = CallPostWakeup,
 #if BUILDFLAG(IS_ANDROID)

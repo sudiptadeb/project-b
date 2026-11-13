@@ -247,6 +247,14 @@
       ]
     },
     {
+      "title": "Profiles",
+      "items": [
+        {
+          "list": "profiles"
+        }
+      ]
+    },
+    {
       "title": "Window",
       "role": "window",
       "locked": true,

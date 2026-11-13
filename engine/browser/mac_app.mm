@@ -103,6 +103,11 @@
 
 @end
 
+// Fills a menu's lists each time it opens, with their items as Go has them then. A list
+// sits in the menu as a hidden placeholder naming it; its items follow it.
+@interface PBMenuLists : NSObject <NSMenuDelegate>
+@end
+
 // Watches the keys macOS App Shortcuts gives our menu items, and tells Go.
 @interface PBKeyBindingsWatcher : NSObject
 @end
@@ -113,9 +118,18 @@ namespace {
 
 constexpr char kKeyEquivalents[] = "NSUserKeyEquivalents";
 
+// The tags of a list's placeholder and of the items Go gave it.
+constexpr NSInteger kListTag = 1;
+constexpr NSInteger kListItemTag = 2;
+
 PBMenuTarget* Target() {
   static PBMenuTarget* target = [[PBMenuTarget alloc] init];
   return target;
+}
+
+PBMenuLists* Lists() {
+  static PBMenuLists* lists = [[PBMenuLists alloc] init];
+  return lists;
 }
 
 int FlagsOf(int mods) {
@@ -140,6 +154,15 @@ NSMenu* BuildMenu(NSString* title, const base::ListValue& items);
 NSMenuItem* BuildItem(const base::DictValue& item) {
   if (item.FindBool("separator").value_or(false)) {
     return [NSMenuItem separatorItem];
+  }
+  if (const std::string* list = item.FindString("list")) {
+    NSMenuItem* placeholder = [[NSMenuItem alloc] initWithTitle:@""
+                                                         action:nil
+                                                  keyEquivalent:@""];
+    placeholder.hidden = YES;
+    placeholder.tag = kListTag;
+    placeholder.representedObject = base::SysUTF8ToNSString(*list);
+    return placeholder;
   }
   const std::string* title = item.FindString("title");
   NSString* ns_title = base::SysUTF8ToNSString(title ? *title : std::string());
@@ -186,7 +209,11 @@ NSMenu* BuildMenu(NSString* title, const base::ListValue& items) {
   menu.autoenablesItems = NO;
   for (const base::Value& item : items) {
     if (item.is_dict()) {
-      [menu addItem:BuildItem(item.GetDict())];
+      NSMenuItem* built = BuildItem(item.GetDict());
+      if (built.tag == kListTag) {
+        menu.delegate = Lists();
+      }
+      [menu addItem:built];
     }
   }
   return menu;
@@ -300,6 +327,32 @@ void RunAppCommand(int32_t command) {
   }
 }
 
+void SetDockColor(uint32_t rgb) {
+  // The bundle's own icon, as it was before the first dot.
+  static NSImage* plain = [NSApp.applicationIconImage copy];
+  NSColor* color = [NSColor colorWithSRGBRed:((rgb >> 16) & 0xff) / 255.0
+                                       green:((rgb >> 8) & 0xff) / 255.0
+                                        blue:(rgb & 0xff) / 255.0
+                                       alpha:1];
+  NSApp.applicationIconImage = [NSImage
+       imageWithSize:plain.size
+             flipped:NO
+      drawingHandler:^BOOL(NSRect rect) {
+        [plain drawInRect:rect];
+        // A dot a quarter of the icon across, inside the artwork's corner, ringed in
+        // white so it shows on any colour.
+        const CGFloat d = rect.size.width * 0.25;
+        const CGFloat inset = rect.size.width * 0.1;
+        NSRect dot = NSMakeRect(NSMaxX(rect) - inset - d, NSMinY(rect) + inset, d, d);
+        [NSColor.whiteColor setFill];
+        [[NSBezierPath bezierPathWithOvalInRect:dot] fill];
+        [color setFill];
+        [[NSBezierPath bezierPathWithOvalInRect:NSInsetRect(dot, d * 0.1, d * 0.1)]
+            fill];
+        return YES;
+      }];
+}
+
 void ReportOSKeyBindings() {
   // All Applications first, then ours over them, as macOS applies them.
   NSMutableDictionary* all = [NSMutableDictionary dictionary];
@@ -337,6 +390,43 @@ void WatchOSKeyBindings() {
 }
 
 }  // namespace project_b
+
+@implementation PBMenuLists
+
+- (void)menuNeedsUpdate:(NSMenu*)menu {
+  for (NSMenuItem* item in [menu.itemArray copy]) {
+    if (item.tag == project_b::kListItemTag) {
+      [menu removeItem:item];
+    }
+  }
+  for (NSMenuItem* placeholder in [menu.itemArray copy]) {
+    if (placeholder.tag != project_b::kListTag) {
+      continue;
+    }
+    project_b::hooks::Args args;
+    args.Str(base::SysNSStringToUTF8(placeholder.representedObject));
+    PBValue result;
+    if (!project_b::hooks::Ask(PB_EVENT_MENU_LIST, args, &result)) {
+      continue;
+    }
+    std::optional<base::Value> items =
+        base::JSONReader::Read(project_b::hooks::TakeString(result), 0);
+    if (!items || !items->is_list()) {
+      continue;
+    }
+    NSInteger at = [menu indexOfItem:placeholder] + 1;
+    for (const base::Value& item : items->GetList()) {
+      if (!item.is_dict()) {
+        continue;
+      }
+      NSMenuItem* built = project_b::BuildItem(item.GetDict());
+      built.tag = project_b::kListItemTag;
+      [menu insertItem:built atIndex:at++];
+    }
+  }
+}
+
+@end
 
 @implementation PBKeyBindingsWatcher
 

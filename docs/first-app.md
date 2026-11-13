@@ -162,6 +162,10 @@ profile folders; a first start makes it holding `default`, named Personal, and l
 `default` that already holds a profile as it is. `--user-data-dir=<dir>` is a folder used
 as the profile as it is, and never enters the list: ChromeDriver and the tests use it.
 
+The Profiles menu lists the profiles, read as it opens, and choosing one starts a copy of
+the app on it; each copy has its own Dock icon, with a dot in its profile's colour. See
+[profiles-build.md](profiles-build.md).
+
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
 started on the same profile writes nothing there: it hands the URLs
 on its command line to the running copy, whose window used last comes to the front and

@@ -273,15 +273,17 @@ def field_middle(img, win, x):
 CAL = "/tmp/pb-layout"  # In the guest: the driver's pipe, its output and a throwaway profile.
 
 
-def driven(where, profile):
+def driven(where, profile, args=None):
     """Opens the installed app with its driver (--pb-driver, as tools/drive_first_app.py uses
-    it), on a profile of its own, keeping the driver's pipe and the app's output in where in
-    the guest. Returns ask(*parts), which sends one driver command and returns its answer,
-    once the app says it's ready."""
+    it), on a profile of its own, or with args in its place, keeping the driver's pipe and the
+    app's output in where in the guest. Returns ask(*parts), which sends one driver command
+    and returns its answer, once the app says it's ready."""
     guest("/bin/sh", "-c", f"rm -rf {where}; mkdir -p {where} && mkfifo {where}/fifo")
-    fresh_profile(profile, profile)
+    if args is None:
+        fresh_profile(profile, profile)
+        args = [f"--user-data-dir={profile}"]
     guest("/usr/bin/open", "-n", "--stdout", f"{where}/out", "--stderr", f"{where}/err", APP, "--args",
-          f"--pb-driver={where}/fifo", f"--user-data-dir={profile}")
+          f"--pb-driver={where}/fifo", *args)
     asked = [0]
 
     def reply(key, timeout=30):
@@ -710,6 +712,96 @@ def state_checks():
     guest("/usr/bin/killall", "project_b")
 
 
+WORK = (91, 127, 214)  # The Work template's frame colour, #5b7fd6.
+
+# The Dock's items for the running copies of the app, each as (x, y, w, h). Its recent
+# apps keep items for copies that quit. Each is asked by its place in the Dock: asked by
+# name, items of the same name all answer as the first.
+DOCK = """
+const list = Application("System Events").processes["Dock"].lists[0];
+const out = [];
+for (let k = 0; k < list.uiElements.length; k++) {
+  const item = list.uiElements.at(k);
+  if (item.name() === "Project B" && item.attributes.byName("AXIsApplicationRunning").value()) {
+    out.push([...item.position(), ...item.size()]);
+  }
+}
+JSON.stringify(out);
+"""
+
+
+def dock_icons():
+    return json.loads(guest("/usr/bin/osascript", "-l", "JavaScript", "-e", DOCK) or "[]")
+
+
+def in_front(script):
+    """Asks System Events about the app in front, which is the copy whose window is."""
+    return guest("/usr/bin/osascript", "-e",
+                 f"tell application \"System Events\" to tell (first process whose frontmost is true) to {script}")
+
+
+def open_menu(title):
+    """Clicks a menu's title in the menu bar, as a person does, and leaves it open."""
+    x, y, w, h = map(float, in_front(f'get {{position, size}} of menu bar item "{title}" of menu bar 1').split(","))
+    desk.click(x + w / 2, y + h / 2)
+    time.sleep(0.6)
+
+
+def menu_items(title):
+    """The items an open menu shows, by title, and the one with a tick."""
+    menu = f'menu "{title}" of menu bar item "{title}" of menu bar 1'
+    names = [n.strip() for n in in_front(f"get name of every menu item of {menu}").split(",")]
+    marks = [m.strip() for m in in_front(f'get value of attribute "AXMenuItemMarkChar" of every menu item of {menu}').split(",")]
+    ticked = [n for n, m in zip(names, marks) if m not in ("", "missing value")]
+    return [n for n in names if n != "missing value"], ticked
+
+
+def profile_checks():
+    """Two profiles on a real screen: the Profiles menu's list as it opens, with a tick on the
+    copy's own, and each profile's copy its own app in the Dock, with a dot in its profile's
+    colour. Work is listed the way New Profile lists one, and opened the way the menu does,
+    as a copy of its own."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    time.sleep(1)
+    launch()
+    time.sleep(1.5)
+    window_or_stop("the app starts on its first profile")
+    open_menu("Profiles")
+    items, ticked = menu_items("Profiles")
+    shot("p3-profiles-menu")
+    check("the Profiles menu lists the profiles, with a tick on this one",
+          items == ["Personal"] and ticked == ["Personal"], f"{items} {ticked}")
+    desk.key("escape")
+
+    root = "/Users/admin/.project-b"
+    listed = json.loads(guest("/bin/cat", f"{root}/profiles.json"))
+    listed["profiles"].append({"id": "work", "name": "Work", "color": "#5b7fd6", "template": "Work"})
+    guest("/bin/sh", "-c", f"mkdir -p {root}/work && printf '%s' \"$1\" > {root}/profiles.json && "
+          f"printf '%s' '{{\"frameColor\":\"#5b7fd6\",\"tabLayout\":\"horizontal\",\"autoUpdate\":false}}' > {root}/work/prefs.json",
+          "sh", json.dumps(listed))
+    guest("/usr/bin/open", "-n", APP, "--args", f"--root={root}", "--profile=work")
+    two = until(lambda: guest("/usr/bin/pgrep", "-x", "project_b").split(), lambda p: len(p) == 2, 20)
+    until(windows, lambda w: len(w) == 2)
+    time.sleep(2)
+    icons = dock_icons()
+    shot("p3-dock")
+    img = desk.image()
+    corner = lambda x, y, w, h: crop(img, x + w / 2, y + h / 2, w / 2, h / 2)
+    dots = [(float(np.mean(near(corner(*i), FRAME, 6))), float(np.mean(near(corner(*i), WORK, 6)))) for i in icons]
+    check("two profiles run at once, each its own app in the Dock", len(two) == 2 and len(icons) == 2, f"{two} {icons}")
+    check("each Dock icon has a dot in its profile's colour, Personal's and Work's",
+          len(dots) == 2 and sorted(d[0] > 0.02 for d in dots) == [False, True] and sorted(d[1] > 0.02 for d in dots) == [False, True],
+          str(dots))
+    open_menu("Profiles")
+    items, ticked = menu_items("Profiles")
+    shot("p3-profiles-menu-work")
+    check("in Work's copy, the Profiles menu lists both, with the tick on Work",
+          items == ["Personal", "Work"] and ticked == ["Work"], f"{items} {ticked}")
+    desk.key("escape")
+    guest("/usr/bin/killall", "project_b")
+
+
 if why := missing():
     screen.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
 os.makedirs(SHOTS, exist_ok=True)
@@ -734,6 +826,12 @@ desk.dismiss_notifications()
 time.sleep(1)
 
 # "check.py windows" runs only the checks of several windows.
+# "check.py profiles" runs only the checks of several profiles.
+if sys.argv[1:] == ["profiles"]:
+    profile_checks()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
+
 if sys.argv[1:] == ["windows"]:
     window_checks()
     move_checks()
@@ -1198,5 +1296,6 @@ check("Cmd+Q ends the app", quit_app())
 window_checks()
 move_checks()
 state_checks()
+profile_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

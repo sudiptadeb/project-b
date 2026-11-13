@@ -77,6 +77,7 @@ type Engine struct {
 	quit       bool
 	shownColor string
 	menu       engine.Menu
+	dockColor  string
 	edits      []engine.EditCommand
 
 	// The fake extension runtime, in a build with extensions.
@@ -502,6 +503,19 @@ func (e *Engine) Menu() engine.Menu {
 }
 
 // AppCommand records a quit; the rest are the OS's.
+func (e *Engine) SetDockColor(color string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.dockColor = color
+}
+
+// DockColor is the colour the app last put on its Dock icon, or "".
+func (e *Engine) DockColor() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.dockColor
+}
+
 func (e *Engine) AppCommand(c engine.AppCommand) {
 	if c == engine.AppQuit {
 		e.mu.Lock()

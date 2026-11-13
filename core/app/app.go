@@ -10,6 +10,7 @@ import (
 	"projectb/history"
 	"projectb/policy"
 	"projectb/prefs"
+	"projectb/profiles"
 	"projectb/relaunch"
 	"projectb/settings"
 	"projectb/shell"
@@ -22,7 +23,11 @@ import (
 
 // Config is what the app needs to start.
 type Config struct {
-	ProfileDir   string
+	ProfileDir string
+	// Profiles is the list of profiles, and Profile this copy's: its id is "" for a folder
+	// named outright, which isn't listed.
+	Profiles     *profiles.Manager
+	Profile      string
 	BlockedHosts []string
 	Update       update.Config
 	// CrashReports is the folder macOS writes its crash reports to.
@@ -75,6 +80,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Update = update.New(cfg.Update, e.Post, a.quit)
 	a.Update.SetAuto(a.Prefs.AutoUpdate())
 	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
+	a.Commands.RegisterList(a.profileList(cfg))
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
@@ -92,6 +98,16 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Window.OnColorChanged(a.Shell.WindowColorChanged)
 	a.Window.OnColorChanged(a.Settings.WindowColorChanged)
 	a.Prefs.OnFrameColorChanged(a.Window.SetColor)
+	// The profile's colour is its frame colour: on its Dock icon, and in the list.
+	e.SetDockColor(a.Prefs.FrameColor())
+	a.Prefs.OnFrameColorChanged(e.SetDockColor)
+	if cfg.Profile != "" {
+		a.Prefs.OnFrameColorChanged(func(c string) {
+			if err := cfg.Profiles.SetColor(cfg.Profile, c); err != nil {
+				timeline.Errorf("profiles: %v", err)
+			}
+		})
+	}
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
 	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)
@@ -119,6 +135,27 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.CreateIn(first)
 	a.Update.Start()
 	return a
+}
+
+// profileList is the Profiles menu's list: every profile, with a tick on this one.
+// Choosing one starts a copy of the app on it, which hands over to the copy already
+// running on it, if any.
+func (a *App) profileList(cfg Config) commands.List {
+	return commands.List{
+		ID: "profiles",
+		Items: func() []commands.ListItem {
+			list, err := cfg.Profiles.List()
+			if err != nil {
+				timeline.Errorf("profiles: %v", err)
+			}
+			var items []commands.ListItem
+			for _, p := range list {
+				items = append(items, commands.ListItem{Key: p.ID, Title: p.Name, Checked: p.ID == cfg.Profile})
+			}
+			return items
+		},
+		Choose: func(id string) { relaunch.Copy("--root="+cfg.Profiles.Root(), "--profile="+id) },
+	}
 }
 
 // openWindow makes a window with no tabs, a little down and right of the window in
@@ -217,6 +254,7 @@ func (a *App) ActivateRequested(tab engine.TabID) {
 // Handover is the request of a copy started on this profile while this one runs: the
 // window used last comes to the front, and each URL opens in a new tab there.
 func (a *App) Handover(urls []string) {
+	timeline.Infof("a copy started on this profile handed over %d URLs", len(urls))
 	a.Window.Request(a.Tabs.Front(), engine.WindowFront)
 	for _, u := range urls {
 		a.Tabs.Open(u)
@@ -245,6 +283,8 @@ func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
 func (a *App) ModsChanged(m engine.Mods) { a.Commands.ModsChanged(m) }
 
 func (a *App) MenuChosen(action string) { a.Commands.Run(action) }
+
+func (a *App) MenuList(name string) engine.Menu { return a.Commands.ListItems(name) }
 
 func (a *App) OSBindings(byTitle map[string]engine.Key) { a.Commands.OSBindings(byTitle) }
 

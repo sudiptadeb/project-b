@@ -14,6 +14,7 @@ import (
 	"projectb/app"
 	"projectb/engine"
 	"projectb/mockengine"
+	"projectb/profiles"
 	"projectb/tabs"
 	"projectb/timeline"
 	"projectb/window"
@@ -38,7 +39,7 @@ func start(t *testing.T, dir string, blocked ...string) *rig {
 	r := &rig{t: t, e: e, got: got, pages: pages}
 	ready := make(chan struct{})
 	e.Post(func() {
-		r.a = app.Start(e, app.Config{ProfileDir: dir, BlockedHosts: blocked})
+		r.a = app.Start(e, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), BlockedHosts: blocked})
 		e.SetListener(r.a)
 		close(ready)
 	})
@@ -859,5 +860,42 @@ func TestAppReadyOnceTheShellShowsItsState(t *testing.T) {
 	sync()
 	if n := readies(); n != 1 {
 		t.Fatalf("app.ready marked %d times after the shell came back", n)
+	}
+}
+
+// The Profiles menu lists every profile as the list has it when the menu opens, with a
+// tick on this one. The profile's colour is its frame colour: on the Dock icon and in
+// the list.
+func TestTheProfilesMenuAndTheProfilesColour(t *testing.T) {
+	root := t.TempDir()
+	list := profiles.New(root)
+	c, err := list.Choose("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := mockengine.New()
+	var a *app.App
+	ready := make(chan struct{})
+	e.Post(func() {
+		a = app.Start(e, app.Config{ProfileDir: c.Dir, Profiles: list, Profile: c.ID})
+		e.SetListener(a)
+		close(ready)
+	})
+	go e.Run()
+	<-ready
+	e.Settle()
+	if got := e.DockColor(); got != "#4f9e9e" {
+		t.Fatalf("the Dock shows %q", got)
+	}
+	var items engine.Menu
+	e.Post(func() { items = a.MenuList("profiles") })
+	e.Settle()
+	if len(items) != 1 || items[0].Title != "Personal" || !items[0].Checked {
+		t.Fatalf("the Profiles menu holds %+v", items)
+	}
+	e.Post(func() { a.Prefs.SetFrameColor("#3470d0") })
+	e.Settle()
+	if p, _, _ := list.Get(c.ID); e.DockColor() != "#3470d0" || p.Color != "#3470d0" {
+		t.Fatalf("the Dock shows %q and the list %q", e.DockColor(), p.Color)
 	}
 }

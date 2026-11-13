@@ -67,14 +67,17 @@ const (
 // MenuItem is one entry of the native menu bar. A submenu has Items; a separator has
 // none of the rest.
 type MenuItem struct {
-	Title     string     `json:"title,omitempty"`
-	Action    string     `json:"action,omitempty"` // What choosing it runs, by id.
-	Key       *Key       `json:"key,omitempty"`    // The key it shows; nil for none.
-	Enabled   bool       `json:"enabled,omitempty"`
-	Checked   bool       `json:"checked,omitempty"`
-	Separator bool       `json:"separator,omitempty"`
-	Role      string     `json:"role,omitempty"` // For a submenu the OS fills: "services".
-	Items     []MenuItem `json:"items,omitempty"`
+	Title     string `json:"title,omitempty"`
+	Action    string `json:"action,omitempty"` // What choosing it runs, by id.
+	Key       *Key   `json:"key,omitempty"`    // The key it shows; nil for none.
+	Enabled   bool   `json:"enabled,omitempty"`
+	Checked   bool   `json:"checked,omitempty"`
+	Separator bool   `json:"separator,omitempty"`
+	Role      string `json:"role,omitempty"` // For a submenu the OS fills: "services".
+	// List stands in for the items of a list that changes, which the engine asks for,
+	// by this name, each time its menu opens (Listener.MenuList).
+	List  string     `json:"list,omitempty"`
+	Items []MenuItem `json:"items,omitempty"`
 }
 
 // Menu is the whole menu bar. Role says which menu the OS knows as which: "app",
@@ -168,6 +171,9 @@ type Engine interface {
 	// SetMenu replaces the native menu bar, where the platform has one.
 	SetMenu(m Menu)
 	AppCommand(c AppCommand)
+	// SetDockColor draws the app's Dock icon with a small dot in color, "#rrggbb", the
+	// profile's, so each running profile's copy tells itself apart there.
+	SetDockColor(color string)
 
 	// Post runs fn on the main thread, later.
 	Post(fn func())
@@ -218,6 +224,9 @@ type Listener interface {
 	ModsChanged(m Mods)
 	// MenuChosen says the user chose a menu item, by its action id.
 	MenuChosen(action string)
+	// MenuList is the items of the menu list name (MenuItem.List) as they are now. The
+	// engine asks each time a menu holding it opens.
+	MenuList(name string) Menu
 	// OSBindings carries the keys the OS lets people give our menu items, by item
 	// title, as macOS App Shortcuts does. It fires after start and whenever they change.
 	OSBindings(byTitle map[string]Key)

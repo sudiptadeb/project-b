@@ -34,11 +34,12 @@ the order of building at the end says which steps are done.
   opens a tab in a workspace by id (`opentab`). The mock engine keeps each tab's workspace,
   and a tab its page opens is in it (`mockengine.Engine.Workspace`).
 - Go keeps the list, in `workspaces.json` in the profile folder beside `prefs.json`:
-  `{"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}]}`, in the order
-  they were made. The id is eight hex digits Go makes, and never changes; a workspace needs
-  a name and a `#rrggbb` colour. The default workspace isn't in the list, and a new profile
-  has none (`core/workspaces`, `workspaces.Manager`: `List`, `Create`, `SetName`,
-  `OnChanged`). A copy on a folder named outright (`--user-data-dir`) has the folder's.
+  `{"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}]}`, in the user's
+  order, which starts as the order they were made. The id is eight hex digits Go makes, and
+  never changes; a workspace needs a name no other has, whatever its case, and a `#rrggbb`
+  colour. The default workspace isn't in the list, and a new profile has none
+  (`core/workspaces`, `workspaces.Manager`: `List`, `Create`, `SetName`, `SetColor`,
+  `Move`, `OnChanged`). A copy on a folder named outright (`--user-data-dir`) has the folder's.
 - A tab carries its workspace's id, "" for the default (`tabs.Tab.Workspace`, `workspace`
   in what the shell and every other manager hear of a tab, left out for the default). It is
   given when the tab is made, `tabs.Manager.CreateIn(window, workspace)`; a tab a page

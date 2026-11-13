@@ -64,6 +64,18 @@ async function until(fn, ms = 5000) {
   }
   return false;
 }
+// WCAG 2's contrast ratio of two computed colours, rgb(r, g, b).
+function contrast(a, b) {
+  const luminance = (c) => {
+    const [r, g, bl] = c.match(/\d+/g).slice(0, 3).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 const regions = async () => (await fetch(`${base}/mock/regions`)).json();
 
 (async () => {
@@ -91,6 +103,14 @@ const regions = async () => (await fetch(`${base}/mock/regions`)).json();
   await page.getByLabel('Name').fill('Office');
   await page.getByLabel('Template').selectOption('Work');
   await page.screenshot({ path: path.join(out, 'picker-new.png') });
+  // Create's words read on its fill, light and dark, as the system has it.
+  for (const scheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await until(async () => (await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === scheme);
+    const [fg, bg] = await page.getByRole('button', { name: 'Create' }).evaluate((b) => [getComputedStyle(b).color, getComputedStyle(b).backgroundColor]);
+    const ratio = contrast(fg, bg);
+    check(`Create reads in ${scheme}: ${ratio.toFixed(2)}`, ratio >= 4.5, `${fg} on ${bg}`);
+  }
   await page.getByRole('button', { name: 'Create' }).click();
   check('Create adds the profile to the list, in its template\'s colour', await until(() => listed().some((p) => p.name === 'Office' && p.color === '#5b7fd6' && p.template === 'Work')), JSON.stringify(listed()));
   const made = listed().find((p) => p.name === 'Office');

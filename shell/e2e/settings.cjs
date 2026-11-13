@@ -104,6 +104,18 @@ const keymapFile = () => {
     return null;
   }
 };
+// WCAG 2's contrast ratio of two computed colours, rgb(r, g, b).
+function contrast(a, b) {
+  const luminance = (c) => {
+    const [r, g, bl] = c.match(/\d+/g).slice(0, 3).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
 const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title}"`);
 
 (async () => {
@@ -196,6 +208,33 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('one check reached the release server', manifests === counted + 1, `${counted} -> ${manifests}`);
   await autoUpdate.click();
   check('the switch turns automatic updates off and saves it in the root\'s update folder, for every copy', await until(() => updateSettings()?.autoUpdate === false));
+
+  // A dialog's answer reads on its fill in every preset colour, light and dark: its words
+  // reach WCAG's 4.5 for text, by the colours the page computes. Profile's reset dialog
+  // has one.
+  const presets = await page.getByRole('radiogroup', { name: 'Frame colour' }).getByRole('radio')
+    .evaluateAll((els) => els.map((e) => ({ name: e.getAttribute('aria-label'), rgb: getComputedStyle(e).backgroundColor })));
+  const toHex = (rgb) => '#' + rgb.match(/\d+/g).map((v) => Number(v).toString(16).padStart(2, '0')).join('');
+  const rootOf = (p, name) => p.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+  for (const theme of ['Light', 'Dark']) {
+    for (const p of presets) {
+      await page.getByRole('button', { name: 'General', exact: true }).click();
+      await page.getByRole('radio', { name: theme }).check();
+      await page.getByRole('radio', { name: p.name, exact: true }).click();
+      const shown = await until(async () => (await rootOf(page, '--frame')) === toHex(p.rgb) && (await rootOf(page, '--text')) === (theme === 'Dark' ? '#e8eaed' : '#1f1f1f'));
+      await page.getByRole('button', { name: 'Profile', exact: true }).click();
+      await page.getByRole('button', { name: 'Reset…' }).click();
+      const answer = page.getByRole('dialog').getByRole('button', { name: 'Reset', exact: true });
+      const [fg, bg] = await answer.evaluate((b) => [getComputedStyle(b).color, getComputedStyle(b).backgroundColor]);
+      const ratio = contrast(fg, bg);
+      check(`a primary button reads in ${p.name}, ${theme.toLowerCase()}: ${ratio.toFixed(2)}`, shown && ratio >= 4.5, `${fg} on ${bg}`);
+      await page.keyboard.press('Escape');
+    }
+  }
+  await page.getByRole('button', { name: 'General', exact: true }).click();
+  await page.getByRole('radio', { name: 'System' }).check();
+  await page.getByRole('radio', { name: 'Blue' }).click();
+  await until(() => prefsFile().theme === 'system' && prefsFile().frameColor === '#3470d0');
 
   // Profile: the name in the list, and reset to a template, which takes its values and
   // nothing else.

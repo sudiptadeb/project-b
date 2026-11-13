@@ -64,7 +64,7 @@
 .text-button.primary:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-accent);
 }
 
 .text-button.primary:hover:not(:disabled) {

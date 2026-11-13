@@ -167,7 +167,7 @@ watch(menu, (on) => {
   padding: 0 2px;
   border-radius: 3px;
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-accent);
   font-size: 9px;
   font-weight: 600;
   line-height: 12px;

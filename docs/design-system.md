@@ -40,6 +40,7 @@ Never write a colour literal in a component. Use these variables, which `tones.j
 |---|---|
 | `--frame` | The window frame and the empty strips of the shell. The colour the user picked |
 | `--accent` | Primary buttons, a switch that is on, a pinned item, focus rings |
+| `--on-accent` | Text or an icon on `--accent`: a primary button's words, an extension's badge |
 | `--accent-soft` | Pressed or selected: the current settings section, an open popup's button |
 | `--accent-tint` | Hover on any control, an open row's details |
 | `--bar` | The toolbar and the settings page's background |
@@ -51,8 +52,15 @@ Never write a colour literal in a component. Use these variables, which `tones.j
 | `--hover`, `--press` | The toolbar's own hover and press |
 | `--danger` | Errors, and only errors |
 
-Text on `--accent` is `--surface`. Check light and dark with three frame colours: the default
-`#4f9e9e`, a dark one and a light one. `tones.js` must keep every pair readable.
+Text on `--accent` is `--on-accent`, never a fixed colour: the accent's lightness follows the
+frame, so white reads on slate and not on amber, and the near-black ink the other way round.
+`tones.js` picks whichever of the two contrasts more, and holds it to WCAG's 4.5 for text. Where
+neither reaches 4.5 (the red preset in dark, a mid blue like Work's in light) it moves the accent
+away from the label it picked, a little at a time, until it does; so the accent can differ
+slightly from the frame. `shell/e2e/settings.cjs` checks every preset, light and dark.
+
+Check light and dark with three frame colours: the default `#4f9e9e`, a dark one and a light
+one. `tones.js` must keep every pair readable.
 
 ## Type
 

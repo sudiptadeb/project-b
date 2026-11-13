@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue';
 import { comboOf, shown } from '@/keys.js';
+import Dialog from '@/ui/Dialog.vue';
 import { send, state } from './state.js';
 
 // Every action by menu, with its keys on this platform. The list only shows; clicking an
@@ -32,6 +33,33 @@ function tagText(k) {
 
 const templateNames = { 'project-b': 'Project B', chrome: 'Chrome' };
 const templateLabel = (name) => templateNames[name] || name;
+
+// How many actions differ from the template: what a reset or another template loses.
+const changedCount = computed(() => kb.value.groups.reduce((n, g) => n + g.actions.filter((a) => a.changed).length, 0));
+
+// Using a template, or the same one again for Reset all. With changes to lose it asks
+// first, and the select keeps showing the template in use until the answer.
+const asking = ref('');
+const templateSelect = ref(null);
+function useTemplate(name) {
+  if (changedCount.value === 0) {
+    send({ t: 'useTemplate', text: name });
+    return;
+  }
+  if (templateSelect.value) templateSelect.value.value = kb.value.template;
+  asking.value = name;
+}
+// Reset all is disabled once nothing differs, so focus goes to the select, which stays.
+async function confirmTemplate() {
+  send({ t: 'useTemplate', text: asking.value });
+  asking.value = '';
+  await nextTick();
+  templateSelect.value?.focus();
+}
+const askTitle = computed(() => {
+  const n = changedCount.value;
+  return `Discard ${n} changed shortcut${n === 1 ? '' : 's'} and use ${templateLabel(asking.value)}'s?`;
+});
 
 const titleOf = (id) => {
   for (const g of kb.value.groups) {
@@ -87,10 +115,10 @@ function onRecordKey(e, action) {
       <div class="card">
         <div class="row">
           <label class="label" for="template">Template</label>
-          <select id="template" :value="kb.template" @change="send({ t: 'useTemplate', text: $event.target.value })">
+          <select id="template" ref="templateSelect" :value="kb.template" @change="useTemplate($event.target.value)">
             <option v-for="t in kb.templates" :key="t" :value="t">{{ templateLabel(t) }}</option>
           </select>
-          <button type="button" class="text-button" :disabled="kb.following" @click="send({ t: 'useTemplate', text: kb.template })">Reset all</button>
+          <button type="button" class="text-button" :disabled="!changedCount" @click="useTemplate(kb.template)">Reset all…</button>
         </div>
       </div>
     </section>
@@ -185,6 +213,13 @@ function onRecordKey(e, action) {
         </template>
       </div>
     </section>
+
+    <Dialog v-if="asking" :title="askTitle" @close="asking = ''">
+      <template #buttons>
+        <button type="button" class="text-button" @click="asking = ''">Cancel</button>
+        <button type="button" class="text-button danger" @click="confirmTemplate">Discard</button>
+      </template>
+    </Dialog>
   </div>
 </template>
 

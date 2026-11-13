@@ -82,6 +82,25 @@ function toggle(id) {
   open.value = open.value === id ? '' : id;
 }
 
+// The filter keeps the actions whose title or one of whose keys has what was typed, in
+// any case, the keys as shown here or as the keymap writes them.
+const filter = ref('');
+const groups = computed(() => {
+  const q = filter.value.trim().toLowerCase();
+  if (!q) return kb.value.groups;
+  const hit = (a) =>
+    a.title.toLowerCase().includes(q) ||
+    a.keys.some((k) => k.keys.toLowerCase().includes(q) || shown(k.keys, platform.value).toLowerCase().includes(q));
+  return kb.value.groups.map((g) => ({ ...g, actions: g.actions.filter(hit) })).filter((g) => g.actions.length);
+});
+
+// Escape in the filter empties it, or leaves it when it is empty; never the page.
+function onFilterEscape(e) {
+  e.preventDefault();
+  if (filter.value) filter.value = '';
+  else e.target.blur();
+}
+
 // Escape closes the open editor before it closes the page, and focus goes back to its row.
 async function closeEditor() {
   const id = open.value;
@@ -101,6 +120,7 @@ watch(open, (id) => {
 // Going to another action, from a clash or the notice: its editor opens, and its row
 // scrolls into view and takes focus.
 async function goTo(id) {
+  filter.value = '';
   stopRecording();
   taken.value = null;
   open.value = id;
@@ -258,8 +278,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 
 <template>
   <div>
-    <section aria-labelledby="keymap">
-      <h2 id="keymap">Keyboard shortcuts</h2>
+    <section aria-label="Template">
       <div class="card">
         <div class="row">
           <label class="label" for="template">Template</label>
@@ -289,7 +308,25 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
       </div>
     </section>
 
-    <section v-for="g in kb.groups" :key="g.title" :aria-label="g.title">
+    <section class="filter-section" aria-label="Filter">
+      <input
+        v-model="filter"
+        class="field filter"
+        type="text"
+        spellcheck="false"
+        aria-label="Filter shortcuts"
+        placeholder="Filter by name or key"
+        @keydown.esc="onFilterEscape"
+      />
+    </section>
+
+    <section v-if="!groups.length" aria-label="No matches">
+      <div class="card">
+        <div class="row empty">No shortcuts match</div>
+      </div>
+    </section>
+
+    <section v-for="g in groups" :key="g.title" :aria-label="g.title">
       <h2>{{ g.title }}</h2>
       <div class="card">
         <template v-for="a in g.actions" :key="a.id">
@@ -548,6 +585,18 @@ kbd.clash {
 .link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+.filter-section {
+  margin-top: 16px;
+}
+
+.filter {
+  width: 100%;
+}
+
+.empty {
+  color: var(--muted);
 }
 
 /* A heading with one action on its right, 30px high. */

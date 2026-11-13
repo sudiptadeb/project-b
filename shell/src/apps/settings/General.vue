@@ -34,16 +34,23 @@ const layouts = [
   { value: 'horizontal', label: 'Horizontal' },
 ];
 
-// What the update manager is doing, or what the check the user asked for found.
-const status = computed(() => {
+// What the update manager is doing, or what the check the user asked for found, in one
+// plain line. A failure's own words go in the line's tooltip.
+const update = computed(() => {
   const s = state.update;
-  if (s.check === 'checking') return 'Checking…';
-  if (s.phase === 'downloading') return `Downloading ${s.version}… ${s.total ? Math.floor((100 * (s.done || 0)) / s.total) : 0}%`;
-  if (s.phase === 'ready') return `${s.version} is ready to ${phone ? 'install' : 'relaunch'}`;
-  if (s.phase === 'failed') return `Update${s.version ? ' to ' + s.version : ''} failed: ${s.error}`;
-  if (s.check === 'current') return 'Up to date';
-  if (s.check === 'failed') return s.checkError;
-  return '';
+  if (s.check === 'checking') return { text: 'Checking…' };
+  if (s.phase === 'downloading') return { text: `Downloading ${s.version}… ${percent.value}%` };
+  if (s.phase === 'ready') return { text: phone ? `Install to update to ${s.version}` : `Relaunch to update to ${s.version}` };
+  if (s.phase === 'failed') return { text: s.version ? `Couldn't update to ${s.version}.` : "Couldn't update.", detail: s.error, failed: true };
+  if (s.check === 'current') return { text: 'Up to date' };
+  if (s.check === 'failed') return { text: "Couldn't check for updates.", detail: s.checkError, failed: true };
+  return { text: '' };
+});
+
+// How much of the release has arrived, as a whole percentage, while it downloads.
+const percent = computed(() => {
+  const u = state.update;
+  return u.total ? Math.floor((100 * (u.done || 0)) / u.total) : 0;
 });
 
 const busy = computed(() => state.update.check === 'checking' || state.update.phase === 'downloading');
@@ -112,15 +119,29 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
     <section aria-labelledby="updates">
       <h2 id="updates">Updates</h2>
       <div class="card">
-        <div class="row">
+        <div class="row update-row">
           <span class="label">
             Version <span class="version">{{ state.running || 'Development build' }}</span>
-            <span class="status" role="status">{{ status }}</span>
+            <span class="secondary" :class="{ failed: update.failed }" role="status" :title="update.detail">{{ update.text }}</span>
           </span>
-          <!-- On a phone the panel is where a ready release is installed from: Android's
-               installer takes it from here. -->
-          <button v-if="phone && state.update.phase === 'ready'" type="button" class="text-button" @click="send({ t: 'relaunch' })">Install update</button>
-          <button v-else type="button" class="text-button" :disabled="busy" @click="send({ t: 'checkUpdate' })">Check for updates</button>
+          <!-- A ready release is applied from here: a relaunch on a desktop, Android's
+               installer on a phone. Both start with the same message to Go. -->
+          <button v-if="state.update.phase === 'ready'" type="button" class="text-button" @click="send({ t: 'relaunch' })">
+            {{ phone ? 'Install update' : 'Relaunch' }}
+          </button>
+          <button v-else type="button" class="text-button" :disabled="busy" @click="send({ t: 'checkUpdate' })">
+            {{ update.failed ? 'Try again' : 'Check for updates' }}
+          </button>
+          <span
+            v-if="state.update.phase === 'downloading'"
+            class="progress"
+            role="progressbar"
+            aria-label="Update download"
+            :aria-valuenow="percent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :style="{ width: percent + '%' }"
+          ></span>
         </div>
         <label class="row">
           <span class="label">Automatic updates</span>
@@ -145,15 +166,26 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
   font-weight: 400;
 }
 
-.status {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 400;
+.secondary:empty {
+  display: none;
 }
 
-.status:empty {
-  display: none;
+.secondary.failed {
+  color: var(--danger);
+}
+
+/* The download's progress: a line along the row's foot, in the accent, as the shell's
+   bubble has. */
+.update-row {
+  position: relative;
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
 }
 
 .swatches {

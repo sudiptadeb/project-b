@@ -213,7 +213,17 @@ def center(app, selector):
 
 
 def click(app, selector):
+    """Clicks a shell element once the window agrees the point is the shell's. The shell draws a
+    change a frame before its new regions reach the window manager, and a click in between goes
+    to whatever was there before: the page, after the tabs move."""
     x, y = center(app, selector)
+    end = time.time() + 5
+    waited = 0
+    while app.cmd("hit", x, y) != "shell" and time.time() < end:
+        waited += 1
+        time.sleep(0.05)
+    if waited:
+        print(f"note click on {selector} waited {waited} polls for the shell's region", flush=True)
     return app.cmd("click", x, y)
 
 

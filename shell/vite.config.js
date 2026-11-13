@@ -61,6 +61,9 @@ export default defineConfig(({ command }) => {
         output: {
           entryFileNames: `${name}.js`,
           assetFileNames: `${name}.[ext]`,
+          // A part a build flag keeps out is imported with import(), and stays in the one
+          // script when it is in.
+          inlineDynamicImports: true,
         },
       },
     },

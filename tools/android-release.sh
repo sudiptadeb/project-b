@@ -12,7 +12,9 @@ export PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH
 export DOCKER_HOST=unix://$HOME/.colima/pb-android/docker.sock
 
 cd "$ROOT"
-[ -f shell/dist/shell/standard/standard.js ] || { echo "build the shell first"; exit 1; }
+# The APK carries the shell built from this checkout, not whatever shell/dist last held.
+echo "=== $(date '+%F %T') build the shell"
+(cd shell && npm run build --silent)
 
 echo "=== $(date '+%F %T') start the VM"
 colima start -p pb-android --activate=false

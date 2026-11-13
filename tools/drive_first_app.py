@@ -101,10 +101,10 @@ READY = re.compile(r" mark +go +app\.ready$")
 class App:
     running = []  # Every app started and not yet closed.
 
-    def __init__(self, profile, extra=()):
+    def __init__(self, profile, extra=(), bin=None):
         """Starts the app on the folder profile, as it is, or with profile None on whatever
         the start chooses from extra. The root is a new one unless extra names one, so the
-        app never reads the real list."""
+        app never reads the real list. bin is another binary than BIN to start."""
         if not any(x.startswith("--root=") for x in extra):
             extra = [f"--root={tempfile.mkdtemp(prefix='pb-root-')}", *extra]
         self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
@@ -115,7 +115,7 @@ class App:
         self.next = 0
         self.started = time.time()
         self.proc = subprocess.Popen(
-            [BIN, *([f"--user-data-dir={profile}"] if profile else []), f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
+            [bin or BIN, *([f"--user-data-dir={profile}"] if profile else []), f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1,
         )
         App.running.append(self)
@@ -1411,6 +1411,60 @@ def copies_picking(root):
     return [p for p in out.split() if int(p) not in {a.proc.pid for a in App.running}]
 
 
+def relaunch_checks():
+    """Relaunch to update, with copies on two profiles of one root and a picker copy: every
+    copy reads the release staged in the root's update folder and offers it; relaunching
+    one tells the others to quit, the picker among them, swaps the installed app once they
+    have ended, and starts each profile that was running again on the new release. The
+    installed app here is a clone of the one under test in a folder of the run's own, and
+    the staged release is a bundle like the update tests' fixtures (core/update): an
+    Info.plist and an executable that records how it was started. Automatic checks are off,
+    so no copy asks the release manifest."""
+    if bundle_version() is None:
+        check("relaunch to update needs the app in its bundle (PB_BIN)", False, BIN)
+        return
+    bundle = os.path.dirname(os.path.dirname(os.path.dirname(BIN)))
+    installed = os.path.join(tempfile.mkdtemp(prefix="pb-installed-"), os.path.basename(bundle))
+    subprocess.run(["cp", "-cR", bundle, installed], check=True)
+    clone = os.path.join(installed, "Contents/MacOS", os.path.basename(BIN))
+    root = tempfile.mkdtemp(prefix="pb-root-")
+    started = os.path.join(root, "started")
+    staged = os.path.join(root, "update/stage", os.path.basename(bundle))
+    os.makedirs(os.path.join(staged, "Contents/MacOS"))
+    with open(os.path.join(staged, "Contents/Info.plist"), "w") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
+                "<key>CFBundleExecutable</key><string>project_b</string>"
+                "<key>CFBundleShortVersionString</key><string>99.0.0</string></dict></plist>\n")
+    with open(os.path.join(staged, "Contents/MacOS/project_b"), "w") as f:
+        f.write(f"#!/bin/sh\necho \"$*\" >> '{started}'\n")
+    os.chmod(os.path.join(staged, "Contents/MacOS/project_b"), 0o755)
+    with open(os.path.join(root, "update/settings.json"), "w") as f:
+        json.dump({"autoUpdate": False}, f)
+
+    a = App(None, [f"--root={root}"], clone)
+    add_work_profile(root)
+    b = App(None, [f"--root={root}", "--profile=work"], clone)
+    picker = App(None, [f"--root={root}", "--picker"], clone)
+    offer = "[...document.querySelectorAll('.update button')].some(b => b.textContent.includes('99.0.0 is ready'))"
+    check("each profile's copy offers the release staged in the root's update folder", bool(a.wait(offer, 20)) and bool(b.wait(offer, 20)))
+    a.js("document.querySelector('.update button').click(), 1")
+    check("relaunching one tells the other profile's copy to quit", b.proc.wait(timeout=30) == 0)
+    check("and the picker copy", picker.proc.wait(timeout=30) == 0)
+    check("and the copy asked quits once they have ended", a.proc.wait(timeout=30) == 0)
+    for app in (a, b, picker):
+        App.running.remove(app)
+    version = lambda app: re.search(r"CFBundleShortVersionString</key>\s*<string>([^<]+)", open(os.path.join(app, "Contents/Info.plist")).read()).group(1)
+    check("the new release is in place, the previous one kept in the root's update folder",
+          version(installed) == "99.0.0" and version(os.path.join(root, "update/previous", os.path.basename(bundle))) == bundle_version())
+    deadline = time.time() + 30
+    lines = lambda: sorted(open(started).read().splitlines()) if os.path.exists(started) else []
+    while len(lines()) < 2 and time.time() < deadline:
+        time.sleep(0.1)
+    check("each profile that was running starts again on it, and the picker doesn't",
+          lines() == [f"--root={root} --profile=default", f"--root={root} --profile=work"], lines())
+    shutil.rmtree(os.path.dirname(installed))
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1427,5 +1481,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks]))

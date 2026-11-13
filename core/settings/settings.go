@@ -142,7 +142,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"cornerRadius": m.window.CornerRadius(w),
 			"tabLayout":    m.prefs.TabLayout(),
 			"theme":        m.prefs.Theme(),
-			"autoUpdate":   m.prefs.AutoUpdate(),
+			"autoUpdate":   m.update.Auto(),
 			"update":       m.update.State(),
 			"running":      m.update.Running(),
 			"keyboard":     m.commands.View(),
@@ -163,7 +163,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "setTheme":
 		m.prefs.SetTheme(c.Text)
 	case "setAutoUpdate":
-		m.prefs.SetAutoUpdate(c.On)
+		m.update.SetAuto(c.On)
 	case "setFrameColor":
 		m.prefs.SetFrameColor(c.Text)
 	case "checkUpdate":

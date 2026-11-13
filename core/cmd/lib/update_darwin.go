@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"projectb/profiles"
+	"projectb/relaunch"
 	"projectb/timeline"
 	"projectb/update"
 )
@@ -35,24 +37,31 @@ func appVersion() string {
 	return version
 }
 
-// updateConfig describes this build to the updater. A binary running from a build directory
-// rather than an installed bundle has no version, and never updates.
-func updateConfig(profileDir string) update.Config {
+// updateConfig describes this build to the updater, for a copy on the profile c. A copy on
+// a listed profile shares the root's update folder with every copy on the root, and
+// relaunches them all; one on a folder named outright keeps its update state in that folder
+// and relaunches alone, so tests and ChromeDriver never touch the copies on the root. A
+// binary running from a build directory rather than an installed bundle has no version, and
+// never updates; its folder still holds the automatic-updates setting.
+func updateConfig(c profiles.Choice) update.Config {
+	cfg := update.Config{StateDir: filepath.Join(c.Dir, "updates")}
+	if c.ID != "" {
+		cfg.StateDir = filepath.Join(list.Root(), "update")
+		cfg.Copies = relaunch.Copies{List: list, Profile: c.ID}
+	}
 	bundle := installedBundle()
 	if bundle == "" {
-		return update.Config{}
+		return cfg
 	}
 	version, err := update.Version(bundle)
 	if err != nil {
 		timeline.Errorf("update: %v; updates are off", err)
-		return update.Config{}
+		return cfg
 	}
-	return update.Config{
-		Project:  releaseProject,
-		Version:  version,
-		Releases: releaseManifest,
-		StateDir: filepath.Join(profileDir, "updates"),
-		App:      bundle,
-		Verify:   update.SignedBy(signingLeafSHA1),
-	}
+	cfg.Project = releaseProject
+	cfg.Version = version
+	cfg.Releases = releaseManifest
+	cfg.App = bundle
+	cfg.Verify = update.SignedBy(signingLeafSHA1)
+	return cfg
 }

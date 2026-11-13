@@ -1,12 +1,14 @@
 package app_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"projectb/app"
 	"projectb/engine"
 	"projectb/prefs"
 	"projectb/profiles"
+	"projectb/update"
 )
 
 // startListed starts the app on the first profile of a list of its own, as a first start
@@ -18,7 +20,8 @@ func startListed(t *testing.T) (*rig, *profiles.Manager, profiles.Choice) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return startWith(t, app.Config{ProfileDir: c.Dir, Profiles: list, Profile: c.ID}), list, c
+	cfg := app.Config{ProfileDir: c.Dir, Profiles: list, Profile: c.ID, Update: update.Config{StateDir: filepath.Join(list.Root(), "update")}}
+	return startWith(t, cfg), list, c
 }
 
 // The Profile section shows the profile's name and its template, and a new name is the
@@ -48,15 +51,12 @@ func TestTheProfileSectionRenamesTheProfile(t *testing.T) {
 }
 
 // Reset to a template writes its values over the profile's prefs and nothing else: the
-// shell, the window, the Dock and the list follow at once, a pref the template doesn't
-// hold keeps its value, and history stays.
+// shell, the window, the Dock and the list follow at once, and history stays.
 func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	r, list, c := startListed(t)
 	defer r.stop()
 	r.visit("https://example.com/docs")
 	got, _ := r.openSettings()
-	r.settings(`{"t":"setAutoUpdate","on":false}`)
-	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "autoUpdate" })
 
 	r.settings(`{"t":"resetProfile","text":"Work"}`)
 	r.waitOn(got, func(m map[string]any) bool {
@@ -72,7 +72,7 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	if listed, _, _ := list.Get(c.ID); listed.Color != "#5b7fd6" || listed.Template != "Work" || listed.Name != "Personal" {
 		t.Fatalf("listed %+v", listed)
 	}
-	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsHorizontal, AutoUpdate: false, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem}) {
+	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsHorizontal, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem}) {
 		t.Fatalf("the prefs are %+v", got)
 	}
 	if items := r.suggestions("exam"); len(items) != 1 {

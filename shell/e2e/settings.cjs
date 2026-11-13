@@ -85,6 +85,13 @@ async function until(fn, ms = 5000) {
   }
   return false;
 }
+const updateSettings = () => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(profilesRoot, 'update/settings.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+};
 const prefsFile = () => JSON.parse(fs.readFileSync(path.join(profile, 'prefs.json'), 'utf8'));
 
 const regions = async (q = '') => (await fetch(`${base}/mock/regions${q}`)).json();
@@ -188,7 +195,7 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('Check asks the update manager, which says it is up to date', await until(async () => (await page.locator('.status').textContent()) === 'Up to date'));
   check('one check reached the release server', manifests === counted + 1, `${counted} -> ${manifests}`);
   await autoUpdate.click();
-  check('the switch turns automatic updates off and saves it', await until(() => prefsFile().autoUpdate === false));
+  check('the switch turns automatic updates off and saves it in the root\'s update folder, for every copy', await until(() => updateSettings()?.autoUpdate === false));
 
   // Profile: the name in the list, and reset to a template, which takes its values and
   // nothing else.
@@ -209,7 +216,6 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await page.getByRole('button', { name: 'Reset…' }).click();
   await confirm.getByRole('button', { name: 'Reset', exact: true }).click();
   check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
-  check('and keeps automatic updates, which no template holds', prefsFile().autoUpdate === false);
   check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.strip').count()) > 0));
   check('and the Dock and the list', await until(async () => (await regions()).dock === '#5b7fd6' && listed().color === '#5b7fd6'), JSON.stringify(listed()));
   check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await profileSection.locator('.note').textContent()).trim() === 'Work'));

@@ -81,7 +81,13 @@ func main() {
 
 	e := mockengine.New()
 	list := profiles.New(rootOf(*root, *profile))
+	// A listed profile's update state is the root's, as in the real app; the mock starts no
+	// copies of itself, so a relaunch restarts this one alone.
 	start := func(dir, id string) *app.App {
+		updates := filepath.Join(dir, "updates")
+		if id != "" {
+			updates = filepath.Join(list.Root(), "update")
+		}
 		return app.Start(e, app.Config{
 			ProfileDir:   dir,
 			Profiles:     list,
@@ -91,7 +97,7 @@ func main() {
 				Project:  "project-b",
 				Version:  *version,
 				Releases: *releases,
-				StateDir: filepath.Join(dir, "updates"),
+				StateDir: updates,
 				App:      *appPath,
 			},
 			CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),

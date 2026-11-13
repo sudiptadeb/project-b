@@ -2,6 +2,11 @@
 // for a newer release, downloads it, checks it, stages it, and when the user says so swaps
 // the installed bundle and relaunches into the new one.
 //
+// Its folder is shared by every copy of the app on one root: the staged release, the
+// automatic-updates setting, and a lock, which one copy at a time holds while it checks and
+// downloads. Every copy reads the staged release from the folder, so each offers the
+// relaunch, and the copy asked to relaunch restarts them all.
+//
 // amarit does the manifest and the verified download. The bundle is ours: the app is a
 // signed folder of two binaries, a library and resources, not one file amarit could rename,
 // so the unpacking, the signature check, the swap and the relaunch live here. On Android the
@@ -10,6 +15,8 @@ package update
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,7 +73,10 @@ type Config struct {
 	Project  string // the manifest's project name
 	Version  string // the running version; empty is a development build, which never updates
 	Releases string // the manifest URL
-	StateDir string // where downloads, the staged release, the previous one and amarit's state live
+	// StateDir is where downloads, the staged release, the previous one, amarit's state, the
+	// automatic-updates setting and the lock live: the root's update folder, shared by every
+	// copy on the root, or for a copy on a folder named outright, that folder's own.
+	StateDir string
 	App      string // the installed bundle this process runs from
 	// Verify checks an unpacked bundle before it is staged: the signature, for the real app.
 	// Nil checks only that the bundle says it is the version the manifest promised.
@@ -76,6 +86,21 @@ type Config struct {
 	// installer, which refuses an APK signed with another key and asks the user. App and
 	// Verify are unused.
 	Install func(file string)
+	// Copies, when set, are the other copies of the app sharing StateDir: Relaunch quits
+	// them before the swap and starts each profile again after it. A copy on a folder named
+	// outright has none and restarts alone.
+	Copies Copies
+}
+
+// Copies are the running copies of the app on one root, as the copy asked to relaunch sees
+// them.
+type Copies interface {
+	// QuitOthers tells every other running copy to quit, and returns once their processes
+	// have ended, with the profiles to start again: this copy's first, then each other
+	// one's. A picker copy quits and isn't among them.
+	QuitOthers() []string
+	// StartAfter starts executable on each profile once this process has ended.
+	StartAfter(executable string, profiles []string)
 }
 
 // Manager owns the update state. Every method runs on the main thread; the check loop
@@ -90,20 +115,18 @@ type Manager struct {
 	state  State
 	staged string // the checked bundle waiting for Relaunch
 
-	checking sync.Mutex // one check at a time, automatic or asked for
-
 	// Main thread only.
-	auto    bool          // check every CheckInterval
 	started bool          // Start has run
 	timer   chan struct{} // closing it ends the running timer; nil when none runs
 
-	onChanged []func(State)
+	onChanged     []func(State)
+	onAutoChanged []func(bool)
 }
 
 // New returns a manager. post runs a function on the main thread; quit ends the app, which
 // Relaunch calls once the new bundle is in place.
 func New(cfg Config, post func(func()), quit func()) *Manager {
-	m := &Manager{cfg: cfg, post: post, quit: quit, auto: true}
+	m := &Manager{cfg: cfg, post: post, quit: quit}
 	if cfg.Version == "" {
 		return m
 	}
@@ -130,20 +153,16 @@ func (m *Manager) OnChanged(f func(State)) { m.onChanged = append(m.onChanged, f
 // Running is the version this build is: empty for a development build.
 func (m *Manager) Running() string { return m.cfg.Version }
 
-// Start begins checking every CheckInterval, unless automatic checks are off. A
-// development build, or one amarit could not be configured for, never checks. Whatever an
-// earlier run left half done is cleared first.
+// Start begins a round every CheckInterval: each reads the staged release, and checks
+// when automatic checks are on. A development build, or one amarit could not be configured
+// for, never does.
 func (m *Manager) Start() {
 	if m.client == nil {
 		return
 	}
-	os.RemoveAll(m.stageDir())
-	os.RemoveAll(m.downloadDir())
 	m.started = true
 	timeline.Infof("update: %s %s", m.cfg.Project, m.cfg.Version)
-	if m.auto {
-		m.startTimer()
-	}
+	m.startTimer()
 }
 
 // Stop ends the checking.
@@ -152,26 +171,89 @@ func (m *Manager) Stop() {
 	m.stopTimer()
 }
 
-// SetAuto turns the check every CheckInterval on or off, at once. Turned on again, the
-// timer starts as it does at launch. A check the user asks for runs either way.
+// autoFile is the automatic-updates setting, in the folder, so every copy sharing it has
+// the same one. On when there is none.
+type autoFile struct {
+	AutoUpdate bool `json:"autoUpdate"`
+}
+
+func (m *Manager) autoPath() string { return filepath.Join(m.cfg.StateDir, "settings.json") }
+
+// Auto says whether the app checks for updates on its own. It reads the folder each time,
+// so a change in another copy holds here from its next round. A check the user asks for
+// runs either way.
+func (m *Manager) Auto() bool {
+	f := autoFile{AutoUpdate: true}
+	if b, err := os.ReadFile(m.autoPath()); err == nil {
+		json.Unmarshal(b, &f)
+	}
+	return f.AutoUpdate
+}
+
+// OnAutoChanged subscribes to this copy turning automatic checks on or off.
+func (m *Manager) OnAutoChanged(f func(bool)) { m.onAutoChanged = append(m.onAutoChanged, f) }
+
+// SetAuto turns automatic checks on or off for every copy sharing the folder. Turned on
+// here, the timer starts again as it does at launch.
 func (m *Manager) SetAuto(on bool) {
-	if on == m.auto {
+	if on == m.Auto() {
 		return
 	}
-	m.auto = on
-	if !m.started {
+	b, _ := json.Marshal(autoFile{AutoUpdate: on})
+	if err := os.MkdirAll(m.cfg.StateDir, 0o700); err != nil {
+		timeline.Errorf("update: %v", err)
+		return
+	}
+	// A new file renamed over the old, so no copy reads half of one.
+	tmp := m.autoPath() + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		timeline.Errorf("update: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, m.autoPath()); err != nil {
+		timeline.Errorf("update: %v", err)
 		return
 	}
 	if on {
-		m.startTimer()
+		timeline.Infof("update: automatic checks are on")
+		if m.started {
+			m.stopTimer()
+			m.startTimer()
+		}
 	} else {
 		timeline.Infof("update: automatic checks are off")
-		m.stopTimer()
+	}
+	for _, f := range m.onAutoChanged {
+		f(on)
 	}
 }
 
+// lock takes the folder's lock, which one copy at a time holds while it checks and
+// downloads. wait says to wait for a copy holding it; else ok is false when one does.
+func (m *Manager) lock(wait bool) (f *os.File, ok bool, err error) {
+	if err := os.MkdirAll(m.cfg.StateDir, 0o700); err != nil {
+		return nil, false, err
+	}
+	f, err = os.OpenFile(filepath.Join(m.cfg.StateDir, "lock"), os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return nil, false, err
+	}
+	how := syscall.LOCK_EX
+	if !wait {
+		how |= syscall.LOCK_NB
+	}
+	if err := syscall.Flock(int(f.Fd()), how); err != nil {
+		f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return f, true, nil
+}
+
 func (m *Manager) startTimer() {
-	timeline.Infof("update: checking every %s", CheckInterval)
+	timeline.Infof("update: a round every %s", CheckInterval)
 	m.timer = make(chan struct{})
 	go m.loop(m.timer)
 }
@@ -191,14 +273,60 @@ func (m *Manager) loop(stop chan struct{}) {
 			return
 		case <-time.After(wait):
 		}
-		m.check(context.Background())
+		m.round()
 		wait = CheckInterval
+	}
+}
+
+// round is one turn of the timer: the release staged in the folder, then a check, when
+// automatic checks are on and no other copy is checking. A copy that can't take the lock
+// does nothing more this round.
+func (m *Manager) round() {
+	m.readStage()
+	if !m.Auto() {
+		return
+	}
+	lock, ok, err := m.lock(false)
+	if err != nil {
+		timeline.Errorf("update: %v", err)
+		return
+	}
+	if !ok {
+		return
+	}
+	defer lock.Close()
+	m.check(context.Background())
+}
+
+// readStage offers the release staged in the folder, whichever copy staged it: a bundle is
+// moved there only once it has passed its checks. With Install set the folder is one copy's.
+func (m *Manager) readStage() {
+	if m.cfg.Install != nil {
+		return
+	}
+	apps, _ := filepath.Glob(filepath.Join(m.stageDir(), "*.app"))
+	if len(apps) != 1 {
+		return
+	}
+	v, _, err := bundleInfo(apps[0])
+	if err != nil {
+		return
+	}
+	if newer, err := amarit.CompareVersions(v, m.cfg.Version); err != nil || newer <= 0 {
+		return
+	}
+	m.mu.Lock()
+	m.staged = apps[0]
+	s := m.state
+	m.mu.Unlock()
+	if s.Phase != Ready || s.Version != v {
+		m.set(State{Phase: Ready, Version: v})
 	}
 }
 
 // CheckNow checks at once, whether or not automatic checks are on, and says how it went in
 // State.Check. A newer release goes the way an automatic check's does: download, checks,
-// stage, and the bubble offers relaunch.
+// stage, and the bubble offers relaunch. While another copy checks, it waits for the lock.
 func (m *Manager) CheckNow() {
 	if m.client == nil {
 		m.setCheck(CheckFailed, "a development build doesn't update")
@@ -206,6 +334,13 @@ func (m *Manager) CheckNow() {
 	}
 	m.setCheck(Checking, "")
 	go func() {
+		lock, _, err := m.lock(true)
+		if err != nil {
+			m.setCheck(CheckFailed, err.Error())
+			return
+		}
+		defer lock.Close()
+		m.readStage()
 		current, err := m.check(context.Background())
 		switch {
 		case err != nil:
@@ -221,10 +356,8 @@ func (m *Manager) CheckNow() {
 // check is one look at the manifest, and the download, unpack and checks when it names a
 // newer release. current says nothing newer was found and nothing is on show; err says the
 // manifest couldn't be read. An automatic check only logs that error: the next minute
-// tries again. A download that fails is shown.
+// tries again. A download that fails is shown. The caller holds the folder's lock.
 func (m *Manager) check(ctx context.Context) (current bool, err error) {
-	m.checking.Lock()
-	defer m.checking.Unlock()
 	if m.cfg.Install == nil {
 		if err := writable(filepath.Dir(m.cfg.App)); err != nil {
 			m.set(State{Phase: Failed, Error: err.Error()})
@@ -266,10 +399,11 @@ func (m *Manager) check(ctx context.Context) (current bool, err error) {
 	return false, nil
 }
 
-// fetch downloads the release and unpacks it into the stage directory, and checks that the
-// bundle inside says it is that version and passes Verify. A download that fails is tried
-// again next check; a bundle that fails its checks is refused for good, so a bad release is
-// downloaded once, not every minute. With Install set, the download itself is staged.
+// fetch downloads the release and unpacks it in the download directory, checks that the
+// bundle inside says it is that version and passes Verify, and only then moves it into the
+// stage directory, where every copy reads it. A download that fails is tried again next
+// check; a bundle that fails its checks is refused for good, so a bad release is downloaded
+// once, not every minute. With Install set, the download itself is staged.
 func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error) {
 	stage, downloads := m.stageDir(), m.downloadDir()
 	os.RemoveAll(stage)
@@ -297,18 +431,21 @@ func (m *Manager) fetch(ctx context.Context, d *amarit.Decision) (string, error)
 		}
 		return staged, os.Rename(archive, staged)
 	}
-	app, err := unpack(archive, stage)
+	app, err := unpack(archive, filepath.Join(downloads, "unpacked"))
 	if err == nil {
 		err = m.checkBundle(app, d.Version)
 	}
 	if err != nil {
-		os.RemoveAll(stage)
 		if rerr := m.client.Reject(d.Version); rerr != nil {
 			timeline.Errorf("update: %v", rerr)
 		}
 		return "", fmt.Errorf("%s was refused: %w", d.Version, err)
 	}
-	return app, nil
+	staged := filepath.Join(stage, filepath.Base(app))
+	if err := os.MkdirAll(stage, 0o700); err != nil {
+		return "", err
+	}
+	return staged, os.Rename(app, staged)
 }
 
 func (m *Manager) checkBundle(app, version string) error {
@@ -327,9 +464,11 @@ func (m *Manager) checkBundle(app, version string) error {
 
 // Relaunch puts the staged bundle where the running one is, keeps the running one as the
 // previous release, and ends the app; a helper left behind starts the new one once this
-// process has gone. With Install set, it hands the staged download to Install and the app
-// carries on; the release stays staged, so a user who cancels can ask again. Nothing happens
-// unless a release is ready.
+// process has gone. With Copies set, every other running copy is told to quit first, the
+// swap waits until they have gone, and each profile that was running starts again on the
+// new release, this copy's among them. With Install set, it hands the staged download to
+// Install and the app carries on; the release stays staged, so a user who cancels can ask
+// again. Nothing happens unless a release is ready.
 func (m *Manager) Relaunch() {
 	m.mu.Lock()
 	staged := m.staged
@@ -342,6 +481,25 @@ func (m *Manager) Relaunch() {
 		m.cfg.Install(staged)
 		return
 	}
+	// Taken, so a second click while the others quit does nothing.
+	m.mu.Lock()
+	m.staged = ""
+	m.mu.Unlock()
+	if m.cfg.Copies == nil {
+		m.swap(staged, nil)
+		return
+	}
+	timeline.Infof("update: telling the other copies to quit")
+	go func() {
+		profiles := m.cfg.Copies.QuitOthers()
+		m.post(func() { m.swap(staged, profiles) })
+	}()
+}
+
+// swap puts the staged bundle in place, keeping the running one as the previous release,
+// and ends the app, leaving the new release to start once this process has gone: on each
+// of profiles with Copies, else as this copy was started.
+func (m *Manager) swap(staged string, profiles []string) {
 	_, executable, err := bundleInfo(staged)
 	if err != nil {
 		m.set(State{Phase: Failed, Version: m.State().Version, Error: err.Error()})
@@ -361,11 +519,13 @@ func (m *Manager) Relaunch() {
 		m.set(State{Phase: Failed, Version: m.State().Version, Error: "couldn't put the new app in place: " + err.Error()})
 		return
 	}
-	m.mu.Lock()
-	m.staged = ""
-	m.mu.Unlock()
 	timeline.Infof("update: %s is in place, previous release kept at %s; relaunching", m.cfg.App, previous)
-	relaunch.After(filepath.Join(m.cfg.App, "Contents", "MacOS", executable), nil)
+	exe := filepath.Join(m.cfg.App, "Contents", "MacOS", executable)
+	if m.cfg.Copies != nil {
+		m.cfg.Copies.StartAfter(exe, profiles)
+	} else {
+		relaunch.After(exe, nil)
+	}
 	m.quit()
 }
 

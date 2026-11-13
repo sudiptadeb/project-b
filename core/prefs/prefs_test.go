@@ -2,8 +2,6 @@ package prefs
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -25,28 +23,6 @@ func TestTabLayoutSurvivesARestart(t *testing.T) {
 
 	if New(dir).TabLayout() != TabsHorizontal {
 		t.Fatal("layout not saved")
-	}
-}
-
-func TestAutoUpdateIsOnByDefaultAndSurvivesARestart(t *testing.T) {
-	dir := t.TempDir()
-	// A file from before the setting existed keeps the default.
-	if err := os.WriteFile(filepath.Join(dir, "prefs.json"), []byte(`{"tabLayout":"horizontal"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	m := New(dir)
-	if !m.AutoUpdate() || m.TabLayout() != TabsHorizontal {
-		t.Fatalf("prefs = %+v", m.All())
-	}
-	var got []bool
-	m.OnAutoUpdateChanged(func(on bool) { got = append(got, on) })
-	m.SetAutoUpdate(true)
-	m.SetAutoUpdate(false)
-	if len(got) != 1 || got[0] {
-		t.Fatalf("changes = %v", got)
-	}
-	if again := New(dir); again.AutoUpdate() || again.TabLayout() != TabsHorizontal {
-		t.Fatalf("after restart = %+v", again.All())
 	}
 }
 
@@ -74,19 +50,18 @@ func TestFrameColorIsDustyTealByDefaultAndSurvivesARestart(t *testing.T) {
 func TestApplySetsWhatTheValuesHoldThroughTheSetters(t *testing.T) {
 	dir := t.TempDir()
 	m := New(dir)
-	m.SetAutoUpdate(false)
+	m.SetTheme(ThemeDark)
 	var heard []string
 	m.OnTabLayoutChanged(func(l string) { heard = append(heard, l) })
 	m.OnFrameColorChanged(func(c string) { heard = append(heard, c) })
 	m.OnThemeChanged(func(th string) { heard = append(heard, th) })
-	m.OnAutoUpdateChanged(func(bool) { heard = append(heard, "autoUpdate") })
-	if err := m.Apply(json.RawMessage(`{"tabLayout":"horizontal","frameColor":"#5b7fd6","theme":"system"}`)); err != nil {
+	if err := m.Apply(json.RawMessage(`{"tabLayout":"horizontal","frameColor":"#5b7fd6"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(heard, " ") != "horizontal #5b7fd6" {
 		t.Fatalf("heard %v", heard)
 	}
-	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, AutoUpdate: false, FrameColor: "#5b7fd6", Theme: ThemeSystem}) {
+	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark}) {
 		t.Fatalf("saved %+v", got)
 	}
 }

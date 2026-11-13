@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ func TestSecondCopyHandsOver(t *testing.T) {
 		t.Fatalf("first copy: %v, %v", first, err)
 	}
 	got := make(chan []string, 1)
-	first.Serve(func(urls []string) { got <- urls })
+	first.Serve(func(urls []string) { got <- urls }, func() {})
 
 	want := []string{"https://example.com/", "https://example.org/"}
 	second, err := Claim(dir, want)
@@ -45,4 +46,28 @@ func TestLongProfilePath(t *testing.T) {
 		t.Fatalf("a %d-byte profile path: %v, %v", len(dir), o, err)
 	}
 	o.Close()
+}
+
+// A copy relaunching for an update asks the owner of a folder to quit: the owner answers
+// with its process and quits. A folder nobody owns has no copy to ask.
+func TestTheOwnerAnswersQuitWithItsProcessAndQuits(t *testing.T) {
+	dir := t.TempDir()
+	if pid, err := Quit(dir); pid != 0 || err != nil {
+		t.Fatalf("a folder no copy has owned: %d, %v", pid, err)
+	}
+	o, err := Claim(dir, nil)
+	if err != nil || o == nil {
+		t.Fatalf("claim: %v, %v", o, err)
+	}
+	quit := make(chan struct{})
+	o.Serve(func([]string) { t.Error("a quit was handed over as URLs") }, func() { close(quit) })
+	pid, err := Quit(dir)
+	if err != nil || pid != os.Getpid() {
+		t.Fatalf("the owner answered %d, %v", pid, err)
+	}
+	<-quit
+	o.Close()
+	if pid, err := Quit(dir); pid != 0 || err != nil {
+		t.Fatalf("a folder whose owner has gone: %d, %v", pid, err)
+	}
 }

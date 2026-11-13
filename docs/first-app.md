@@ -232,8 +232,8 @@ dev server and start it again on the same `--profile`.
 - No popup blocking: every `window.open` becomes a tab, in the opener's window. No window
   features (size, position) are honoured.
 - No spaces, groups, pinned tabs, tab search, drag to reorder, or session restore. Tabs
-  are not saved; the prefs, the tab layout, automatic updates and the frame colour, are, in
-  `prefs.json` in the profile.
+  are not saved; the prefs, the tab layout, the frame colour and the theme, are, in
+  `prefs.json` in the profile. Automatic updates are the app's: [updates.md](updates.md).
 - No downloads, permissions, dialogs, autofill or extensions. An installed copy does update
   itself: [updates.md](updates.md).
 - Content's own `chrome://` pages, such as `chrome://gpu`, pass the gate but fail to

@@ -63,10 +63,12 @@ PAGE_HTML = {
     "bravo.html": "<title>Bravo</title><body style='margin:0;background:#dd6b20;color:#fff;font:64px sans-serif'><p>Bravo</p>",
     "charlie.html": "<title>Charlie</title><body style='margin:0;background:#2f855a;color:#fff;font:64px sans-serif'><p>Charlie</p>",
 }
-PROFILE = "/Users/admin/.project-b/default"
+ROOT = "/Users/admin/.project-b"
+PROFILE = f"{ROOT}/default"
 # Every launch starts from a fresh profile with automatic update checks off, so no update
-# notice comes up over the page in the middle of a check.
-PREFS = '{"autoUpdate": false}'
+# notice comes up over the page in the middle of a check. The setting is in the update
+# folder: the root's for a listed profile, a folder named outright's own.
+UPDATE_OFF = '{"autoUpdate": false}'
 
 results = []
 finished = False
@@ -120,8 +122,9 @@ def guest(*cmd):
     return subprocess.run([TART, "exec", VM, *cmd], capture_output=True, text=True, timeout=60).stdout.strip()
 
 
-def fresh_profile(path=PROFILE, wipe="/Users/admin/.project-b"):
-    guest("/bin/sh", "-c", f"rm -rf '{wipe}' && mkdir -p '{path}' && echo '{PREFS}' > '{path}/prefs.json'")
+def fresh_profile(path=PROFILE, wipe=ROOT):
+    updates = f"{ROOT}/update" if wipe == ROOT else f"{path}/updates"
+    guest("/bin/sh", "-c", f"rm -rf '{wipe}' && mkdir -p '{path}' '{updates}' && echo '{UPDATE_OFF}' > '{updates}/settings.json'")
 
 
 def serve_pages():
@@ -778,7 +781,7 @@ def profile_checks():
     listed = json.loads(guest("/bin/cat", f"{root}/profiles.json"))
     listed["profiles"].append({"id": "work", "name": "Work", "color": "#5b7fd6", "template": "Work"})
     guest("/bin/sh", "-c", f"mkdir -p {root}/work && printf '%s' \"$1\" > {root}/profiles.json && "
-          f"printf '%s' '{{\"frameColor\":\"#5b7fd6\",\"tabLayout\":\"horizontal\",\"autoUpdate\":false}}' > {root}/work/prefs.json",
+          f"printf '%s' '{{\"frameColor\":\"#5b7fd6\",\"tabLayout\":\"horizontal\"}}' > {root}/work/prefs.json",
           "sh", json.dumps(listed))
     guest("/usr/bin/open", "-n", APP, "--args", f"--root={root}", "--profile=work")
     two = until(lambda: guest("/usr/bin/pgrep", "-x", "project_b").split(), lambda p: len(p) == 2, 20)

@@ -79,7 +79,6 @@ func Start(e engine.Engine, cfg Config) *App {
 	first := a.openWindow()
 	a.quit = func() { e.AppCommand(engine.AppQuit) }
 	a.Update = update.New(cfg.Update, e.Post, a.quit)
-	a.Update.SetAuto(a.Prefs.AutoUpdate())
 	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
 	a.Commands.RegisterList(a.profileList(cfg))
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
@@ -115,8 +114,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
-	a.Prefs.OnAutoUpdateChanged(a.Update.SetAuto)
-	a.Prefs.OnAutoUpdateChanged(a.Settings.AutoUpdateChanged)
+	a.Update.OnAutoChanged(a.Settings.AutoUpdateChanged)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 	a.Update.OnChanged(a.Settings.UpdateChanged)
 	a.Commands.OnChanged(a.Settings.KeyboardChanged)

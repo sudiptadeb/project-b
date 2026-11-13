@@ -179,7 +179,7 @@ func TestNewerReleaseIsStagedAndRelaunchSwapsTheBundle(t *testing.T) {
 	if r.phases() != "downloading ready" || r.states[1].Version != "0.2.0" {
 		t.Fatalf("phases %q states %+v", r.phases(), r.states)
 	}
-	if !strings.HasPrefix(verified, r.m.stageDir()) {
+	if !strings.HasPrefix(verified, r.m.downloadDir()) {
 		t.Fatalf("verify saw %q", verified)
 	}
 	if v, _ := Version(r.app); v != "0.1.0" {
@@ -437,5 +437,128 @@ func TestDownloadShowsHowMuchHasArrived(t *testing.T) {
 	}
 	if r.phases() != "downloading ready" {
 		t.Fatalf("phases %q", r.phases())
+	}
+}
+
+// sharing is a manager on a folder another copy may share, installed as running.
+func sharing(t *testing.T, folder, running, releases string, post func(func()), quit func()) *Manager {
+	t.Helper()
+	cfg := Config{Project: "project-b", Version: running, Releases: releases, StateDir: folder, App: fakeApp(t, t.TempDir(), running)}
+	return New(cfg, post, quit)
+}
+
+// Two copies on one folder: while one checks and downloads, holding the lock, the other's
+// round does nothing; once the release is staged, the other reads it from the folder and
+// offers it too, without downloading it again.
+func TestOneCopyAtATimeChecksAndEachReadsTheStagedRelease(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	half := make(chan struct{})
+	rest := make(chan struct{})
+	rs.serve = func(w http.ResponseWriter) {
+		w.Write(good[:len(good)/2])
+		w.(http.Flusher).Flush()
+		close(half)
+		<-rest
+		w.Write(good[len(good)/2:])
+	}
+	folder := filepath.Join(t.TempDir(), "update")
+	inline := func(f func()) { f() }
+	first := sharing(t, folder, "0.1.0", rs.url, inline, func() {})
+	second := sharing(t, folder, "0.1.0", rs.url, inline, func() {})
+	done := make(chan struct{})
+	go func() { first.round(); close(done) }()
+	<-half
+	second.round()
+	if n := rs.manifests.Load(); n != 1 || second.State().Phase != Idle {
+		t.Fatalf("while the first copy downloads, the second read the manifest %d times in all and shows %+v", n, second.State())
+	}
+	close(rest)
+	<-done
+	if s := first.State(); s.Phase != Ready || s.Version != "0.2.0" {
+		t.Fatalf("the first copy shows %+v", s)
+	}
+	second.round()
+	if s := second.State(); s.Phase != Ready || s.Version != "0.2.0" || rs.downloads.Load() != 1 {
+		t.Fatalf("the second copy shows %+v after %d downloads", s, rs.downloads.Load())
+	}
+	// With automatic checks off, a round still reads the staged release.
+	third := sharing(t, folder, "0.1.0", rs.url, inline, func() {})
+	third.SetAuto(false)
+	third.round()
+	if s := third.State(); s.Phase != Ready || rs.manifests.Load() != 2 {
+		t.Fatalf("with automatic checks off the copy shows %+v, after %d manifests", s, rs.manifests.Load())
+	}
+}
+
+// The automatic-updates setting is the folder's: every copy sharing it reads the same, a
+// change in one holds in the others, and it is on until someone turns it off.
+func TestTheAutomaticUpdatesSettingIsShared(t *testing.T) {
+	folder := filepath.Join(t.TempDir(), "update")
+	inline := func(f func()) { f() }
+	one := sharing(t, folder, "0.1.0", "http://127.0.0.1:1/releases.json", inline, func() {})
+	other := sharing(t, folder, "0.1.0", "http://127.0.0.1:1/releases.json", inline, func() {})
+	if !one.Auto() || !other.Auto() {
+		t.Fatal("automatic updates start off")
+	}
+	var heard []bool
+	one.OnAutoChanged(func(on bool) { heard = append(heard, on) })
+	one.SetAuto(false)
+	one.SetAuto(false)
+	if other.Auto() || len(heard) != 1 || heard[0] {
+		t.Fatalf("the other copy reads %v; this one heard %v", other.Auto(), heard)
+	}
+	if later := sharing(t, folder, "0.1.0", "http://127.0.0.1:1/releases.json", inline, func() {}); later.Auto() {
+		t.Fatal("a copy started later reads automatic updates on")
+	}
+	other.SetAuto(true)
+	if !one.Auto() {
+		t.Fatal("turned on in the other copy, this one reads it off")
+	}
+}
+
+// fakeCopies records what Relaunch asks of the other copies, and what the installed app
+// was at each step.
+type fakeCopies struct {
+	app     string
+	steps   []string
+	started chan struct{}
+}
+
+func (c *fakeCopies) QuitOthers() []string {
+	v, _ := Version(c.app)
+	c.steps = append(c.steps, "quit the others on "+v)
+	return []string{"default", "work"}
+}
+
+func (c *fakeCopies) StartAfter(executable string, profiles []string) {
+	v, _ := Version(c.app)
+	c.steps = append(c.steps, fmt.Sprintf("start %s on %s with %s", strings.Join(profiles, " "), v, filepath.Base(executable)))
+	close(c.started)
+}
+
+// Relaunch with other copies: they quit first, the swap waits for them, and each profile
+// starts again on the new release once this copy has ended.
+func TestRelaunchQuitsTheOtherCopiesThenSwapsAndStartsEachProfile(t *testing.T) {
+	good := archive(t, fakeApp(t, t.TempDir(), "0.2.0"))
+	rs := release(t, "0.2.0", good, good)
+	app := fakeApp(t, t.TempDir(), "0.1.0")
+	copies := &fakeCopies{app: app, started: make(chan struct{})}
+	quit := make(chan struct{})
+	cfg := Config{Project: "project-b", Version: "0.1.0", Releases: rs.url, StateDir: filepath.Join(t.TempDir(), "update"), App: app, Copies: copies}
+	m := New(cfg, func(f func()) { f() }, func() {
+		copies.steps = append(copies.steps, "quit")
+		close(quit)
+	})
+	m.round()
+	if m.State().Phase != Ready {
+		t.Fatalf("state %+v", m.State())
+	}
+	m.Relaunch()
+	<-quit
+	<-copies.started
+	want := "quit the others on 0.1.0, start default work on 0.2.0 with project_b, quit"
+	if got := strings.Join(copies.steps, ", "); got != want {
+		t.Fatalf("the steps were %q, want %q", got, want)
 	}
 }

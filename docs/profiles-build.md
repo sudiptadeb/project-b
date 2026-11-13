@@ -22,11 +22,11 @@ built so far, and the order of building at the end says which steps are done.
   and menu templates and built in the same way: a name and pref values, nothing else.
   Personal is today's defaults; Work has the tabs on top and the frame colour `#5b7fd6`.
   They hold the profile's own prefs only (the tabs, the frame colour, the theme), not
-  automatic updates, which become app-wide. Making a profile from one writes its values as
+  automatic updates, which are app-wide. Making a profile from one writes its values as
   the profile's `prefs.json`; the list keeps the template's name only to show it
   (`core/profiles/templates.go`).
-- Prefs are four values in `<profile>/prefs.json`: where the tabs go, automatic updates,
-  the frame colour, the theme (`core/prefs`).
+- Prefs are three values in `<profile>/prefs.json`: where the tabs go, the frame colour, the
+  theme (`core/prefs`).
 - One copy of the app per folder, with a handover (`core/instance`).
 - Opening another profile starts another copy. The menu bar has a Profiles menu, from the
   menu template, listing the profiles with a tick on this one. A menu template places a
@@ -68,8 +68,21 @@ built so far, and the order of building at the end says which steps are done.
   touched. It is a `settings.Part` that `app.Start` adds only when the copy's profile is
   listed, so a copy on a folder named outright has no Profile section
   (`core/app/profile.go`, `shell/src/apps/settings/Profile.vue`).
-- The update state lives in the profile folder, and "relaunch to update" swaps the
-  installed app and restarts this one copy (`core/update`).
+- Updates are app-wide ([updates.md](updates.md)). The update state is the root's `update`
+  folder, which every copy on the root shares: the staged release, which every copy reads
+  each round, so each offers the relaunch; the automatic-updates setting,
+  `update/settings.json`, which every copy reads each round and when its settings page
+  opens; and a lock, which one copy at a time holds while it checks and downloads, so a
+  copy that can't take it does nothing that round (`core/update`). "Relaunch to update"
+  tells every other running copy to quit, over the handover's socket (`{"quit": true}`,
+  answered `{"pid": …}`, `core/instance`), waits for their processes to end, swaps the
+  installed app, and starts each profile that was running again, its own included; an open
+  picker quits and isn't started again (`relaunch.Copies`). A running copy shows as a live
+  flock on `<root>/<id>/lock`, and a picker copy on `<root>/lock`: it owns the root as a
+  profile's copy owns its folder, with a socket of its own, so a second picker copy hands
+  over to it and it comes to the front. A copy started with `--user-data-dir` keeps its
+  update state in `updates` in its own folder, as before, and takes no part in the restart,
+  so tests and ChromeDriver never touch the copies on the root or the installed app.
 - Our pages, the shells and the settings pages, load in a context of their own, off the
   record and with no folder, made before the profile's
   (`engine/browser/browser_main_parts.mm`). They are registered only there, so in the
@@ -156,7 +169,7 @@ Each commit builds, leaves a working app, and carries its tests.
 4. Done. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
 5. Done. The picker: a copy that hasn't chosen, its page, New Profile from a template.
 6. Done. The Profile section in settings: the name, and reset to a template.
-7. Updates app-wide: the shared state and setting, and the restart of every copy.
+7. Done. Updates app-wide: the shared state and setting, and the restart of every copy.
 
 ## Decided while building
 
@@ -178,6 +191,24 @@ Each commit builds, leaves a working app, and carries its tests.
   in a dialog of the page's own, as the extension prompt does, naming the template; Escape
   answers Cancel. The mock's dev server takes `-id` to start on a listed profile, which
   `shell/e2e/settings.cjs` now does.
+- The automatic-updates setting is a small file in the update folder, `settings.json`,
+  rather than the list's top level or a file in the root. Everything about updates is then
+  in the one folder: a copy on a folder named outright, which keeps its own update folder,
+  keeps its own setting with no second path, and the list stays a list of profiles. The
+  update manager owns it, and the profile's prefs no longer have it; a value an older
+  `prefs.json` holds is not read.
+- Each round reads the setting from the file, rather than a copy being told: a change
+  holds in the other copies from their next round, and their settings pages show it when
+  they next open. Every copy's timer runs; a round with automatic updates off reads only
+  the stage.
+- The stage holds only a checked release: a download is unpacked and checked beside it and
+  then moved in. So it is read without checks, and it survives a restart, where the
+  stage and the download were cleared at every start before.
+- Check for updates waits for the lock while another copy checks, then checks itself, so
+  it always ends in what it found.
+- The asking copy waits for the other processes to end through the kernel (a kqueue's
+  process-exit events), not by polling as the shell helper does, and the helper that
+  starts each profile again is the one `relaunch.After` leaves, one per profile.
 
 ## Not in this step
 

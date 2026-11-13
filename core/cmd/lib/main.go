@@ -241,10 +241,10 @@ var (
 
 // PBClaimProfile is the first call, before anything is written to the profile. It chooses
 // the profile from the command line's --root, --profile and --user-data-dir, each "" when
-// not given, and --picker, and returns the folder this copy keeps its files in: the
-// profile's, once this copy owns it, or the root when the copy picks its profile later.
-// It returns nil when another copy owns the profile and has been handed urls, one per
-// line, so this copy quits.
+// not given, and --picker, and returns the folder this copy keeps its files in, once this
+// copy owns it: the profile's, or the root when the copy picks its profile later. It
+// returns nil when another copy owns that folder and has been handed urls, one per line,
+// so this copy quits.
 //
 //export PBClaimProfile
 func PBClaimProfile(root, id, userDataDir *C.char, picker C.int, urls *C.char) *C.char {
@@ -260,14 +260,13 @@ func PBClaimProfile(root, id, userDataDir *C.char, picker C.int, urls *C.char) *
 		fmt.Fprintf(os.Stderr, "the profile: %v\n", err)
 		os.Exit(1)
 	}
+	// A picker copy owns the root, so a copy relaunching for an update finds it, and a
+	// second picker copy hands over to it.
+	dir := profile.Dir
 	if profile.Pick {
-		if err := os.MkdirAll(list.Root(), 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "the root: %v\n", err)
-			os.Exit(1)
-		}
-		return C.CString(list.Root())
+		dir = list.Root()
 	}
-	o, err := instance.Claim(profile.Dir, handed)
+	o, err := instance.Claim(dir, handed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "the profile folder: %v\n", err)
 		os.Exit(1)
@@ -276,7 +275,7 @@ func PBClaimProfile(root, id, userDataDir *C.char, picker C.int, urls *C.char) *
 		return nil
 	}
 	owner = o
-	return C.CString(profile.Dir)
+	return C.CString(dir)
 }
 
 // rootOf is the folder that holds the profiles: the one --root names, else ~/.project-b.
@@ -306,9 +305,11 @@ func PBStart(calls *C.PBEngineCalls, blockedHosts, hookTable *C.char) {
 		blocked = strings.Split(s, ",")
 	}
 	if profile.Pick {
-		content.WirePicker(hooks, app.StartPicker(native, list, func(id string) {
+		picker := app.StartPicker(native, list, func(id string) {
 			relaunch.Copy("--root="+list.Root(), "--profile="+id)
-		}))
+		})
+		content.WirePicker(hooks, picker)
+		owner.Serve(func([]string) { native.Post(picker.Handover) }, quit)
 	} else {
 		startProfile(profile)
 	}
@@ -330,20 +331,23 @@ func startProfile(c profiles.Choice) {
 		Profiles:     list,
 		Profile:      c.ID,
 		BlockedHosts: blocked,
-		Update:       updateConfig(c.Dir),
+		Update:       updateConfig(c),
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)
-	owner.Serve(func(urls []string) { native.Post(func() { theApp.Handover(urls) }) })
+	owner.Serve(func(urls []string) { native.Post(func() { theApp.Handover(urls) }) }, quit)
 }
+
+// quit ends this copy, as another copy relaunching for an update asks.
+func quit() { native.Post(func() { native.AppCommand(engine.AppQuit) }) }
 
 //export PBStop
 func PBStop() {
 	// A picker copy has no profile to stop.
 	if theApp != nil {
 		theApp.Stop()
-		owner.Close()
 	}
+	owner.Close()
 	timeline.Close()
 }
 

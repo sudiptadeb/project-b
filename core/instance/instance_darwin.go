@@ -78,9 +78,45 @@ func handOver(socket string, urls []string) error {
 	return json.NewEncoder(conn).Encode(request{URLs: urls})
 }
 
-// Serve hands each request from a later copy to handle, on a goroutine of its own, until
-// Close.
-func (o *Owner) Serve(handle func(urls []string)) {
+// Quit asks the copy that owns dir to quit, and returns its process, or 0 when no copy
+// owns dir: its lock is free.
+func Quit(dir string) (int, error) {
+	lock, err := os.OpenFile(filepath.Join(dir, "lock"), os.O_RDWR, 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err == nil {
+		return 0, nil
+	} else if !errors.Is(err, syscall.EWOULDBLOCK) {
+		return 0, err
+	}
+	socket, err := socketPath(dir)
+	if err != nil {
+		return 0, err
+	}
+	conn, err := net.Dial("unix", socket)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	if err := json.NewEncoder(conn).Encode(request{Quit: true}); err != nil {
+		return 0, err
+	}
+	var r reply
+	if err := json.NewDecoder(conn).Decode(&r); err != nil {
+		return 0, err
+	}
+	return r.PID, nil
+}
+
+// Serve hands each request from another copy to handover, or to quit when it asks this
+// copy to quit, once this copy has answered with its process. Each runs on a goroutine of
+// its own, until Close.
+func (o *Owner) Serve(handover func(urls []string), quit func()) {
 	go func() {
 		for {
 			conn, err := o.ln.Accept()
@@ -89,12 +125,19 @@ func (o *Owner) Serve(handle func(urls []string)) {
 			}
 			var r request
 			err = json.NewDecoder(conn).Decode(&r)
+			if err == nil && r.Quit {
+				err = json.NewEncoder(conn).Encode(reply{PID: os.Getpid()})
+			}
 			conn.Close()
 			if err != nil {
 				timeline.Errorf("instance: a request from another copy: %v", err)
 				continue
 			}
-			handle(r.URLs)
+			if r.Quit {
+				quit()
+				continue
+			}
+			handover(r.URLs)
 		}
 	}()
 }

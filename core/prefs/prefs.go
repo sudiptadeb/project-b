@@ -1,6 +1,7 @@
-// Package prefs owns the user's settings: where the tabs go, whether the app checks for
-// updates on its own, and the frame colour. They live in one small JSON file in the profile, read when the app
-// starts and written when one changes.
+// Package prefs owns the profile's settings: where the tabs go, the frame colour and the
+// theme. They live in one small JSON file in the profile, read when the app starts and
+// written when one changes. Automatic updates are the app's, not a profile's
+// (core/update).
 package prefs
 
 import (
@@ -27,14 +28,13 @@ const (
 // Prefs is every setting, as the file holds them.
 type Prefs struct {
 	TabLayout  string `json:"tabLayout"`
-	AutoUpdate bool   `json:"autoUpdate"`
 	FrameColor string `json:"frameColor"`
 	Theme      string `json:"theme"`
 }
 
 // Defaults are the settings before the user changes any.
 func Defaults() Prefs {
-	return Prefs{TabLayout: TabsVertical, AutoUpdate: true, FrameColor: "#4f9e9e", Theme: ThemeSystem}
+	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem}
 }
 
 func isTheme(t string) bool { return t == ThemeSystem || t == ThemeLight || t == ThemeDark }
@@ -47,7 +47,6 @@ type Manager struct {
 	path         string
 	prefs        Prefs
 	onLayout     []func(string)
-	onAutoUpdate []func(bool)
 	onFrameColor []func(string)
 	onTheme      []func(string)
 }
@@ -93,27 +92,6 @@ func (m *Manager) SetTabLayout(layout string) {
 	m.save()
 	for _, f := range m.onLayout {
 		f(layout)
-	}
-}
-
-// AutoUpdate says whether the app checks for updates on its own. A check the user asks
-// for runs either way.
-func (m *Manager) AutoUpdate() bool { return m.prefs.AutoUpdate }
-
-// OnAutoUpdateChanged subscribes to automatic updates being turned on or off.
-func (m *Manager) OnAutoUpdateChanged(f func(bool)) {
-	m.onAutoUpdate = append(m.onAutoUpdate, f)
-}
-
-// SetAutoUpdate turns automatic update checks on or off.
-func (m *Manager) SetAutoUpdate(on bool) {
-	if on == m.prefs.AutoUpdate {
-		return
-	}
-	m.prefs.AutoUpdate = on
-	m.save()
-	for _, f := range m.onAutoUpdate {
-		f(on)
 	}
 }
 
@@ -165,7 +143,6 @@ func (m *Manager) Apply(values json.RawMessage) error {
 		return err
 	}
 	m.SetTabLayout(p.TabLayout)
-	m.SetAutoUpdate(p.AutoUpdate)
 	m.SetFrameColor(p.FrameColor)
 	m.SetTheme(p.Theme)
 	return nil

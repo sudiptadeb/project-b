@@ -17,6 +17,7 @@ import (
 	"projectb/profiles"
 	"projectb/tabs"
 	"projectb/timeline"
+	"projectb/update"
 	"projectb/window"
 )
 
@@ -31,7 +32,7 @@ type rig struct {
 
 func start(t *testing.T, dir string, blocked ...string) *rig {
 	t.Helper()
-	return startWith(t, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), BlockedHosts: blocked})
+	return startWith(t, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), BlockedHosts: blocked, Update: update.Config{StateDir: filepath.Join(dir, "updates")}})
 }
 
 // startWith starts the app as start does, on cfg.
@@ -411,9 +412,9 @@ func TestTheSettingsPageReadsAndSetsTheSettings(t *testing.T) {
 	}
 	r.settings(`{"t":"setAutoUpdate","on":false}`)
 	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "autoUpdate" && m["autoUpdate"] == false })
-	b, _ := os.ReadFile(filepath.Join(dir, "prefs.json"))
+	b, _ := os.ReadFile(filepath.Join(dir, "updates", "settings.json"))
 	if !strings.Contains(string(b), `"autoUpdate":false`) {
-		t.Fatalf("prefs.json = %s", b)
+		t.Fatalf("the update folder's settings.json = %s", b)
 	}
 	// The theme: saved, the shell told, the window's own parts dark.
 	if snap["theme"] != "system" || r.e.Layout(1).Theme != engine.ThemeSystem {

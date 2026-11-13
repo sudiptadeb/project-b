@@ -7,7 +7,10 @@ type Owner struct{}
 func Claim(dir string, urls []string) (*Owner, error) { return &Owner{}, nil }
 
 // Serve has nothing to serve.
-func (o *Owner) Serve(handle func(urls []string)) {}
+func (o *Owner) Serve(handover func(urls []string), quit func()) {}
+
+// Quit finds no other copy.
+func Quit(dir string) (int, error) { return 0, nil }
 
 // Close has nothing to give up.
 func (o *Owner) Close() {}

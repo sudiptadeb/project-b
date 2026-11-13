@@ -123,6 +123,38 @@ func TestAnUpdateMergesNewActions(t *testing.T) {
 	}
 }
 
+// The view marks an action changed when its keys or its hidden mark aren't its
+// template's, and names the action that wins a key two have.
+func TestTheViewMarksChangesAndClashes(t *testing.T) {
+	full := false
+	m, _ := manager(t, t.TempDir(), &full)
+	actions := func() map[string]ActionView {
+		out := map[string]ActionView{}
+		for _, g := range m.View().Groups {
+			for _, a := range g.Actions {
+				out[a.ID] = a
+			}
+		}
+		return out
+	}
+	m.AddBinding("tab.new", "Cmd+W", ReservePage)
+	m.SetHidden("nav.reload", true)
+	m.OSBindings(map[string]engine.Key{"app.hide": key(t, "Option+Cmd+J")})
+	v := actions()
+	if !v["tab.new"].Changed || !v["nav.reload"].Changed || v["tab.close"].Changed || v["app.hide"].Changed {
+		t.Fatalf("changed: tab.new %v, nav.reload %v, tab.close %v, app.hide %v",
+			v["tab.new"].Changed, v["nav.reload"].Changed, v["tab.close"].Changed, v["app.hide"].Changed)
+	}
+	// New Tab is ahead of Close Tab in the menu, so it wins Cmd+W.
+	if k := v["tab.close"].Keys[0]; k.Clash != "tab.new" || k.ClashID != "tab.new" {
+		t.Fatalf("the clash is %+v", k)
+	}
+	m.ResetAction("tab.new")
+	if actions()["tab.new"].Changed {
+		t.Fatal("a reset action is still changed")
+	}
+}
+
 func TestABadFileIsSetAside(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "keymap.json"), []byte("{nope"), 0o644)

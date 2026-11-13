@@ -27,6 +27,9 @@ type ActionView struct {
 	// Locked: its menu item can't be hidden.
 	Locked bool          `json:"locked"`
 	Keys   []BindingView `json:"keys"`
+	// Changed: its keys on this platform, or whether it is hidden, aren't its template's,
+	// so a reset or another template would lose something.
+	Changed bool `json:"changed"`
 }
 
 // BindingView is one key. Index is its place in the keymap's list, -1 for a locked one.
@@ -36,8 +39,10 @@ type BindingView struct {
 	Reserve string `json:"reserve"`
 	FromOS  bool   `json:"fromOS"`
 	Locked  bool   `json:"locked"`
-	// Clash names the action that also has this key and wins it, "" when none does.
-	Clash string `json:"clash"`
+	// Clash names the action that also has this key and wins it, "" when none does, and
+	// ClashID is its id, so the page can take the user there.
+	Clash   string `json:"clash"`
+	ClashID string `json:"clashID"`
 }
 
 // View returns what the settings page shows.
@@ -50,6 +55,12 @@ func (m *Manager) View() View {
 		Missing:   append([]Missing{}, m.missing...),
 		Gone:      []string{},
 		Problems:  append([]string{}, m.problems...),
+	}
+	// An owned keymap is compared with its template; a following one is the template.
+	var template *Keymap
+	if m.file.Follows == "" {
+		t := keymapTemplates()[m.keys.Template]
+		template = &t
 	}
 	inTree := map[string]bool{}
 	var walk func(path string, nodes []Node, locked bool)
@@ -78,7 +89,7 @@ func (m *Manager) View() View {
 				v.Groups = append(v.Groups, Group{Title: path})
 				g = &v.Groups[len(v.Groups)-1]
 			}
-			g.Actions = append(g.Actions, m.actionView(a, n.Locked))
+			g.Actions = append(g.Actions, m.actionView(a, n.Locked, template))
 		}
 	}
 	walk("", m.tree, false)
@@ -90,8 +101,11 @@ func (m *Manager) View() View {
 	return v
 }
 
-func (m *Manager) actionView(a *Action, locked bool) ActionView {
+func (m *Manager) actionView(a *Action, locked bool, template *Keymap) ActionView {
 	v := ActionView{ID: a.ID, Title: a.Title, Locked: locked, Keys: []BindingView{}}
+	if template != nil {
+		v.Changed = m.differs(m.keys.Actions[a.ID], template.Actions[a.ID])
+	}
 	if k, ok := m.keys.Actions[a.ID]; ok {
 		v.Hidden = k.Hidden && !locked
 	}
@@ -100,6 +114,7 @@ func (m *Manager) actionView(a *Action, locked bool) ActionView {
 		if k, err := ParseKeys(b.Keys); err == nil {
 			if hit, ok := m.index[k]; ok && hit.id != a.ID {
 				bv.Clash = m.titleOf(hit.id)
+				bv.ClashID = hit.id
 			}
 		}
 		v.Keys = append(v.Keys, bv)
@@ -115,6 +130,37 @@ func (m *Manager) actionView(a *Action, locked bool) ActionView {
 		}
 	}
 	return v
+}
+
+// differs says whether an action's keys on this platform, or its hidden mark, aren't its
+// template's. A key from the OS is the OS's, not a change the user made here, so it
+// doesn't count; nil is an action with no keys.
+func (m *Manager) differs(mine, theirs *ActionKeys) bool {
+	if mine == nil {
+		mine = &ActionKeys{}
+	}
+	if theirs == nil {
+		theirs = &ActionKeys{}
+	}
+	if mine.Hidden != theirs.Hidden {
+		return true
+	}
+	var own []Binding
+	for _, b := range mine.On(m.platform) {
+		if !b.FromOS {
+			own = append(own, b)
+		}
+	}
+	want := theirs.On(m.platform)
+	if len(own) != len(want) {
+		return true
+	}
+	for i := range own {
+		if own[i].Keys != want[i].Keys || own[i].Reserve != want[i].Reserve {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) titleOf(id string) string {

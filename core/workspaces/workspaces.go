@@ -63,18 +63,19 @@ func New(dir string) *Manager {
 	return m
 }
 
-// List returns a copy of the workspaces, in the order they were made: none is an empty
-// list, never nil, so it goes to a page as [].
+// List returns a copy of the workspaces, in the user's order, which starts as the order
+// they were made: none is an empty list, never nil, so it goes to a page as [].
 func (m *Manager) List() []Workspace { return append([]Workspace{}, m.list...) }
 
-// OnChanged subscribes to a workspace being made or renamed.
+// OnChanged subscribes to a workspace being made, renamed, recoloured or moved.
 func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }
 
 // Create makes a workspace called name, in color, with an id Go makes: eight hex digits.
+// Names are unique in the list, whatever their case.
 func (m *Manager) Create(name, c string) (Workspace, error) {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return Workspace{}, errors.New("a workspace needs a name")
+	if err := m.checkName("", name); err != nil {
+		return Workspace{}, err
 	}
 	if !color.MatchString(c) {
 		return Workspace{}, errors.New("a workspace's colour is #rrggbb")
@@ -85,18 +86,77 @@ func (m *Manager) Create(name, c string) (Workspace, error) {
 	return w, nil
 }
 
-// SetName renames a workspace. Its id stays, and so do its tabs and storage.
+// SetName renames a workspace. Its id stays, and so do its tabs and storage. The new name
+// may differ from its own only in case, but not match another's.
 func (m *Manager) SetName(id, name string) error {
 	name = strings.TrimSpace(name)
-	if name == "" {
-		return errors.New("a workspace needs a name")
+	i, err := m.index(id)
+	if err != nil {
+		return err
 	}
-	i := slices.IndexFunc(m.list, func(w Workspace) bool { return w.ID == id })
-	if i < 0 {
-		return errors.New("no workspace " + id)
+	if err := m.checkName(id, name); err != nil {
+		return err
+	}
+	if m.list[i].Name == name {
+		return nil
 	}
 	m.list[i].Name = name
 	m.changed()
+	return nil
+}
+
+// SetColor changes a workspace's colour, the dot on its tabs.
+func (m *Manager) SetColor(id, c string) error {
+	i, err := m.index(id)
+	if err != nil {
+		return err
+	}
+	if !color.MatchString(c) {
+		return errors.New("a workspace's colour is #rrggbb")
+	}
+	if m.list[i].Color == c {
+		return nil
+	}
+	m.list[i].Color = c
+	m.changed()
+	return nil
+}
+
+// Move moves a workspace one place up the list (by -1) or down it (by +1). The list's
+// order is the order the Tab menu and settings show.
+func (m *Manager) Move(id string, by int) error {
+	i, err := m.index(id)
+	if err != nil {
+		return err
+	}
+	if by != -1 && by != 1 {
+		return errors.New("a workspace moves one place at a time")
+	}
+	j := i + by
+	if j < 0 || j >= len(m.list) {
+		return errors.New("the workspace is already at that end")
+	}
+	m.list[i], m.list[j] = m.list[j], m.list[i]
+	m.changed()
+	return nil
+}
+
+func (m *Manager) index(id string) (int, error) {
+	i := slices.IndexFunc(m.list, func(w Workspace) bool { return w.ID == id })
+	if i < 0 {
+		return -1, errors.New("no workspace " + id)
+	}
+	return i, nil
+}
+
+// checkName refuses an empty name, and one another workspace than id has, in any case.
+func (m *Manager) checkName(id, name string) error {
+	if name == "" {
+		return errors.New("a workspace needs a name")
+	}
+	if slices.ContainsFunc(m.list, func(w Workspace) bool { return w.ID != id && strings.EqualFold(w.Name, name) }) {
+		return errors.New("there is already a workspace called " + name)
+	}
 	return nil
 }
 

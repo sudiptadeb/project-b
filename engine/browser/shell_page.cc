@@ -257,6 +257,9 @@ class AppDataSource : public content::URLDataSource {
     if (base::EndsWith(name, ".css")) {
       return "text/css";
     }
+    if (base::EndsWith(name, ".woff2")) {
+      return "font/woff2";
+    }
     return "text/html";
   }
 
@@ -275,21 +278,26 @@ class AppDataSource : public content::URLDataSource {
         return "style-src 'self' 'unsafe-inline';";
       case Name::ImgSrc:
         return "img-src 'self' data:;";
+      case Name::FontSrc:
+        return "font-src 'self';";
       case Name::RequireTrustedTypesFor:
         return "require-trusted-types-for 'script';";
+      // The policies the frameworks our pages are built with make for their templates.
+      // The mock engine serves our pages with the same policy (core/cmd/dev, pageCSP).
       case Name::TrustedTypes:
-        return "trusted-types vue;";
+        return "trusted-types vue svelte-trusted-html;";
       default:
         return content::URLDataSource::GetContentSecurityPolicy(directive);
     }
   }
 
  private:
-  // The file a URL names, as a path in the folder of our pages, or "" for none. Only an
-  // app's index.html, its one script and its one stylesheet exist, so no path reaches
-  // outside its folder; any other path of settings or the picker is its index.html. A
-  // shell's folder is its id, the path's first part: lower-case letters, digits and
-  // dashes.
+  // The file a URL names, as a path in the folder of our pages, or "" for none. Settings
+  // and the picker have their index.html, their one script and their one stylesheet; any
+  // other path of theirs is their index.html. A shell's folder is its id, the path's first
+  // part, and a shell has any file its build put in that folder, such as its fonts, by a
+  // plain name: lower-case letters, digits, dashes and dots, not starting with a dot. So
+  // no path reaches outside its folder.
   std::string Name(const GURL& url) const {
     std::string_view path = url.path().substr(1);
     if (host_ != "shell") {
@@ -307,7 +315,10 @@ class AppDataSource : public content::URLDataSource {
     if (id.empty() || !std::ranges::all_of(id, [](char c) {
           return base::IsAsciiLower(c) || base::IsAsciiDigit(c) || c == '-';
         }) ||
-        (file != "index.html" && !IsOwnFile(id, file))) {
+        file.front() == '.' || !std::ranges::all_of(file, [](char c) {
+          return base::IsAsciiLower(c) || base::IsAsciiDigit(c) || c == '-' ||
+                 c == '.';
+        })) {
       return "";
     }
     return base::StrCat({"shell/", id, "/", file});

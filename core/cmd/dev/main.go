@@ -302,9 +302,15 @@ func serve(name, contentType string) http.HandlerFunc {
 	}
 }
 
+// pageCSP is the policy the engine serves our pages with (engine/browser/shell_page.cc,
+// GetContentSecurityPolicy), so a page that breaks it breaks here too, and connect-src
+// for the mock's own way to Go, which the engine's pages don't have.
+const pageCSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+	"font-src 'self'; require-trusted-types-for 'script'; trusted-types vue svelte-trusted-html; connect-src 'self'"
+
 // webUI serves one of our pages' folders as the real app's WebUI does, with what the
 // engine gives the page, chrome.send and the call back, in its index.html before the
-// page's own scripts.
+// page's own scripts, and with the engine's policy.
 func webUI(dir string) http.Handler {
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -319,6 +325,7 @@ func webUI(dir string) http.Handler {
 		}
 		b = bytes.Replace(b, []byte("</head>"), []byte("<script src=\"/mock/webui.js\"></script>\n</head>"), 1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Security-Policy", pageCSP)
 		w.Write(b)
 	})
 }

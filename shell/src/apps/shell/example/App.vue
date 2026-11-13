@@ -16,6 +16,10 @@ connect({ focusAddressBar: () => address.value.focus() });
       @click="send({ t: 'activateTab', id: tab.id })"
     >{{ tabLabel(tab) }}</button>
     <button aria-label="New Tab" @click="send({ t: 'newTab' })">+</button>
+    <button @click="send({ t: 'closeTab', id: state.active })">Close Tab</button>
+    <button @click="send({ t: 'back' })">Back</button>
+    <button @click="send({ t: 'forward' })">Forward</button>
+    <button @click="send({ t: 'reload' })">Reload</button>
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />

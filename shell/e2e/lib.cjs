@@ -18,12 +18,13 @@ const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
 fs.mkdirSync(out, { recursive: true });
 // This run's own folder: the server binary, and the profile, which outlives a restart so a
-// test can see what a profile keeps.
+// test can see what a profile keeps. The server is built with extensions, which run only
+// while their flag is on in the profile's flags.json.
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-e2e-'));
 const profile = path.join(temp, 'profile');
 fs.mkdirSync(profile);
 const bin = path.join(temp, 'dev');
-execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
+execFileSync('go', ['build', '-tags', 'extensions', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
 let server = null;
 // The running server's address, such as http://127.0.0.1:53124, and what it has printed:

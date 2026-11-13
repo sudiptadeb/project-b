@@ -1,7 +1,8 @@
 // The check every shell passes: "What every shell does" in docs/shells.md, rule by rule, on
-// the mock engine in a real browser. It knows nothing of a shell but what the rules say: the
-// tabs are role=tab with data-tab, a control is named Settings, pages show where the layout
-// puts them, and Go's state comes through the mock (/mock/regions, /mock/fire).
+// the mock engine in a real browser, with the Extensions flag on. It knows nothing of a
+// shell but what the rules say: the tabs are role=tab with data-tab, the basic controls
+// are found by their role and name, pages show where the layout puts them, and Go's state
+// comes through the mock (/mock/regions, /mock/fire).
 // Run: node shell/e2e/shell-contract.cjs [id]   (from the repo root, after `npm run build`
 // in shell/; with no id, every shell in core/shells/registry.json)
 
@@ -17,15 +18,16 @@ const ids = process.argv[2] ? [process.argv[2]] : registry.map((s) => s.id);
 const rules = [
   'It says ready, draws the snapshot, and says shown',
   "The active tab's page shows, after every change, and no page is given the keyboard before it shows",
-  "The pages it shows lie inside the window's frame, don't overlap, and are all tabs of this window",
+  "The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of this window",
   'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active',
-  'focusAddressBar puts the keyboard in a text field where an address and Enter take the active tab there',
+  'focusAddressBar puts the keyboard in the field named Address, where an address and Enter take the active tab there',
   'Every control it draws is the shell\'s: a press on it reaches the shell',
   'A press in the middle of a page it shows reaches that page',
-  'Some space is marked v-drag, and no page lies under the native window buttons',
+  'Some space is marked drag, and no page lies under the native window buttons',
   'Reloaded, it comes back showing the same pages',
   'Switched to and away from, it starts from Go\'s data alone',
   'Settings is one press away, or two: a control named Settings, on the shell or in a menu one of its controls opens, opens the settings page',
+  'The basic controls are somewhere in the shell, found by role and name, and each does its job',
   'It logs no errors',
 ];
 
@@ -34,6 +36,8 @@ const rules = [
   const { controls: control } = await import('../src/sdk/controls.js');
   const browser = await chromium.launch();
   const summary = [];
+  // The extensions' buttons show only while their flag is on, as the settings page saves it.
+  fs.writeFileSync(path.join(lib.profile, 'flags.json'), JSON.stringify({ extensions: 'on' }));
   for (const id of ids) {
     if (!registry.some((s) => s.id === id)) throw new Error(`no shell ${id} in core/shells/registry.json`);
     console.log(`\n=== the ${id} shell`);
@@ -74,7 +78,7 @@ const rules = [
       const overlap = r.visible.some((a, i) => r.visible.some((b, j) => j > i &&
         a.rect.x < b.rect.x + b.rect.w && b.rect.x < a.rect.x + a.rect.w && a.rect.y < b.rect.y + b.rect.h && b.rect.y < a.rect.y + a.rect.h));
       const strangers = r.visible.filter((v) => !r.tabs.some((t) => t.id === v.tab));
-      rule(3, `${when}: the pages lie inside the frame, apart, and are this window's tabs`, outside.length === 0 && !overlap && strangers.length === 0,
+      rule(3, `${when}: the pages lie inside the band, apart, and are this window's tabs`, outside.length === 0 && !overlap && strangers.length === 0,
         JSON.stringify({ visible: r.visible, frame: f, window: [W, H], tabs: r.tabs.map((t) => t.id) }));
     };
     // 2, after a change: Go's active tab is one the layout shows, and the dev window shows
@@ -92,11 +96,16 @@ const rules = [
       await insideAndApart(when);
     };
     const tabCount = async (n) => until(async () => (await regions()).tabs.length === n && (await drawn()).length === n);
+    // The settings page closed with its own button, as settings.cjs closes it.
+    const closeSettings = async () => {
+      await page.frameLocator('iframe.mock-settings').getByRole('button', { name: 'Close settings' }).click();
+      await until(async () => (await regions()).settingsOpen === false);
+    };
 
     // A check that throws fails the rule it was checking, and leaves the rest unchecked.
     let current = 2;
     if (!ready) {
-      for (let n = 2; n <= 11; n++) rule(n, 'not checked: the shell never came up', false);
+      for (let n = 2; n <= 12; n++) rule(n, 'not checked: the shell never came up', false);
     } else {
       try {
         await activeShows('at the start');
@@ -136,11 +145,9 @@ const rules = [
         // 5. The address bar.
         current = 5;
         await fire('key', 'focusAddressBar', { tab: other });
-        const inField = () => w.shell().evaluate(() => {
-          const el = document.activeElement;
-          return document.hasFocus() && !!el && (el.tagName === 'INPUT' && /^(text|url|search|)$/.test(el.type) || el.tagName === 'TEXTAREA' || el.isContentEditable);
-        });
-        rule(5, 'focusAddressBar puts the keyboard in a text field', await until(inField), await w.shell().evaluate(() => document.activeElement?.outerHTML.slice(0, 80)));
+        const address = ui.getByRole('textbox', { name: 'Address', exact: true }).or(ui.getByRole('combobox', { name: 'Address', exact: true }));
+        const inField = () => address.evaluateAll((els) => document.hasFocus() && els.includes(document.activeElement));
+        rule(5, 'focusAddressBar puts the keyboard in the text field named Address', await until(inField), await w.shell().evaluate(() => document.activeElement?.outerHTML.slice(0, 80)));
         await page.keyboard.press('ControlOrMeta+A');
         await page.keyboard.type('contract.test/typed');
         await page.keyboard.press('Enter');
@@ -188,7 +195,7 @@ const rules = [
         // 8. Drag space, and the native buttons over no page.
         current = 8;
         r = await regions();
-        rule(8, 'some space is marked v-drag', r.drag.length > 0, JSON.stringify(r.drag));
+        rule(8, 'some space is marked drag', r.drag.length > 0, JSON.stringify(r.drag));
         const c = r.window.Controls;
         const under = r.visible.filter(({ rect: p }) => c.w > 0 && p.x < c.x + c.w && c.x < p.x + p.w && p.y < c.y + c.h && c.y < p.y + p.h);
         rule(8, 'no page lies under the native window buttons', under.length === 0, JSON.stringify({ controls: c, under }));
@@ -228,17 +235,104 @@ const rules = [
           await settings.first().click();
           rule(11, 'pressed, it opens the settings page', await until(async () => (await regions()).settingsOpen === true));
           // Closed again with the page's own button, as settings.cjs closes it.
-          await page.frameLocator('iframe.mock-settings').getByRole('button', { name: 'Close settings' }).click();
-          await until(async () => (await regions()).settingsOpen === false);
+          await closeSettings();
         }
+
+        // 12. The basic controls, each found only by its role and its name, as a screen
+        // reader finds it, on the shell or in a menu one of its controls opens, and pressed
+        // or typed into to see it work.
+        current = 12;
+        // A control is a button or a menu item, whose name may end with its key.
+        const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const byName = (name) => {
+          const pattern = new RegExp(`^(${name})\\b`);
+          return ui.getByRole('button', { name: pattern }).or(ui.getByRole('menuitem', { name: pattern }));
+        };
+        // reach is the first of what locator finds that shows: on the shell, or once one of
+        // the shell's controls that open something is pressed. One that shows nothing is
+        // closed again with Escape. null when none shows it.
+        const reach = async (locator) => {
+          const shown = locator.filter({ visible: true });
+          if (await shown.count()) return shown.first();
+          for (const opener of await ui.locator('[aria-haspopup], [aria-expanded]').filter({ visible: true }).all()) {
+            await opener.click();
+            if (await until(async () => (await shown.count()) > 0, 500)) return shown.first();
+            await page.keyboard.press('Escape');
+          }
+          return null;
+        };
+        // basic checks one control: that it is there, and that pressing it does what done
+        // waits for.
+        const basic = async (what, locator, press, done) => {
+          const found = await reach(locator);
+          if (!rule(12, `${what}: found by its role and name`, !!found)) return;
+          await press(found);
+          rule(12, `${what}: does its job`, await done());
+        };
+        const click = (el) => el.click();
+        const active = async () => {
+          const r = await regions();
+          return r.tabs.find((t) => t.id === r.active);
+        };
+        // Whether the active tab has loaded url.
+        const at = (url) => until(async () => {
+          const t = await active();
+          return t.url === url && !t.loading;
+        });
+
+        // History to go back and forward in, made as a page makes it.
+        const tab = (await regions()).active;
+        await fire('navigate', 'https://contract.test/one', { tab });
+        await at('https://contract.test/one');
+        await fire('navigate', 'https://contract.test/two', { tab });
+        await at('https://contract.test/two');
+        await basic('Back', byName('Back'), click, () => at('https://contract.test/one'));
+        await basic('Forward', byName('Forward'), click, () => at('https://contract.test/two'));
+        // Reload loads the page again, which its mock page shows.
+        const mockPage = await (await page.locator(`iframe.mock-page[data-tab="${tab}"]`).elementHandle()).contentFrame();
+        await mockPage.evaluate(() => {
+          const shown = document.getElementById('state');
+          window.states = [];
+          new MutationObserver(() => window.states.push(shown.textContent)).observe(shown, { childList: true, characterData: true, subtree: true });
+        });
+        await basic('Reload', byName('Reload'), click, async () =>
+          await until(() => mockPage.evaluate(() => window.states.includes('Loading'))) && at('https://contract.test/two'));
+
+        const had = (await regions()).tabs.map((t) => t.id);
+        let opened = 0;
+        await basic('New Tab', byName('New Tab'), click, () => until(async () => {
+          const r = await regions();
+          opened = r.tabs.find((t) => !had.includes(t.id))?.id || 0;
+          return opened !== 0 && r.active === opened;
+        }));
+        await basic('the text field named Address', address, async (field) => {
+          await field.click();
+          await page.keyboard.press('ControlOrMeta+A');
+          await page.keyboard.type('close.test/tab');
+          await page.keyboard.press('Enter');
+        }, () => at('https://close.test/tab'));
+        // The tab just opened has a title of its own, which no other tab has.
+        await until(async () => (await active()).title !== '');
+        const title = (await active()).title;
+        await basic(`a way to close a tab, Close Tab or Close ${title}`, byName(`Close Tab|Close ${escaped(title)}`), click,
+          () => until(async () => !(await regions()).tabs.some((t) => t.id === opened)));
+
+        await basic('Settings', byName('Settings'), click, () => until(async () => (await regions()).settingsOpen === true));
+        await closeSettings();
+        // Extensions, whose menu's Manage extensions opens the settings page.
+        await basic('Extensions', byName('Extensions'), async (el) => {
+          await el.click();
+          await byName('Manage extensions').filter({ visible: true }).first().click();
+        }, () => until(async () => (await regions()).settingsOpen === true));
+        await closeSettings();
       } catch (e) {
         rule(current, 'its checks ran to their end', false, e.message.split('\n')[0]);
-        for (let n = current + 1; n <= 11; n++) rule(n, 'not checked: an earlier check ended the run', false);
+        for (let n = current + 1; n <= 12; n++) rule(n, 'not checked: an earlier check ended the run', false);
       }
     }
 
-    // 12.
-    rule(12, 'it logged no errors', w.errors.length === 0, w.errors.join(' | '));
+    // 13.
+    rule(13, 'it logged no errors', w.errors.length === 0, w.errors.join(' | '));
 
     await w.page.close();
     await lib.stop();

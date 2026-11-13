@@ -132,9 +132,15 @@ class Driver:
         if not self.lines.wait(lambda: "start" in self.lines.replies, timeout):
             raise TimeoutError("the app's driver never started")
         self.writer = open(self.fifo, "w", buffering=1)
-        # The app prints app.ready once the shell shows Go's state: docs/logging.md.
-        if not self.lines.wait(lambda: any(re.search(r" mark +go +app\.ready$", line) for line in self.lines.text), timeout):
-            raise TimeoutError("the app never said it was ready")
+        # The app marks app.ready once the shell shows Go's state (docs/logging.md). It is
+        # asked for over the driver: under ChromeDriver, the app's stderr, where it prints,
+        # never reaches us.
+        deadline = time.time() + timeout
+        while not any(e.get("kind") == "mark" and e.get("name") == "app.ready"
+                      for e in json.loads(self.cmd("timeline", 0))["result"]["entries"]):
+            if time.time() > deadline:
+                raise TimeoutError("the app never said it was ready")
+            time.sleep(0.1)
 
     def cmd(self, *parts, timeout=20):
         self.next += 1

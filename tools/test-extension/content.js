@@ -23,3 +23,10 @@ if (location.search === '?capture') {
     document.documentElement.dataset.pbCapture = JSON.stringify(answer);
   });
 }
+
+// On a page asking for it, what the extension saw of a second window.
+if (location.search === '?windows') {
+  chrome.runtime.sendMessage({ type: 'windows' }).then((answer) => {
+    document.documentElement.dataset.pbWindows = JSON.stringify(answer);
+  });
+}

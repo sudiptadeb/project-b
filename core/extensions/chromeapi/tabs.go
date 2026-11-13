@@ -40,11 +40,17 @@ func status(t tabs.Tab) string {
 	return "complete"
 }
 
+// index is a tab's place in its window.
+func (a *API) index(id engine.TabID) int {
+	return slices.IndexFunc(a.tabs.AllIn(a.tabs.WindowOf(id)), func(o tabs.Tab) bool { return o.ID == id })
+}
+
 func (a *API) tabFor(e engine.Extension, t tabs.Tab) tab {
-	active := t.ID == a.tabs.ActiveID()
+	w := a.tabs.WindowOf(t.ID)
+	active := t.ID == a.tabs.ActiveIn(w)
 	out := tab{
-		ID: t.ID, Index: slices.IndexFunc(a.tabs.All(), func(o tabs.Tab) bool { return o.ID == t.ID }),
-		GroupID: -1, WindowID: windowID, Selected: active, Highlighted: active, Active: active,
+		ID: t.ID, Index: a.index(t.ID),
+		GroupID: -1, WindowID: int(w), Selected: active, Highlighted: active, Active: active,
 		LastAccessed:    float64(a.accessed[t.ID].UnixMilli()),
 		AutoDiscardable: true, Status: status(t),
 	}
@@ -96,27 +102,28 @@ func init() {
 	}
 	// The engine takes the picture of the tab named here, if the caller may see its page.
 	functions["tabs.captureVisibleTab"] = func(a *API, c call) (any, error) {
-		var window int
-		if c.arg(0, &window) && window != windowID && window != currentWindow {
-			return nil, fmt.Errorf("No window with id: %d.", window)
+		w, err := a.windowArg(c, 0)
+		if err != nil {
+			return nil, err
 		}
-		if _, ok := a.tabs.Get(a.tabs.ActiveID()); !ok {
+		active := a.tabs.ActiveIn(w.ID)
+		if _, ok := a.tabs.Get(active); !ok {
 			return nil, fmt.Errorf("No active web contents to capture")
 		}
-		return map[string]engine.TabID{"tab": a.tabs.ActiveID()}, nil
+		return map[string]engine.TabID{"tab": active}, nil
 	}
 	functions["tabs.query"] = func(a *API, c call) (any, error) {
 		var q struct {
-			Active            *bool   `json:"active"`
-			CurrentWindow     *bool   `json:"currentWindow"`
-			LastFocusedWindow *bool   `json:"lastFocusedWindow"`
-			Highlighted       *bool   `json:"highlighted"`
-			Pinned            *bool   `json:"pinned"`
-			Status            *string `json:"status"`
-			WindowID          *int    `json:"windowId"`
-			Index             *int    `json:"index"`
-			Title             *string `json:"title"`
-			URL               any     `json:"url"`
+			Active            *bool            `json:"active"`
+			CurrentWindow     *bool            `json:"currentWindow"`
+			LastFocusedWindow *bool            `json:"lastFocusedWindow"`
+			Highlighted       *bool            `json:"highlighted"`
+			Pinned            *bool            `json:"pinned"`
+			Status            *string          `json:"status"`
+			WindowID          *engine.WindowID `json:"windowId"`
+			Index             *int             `json:"index"`
+			Title             *string          `json:"title"`
+			URL               any              `json:"url"`
 		}
 		c.arg(0, &q)
 		e := a.caller(c)
@@ -132,17 +139,22 @@ func init() {
 				}
 			}
 		}
+		if q.WindowID != nil && *q.WindowID == currentWindow {
+			*q.WindowID = a.current(c)
+		}
+		current, front := a.current(c), a.tabs.Front()
 		out := []tab{}
-		for i, t := range a.tabs.All() {
-			active := t.ID == a.tabs.ActiveID()
+		for _, t := range a.tabs.All() {
+			w := a.tabs.WindowOf(t.ID)
+			active := t.ID == a.tabs.ActiveIn(w)
 			if q.Active != nil && *q.Active != active ||
 				q.Highlighted != nil && *q.Highlighted != active ||
-				q.CurrentWindow != nil && !*q.CurrentWindow ||
-				q.LastFocusedWindow != nil && !*q.LastFocusedWindow ||
+				q.CurrentWindow != nil && *q.CurrentWindow != (w == current) ||
+				q.LastFocusedWindow != nil && *q.LastFocusedWindow != (w == front) ||
 				q.Pinned != nil && *q.Pinned ||
 				q.Status != nil && *q.Status != status(t) ||
-				q.WindowID != nil && *q.WindowID != windowID && *q.WindowID != currentWindow ||
-				q.Index != nil && *q.Index != i {
+				q.WindowID != nil && *q.WindowID != w ||
+				q.Index != nil && *q.Index != a.index(t.ID) {
 				continue
 			}
 			// An extension that can't see a tab's address and title can't find it by them.
@@ -157,15 +169,30 @@ func init() {
 	}
 	functions["tabs.create"] = func(a *API, c call) (any, error) {
 		var p struct {
-			URL    string `json:"url"`
-			Active *bool  `json:"active"`
+			URL      string           `json:"url"`
+			Active   *bool            `json:"active"`
+			WindowID *engine.WindowID `json:"windowId"`
 		}
 		c.arg(0, &p)
 		u := tabs.BlankURL
 		if p.URL != "" {
 			u = resolve(c.Extension, p.URL)
 		}
-		id := a.tabs.OpenIn(u, p.Active == nil || *p.Active)
+		// Into the window named, or the caller's current one.
+		w := a.current(c)
+		if p.WindowID != nil && *p.WindowID != currentWindow {
+			if _, ok := a.windows.Get(*p.WindowID); !ok {
+				return nil, fmt.Errorf("No window with id: %d.", *p.WindowID)
+			}
+			w = *p.WindowID
+		}
+		var id engine.TabID
+		if w == a.tabs.Front() {
+			id = a.tabs.OpenIn(u, p.Active == nil || *p.Active)
+		} else {
+			id = a.tabs.CreateIn(w)
+			a.tabs.Load(id, u)
+		}
 		t, _ := a.tabs.Get(id)
 		return a.tabFor(a.caller(c), t), nil
 	}
@@ -234,21 +261,27 @@ func init() {
 	}
 }
 
-// TabsChanged tells the extensions which tabs opened and closed and which is active
-// now, from what they were last told.
+// TabsChanged tells the extensions which tabs opened and closed and which is active in
+// each window now, from what they were last told.
 func (a *API) TabsChanged() {
 	now := map[engine.TabID]tabs.Tab{}
+	in := map[engine.TabID]engine.WindowID{}
+	left := map[engine.WindowID]int{}
 	for _, t := range a.tabs.All() {
 		now[t.ID] = t
+		in[t.ID] = a.tabs.WindowOf(t.ID)
+		left[in[t.ID]]++
 	}
-	active := a.tabs.ActiveID()
-	if active != 0 && active != a.active {
-		a.accessed[active] = time.Now()
-	}
-	for _, e := range a.ext.Installed() {
-		if !e.Enabled {
-			continue
+	active := map[engine.WindowID]engine.TabID{}
+	for _, w := range a.tabs.Windows() {
+		if id := a.tabs.ActiveIn(w); id != 0 {
+			active[w] = id
+			if a.active[w] != id {
+				a.accessed[id] = time.Now()
+			}
 		}
+	}
+	for _, e := range a.enabled() {
 		for _, t := range a.tabs.All() {
 			if _, was := a.known[t.ID]; !was {
 				a.dispatch(e.ID, "tabs.onCreated", a.tabFor(e, t))
@@ -256,11 +289,14 @@ func (a *API) TabsChanged() {
 		}
 		for id := range a.known {
 			if _, is := now[id]; !is {
-				a.dispatch(e.ID, "tabs.onRemoved", id, map[string]any{"windowId": windowID, "isWindowClosing": len(now) == 0})
+				w := a.knownIn[id]
+				a.dispatch(e.ID, "tabs.onRemoved", id, map[string]any{"windowId": w, "isWindowClosing": left[w] == 0})
 			}
 		}
-		if active != 0 && active != a.active {
-			a.dispatch(e.ID, "tabs.onActivated", map[string]any{"tabId": active, "windowId": windowID})
+		for w, id := range active {
+			if a.active[w] != id {
+				a.dispatch(e.ID, "tabs.onActivated", map[string]any{"tabId": id, "windowId": w})
+			}
 		}
 	}
 	for id := range a.known {
@@ -269,7 +305,7 @@ func (a *API) TabsChanged() {
 			a.ext.ForgetTab(id)
 		}
 	}
-	a.known, a.active = now, active
+	a.known, a.knownIn, a.active = now, in, active
 }
 
 // TabChanged tells the extensions what changed in one tab: its status, and for those

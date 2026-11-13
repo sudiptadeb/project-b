@@ -93,5 +93,4 @@ Each commit builds and leaves a working app.
 4. Done. What macOS expects of an app with several windows: the Window menu's list and
    Cmd+`.
 5. Done. Moving a tab to another window.
-6. Extensions' `chrome.windows` and DevTools' window calls with real windows. DevTools'
-   are done, and Go's side of what extensions need; the extension side is its own work.
+6. Done. Extensions' `chrome.windows` and DevTools' window calls with real windows.

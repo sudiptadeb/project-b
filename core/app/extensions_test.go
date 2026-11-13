@@ -371,6 +371,94 @@ func TestTabsAPI(t *testing.T) {
 	}
 }
 
+// Each window is one of Go's: the calls find, open, move, size and close them, and the
+// events say what happened to each.
+func TestWindowsAPI(t *testing.T) {
+	r := startExtensions(t, t.TempDir())
+	r.install()
+	r.visit("https://example.com/")
+	var first engine.TabID
+	var w1, w2 engine.WindowID
+	r.on(func() {
+		first, w1 = r.a.Tabs.ActiveID(), r.a.Tabs.Front()
+		w2, _ = r.a.NewWindow("https://example.org/")
+	})
+	r.until("windows.onFocusChanged", func() bool { return len(r.events("windows.onFocusChanged")) > 0 })
+	if len(r.events("windows.onCreated")) != 1 {
+		t.Fatalf("windows.onCreated: %v", r.events("windows.onCreated"))
+	}
+	id := func(v any) engine.WindowID { return engine.WindowID(v.(float64)) }
+
+	var all []map[string]any
+	json.Unmarshal(r.call("windows.getAll", `[{"populate":true}]`, 0).Result, &all)
+	if len(all) != 2 || id(all[0]["id"]) != w1 || all[0]["focused"] != false || all[1]["focused"] != true || len(all[1]["tabs"].([]any)) != 1 {
+		t.Fatalf("windows.getAll: %v", all)
+	}
+
+	// The current window is the caller's tab's, or for a popup the one in front.
+	var w map[string]any
+	json.Unmarshal(r.call("windows.getCurrent", `[]`, first).Result, &w)
+	if id(w["id"]) != w1 {
+		t.Fatalf("windows.getCurrent from a tab in the first window: %v", w)
+	}
+	var tabs []map[string]any
+	json.Unmarshal(r.call("tabs.query", `[{"active":true,"currentWindow":true}]`, 0).Result, &tabs)
+	if len(tabs) != 1 || tabs[0]["url"] != "https://example.org/" || id(tabs[0]["windowId"]) != w2 || tabs[0]["index"] != 0.0 {
+		t.Fatalf("the active tab in the window in front: %v", tabs)
+	}
+	json.Unmarshal(r.call("tabs.query", `[{"active":true}]`, 0).Result, &tabs)
+	if len(tabs) != 2 {
+		t.Fatalf("each window has an active tab: %v", tabs)
+	}
+
+	// A tab made in a window behind goes there.
+	var made map[string]any
+	json.Unmarshal(r.call("tabs.create", `[{"url":"https://example.net/","windowId":`+itoa(engine.TabID(w1))+`}]`, 0).Result, &made)
+	if id(made["windowId"]) != w1 || made["index"] != 1.0 {
+		t.Fatalf("tabs.create in the first window: %v", made)
+	}
+
+	// A size and a state.
+	r.call("windows.update", `[`+itoa(engine.TabID(w2))+`,{"left":10,"top":20,"width":800,"height":600}]`, 0)
+	r.until("windows.onBoundsChanged", func() bool {
+		got, _ := r.a.Window.Get(w2)
+		return got.Bounds == engine.Rect{X: 10, Y: 20, W: 800, H: 600}
+	})
+	if len(r.events("windows.onBoundsChanged")) == 0 {
+		t.Fatal("no windows.onBoundsChanged")
+	}
+	r.call("windows.update", `[`+itoa(engine.TabID(w2))+`,{"state":"maximized"}]`, 0)
+	json.Unmarshal(r.call("windows.get", `[`+itoa(engine.TabID(w2))+`]`, 0).Result, &w)
+	if w["state"] != "maximized" {
+		t.Fatalf("windows.update to maximized: %v", w)
+	}
+	if a := r.x.Call(testExtensionID, "windows.update", `[`+itoa(engine.TabID(w2))+`,{"state":"minimized","left":0}]`, 0); a.Error == "" {
+		t.Fatal("a place went with the minimized state")
+	}
+
+	// A tab moved into a window of its own, and that window closed.
+	tab := engine.TabID(made["id"].(float64))
+	json.Unmarshal(r.call("windows.create", `[{"tabId":`+itoa(tab)+`}]`, 0).Result, &w)
+	w3 := id(w["id"])
+	if w3 == w1 || w3 == w2 || len(w["tabs"].([]any)) != 1 {
+		t.Fatalf("windows.create with a tab: %v", w)
+	}
+	if d, at := r.events("tabs.onDetached"), r.events("tabs.onAttached"); len(d) != 1 || len(at) != 1 ||
+		string(d[0].Args) != `[`+itoa(tab)+`,{"oldPosition":1,"oldWindowId":`+itoa(engine.TabID(w1))+`}]` ||
+		string(at[0].Args) != `[`+itoa(tab)+`,{"newPosition":0,"newWindowId":`+itoa(engine.TabID(w3))+`}]` {
+		t.Fatalf("the move's events: %v %v", d, at)
+	}
+	r.call("windows.remove", `[`+itoa(engine.TabID(w3))+`]`, 0)
+	r.until("windows.onRemoved", func() bool { return len(r.events("windows.onRemoved")) == 1 })
+	r.until("tabs.onRemoved", func() bool { return len(r.events("tabs.onRemoved")) == 1 })
+	if a := r.events("tabs.onRemoved")[0]; string(a.Args) != `[`+itoa(tab)+`,{"isWindowClosing":true,"windowId":`+itoa(engine.TabID(w3))+`}]` {
+		t.Fatalf("tabs.onRemoved: %s", a.Args)
+	}
+	if a := r.x.Call(testExtensionID, "windows.get", `[`+itoa(engine.TabID(w3))+`]`, 0); !strings.Contains(a.Error, "No window with id") {
+		t.Fatalf("windows.get of a closed window: %+v", a)
+	}
+}
+
 func itoa(id engine.TabID) string {
 	b, _ := json.Marshal(id)
 	return string(b)

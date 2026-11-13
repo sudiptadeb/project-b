@@ -31,13 +31,14 @@ func startExtensions(a *App, e engine.Engine, cfg Config) {
 	}
 	eng := e.(engine.Extensions)
 	m := extensions.New(eng, cfg.ProfileDir, a.Tabs.ActiveID)
-	api := chromeapi.New(eng, a.Tabs, m, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
+	api := chromeapi.New(eng, a.Tabs, a.Window, a, m)
 	extensionManagers[a] = m
 	eng.SetExtensionsListener(&extensionEvents{m, api})
 
 	m.OnClicked(api.Clicked)
 	a.Tabs.OnListChanged(api.TabsChanged)
 	a.Tabs.OnChanged(api.TabChanged)
+	a.Window.OnEvent(api.WindowEvent)
 
 	// The shell draws the buttons; they differ by tab, so they go again when the active
 	// tab changes.

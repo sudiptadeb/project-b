@@ -564,9 +564,15 @@ void Extensions::DispatchEvent(const std::string& id,
       {"action.onClicked", extensions::events::ACTION_ON_CLICKED},
       {"commands.onCommand", extensions::events::COMMANDS_ON_COMMAND},
       {"tabs.onActivated", extensions::events::TABS_ON_ACTIVATED},
+      {"tabs.onAttached", extensions::events::TABS_ON_ATTACHED},
       {"tabs.onCreated", extensions::events::TABS_ON_CREATED},
+      {"tabs.onDetached", extensions::events::TABS_ON_DETACHED},
       {"tabs.onRemoved", extensions::events::TABS_ON_REMOVED},
       {"tabs.onUpdated", extensions::events::TABS_ON_UPDATED},
+      {"windows.onBoundsChanged", extensions::events::WINDOWS_ON_BOUNDS_CHANGED},
+      {"windows.onCreated", extensions::events::WINDOWS_ON_CREATED},
+      {"windows.onFocusChanged", extensions::events::WINDOWS_ON_FOCUS_CHANGED},
+      {"windows.onRemoved", extensions::events::WINDOWS_ON_REMOVED},
   });
   std::optional<base::ListValue> args =
       base::JSONReader::ReadList(args_json, base::JSON_PARSE_RFC);

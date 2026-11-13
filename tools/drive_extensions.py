@@ -248,6 +248,15 @@ def extension_checks():
     check("tabs.captureVisibleTab takes a picture of the tab", shot.get("url") == "data:image/png;base64," and shot["length"] > 1000, shot)
     visit(app, PAGE)
 
+    # A second window: the extension opens one, finds it in front, and closes it.
+    visit(app, PAGE + "?windows")
+    app.wait("!!document.documentElement.dataset.pbWindows", 20, page=True)
+    seen = json.loads(app.js("document.documentElement.dataset.pbWindows", page=True))
+    check("chrome.windows opens, finds and closes a second window",
+          seen.get("windows") == 2 and seen["made"] != seen["own"] and seen["madeTabs"] == 1
+          and seen["front"] == seen["made"] and seen["gone"] == seen["made"] and seen["left"] == 1, seen)
+    visit(app, PAGE)
+
     # The popup: a view of its own under the button, running the extension's page.
     icon = "document.querySelector('.pbx-action img')?.src"
     first_icon = app.js(icon)

@@ -138,7 +138,8 @@ func (e *Engine) Extensions() []engine.Extension { return slices.Clone(e.extensi
 // lists them: it stops on any other, and so does the mock.
 var events = []string{
 	"action.onClicked", "commands.onCommand",
-	"tabs.onActivated", "tabs.onCreated", "tabs.onRemoved", "tabs.onUpdated",
+	"tabs.onActivated", "tabs.onAttached", "tabs.onCreated", "tabs.onDetached", "tabs.onRemoved", "tabs.onUpdated",
+	"windows.onBoundsChanged", "windows.onCreated", "windows.onFocusChanged", "windows.onRemoved",
 }
 
 func (e *Engine) DispatchExtensionEvent(id, event, args string) {

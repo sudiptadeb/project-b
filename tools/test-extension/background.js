@@ -27,6 +27,27 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     );
     return true;
   }
+  if (message.type === 'windows') {
+    // A second window, as the page's own window sees it, and gone again.
+    (async () => {
+      const removed = new Promise((done) => chrome.windows.onRemoved.addListener(done));
+      const made = await chrome.windows.create({ url: 'https://example.com/' });
+      const all = await chrome.windows.getAll({ populate: true });
+      const front = await chrome.windows.getLastFocused();
+      await chrome.windows.remove(made.id);
+      const gone = await removed;
+      respond({
+        windows: all.length,
+        own: sender.tab.windowId,
+        made: made.id,
+        madeTabs: made.tabs.length,
+        front: front.id,
+        gone,
+        left: (await chrome.windows.getAll()).length,
+      });
+    })().catch((error) => respond({ error: error.message }));
+    return true;
+  }
   if (message.type === 'state') {
     // A popup opened: the icon becomes one drawn here, a green square.
     const canvas = new OffscreenCanvas(16, 16);

@@ -3,7 +3,7 @@
 // Package chromeapi answers the chrome.* calls that are about the browser itself: tabs,
 // windows, action and commands. Chromium's extension runtime carries a call here with
 // its name and its arguments as JSON, and this package answers from Go's own tabs and
-// window, in the shapes Chrome's API documents. Everything shaped by Chrome's API is in
+// windows, in the shapes Chrome's API documents. Everything shaped by Chrome's API is in
 // this package and nowhere else in core/.
 package chromeapi
 
@@ -15,31 +15,42 @@ import (
 	"projectb/engine"
 	"projectb/extensions"
 	"projectb/tabs"
+	"projectb/window"
 )
 
-// There is one window. Chrome's API also takes -2 for "the current window".
-const (
-	windowID      = 1
-	currentWindow = -2
-)
+// Chrome's API takes -2 for "the current window".
+const currentWindow = -2
+
+// Opener opens windows, as the app does.
+type Opener interface {
+	NewWindow(u string) (engine.WindowID, engine.TabID)
+	NewWindowWith(tab engine.TabID) engine.WindowID
+}
 
 // API answers calls and fires events.
 type API struct {
-	eng        engine.Extensions
-	tabs       *tabs.Manager
-	ext        *extensions.Manager
-	fullScreen func() bool
+	eng     engine.Extensions
+	tabs    *tabs.Manager
+	windows *window.Manager
+	open    Opener
+	ext     *extensions.Manager
 
-	// What the extensions were last told about the tabs.
+	// What the extensions were last told about the tabs: each tab, the window it is in,
+	// and each window's active tab.
 	known    map[engine.TabID]tabs.Tab
-	active   engine.TabID
+	knownIn  map[engine.TabID]engine.WindowID
+	active   map[engine.WindowID]engine.TabID
 	accessed map[engine.TabID]time.Time
 }
 
 // New returns an API. The caller forwards the tab manager's changes to TabChanged and
-// TabsChanged, and button clicks to Clicked.
-func New(eng engine.Extensions, t *tabs.Manager, ext *extensions.Manager, fullScreen func() bool) *API {
-	return &API{eng: eng, tabs: t, ext: ext, fullScreen: fullScreen, known: map[engine.TabID]tabs.Tab{}, accessed: map[engine.TabID]time.Time{}}
+// TabsChanged, the window manager's events to WindowEvent, and button clicks to Clicked.
+func New(eng engine.Extensions, t *tabs.Manager, w *window.Manager, open Opener, ext *extensions.Manager) *API {
+	return &API{
+		eng: eng, tabs: t, windows: w, open: open, ext: ext,
+		known: map[engine.TabID]tabs.Tab{}, knownIn: map[engine.TabID]engine.WindowID{},
+		active: map[engine.WindowID]engine.TabID{}, accessed: map[engine.TabID]time.Time{},
+	}
 }
 
 // call is one API function: the caller, and its arguments, each nil when left out.
@@ -89,6 +100,17 @@ func (a *API) dispatch(id, event string, args ...any) {
 // extension for the tab a message came from, sees them too.
 func seesTabs(e engine.Extension) bool {
 	return e.ID == "" || slices.Contains(e.Permissions, "tabs") || len(e.Hosts) > 0
+}
+
+// enabled is the extensions events go to.
+func (a *API) enabled() []engine.Extension {
+	var out []engine.Extension
+	for _, e := range a.ext.Installed() {
+		if e.Enabled {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func (a *API) caller(c call) engine.Extension {

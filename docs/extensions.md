@@ -98,13 +98,15 @@ profile with no incognito, kiosk, guest or policy side, most answers are one lin
 | `browser/web_contents_observer.cc` | Per page: which extension a frame belongs to, and `chrome.scripting` in a tab |
 | `browser/popup.cc` | The popup: a page of the extension that sizes itself, in a view over the shell |
 
-The tab ids `//extensions` sees are the engine's own, which are Go's. Every tab is still reported
-in one window, id 1, and `chrome.windows` knows one window; what an extension asks of "the
-current window" is answered for the window in front. Go now offers what real windows need
-(step 6 of [windows.md](windows.md)): the windows with id, frame, state and which is in
-front, a tab's window, a new window with a URL or a moved tab, closing, focusing, frame and
-state, and events for windows opening, closing, coming to the front and tabs moving. The
-extension side still answers for one window.
+The tab and window ids `//extensions` sees are the engine's own, which are Go's.
+`chrome.windows` answers from Go's windows (`core/window`): each window's frame, state and
+whether it is in front, its tabs, each with its index there, and one active tab per window.
+"The current window" is the window of the caller's tab, or for a popup or a service worker
+the window in front, which is also the last focused. Go's word for a window's state maps to
+Chrome's: zoomed is `maximized`. Every window is a normal one: one created as a popup is a
+normal window. Nothing is fired when the whole app loses focus, so `onFocusChanged` never
+reports `WINDOW_ID_NONE`. A frame dragged across the screen fires `onBoundsChanged` each time
+the engine reports it.
 
 **What `//extensions` insisted on.** It would not start, or its installer
 would not run, without each of these, so each exists with nothing behind it:
@@ -140,8 +142,8 @@ What Go answers today:
 
 | API | Functions |
 |---|---|
-| `tabs` | `get`, `getCurrent`, `query` (`url` by match pattern, `title` by `*` and `?`), `create`, `duplicate`, `update` (`url`, `active`), `reload`, `remove`, `captureVisibleTab` |
-| `windows` | `get`, `getCurrent`, `getLastFocused`, `getAll`, `create` (its pages open as tabs), `update` (answers, changes nothing) |
+| `tabs` | `get`, `getCurrent`, `query` (`url` by match pattern, `title` by `*` and `?`), `create` (into `windowId`), `duplicate`, `update` (`url`, `active`), `reload`, `remove`, `captureVisibleTab` |
+| `windows` | `get`, `getCurrent`, `getLastFocused`, `getAll`, `create` (`url`, one or a list, or `tabId`, with `left`, `top`, `width`, `height`, `state`), `update` (`focused`, the frame, `state`), `remove`; the events `onCreated`, `onRemoved`, `onFocusChanged`, `onBoundsChanged`, and `tabs.onDetached` and `onAttached` for a tab moved between windows |
 | `action` | `setTitle`, `getTitle`, `setBadgeText`, `getBadgeText`, `setBadgeBackgroundColor`, `getBadgeBackgroundColor`, `setBadgeTextColor`, `getBadgeTextColor`, `setPopup`, `getPopup`, `setIcon` (by `path` or `imageData`), `enable`, `disable`, `isEnabled`, `getUserSettings` |
 | `commands` | `getAll` |
 
@@ -316,7 +318,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   `action` APIs, on the mock engine's fake runtime), then `shell/e2e/extensions.cjs`, 42 checks: the same
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
-- `tools/test.sh app`: `tools/drive_extensions.py`, 53 checks on the real app
+- `tools/test.sh app`: `tools/drive_extensions.py`, 54 checks on the real app
   (`PB_BIN`, or `chromium/src/out/pb/project_b`), in profiles with the Extensions flag on, and
   one with it off, where no button shows, the store's page has no store API, and the Flags
   section's switch and Relaunch turn it on. Started with the mock store as

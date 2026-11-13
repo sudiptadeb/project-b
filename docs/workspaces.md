@@ -62,14 +62,22 @@ the order of building at the end says which steps are done.
   workspace is made or renamed, so the dots follow at once (`core/app/workspaces.go`,
   `shell/src/apps/shell/standard/`). The mock's page fires a menu item by its action, as the menu
   bar does (`/mock/fire`, kind `menu`).
-- Settings has a Workspaces section, after Profile: each workspace's colour and name, which
-  can be changed, and New Workspace, with a name and a colour from a colour picker. Go
-  answers with the list as it is now (`createWorkspace`, `renameWorkspace`; the page and
-  every shell hear `{"t": "workspaces", ...}`), so the dots change at once and the Tab menu
-  has the change the next time it opens. No workspace can be deleted. Every copy has the
-  section, a copy on a folder named outright (`--user-data-dir`) too: the list is the
-  folder's, as its prefs are, and nothing about it needs the profile list
-  (`core/app/workspaces.go`, `shell/src/apps/settings/Workspaces.vue`).
+- Settings has a Workspaces section, after Profile: a list of rows, each with the
+  workspace's colour, its name and the number of tabs open in it, and a menu (the ⋯
+  button, or a right-click on the row) with Edit…, Move up and Move down. New workspace…
+  on the heading's right and Edit… open one dialog with the name and the colour (the
+  presets, or any other). A new one starts on the first preset no workspace has. Names are
+  unique whatever their case: the dialog says so under the name, and Go refuses one too.
+  The order is the user's, and the Tab menu lists them in it. Go answers with the list as
+  it is now (`createWorkspace`, `editWorkspace` with the name and colour together,
+  `moveWorkspace` by -1 or +1, and `renameWorkspace`; the page and every shell hear
+  `{"t": "workspaces", ...}`), so the dots change at once and the Tab menu has the change
+  the next time it opens. The page has the counts in its snapshot and hears them again,
+  `{"t": "workspaceTabs", ...}`, when a tab opening or closing changes them. No workspace
+  can be deleted. Every copy has the section, a copy on a folder named outright
+  (`--user-data-dir`) too: the list is the folder's, as its prefs are, and nothing about
+  it needs the profile list (`core/app/workspaces.go`,
+  `shell/src/apps/settings/Workspaces.vue`).
 
 ## Decided
 
@@ -112,8 +120,8 @@ over DevTools, a new window's first tab.
 **Using it, first version.**
 - Tab menu: "New Tab in Workspace", a list of the workspaces read when the menu opens, as
   the Profiles menu is.
-- Settings: a Workspaces section, with the list, New Workspace (a name and a colour) and
-  rename.
+- Settings: a Workspaces section, with the list, New workspace (a name and a colour), and
+  edit and reorder.
 - The shell shows a tab's workspace as a dot in the workspace's colour on the tab. A tab
   in the default workspace has none.
 

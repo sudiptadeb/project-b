@@ -4,5 +4,6 @@
   { "id": "fox", "name": "Fox" },
   { "id": "example", "name": "Example", "example": true },
   { "id": "minimal-svelte", "name": "Minimal (Svelte)", "example": true },
+  { "id": "minimal-js", "name": "Minimal (JS)" },
   { "id": "minimal-vue", "name": "Minimal (Vue)", "example": true }
 ]

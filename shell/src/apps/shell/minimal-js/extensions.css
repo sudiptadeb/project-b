@@ -1,0 +1,205 @@
+/* The extensions: the pinned ones' buttons, then Extensions with its menu under the
+   toolbar. */
+.exts {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.exts[hidden] {
+  display: none;
+}
+
+.pinned {
+  display: contents;
+}
+
+.pbx-action {
+  position: relative;
+}
+
+.pbx-open,
+.pbx-open:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.pbx-icon {
+  display: block;
+  flex: none;
+}
+
+.pbx-letter {
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pbx-letter.size16 {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+
+.pbx-letter.size32 {
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+}
+
+.pbx-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 2px;
+  min-width: 8px;
+  height: 12px;
+  padding: 0 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 12px;
+  pointer-events: none;
+}
+
+.anchor {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.pbx-menu {
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  z-index: 10;
+  width: 280px;
+  padding: 4px 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.pbx-menu .row {
+  display: flex;
+  align-items: center;
+}
+
+.pbx-menu .item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  text-align: left;
+}
+
+.pbx-menu .pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--icon);
+}
+
+.pbx-menu .pin .on {
+  color: var(--accent);
+  fill: currentColor;
+}
+
+.pbx-menu .item:hover:not(:disabled),
+.pbx-menu .pin:hover {
+  background: var(--accent-tint);
+}
+
+.pbx-menu .item:disabled {
+  opacity: 0.4;
+}
+
+.pbx-menu .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pbx-menu .empty {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--muted);
+}
+
+.pbx-menu .line {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+/* The prompt, over the window. */
+.cover {
+  position: fixed;
+  inset: 0;
+}
+
+.pbx-prompt {
+  width: 360px;
+  max-width: calc(100% - 32px);
+  padding: 20px;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: 13px/1.4 var(--sans);
+}
+
+.pbx-prompt::backdrop {
+  background: color-mix(in srgb, var(--bar) 70%, transparent);
+}
+
+.pbx-prompt .head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pbx-prompt h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pbx-prompt .version,
+.pbx-prompt .label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pbx-prompt p {
+  margin: 16px 0 0;
+}
+
+.pbx-prompt ul {
+  max-height: 168px;
+  margin: 8px 0 0;
+  padding: 4px 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  list-style: none;
+}
+
+.pbx-prompt li {
+  padding: 4px 12px;
+  overflow-wrap: anywhere;
+}
+
+.pbx-prompt .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+

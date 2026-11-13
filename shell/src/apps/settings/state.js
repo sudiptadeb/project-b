@@ -12,7 +12,6 @@ export const { mark, end, firstPaint, inputs } = channel.timeline;
 export const state = reactive({
   ready: false,
   windowColor: '',
-  frameWidth: 0,
   controls: { x: 0, y: 0, w: 0, h: 0 },
   tabLayout: 'vertical',
   // 'system', 'light' or 'dark', as Go's theme pref says.
@@ -45,7 +44,6 @@ export function connect() {
         case 'snapshot':
           Object.assign(state, {
             windowColor: m.windowColor,
-            frameWidth: m.frameWidth,
             controls: m.controls,
             tabLayout: m.tabLayout,
             theme: m.theme,

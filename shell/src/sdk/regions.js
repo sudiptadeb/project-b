@@ -23,6 +23,8 @@ const pages = new Map();
 let scheduled = false;
 let animations = 0;
 let last = '';
+// The band around the window's edge the shell wants, in CSS pixels: setFrame sets it.
+export let frame = 0;
 
 function rectOf(el) {
   const r = el.getBoundingClientRect();
@@ -75,6 +77,7 @@ function measure(always = false) {
     tabs: tabs(),
     viewW: window.innerWidth,
     viewH: window.innerHeight,
+    frame,
   };
   const json = JSON.stringify(layout);
   if (always || json !== last) {
@@ -151,6 +154,16 @@ export const page = {
     schedule();
   },
 };
+
+// setFrame asks the window for a band width px wide around its edge, or none for 0, as a
+// shell that never calls it has. The window draws it in the frame colour over the shell
+// and the pages, so the shell keeps its pages inside it; the width goes on the root as
+// --frame-width for the shell's own strips.
+export function setFrame(width) {
+  frame = width;
+  document.documentElement.style.setProperty('--frame-width', width + 'px');
+  schedule();
+}
 
 // measureNow sends the layout at once, when it changed. Asking for a tab's keyboard goes
 // after it, so the tab is already showing when it gets it.

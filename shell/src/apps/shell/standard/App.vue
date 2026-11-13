@@ -5,19 +5,19 @@ import Sidebar from './Sidebar.vue';
 import TabIcons from './TabIcons.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
-import { state } from '@/sdk/vue.js';
+import { setFrame, state } from '@/sdk/vue.js';
 import { phone, tabsOnTop, view } from './state.js';
 
 // Every layout shows the same tabs from the same state; only where they sit differs. On a
 // phone they are favicons under the toolbar, and the sidebar is a drawer over everything.
 
-// The frame's colour and width and the window's corner radius come from the managers
-// and become CSS variables on the root: the shell paints its bands in the colour and
-// width the window paints natively, so there is one source for both, and every other
-// tone of the shell derives from that colour. The curve over the corners is the window's
-// own border, drawn by the engine. Light or dark follows Go's theme pref.
+// The window draws a 4px band of the frame colour around its edge, and the shell paints
+// its own strips in that colour and width, as CSS variables on the root, so there is one
+// source for both; every other tone of the shell derives from that colour. The window's
+// corner radius comes from the managers. The curve over the corners is the window's own
+// border, drawn by the engine. Light or dark follows Go's theme pref.
+setFrame(4);
 watchEffect(() => {
-  document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
   document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');
 });
 </script>

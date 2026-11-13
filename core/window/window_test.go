@@ -51,11 +51,32 @@ var (
 	}
 )
 
-func TestTheFirstLayoutCarriesTheFrame(t *testing.T) {
+func TestTheFirstLayoutCarriesTheFrameColourAndNoBand(t *testing.T) {
 	e := &recorder{}
 	one(e)
-	if len(e.layouts) != 1 || e.last().FrameColor != "#4f9e9e" || e.last().FrameWidth != 4 || len(e.last().Regions) != 0 {
+	if len(e.layouts) != 1 || e.last().FrameColor != "#4f9e9e" || e.last().FrameWidth != 0 || len(e.last().Regions) != 0 {
 		t.Fatalf("layouts %+v", e.layouts)
+	}
+}
+
+// The band is the shell's: the window draws the width its shell asks for, none when it
+// asks for none, and keeps it while a shell that crashed or was switched loads again.
+func TestTheShellChoosesTheBand(t *testing.T) {
+	e := &recorder{}
+	m := one(e)
+	banded := report
+	banded.Frame = 4
+	m.HandleShellLayout(1, banded)
+	if e.last().FrameWidth != 4 {
+		t.Fatalf("asked for 4: %+v", e.last())
+	}
+	m.HandleShellCrashed(1)
+	if e.last().FrameWidth != 4 || len(e.last().Regions) != 0 {
+		t.Fatalf("after a crash: %+v", e.last())
+	}
+	m.HandleShellLayout(1, report)
+	if e.last().FrameWidth != 0 {
+		t.Fatalf("asked for none: %+v", e.last())
 	}
 }
 

@@ -7,7 +7,8 @@
 
   // The barest shell on the SDK, in Svelte: every control plain, with no design. The tabs
   // and New Tab, then a row of back, forward, reload, the address, the extensions and
-  // Settings, both in one bar whose gaps move the window; any notice; then the page.
+  // Settings, both in one bar whose gaps move the window; any notice; then the page, to
+  // the window's edge: it asks for no band.
   let address;
   // The tab last made active, so each change of it is seen once.
   let active = 0;
@@ -81,7 +82,7 @@
 {#if state.crashLog}
   <p use:shell>Project B crashed last time. The log is at {state.crashLog}. <button onclick={() => send({ t: 'dismissCrash' })}>Close</button></p>
 {/if}
-<main use:page={state.active} style:margin="0 {state.frameWidth}px {state.frameWidth}px"></main>
+<main use:page={state.active}></main>
 
 <style>
   :global(#app) {

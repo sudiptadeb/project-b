@@ -221,6 +221,22 @@ func TestStaleNavigationDoesNotCommit(t *testing.T) {
 	}
 }
 
+// The window has no band until its shell asks for one, and then the one it asked for.
+func TestTheShellsLayoutSetsTheBand(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if _, ok := m["frameWidth"]; ok || r.e.Layout(1).FrameWidth != 0 {
+		t.Fatalf("before the shell asked: snapshot %v, engine %v", m["frameWidth"], r.e.Layout(1).FrameWidth)
+	}
+	r.shell(`{"t":"layout","shell":[],"drag":[],"tabs":[{"tab":1,"rect":{"x":4,"y":48,"w":792,"h":548}}],"viewW":800,"viewH":600,"frame":4}`)
+	r.e.Settle()
+	if r.e.Layout(1).FrameWidth != 4 {
+		t.Fatalf("asked for 4: %+v", r.e.Layout(1))
+	}
+}
+
 func TestShellRegionsDecideTheHitTest(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
@@ -352,8 +368,8 @@ func TestSnapshotCarriesTheWindowControls(t *testing.T) {
 	if m["cornerRadius"] != mockengine.CornerRadius {
 		t.Fatalf("cornerRadius = %v", m["cornerRadius"])
 	}
-	if m["windowColor"] != "#4f9e9e" || r.e.Layout(1).FrameColor != "#4f9e9e" || m["frameWidth"] != 4.0 || r.e.Layout(1).FrameWidth != 4 {
-		t.Fatalf("window frame: shell %v %v, engine %v %v", m["windowColor"], m["frameWidth"], r.e.Layout(1).FrameColor, r.e.Layout(1).FrameWidth)
+	if m["windowColor"] != "#4f9e9e" || r.e.Layout(1).FrameColor != "#4f9e9e" {
+		t.Fatalf("frame colour: shell %v, engine %v", m["windowColor"], r.e.Layout(1).FrameColor)
 	}
 
 	r.e.Fire(1, 0, "fullscreen", "")

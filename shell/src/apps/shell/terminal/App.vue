@@ -1,17 +1,16 @@
 <script setup>
-import { watch, watchEffect } from 'vue';
+import { watch } from 'vue';
 import PaneTree from './PaneTree.vue';
 import PromptLine from './PromptLine.vue';
 import TopStrip from './TopStrip.vue';
-import { connect, state } from '@/sdk/vue.js';
+import { connect, setFrame, state } from '@/sdk/vue.js';
 import { follow, load, shown } from './panes.js';
 import { prompt } from './prompt.js';
 
 // A terminal's window: a strip of groups on top, the shown group's panes in the body, and
-// a prompt line at the foot that is the active pane's address bar.
-watchEffect(() => {
-  document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
-});
+// a prompt line at the foot that is the active pane's address bar, inside the window's
+// 4px band.
+setFrame(4);
 
 connect({
   snapshot: () => load(state.data),

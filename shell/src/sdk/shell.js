@@ -7,9 +7,10 @@
 import { shown } from '@/keys.js';
 import { paintTheme } from '@/theme.js';
 import { channel, send } from './channel.js';
-import { measureNow, reportLayout } from './regions.js';
+import { frame, measureNow, reportLayout } from './regions.js';
 
 export { send };
+export { setFrame } from './regions.js';
 
 const { mark, end, painted, firstPaint, inputs } = channel.timeline;
 
@@ -32,10 +33,9 @@ export const state = {
   controls: { x: 0, y: 0, w: 0, h: 0 },
   // The radius the OS rounds the window's corners with, in CSS pixels. 0 in full screen.
   cornerRadius: 0,
-  // The frame the window paints natively; a shell paints its own bands with the same
-  // colour and width.
+  // The frame colour the window paints natively, and a band of it around its edge when
+  // the shell asks for one (setFrame); a shell paints its own strips with the same colour.
   windowColor: '',
-  frameWidth: 0,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
   // with the release's version and, when it failed, why; and how a check the user asked
   // for went.
@@ -152,10 +152,9 @@ export function keyLabel(s, action) {
 }
 
 // How much room each end of the top row leaves: the native window controls' space on
-// whichever side they are, counted from inside the 4px window frame, and 8px, the same
-// gap the controls get, on an end without them.
+// whichever side they are, counted from inside the band the shell asked for, and 8px, the
+// same gap the controls get, on an end without them.
 export function controlSpace(s) {
-  const frame = 4;
   const c = s.controls;
   if (c.w <= 0) return { left: '8px', right: '8px' };
   const onLeft = c.x + c.w / 2 < window.innerWidth / 2;

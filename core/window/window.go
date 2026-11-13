@@ -12,8 +12,8 @@ import (
 
 // ShellLayout is what the shell reports about itself: the rectangles that are its own,
 // the bars and empty spaces in the top row that drag the window, the controls inside
-// those that stay the shell's, the tabs it shows and where, and the window size it
-// measured against.
+// those that stay the shell's, the tabs it shows and where, the window size it measured
+// against, and the band it wants around the window's edge.
 type ShellLayout struct {
 	Shell    []engine.Rect       `json:"shell"`
 	Controls []engine.Rect       `json:"controls"`
@@ -21,19 +21,21 @@ type ShellLayout struct {
 	Tabs     []engine.VisibleTab `json:"tabs"`
 	ViewW    float64             `json:"viewW"`
 	ViewH    float64             `json:"viewH"`
+	// Frame is the band's width in CSS pixels, 0 for none. The window draws it in the
+	// frame colour over the shell and the pages, so a shell keeps its pages inside it.
+	Frame float64 `json:"frame"`
 }
 
 // Manager owns the windows.
 type Manager struct {
-	eng        engine.Engine
-	page       engine.Page
-	color      string
-	theme      engine.Theme
-	frameWidth float64
-	windows    map[engine.WindowID]*window
-	onChanged  []func(engine.WindowID, engine.Rect, float64)
-	onColor    []func(string)
-	onEvent    []func(Event)
+	eng       engine.Engine
+	page      engine.Page
+	color     string
+	theme     engine.Theme
+	windows   map[engine.WindowID]*window
+	onChanged []func(engine.WindowID, engine.Rect, float64)
+	onColor   []func(string)
+	onEvent   []func(Event)
 	// front says which window is in front, which the tabs manager keeps.
 	front func() engine.WindowID
 }
@@ -47,15 +49,15 @@ type window struct {
 }
 
 // New returns a manager with no windows. Every window it opens is covered by page and
-// has the frame, color, "#rrggbb", 4px wide, and the theme. front says which window is in
+// has the frame colour, color, "#rrggbb", and the theme. front says which window is in
 // front.
 func New(eng engine.Engine, page engine.Page, color string, theme engine.Theme, front func() engine.WindowID) *Manager {
-	return &Manager{eng: eng, page: page, color: color, theme: theme, frameWidth: 4, windows: map[engine.WindowID]*window{}, front: front}
+	return &Manager{eng: eng, page: page, color: color, theme: theme, windows: map[engine.WindowID]*window{}, front: front}
 }
 
 // Open makes window id, a little down and right of window near, or where a first window
-// goes when near is 0. Its first layout carries the frame. The engine reports its state
-// after it starts.
+// goes when near is 0. Its first layout carries the frame colour, and no band until its
+// shell asks for one. The engine reports its state after it starts.
 func (m *Manager) Open(id, near engine.WindowID) {
 	w := &window{}
 	m.windows[id] = w
@@ -86,7 +88,7 @@ func (m *Manager) layout(w *window) engine.WindowLayout {
 		ViewH:      w.shell.ViewH,
 		Tabs:       w.shell.Tabs,
 		FrameColor: m.color,
-		FrameWidth: m.frameWidth,
+		FrameWidth: w.shell.Frame,
 		Theme:      m.theme,
 	}
 	for _, r := range w.shell.Controls {
@@ -130,7 +132,8 @@ func (m *Manager) HandleShellLayout(id engine.WindowID, l ShellLayout) {
 }
 
 // HandleShellCrashed drops what the dead shell claimed, so the pages take every press
-// until the reloaded shell reports again. The pages stay where they were.
+// until the reloaded shell reports again. The pages stay where they were, and the band
+// as it was.
 func (m *Manager) HandleShellCrashed(id engine.WindowID) {
 	w := m.windows[id]
 	w.shell.Shell = nil
@@ -202,10 +205,6 @@ func (m *Manager) SetTheme(t engine.Theme) {
 	m.theme = t
 	m.updateAll()
 }
-
-// FrameWidth is the width of the frame band, in CSS pixels, for the windows and the
-// shells alike.
-func (m *Manager) FrameWidth() float64 { return m.frameWidth }
 
 // Controls returns where a window's native controls are. Empty when there are none.
 func (m *Manager) Controls(id engine.WindowID) engine.Rect { return m.windows[id].state.Controls }

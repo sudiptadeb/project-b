@@ -1,8 +1,9 @@
 <script setup>
 import { ref } from 'vue';
-import { connect, controlSpace, send, state, tabLabel } from '@/sdk/vue.js';
+import { connect, controlSpace, send, setFrame, state, tabLabel } from '@/sdk/vue.js';
 import { ExtensionsToolbar } from '@extensions';
 
+setFrame(4);
 const address = ref(null);
 connect({ focusAddressBar: () => address.value.focus() });
 </script>
@@ -20,12 +21,12 @@ connect({ focusAddressBar: () => address.value.focus() });
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />
     <button @click="send({ t: 'run', text: 'app.settings' })">Settings</button>
   </header>
-  <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>
+  <main v-page="state.active"></main>
 </template>
 
 <style>
 #app { display: flex; flex-direction: column; }
 header { display: flex; align-items: center; gap: 4px; height: 44px; padding-right: 8px; background: var(--bar); color: var(--text); }
 input { flex: 1; }
-main { flex: 1; }
+main { flex: 1; margin: 0 var(--frame-width) var(--frame-width); }
 </style>

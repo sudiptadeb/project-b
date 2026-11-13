@@ -137,7 +137,6 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		snapshot := map[string]any{
 			"t":            "snapshot",
 			"windowColor":  m.window.Color(),
-			"frameWidth":   m.window.FrameWidth(),
 			"controls":     m.window.Controls(w),
 			"cornerRadius": m.window.CornerRadius(w),
 			"tabLayout":    m.prefs.TabLayout(),

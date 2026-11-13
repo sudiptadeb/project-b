@@ -1,17 +1,14 @@
 <script setup>
-import { watchEffect } from 'vue';
 import CrashBar from './CrashBar.vue';
 import NavBar from './NavBar.vue';
 import TabStrip from './TabStrip.vue';
 import UpdateBar from './UpdateBar.vue';
-import { state } from '@/sdk/vue.js';
+import { setFrame, state } from '@/sdk/vue.js';
 
-// The tabs on top, the navigation bar under them, any notice under that, then the page.
-// The frame's sides and foot are strips of their own, so nothing is painted under the
-// page: it shows through the hole.
-watchEffect(() => {
-  document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
-});
+// The tabs on top, the navigation bar under them, any notice under that, then the page,
+// inside the window's 4px band. The frame's sides and foot are strips of their own, so
+// nothing is painted under the page: it shows through the hole.
+setFrame(4);
 </script>
 
 <template>

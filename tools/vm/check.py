@@ -659,7 +659,7 @@ def window_checks():
         guest("/usr/bin/killall", "project_b")
 
 
-MOVE = "/tmp/pb-move"  # In the guest: the driver's pipe and output, and a profile, for move_checks.
+MOVED = "/tmp/pb-move"  # In the guest: the driver's pipe and output, and a profile, for move_checks.
 ALPHA_RGB = (43, 108, 176)  # alpha.html's colour.
 
 
@@ -667,7 +667,7 @@ def move_checks():
     """A tab moved to the other window arrives there still showing its page. The move is
     Go's, asked for through the driver's own DevTools command, ProjectB.moveTab."""
     guest("/usr/bin/killall", "project_b")
-    ask = driven(MOVE, f"{MOVE}/profile")
+    ask = driven(MOVED, f"{MOVED}/profile")
     window_or_stop("the app starts with one window")
     go_to(ALPHA)
     until(titles, lambda t: t == ["Alpha"])

@@ -1,7 +1,8 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { comboOf, shown } from '@/keys.js';
 import Dialog from '@/ui/Dialog.vue';
+import { pushEscape } from '@/ui/escape.js';
 import { send, state } from './state.js';
 
 // Every action by menu, with its keys on this platform. The list only shows; clicking an
@@ -73,39 +74,139 @@ const titleOf = (id) => {
 const open = ref('');
 function toggle(id) {
   stopRecording();
+  taken.value = null;
   open.value = open.value === id ? '' : id;
 }
 
+// Going to another action, from a clash or the notice: its editor opens, and its row
+// scrolls into view and takes focus.
+async function goTo(id) {
+  stopRecording();
+  taken.value = null;
+  open.value = id;
+  await nextTick();
+  const row = document.getElementById('action-' + id);
+  row?.scrollIntoView({ block: 'center' });
+  row?.focus({ preventScroll: true });
+}
+
 // Recording a new key: Go runs nothing while it lasts, so every key reaches this page.
+// A key the action has, or one with no modifier, is refused in the row and recording
+// goes on; a key another action has asks there whether to take it from that action.
 const recording = ref(false);
-const recorder = ref(null);
+const recordError = ref('');
+const taken = ref(null);
+let recorder = null;
+let addButton = null;
 
 async function record() {
+  recordError.value = '';
   recording.value = true;
   send({ t: 'recording', on: true });
   await nextTick();
-  recorder.value?.[0]?.focus();
+  recorder?.focus();
 }
 
 function stopRecording() {
   if (!recording.value) return;
   recording.value = false;
+  recordError.value = '';
   send({ t: 'recording', on: false });
 }
 
-function onRecordKey(e, action) {
+// Escape, Cancel and a key added all end at Add key, so the keyboard stays in the editor.
+async function backToAdd() {
+  stopRecording();
+  taken.value = null;
+  await nextTick();
+  addButton?.focus();
+}
+
+// While a key is being recorded or a taken key asks its question, Escape ends that and
+// leaves the editor open.
+let popRecording = null;
+watch(
+  () => recording.value || !!taken.value,
+  (on) => {
+    if (on && !popRecording) popRecording = pushEscape(backToAdd);
+    if (!on && popRecording) {
+      popRecording();
+      popRecording = null;
+    }
+  },
+);
+
+// The modifiers in the one order, and the key, so keys written two ways compare equal.
+const modOrder = ['Ctrl', 'Alt', 'Shift', 'Cmd'];
+const modAlias = { Option: 'Alt', Win: 'Cmd' };
+function same(keys) {
+  const parts = keys.split('+');
+  const key = parts.pop().toUpperCase();
+  const mods = parts.map((p) => modAlias[p] || p);
+  return modOrder.filter((m) => mods.includes(m)).concat(key).join('+');
+}
+
+// The action that has a key and the binding, preferring the one that wins it.
+function ownerOf(text) {
+  let found = null;
+  for (const g of kb.value.groups) {
+    for (const a of g.actions) {
+      for (const k of a.keys) {
+        if (same(k.keys) !== text) continue;
+        if (!found || (found.key.clash && !k.clash)) found = { action: a, key: k };
+      }
+    }
+  }
+  return found;
+}
+
+const modifierHint = computed(() => (platform.value === 'mac' ? 'Hold ⌘, ⌃ or ⌥ with it' : 'Hold Ctrl or Alt with it'));
+
+async function onRecordKey(e, action) {
+  // Tab still moves on, which ends recording.
+  if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) return;
   e.preventDefault();
   e.stopPropagation();
-  if (e.key === 'Escape') {
-    stopRecording();
-    return;
-  }
   const combo = comboOf(e, platform.value);
   if (!combo) return;
+  // F keys are fine alone, as the templates' F5, F6 and F11 are; anything else needs a
+  // modifier other than Shift, or it would only type.
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !/^F[0-9]+$/.test(combo.split('+').pop())) {
+    recordError.value = modifierHint.value;
+    return;
+  }
+  const text = same(combo);
+  if (action.keys.some((k) => same(k.keys) === text)) {
+    recordError.value = `${action.title} already has ${shown(combo, platform.value)}`;
+    return;
+  }
+  const owner = ownerOf(text);
+  if (owner) {
+    stopRecording();
+    taken.value = { combo, action: owner.action, key: owner.key };
+    await nextTick();
+    document.getElementById('taken-answer')?.focus();
+    return;
+  }
+  addKey(action, combo);
+  backToAdd();
+}
+
+function addKey(action, combo) {
   const reserve = action.keys.find((k) => !k.locked)?.reserve || 'page';
   send({ t: 'addKey', id: action.id, text: combo, reserve });
-  stopRecording();
 }
+
+// Replace takes the key from the action that has it and gives it to this one.
+function replace(action) {
+  const t = taken.value;
+  send({ t: 'removeKey', id: t.action.id, index: t.key.index });
+  addKey(action, t.combo);
+  backToAdd();
+}
+
+// A key another action has can be taken from it unless it is locked or set in macOS.
+const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 </script>
 
 <template>
@@ -145,7 +246,7 @@ function onRecordKey(e, action) {
       <h2>{{ g.title }}</h2>
       <div class="card">
         <template v-for="a in g.actions" :key="a.id">
-          <button type="button" class="action" :aria-expanded="open === a.id" @click="toggle(a.id)">
+          <button :id="'action-' + a.id" type="button" class="action" :aria-expanded="open === a.id" @click="toggle(a.id)">
             <span class="name">
               {{ a.title }}
               <span v-if="a.hidden" class="tag">Hidden</span>
@@ -182,18 +283,31 @@ function onRecordKey(e, action) {
                 @click="send({ t: 'removeKey', id: a.id, index: k.index })"
               >Remove</button>
             </div>
-            <div class="key-row">
-              <input
-                v-if="recording"
-                ref="recorder"
-                class="recorder"
-                readonly
-                :aria-label="`New key for ${a.title}`"
-                placeholder="Press keys"
-                @keydown="onRecordKey($event, a)"
-                @blur="stopRecording"
-              />
-              <button v-else type="button" class="text-button" @click="record">Add key</button>
+            <div v-if="taken" class="key-row">
+              <span class="taken">
+                {{ shown(taken.combo, platform) }} is
+                <button type="button" class="link" @click="goTo(taken.action.id)">{{ taken.action.title }}</button>'s
+              </span>
+              <span class="spacer"></span>
+              <button v-if="replaceable(taken)" id="taken-answer" type="button" class="text-button" @click="replace(a)">Replace</button>
+              <button :id="replaceable(taken) ? undefined : 'taken-answer'" type="button" class="text-button" @click="backToAdd">Cancel</button>
+            </div>
+            <div v-else class="key-row">
+              <template v-if="recording">
+                <input
+                  :ref="(el) => (recorder = el)"
+                  class="field recorder"
+                  readonly
+                  :aria-label="`New key for ${a.title}`"
+                  :aria-invalid="recordError ? 'true' : undefined"
+                  :aria-describedby="recordError ? 'record-error' : undefined"
+                  placeholder="Press keys"
+                  @keydown="onRecordKey($event, a)"
+                  @blur="stopRecording"
+                />
+                <span v-if="recordError" id="record-error" class="field-error" role="alert">{{ recordError }}</span>
+              </template>
+              <button v-else :ref="(el) => (addButton = el)" type="button" class="text-button" @click="record">Add key</button>
               <span class="spacer"></span>
               <label class="menu-switch">
                 In menu
@@ -341,18 +455,39 @@ kbd.clash {
   font-size: 13px;
 }
 
+/* The recorder is a field that shows it is listening: always ringed while it lasts. */
 .recorder {
-  width: 130px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--surface);
-  color: inherit;
+  width: 128px;
+  box-shadow: var(--focus-ring);
+  caret-color: transparent;
+}
+
+.key-row .field-error {
+  margin-top: 0;
+}
+
+.taken {
+  min-width: 0;
+}
+
+/* A link to another action, in running text. */
+.link {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--accent);
   font: inherit;
-  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 .sub {

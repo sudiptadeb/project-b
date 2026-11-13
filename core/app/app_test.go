@@ -1048,6 +1048,54 @@ func TestTheSettingsPageMakesAndRenamesWorkspaces(t *testing.T) {
 	}
 }
 
+// The section's dialog edits a workspace's name and colour in one message, a name another
+// has is refused whole, and Move up and Move down reorder the list for the Tab menu too.
+// The page has the number of tabs open in each workspace, and hears it again when a tab
+// opens or closes in one.
+func TestTheSettingsPageEditsMovesAndCountsWorkspaces(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	var work, shop string
+	r.e.Post(func() {
+		w, _ := r.a.Workspaces.Create("Work", "#5b7fd6")
+		s, _ := r.a.Workspaces.Create("Shopping", "#c2410c")
+		work, shop = w.ID, s.ID
+	})
+	r.e.Settle()
+	got, snap := r.openSettings()
+	if c, ok := snap["workspaceTabs"].(map[string]any); !ok || len(c) != 0 {
+		t.Fatalf("the snapshot's counts: %v", snap["workspaceTabs"])
+	}
+	r.settings(`{"t":"editWorkspace","id":"` + work + `","text":"shopping","color":"#2f9e44"}`)
+	r.settings(`{"t":"editWorkspace","id":"` + work + `","text":"Office","color":"#2f9e44"}`)
+	r.settings(`{"t":"moveWorkspace","id":"` + shop + `","by":-1}`)
+	r.waitOn(got, func(m map[string]any) bool {
+		return m["t"] == "workspaces" && m["workspaces"].([]any)[0].(map[string]any)["id"] == shop
+	})
+	l := workspaces.New(dir).List()
+	if len(l) != 2 || l[0].ID != shop || l[1].ID != work || l[1].Name != "Office" || l[1].Color != "#2f9e44" {
+		t.Fatalf("the profile's list holds %+v", l)
+	}
+	var items engine.Menu
+	r.e.Post(func() { items = r.a.MenuList("workspaces") })
+	r.e.Settle()
+	if len(items) != 2 || items[0].Title != "Shopping" || items[1].Title != "Office" {
+		t.Fatalf("the Tab menu's list holds %+v", items)
+	}
+	var tab engine.TabID
+	r.e.Post(func() { tab = r.a.Tabs.CreateIn(r.a.Tabs.Front(), work) })
+	m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaceTabs" })
+	if c := m["workspaceTabs"].(map[string]any); len(c) != 1 || c[work] != float64(1) {
+		t.Fatalf("after a tab opened in Office the page heard %v", m)
+	}
+	r.e.Post(func() { r.a.Tabs.Close(tab) })
+	m = r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaceTabs" })
+	if c := m["workspaceTabs"].(map[string]any); len(c) != 0 {
+		t.Fatalf("after it closed the page heard %v", m)
+	}
+}
+
 // View, Shell lists the shells the user can choose, with a tick on the one in use. Choosing
 // another makes it the profile's and loads it in the window, which hears nothing until it
 // says it's ready; what the old shell claimed of the window goes, and the tab stays shown.

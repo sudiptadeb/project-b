@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"maps"
 
 	"projectb/commands"
 	"projectb/engine"
@@ -42,15 +43,28 @@ type workspaceCommand struct {
 	ID    string `json:"id"`
 	Text  string `json:"text"`
 	Color string `json:"color"`
+	By    int    `json:"by"`
 }
 
-// workspaceSettingsPart is the settings page's Workspaces section: the list, New Workspace
-// with a name and a colour, and rename. Every copy has it, a copy on a folder named
+// workspaceSettingsPart is the settings page's Workspaces section: the list, each with the
+// number of tabs open in it, New workspace with a name and a colour, editing one's name and
+// colour, and moving one up or down the list. Every copy has it, a copy on a folder named
 // outright too, since the list is the profile folder's. The pages hear the list again
-// through its OnChanged, as the shells do.
+// through its OnChanged, as the shells do, and the counts again when a tab opens or closes
+// and they differ.
 func (a *App) workspaceSettingsPart() settings.Part {
+	counts := a.workspaceTabs()
+	a.Tabs.OnListChanged(func() {
+		if now := a.workspaceTabs(); !maps.Equal(now, counts) {
+			counts = now
+			a.Settings.Send(map[string]any{"t": "workspaceTabs", "workspaceTabs": counts})
+		}
+	})
 	return settings.Part{
-		Snapshot: func(into map[string]any) { into["workspaces"] = a.Workspaces.List() },
+		Snapshot: func(into map[string]any) {
+			into["workspaces"] = a.Workspaces.List()
+			into["workspaceTabs"] = counts
+		},
 		Handle: func(w engine.WindowID, t string, msg []byte) bool {
 			var c workspaceCommand
 			json.Unmarshal(msg, &c)
@@ -60,6 +74,14 @@ func (a *App) workspaceSettingsPart() settings.Part {
 				_, err = a.Workspaces.Create(c.Text, c.Color)
 			case "renameWorkspace":
 				err = a.Workspaces.SetName(c.ID, c.Text)
+			// The page's dialog sends a workspace's name and colour together. The name goes
+			// first, so a name refused changes nothing.
+			case "editWorkspace":
+				if err = a.Workspaces.SetName(c.ID, c.Text); err == nil {
+					err = a.Workspaces.SetColor(c.ID, c.Color)
+				}
+			case "moveWorkspace":
+				err = a.Workspaces.Move(c.ID, c.By)
 			default:
 				return false
 			}
@@ -69,4 +91,16 @@ func (a *App) workspaceSettingsPart() settings.Part {
 			return true
 		},
 	}
+}
+
+// workspaceTabs counts the tabs open in each workspace, by its id, in every window. A
+// workspace with none isn't in it, nor is the default.
+func (a *App) workspaceTabs() map[string]int {
+	counts := map[string]int{}
+	for _, t := range a.Tabs.All() {
+		if t.Workspace != "" {
+			counts[t.Workspace]++
+		}
+	}
+	return counts
 }

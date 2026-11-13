@@ -190,7 +190,7 @@ func init() {
 		if w == a.tabs.Front() {
 			id = a.tabs.OpenIn(u, p.Active == nil || *p.Active)
 		} else {
-			id = a.tabs.CreateIn(w)
+			id = a.tabs.CreateIn(w, "")
 			a.tabs.Load(id, u)
 		}
 		t, _ := a.tabs.Get(id)

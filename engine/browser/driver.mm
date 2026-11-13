@@ -574,11 +574,16 @@ void Run(const std::string& line) {
   } else if (cmd == "menu") {
     Reply(id, MenuJson(NSApp.mainMenu));
   } else if (cmd == "choosemenu") {
-    // "choosemenu <menu> <item>": chooses the item, as a click on it does, its menu read
-    // as it opens.
+    // "choosemenu <menu> <item>": chooses the item, as a click on it does, each menu read
+    // as it opens. An item in a submenu is "<submenu> > <item>".
     NSMenu* menu = [NSApp.mainMenu itemWithTitle:base::SysUTF8ToNSString(parts[2])].submenu;
-    [menu.delegate menuNeedsUpdate:menu];
-    NSMenuItem* item = [menu itemWithTitle:base::SysUTF8ToNSString(rest(3))];
+    NSMenuItem* item = nil;
+    for (const std::string& title : base::SplitStringUsingSubstr(
+             rest(3), " > ", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+      [menu.delegate menuNeedsUpdate:menu];
+      item = [menu itemWithTitle:base::SysUTF8ToNSString(title)];
+      menu = item.submenu;
+    }
     [NSApp sendAction:item.action to:item.target from:item];
     Reply(id, item ? "ok" : "no such item");
   } else if (cmd == "dockdot") {

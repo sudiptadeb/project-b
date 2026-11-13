@@ -18,7 +18,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
     python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
     python3 tools/drive_first_app.py picker     # only the picker
-    python3 tools/drive_first_app.py workspaces # only workspaces' storage, apart from each other
+    python3 tools/drive_first_app.py workspaces # only workspaces: their storage, and New Tab in Workspace
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -1600,6 +1600,37 @@ def workspace_checks():
     app.close()
 
 
+def tabs_of(app):
+    """Go's tabs and the active one, as ProjectB.getTabs answers."""
+    return json.loads(app.cmd("projectb", "getTabs", "{}"))["result"]
+
+
+def workspace_menu_checks():
+    """Tab, New Tab in Workspace lists the profile's workspaces from their list in its
+    folder, and choosing one opens a new tab in that workspace in the window in front. With
+    no workspaces it is disabled."""
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    app = App(profile)
+    item = lambda: next(i for m in json.loads(app.cmd("menu")) if m["title"] == "Tab" for i in m["items"] if i != "-" and i["title"] == "New Tab in Workspace")
+    check("with no workspaces, Tab, New Tab in Workspace is disabled and empty", not item()["enabled"] and item()["items"] == [], item())
+    app.close()
+    with open(os.path.join(profile, "workspaces.json"), "w") as f:
+        json.dump({"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}, {"id": "4e5f6a7b", "name": "Shopping", "color": "#c2410c"}]}, f)
+    app = App(profile)
+    check("it lists the profile's workspaces by name", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Work", "Shopping"], item())
+    check("choosing one works", app.cmd("choosemenu", "Tab", "New Tab in Workspace > Shopping") == "ok")
+    app.wait(f"{ROWS}===2")
+    tabs = tabs_of(app)
+    shopping = next(t for t in tabs["tabs"] if t["id"] == tabs["active"])
+    check("it opens a new tab, the active one, which Go has in that workspace", shopping["id"] != 1 and shopping.get("workspace") == "4e5f6a7b", tabs)
+    app.js(f"location.href={json.dumps(STORE)}", tab=shopping["id"])
+    app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=shopping["id"])
+    app.js("document.cookie='w=shopping; max-age=3600'", tab=shopping["id"])
+    check("and the engine has it there: its cookie is that workspace's and not another's",
+          stored(app, open_in(app, "4e5f6a7b", STORE))[0] == "w=shopping" and stored(app, open_in(app, "0a1b2c3d", STORE))[0] == "", tabs_of(app))
+    app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1616,5 +1647,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks]))

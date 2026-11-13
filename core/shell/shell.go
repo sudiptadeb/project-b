@@ -145,7 +145,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "reload":
 		m.tabs.Reload()
 	case "newTab":
-		m.Interaction(w, "tab.new", func() { m.tabs.CreateIn(w) })
+		m.Interaction(w, "tab.new", func() { m.tabs.CreateIn(w, "") })
 	case "closeTab":
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":

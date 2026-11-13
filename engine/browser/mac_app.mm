@@ -104,7 +104,9 @@
 @end
 
 // Fills a menu's lists each time it opens, with their items as Go has them then. A list
-// sits in the menu as a hidden placeholder naming it; its items follow it.
+// sits in the menu as a hidden placeholder naming it; its items follow it. A submenu that
+// holds a list is filled when the menu holding it opens too, and shows disabled there
+// while it has nothing in it.
 @interface PBMenuLists : NSObject <NSMenuDelegate>
 @end
 
@@ -210,7 +212,7 @@ NSMenu* BuildMenu(NSString* title, const base::ListValue& items) {
   for (const base::Value& item : items) {
     if (item.is_dict()) {
       NSMenuItem* built = BuildItem(item.GetDict());
-      if (built.tag == kListTag) {
+      if (built.tag == kListTag || built.submenu.delegate == Lists()) {
         menu.delegate = Lists();
       }
       [menu addItem:built];
@@ -423,6 +425,17 @@ void WatchOSKeyBindings() {
       built.tag = project_b::kListItemTag;
       [menu insertItem:built atIndex:at++];
     }
+  }
+  for (NSMenuItem* item in menu.itemArray) {
+    if (item.submenu.delegate != self) {
+      continue;
+    }
+    [self menuNeedsUpdate:item.submenu];
+    item.enabled = [item.submenu.itemArray
+                       indexOfObjectPassingTest:^BOOL(NSMenuItem* shown, NSUInteger,
+                                                      BOOL*) {
+                         return !shown.hidden;
+                       }] != NSNotFound;
   }
 }
 

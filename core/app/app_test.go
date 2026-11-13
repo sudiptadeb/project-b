@@ -19,6 +19,7 @@ import (
 	"projectb/timeline"
 	"projectb/update"
 	"projectb/window"
+	"projectb/workspaces"
 )
 
 // rig runs the real managers on the mock engine, as the dev server does.
@@ -904,5 +905,52 @@ func TestTheProfilesMenuAndTheProfilesColour(t *testing.T) {
 	e.Settle()
 	if p, _, _ := list.Get(c.ID); e.DockColor() != "#3470d0" || p.Color != "#3470d0" {
 		t.Fatalf("the Dock shows %q and the list %q", e.DockColor(), p.Color)
+	}
+}
+
+// Tab, New Tab in Workspace lists the profile's workspaces, read as the menu opens, and
+// choosing one opens a new tab in it in the window in front: Go and the engine have the tab
+// there, a tab its page opens is there too, and its visits go into the profile's one
+// history, as every tab's do.
+func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var items engine.Menu
+	r.e.Post(func() { items = r.a.MenuList("workspaces") })
+	r.e.Settle()
+	if len(items) != 0 {
+		t.Fatalf("a new profile's list holds %+v", items)
+	}
+	var work workspaces.Workspace
+	r.e.Post(func() {
+		work, _ = r.a.Workspaces.Create("Work", "#5b7fd6")
+		items = r.a.MenuList("workspaces")
+	})
+	r.e.Settle()
+	if len(items) != 1 || items[0].Title != "Work" || items[0].Action != "workspaces:"+work.ID {
+		t.Fatalf("the list holds %+v", items)
+	}
+	r.e.Post(func() { r.a.MenuChosen(items[0].Action) })
+	m := r.waitFor(isTabs(2))
+	tab := m["tabs"].([]any)[1].(map[string]any)
+	id := engine.TabID(tab["id"].(float64))
+	var in string
+	r.e.Post(func() { in = r.e.Workspace(id) })
+	r.e.Settle()
+	if m["active"] != tab["id"] || tab["workspace"] != work.ID || in != work.ID {
+		t.Fatalf("the new tab %v, active %v, is in %q in the engine", tab, m["active"], in)
+	}
+	r.show(tab["id"].(float64))
+	r.visit("https://work.test/")
+	r.e.Fire(1, "open", "https://work.test/more")
+	m = r.waitFor(isTabs(3))
+	if opened := m["tabs"].([]any)[2].(map[string]any); opened["workspace"] != work.ID {
+		t.Fatalf("the tab its page opened is %v", opened)
+	}
+	r.waitForTab(func(t map[string]any) bool {
+		return t["url"] == "https://work.test/more" && strings.HasPrefix(t["title"].(string), "Mock")
+	})
+	if items := r.suggestions("work"); len(items) != 2 {
+		t.Fatal("a visit in a workspace isn't in the history")
 	}
 }

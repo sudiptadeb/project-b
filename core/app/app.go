@@ -19,6 +19,7 @@ import (
 	"projectb/timeline"
 	"projectb/update"
 	"projectb/window"
+	"projectb/workspaces"
 )
 
 // Config is what the app needs to start.
@@ -48,6 +49,8 @@ type App struct {
 	Shell    *shell.Manager
 	Commands *commands.Manager
 	Settings *settings.Manager
+	// Workspaces is the profile's list of workspaces, beside its prefs.
+	Workspaces *workspaces.Manager
 
 	actions []*commands.Action
 	// keyIn is which page had the keyboard at the last key press.
@@ -72,6 +75,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Suggest = suggest.New(a.History)
 	a.Tabs = tabs.New(e)
 	a.Prefs = prefs.New(cfg.ProfileDir)
+	a.Workspaces = workspaces.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
 	a.Window = window.New(e, engine.PageShell, a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
@@ -81,6 +85,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Update = update.New(cfg.Update, e.Post, a.quit)
 	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
 	a.Commands.RegisterList(a.profileList(cfg))
+	a.Commands.RegisterList(a.workspaceList())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
@@ -132,7 +137,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	}
 
 	a.History.Load(nil)
-	a.Tabs.CreateIn(first)
+	a.Tabs.CreateIn(first, "")
 	a.Update.Start()
 	return a
 }
@@ -174,7 +179,7 @@ func (a *App) openWindow() engine.WindowID {
 func (a *App) NewWindow(u string) (engine.WindowID, engine.TabID) {
 	w := a.openWindow()
 	if u == "" {
-		return w, a.Tabs.CreateIn(w)
+		return w, a.Tabs.CreateIn(w, "")
 	}
 	// The new window is in front, where OpenIn opens.
 	return w, a.Tabs.OpenIn(u, true)
@@ -238,7 +243,7 @@ func (a *App) TabOpened(opener, tab engine.TabID, url, workspace string, foregro
 	if newWindow {
 		a.openWindow()
 	}
-	a.Tabs.HandleTabOpened(opener, tab, url, foreground)
+	a.Tabs.HandleTabOpened(opener, tab, url, workspace, foreground)
 }
 
 func (a *App) TabFocused(tab engine.TabID) { a.Tabs.HandleTabFocused(tab) }

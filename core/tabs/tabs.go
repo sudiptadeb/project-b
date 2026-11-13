@@ -1,6 +1,6 @@
 // Package tabs owns the windows and the tabs: which windows exist, which is in front,
-// each one's tabs in order and which of them is active, and each tab's state. Tab state
-// changes only through this manager. A window's active tab is the one the user acts on
+// each one's tabs in order and which of them is active, and each tab's state, the
+// workspace it is in among it. Tab state changes only through this manager. A window's active tab is the one the user acts on
 // there: its shell shows it and gives it the keyboard, and says where it put it in its
 // layout, which shows it. Commands act on the active tab of the window in front. A tab
 // keeps its id for its life.
@@ -17,10 +17,13 @@ import (
 
 // Tab is a copy of one tab's state. Subscribers can keep it.
 type Tab struct {
-	ID      engine.TabID `json:"id"`
-	URL     string       `json:"url"`
-	Title   string       `json:"title"`
-	Loading bool         `json:"loading"`
+	ID engine.TabID `json:"id"`
+	// Workspace is the id of the workspace the tab is in, or "" for the default. It is
+	// given when the tab is made and never changes, whichever window the tab is in.
+	Workspace string `json:"workspace,omitempty"`
+	URL       string `json:"url"`
+	Title     string `json:"title"`
+	Loading   bool   `json:"loading"`
 	// Progress is how far the load has got, 0 to 1.
 	Progress float64 `json:"progress"`
 	Blocked  bool    `json:"blocked"`
@@ -165,14 +168,15 @@ func (m *Manager) WindowOf(id engine.TabID) engine.WindowID { return m.windowOf[
 // front is the window in front's tabs.
 func (m *Manager) front() *window { return m.windows[m.Front()] }
 
-// Create opens a new tab at the end of the window in front, on the blank page, and makes
-// it active.
-func (m *Manager) Create() engine.TabID { return m.CreateIn(m.Front()) }
+// Create opens a new tab at the end of the window in front, on the blank page, in the
+// default workspace, and makes it active.
+func (m *Manager) Create() engine.TabID { return m.CreateIn(m.Front(), "") }
 
-// CreateIn opens a new tab at the end of window w, on the blank page, and makes it active.
-func (m *Manager) CreateIn(w engine.WindowID) engine.TabID {
-	id := m.eng.CreateTab("")
-	m.add(id, w)
+// CreateIn opens a new tab at the end of window w, on the blank page, in a workspace, by
+// its id, or in the default one for "", and makes it active.
+func (m *Manager) CreateIn(w engine.WindowID, workspace string) engine.TabID {
+	id := m.eng.CreateTab(workspace)
+	m.add(id, w).Workspace = workspace
 	m.eng.LoadURL(id, BlankURL)
 	m.Activate(id)
 	return id
@@ -438,23 +442,24 @@ func (m *Manager) Stop() {
 	}
 }
 
-// Duplicate opens a copy of the active tab, history and all, as the last tab, and shows it.
+// Duplicate opens a copy of the active tab, history and all, as the last tab, in its
+// workspace, and shows it.
 func (m *Manager) Duplicate() {
 	t := m.tabs[m.ActiveID()]
 	if t == nil {
 		return
 	}
-	m.HandleTabOpened(m.ActiveID(), m.eng.DuplicateTab(m.ActiveID()), t.URL, true)
+	m.HandleTabOpened(m.ActiveID(), m.eng.DuplicateTab(m.ActiveID()), t.URL, t.Workspace, true)
 }
 
 // Open opens a URL in a new last tab of the window in front and shows it.
 func (m *Manager) Open(u string) { m.OpenIn(u, true) }
 
-// OpenIn opens a URL in a new last tab of the window in front, shown or behind the
-// active one.
+// OpenIn opens a URL in a new last tab of the window in front, in the default workspace,
+// shown or behind the active one.
 func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
 	id := m.eng.CreateTab("")
-	m.HandleTabOpened(m.ActiveID(), id, u, foreground)
+	m.HandleTabOpened(m.ActiveID(), id, u, "", foreground)
 	m.eng.LoadURL(id, u)
 	return id
 }
@@ -525,14 +530,15 @@ func (m *Manager) zoomTo(f float64) {
 }
 
 // HandleTabOpened records a tab a page opened, in the opener's window, or in the window
-// in front when no tab opened it, and shows it if the page asked for the foreground.
-func (m *Manager) HandleTabOpened(opener, id engine.TabID, u string, foreground bool) {
+// in front when no tab opened it, in the workspace the engine made it in, and shows it if
+// the page asked for the foreground.
+func (m *Manager) HandleTabOpened(opener, id engine.TabID, u, workspace string, foreground bool) {
 	w := m.windowOf[opener]
 	if w == 0 {
 		w = m.Front()
 	}
 	t := m.add(id, w)
-	t.URL = address(u)
+	t.URL, t.Workspace = address(u), workspace
 	if foreground {
 		m.Activate(id)
 	} else {

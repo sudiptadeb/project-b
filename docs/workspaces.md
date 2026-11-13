@@ -30,10 +30,28 @@ the order of building at the end says which steps are done.
   own. Its sessionStorage starts empty there, as such a tab's does anywhere. A tab made over
   DevTools, and one an extension opens, is in the default.
 - The tab-opened event says which workspace the new tab is in (`PB_EVENT_TAB_OPENED`,
-  `engine.Listener.TabOpened`); the engine reads it from the tab's partition. Go doesn't
-  keep it yet, and nothing in the app opens a tab in a workspace yet: the driver does, by
-  id (`opentab`). The mock engine keeps each tab's workspace, and a tab its page opens is
-  in it (`mockengine.Engine.Workspace`).
+  `engine.Listener.TabOpened`); the engine reads it from the tab's partition. The driver
+  opens a tab in a workspace by id (`opentab`). The mock engine keeps each tab's workspace,
+  and a tab its page opens is in it (`mockengine.Engine.Workspace`).
+- Go keeps the list, in `workspaces.json` in the profile folder beside `prefs.json`:
+  `{"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}]}`, in the order
+  they were made. The id is eight hex digits Go makes, and never changes; a workspace needs
+  a name and a `#rrggbb` colour. The default workspace isn't in the list, and a new profile
+  has none (`core/workspaces`, `workspaces.Manager`: `List`, `Create`, `SetName`,
+  `OnChanged`). A copy on a folder named outright (`--user-data-dir`) has the folder's.
+- A tab carries its workspace's id, "" for the default (`tabs.Tab.Workspace`, `workspace`
+  in what the shell and every other manager hear of a tab, left out for the default). It is
+  given when the tab is made, `tabs.Manager.CreateIn(window, workspace)`; a tab a page
+  opens, and a copy, take the one the engine says. Moving a tab to another window keeps it.
+  A new tab (Cmd+T, File, New Tab, the shell's button), a link from another app, a
+  handover, a new window's first tab, an extension's tab and a tab made over DevTools open
+  in the default. History is the profile's one: a visit in a workspace goes in as any other.
+- The Tab menu has New Tab in Workspace, a submenu holding the list `workspaces`
+  (`{"list": "workspaces"}` in the menu template), read when the menu opens, as the
+  Profiles menu is. Choosing a workspace opens a new tab in it, at the end of the window in
+  front. With no workspaces the item is disabled: the engine reads a submenu's lists when
+  the menu holding it opens, and disables the submenu while they hold nothing
+  (`engine/browser/mac_app.mm`). Nothing in the app makes a workspace yet but the file.
 
 ## Decided
 
@@ -93,8 +111,8 @@ Each commit builds, leaves a working app, and carries its tests.
    opener's, the tab-opened event saying which. A check that two workspaces don't share a
    cookie or local storage, and that one survives a restart.
 2. Done. The link that opens a new tab without an opener stays in its workspace.
-3. Go: the workspace list in the profile, tabs carrying their workspace, the Tab menu's
-   list.
+3. Done. Go: the workspace list in the profile, tabs carrying their workspace, the Tab
+   menu's list.
 4. The shell: the dot on a tab.
 5. Settings: the Workspaces section.
 
@@ -137,6 +155,13 @@ Each commit builds, leaves a working app, and carries its tests.
   dropped WebContents never loaded anything, and the sessionStorage namespace content made
   for it goes with it, so no tab is left with storage from one partition and pages in
   another.
+- The list has a manager and a file of its own (`core/workspaces`, `workspaces.json`),
+  rather than being the tabs manager's or a pref: the tabs manager keeps only each tab's
+  workspace id, and the list is read by the menu, the shell and settings, none of which
+  needs the tabs.
+- With no workspaces, New Tab in Workspace shows disabled. The menu-list mechanism alone
+  would show it enabled, opening on an empty submenu, so the engine reads a submenu's
+  lists with the menu holding it.
 
 ## Not in this step
 

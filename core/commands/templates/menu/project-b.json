@@ -204,6 +204,14 @@
           "separator": true
         },
         {
+          "title": "New Tab in Workspace",
+          "items": [
+            {
+              "list": "workspaces"
+            }
+          ]
+        },
+        {
           "action": "tab.duplicate"
         },
         {

@@ -14,9 +14,10 @@ type fakeEngine struct {
 	closed []engine.TabID
 }
 
-func (f *fakeEngine) CreateTab(string) engine.TabID { f.next++; return f.next }
-func (f *fakeEngine) CloseTab(id engine.TabID)      { f.closed = append(f.closed, id) }
-func (f *fakeEngine) LoadURL(engine.TabID, string)  {}
+func (f *fakeEngine) CreateTab(string) engine.TabID          { f.next++; return f.next }
+func (f *fakeEngine) DuplicateTab(engine.TabID) engine.TabID { f.next++; return f.next }
+func (f *fakeEngine) CloseTab(id engine.TabID)               { f.closed = append(f.closed, id) }
+func (f *fakeEngine) LoadURL(engine.TabID, string)           {}
 
 // oneWindow is a manager with window 1.
 func oneWindow(e engine.Engine) *Manager {
@@ -93,11 +94,11 @@ func TestATabAPageOpensIsShownOnlyInTheForeground(t *testing.T) {
 	e := &fakeEngine{}
 	m := oneWindow(e)
 	a := m.Create()
-	m.HandleTabOpened(a, 7, "https://b.test/", false)
+	m.HandleTabOpened(a, 7, "https://b.test/", "", false)
 	if m.ActiveID() != a || m.All()[1].URL != "https://b.test/" {
 		t.Fatalf("background open: active %v all %v", m.ActiveID(), m.All())
 	}
-	m.HandleTabOpened(a, 8, "https://c.test/", true)
+	m.HandleTabOpened(a, 8, "https://c.test/", "", true)
 	if m.ActiveID() != 8 {
 		t.Fatalf("foreground open: active %v", m.ActiveID())
 	}
@@ -195,12 +196,12 @@ func TestWindowsKeepTheirOwnTabs(t *testing.T) {
 	}
 
 	// A page in window 2 opens a tab: it goes in window 2, though window 1 is in front.
-	m.HandleTabOpened(c, 9, "https://p.test/", true)
+	m.HandleTabOpened(c, 9, "https://p.test/", "", true)
 	if m.WindowOf(9) != 2 || m.ActiveIn(2) != 9 || m.ActiveID() != a {
 		t.Fatalf("opened tab in window %v, window 2 active %v, in front %v", m.WindowOf(9), m.ActiveIn(2), m.ActiveID())
 	}
 	// One no page opened goes in the window in front.
-	m.HandleTabOpened(0, 10, "https://q.test/", true)
+	m.HandleTabOpened(0, 10, "https://q.test/", "", true)
 	if m.WindowOf(10) != 1 {
 		t.Fatalf("tab with no opener in window %v", m.WindowOf(10))
 	}
@@ -252,5 +253,28 @@ func TestMovingATabBetweenWindows(t *testing.T) {
 	m.Move(a, 2, 2)
 	if !slices.Equal(ids(m.AllIn(2)), []engine.TabID{b, c, a}) || !slices.Equal(emptied, []engine.WindowID{1}) || len(e.closed) != 0 {
 		t.Fatalf("window 2 %v, emptied %v, closed %v", ids(m.AllIn(2)), emptied, e.closed)
+	}
+}
+
+// A tab is in the workspace it was made in for its life: a new one, one a page opened, a
+// copy, and one moved to another window.
+func TestATabKeepsItsWorkspace(t *testing.T) {
+	m := oneWindow(&fakeEngine{})
+	plain := m.CreateIn(1, "")
+	work := m.CreateIn(1, "0a1b2c3d")
+	m.HandleTabOpened(work, 9, "https://p.test/", "0a1b2c3d", true)
+	m.Duplicate()
+	workspace := func(id engine.TabID) string { t, _ := m.Get(id); return t.Workspace }
+	got := []string{workspace(plain), workspace(work), workspace(9), workspace(m.ActiveID())}
+	if !slices.Equal(got, []string{"", "0a1b2c3d", "0a1b2c3d", "0a1b2c3d"}) || m.ActiveID() == 9 {
+		t.Fatalf("workspaces %q, the copy %v", got, m.ActiveID())
+	}
+	m.AddWindow(2)
+	m.Move(work, 2, 0)
+	if m.WindowOf(work) != 2 || workspace(work) != "0a1b2c3d" || m.AllIn(2)[0].Workspace != "0a1b2c3d" {
+		t.Fatalf("after the move: window %v, %+v", m.WindowOf(work), m.AllIn(2))
+	}
+	if m.Create(); workspace(m.ActiveID()) != "" {
+		t.Fatalf("a new tab is in %q", workspace(m.ActiveID()))
 	}
 }

@@ -168,6 +168,11 @@ the app on it; each copy has its own Dock icon, with a dot in its profile's colo
 the picker page instead, which opens the profile chosen, or a new one, in a copy of its
 own. See [profiles-build.md](profiles-build.md).
 
+A profile has workspaces: sets of tabs whose cookies and site storage are their own. Each
+is a storage partition of the profile's context, listed in `workspaces.json` in the profile
+folder. Tab, New Tab in Workspace opens a tab in one, and every tab that tab opens is in it
+too. See [workspaces.md](workspaces.md).
+
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
 started on the same profile writes nothing there: it hands the URLs
 on its command line to the running copy, whose window used last comes to the front and

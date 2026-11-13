@@ -9,7 +9,7 @@ How every piece of our own UI looks: the shell, the settings page, and any app a
 |---|---|
 | `shell/src/tones.js` | Every colour, made from the one frame colour Go owns, light and dark |
 | `shell/src/theme.js` | Puts those colours on the root as CSS variables and follows light or dark |
-| `shell/src/design.css` | Type, the floating shadow, the focus ring, and the shared controls: `.icon-button`, `.text-button` with `.primary`, `.quiet` and `.danger`, `.field`, `select`, `.switch`, `.tag`, `.secondary`, `.field-error`, and their touch sizes |
+| `shell/src/design.css` | Type, the floating shadow, the focus ring, and the shared controls: `.icon-button`, `.text-button` with `.primary`, `.quiet` and `.danger`, `.text-field`, `select`, `.switch`, `.tag`, `.secondary`, `.text-field-error`, and their touch sizes |
 | `shell/src/ui/` | The shared parts that need behaviour: `Dialog`, `RowMenu`, `Field`, `Segmented`, `Swatches`, and `escape.js`, which gives Escape to the innermost thing open |
 | `shell/src/apps/settings/SettingsApp.vue` | The settings page's own layout: `.nav-item`, `.card`, `.row`, `.label`, `h2` |
 | `shell/src/extensions/ExtensionsToolbar.vue` | The toolbar's floating menu (`.pbx-menu`) |
@@ -115,7 +115,7 @@ Use these; never leave a `<button>`, `<select>`, `<input>` or radio to the brows
 | Two to four short choices | `Segmented` (Theme: System, Light, Dark) | radio buttons |
 | Five or more choices, or long ones | `select` | |
 | A colour | `Swatches`: presets, and with `custom` the system's picker behind a + | a bare colour input |
-| A name, a number, a value | `Field` (`.field`); empty means Off where Off makes sense | a section's own input style |
+| A name, a number, a value | `Field` (`.text-field`); empty means Off where Off makes sense | a section's own input style |
 | A row's actions | `RowMenu`: a ⋯ button and its menu | a row of quiet buttons |
 | A label on an item (Hidden, Locked, Not in this build) | `.tag`, a hairline outline | a filled pill |
 | A link in a line of text that opens something on the page | `.link` | |
@@ -175,7 +175,7 @@ From the settings audit of 2026-11-13 (owner approved). Every section follows th
 ### Errors and status
 
 - **Check a value where the rule is known** (required, unique, min, max, pattern, a key in
-  use). The error shows under the field in `.field-error`, the typed text stays, and Enter
+  use). The error shows under the field in `.text-field-error`, the typed text stays, and Enter
   keeps focus there.
 - **A system error is one plain sentence** in a row of the card it is about, with the
   technical detail in its tooltip. Never a raw Go or system message.

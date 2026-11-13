@@ -312,7 +312,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
     <section class="filter-section" aria-label="Filter">
       <input
         v-model="filter"
-        class="field filter"
+        class="text-field filter"
         type="text"
         spellcheck="false"
         aria-label="Filter shortcuts"
@@ -390,7 +390,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               <template v-if="recording">
                 <input
                   :ref="(el) => (recorder = el)"
-                  class="field recorder"
+                  class="text-field recorder"
                   readonly
                   :aria-label="`New key for ${a.title}`"
                   :aria-invalid="recordError ? 'true' : undefined"
@@ -399,7 +399,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
                   @keydown="onRecordKey($event, a)"
                   @blur="stopRecording"
                 />
-                <span v-if="recordError" id="record-error" class="field-error" role="alert">{{ recordError }}</span>
+                <span v-if="recordError" id="record-error" class="text-field-error" role="alert">{{ recordError }}</span>
               </template>
               <button v-else :ref="(el) => (addButton = el)" type="button" class="text-button" @click="record">Add key</button>
               <span class="spacer"></span>
@@ -580,7 +580,7 @@ kbd.clash {
   caret-color: transparent;
 }
 
-.key-row .field-error {
+.key-row .text-field-error {
   margin-top: 0;
 }
 

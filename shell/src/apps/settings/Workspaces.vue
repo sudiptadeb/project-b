@@ -136,14 +136,14 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
             id="workspace-name"
             ref="nameInput"
             v-model="name"
-            class="field"
+            class="text-field"
             :class="{ invalid: error }"
             spellcheck="false"
             :aria-invalid="error ? 'true' : undefined"
             aria-describedby="workspace-name-error"
             @input="onInput"
           />
-          <div v-if="error" id="workspace-name-error" class="field-error" role="alert">{{ error }}</div>
+          <div v-if="error" id="workspace-name-error" class="text-field-error" role="alert">{{ error }}</div>
         </div>
         <div class="ui-dialog-part">
           <label>Colour</label>
@@ -187,7 +187,7 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
   color: var(--muted);
 }
 
-.field {
+.text-field {
   width: 100%;
 }
 </style>

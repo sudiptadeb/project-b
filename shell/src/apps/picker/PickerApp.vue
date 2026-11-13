@@ -42,7 +42,7 @@ function create() {
       </li>
     </ul>
     <form v-if="making" class="card new" aria-label="New profile" @submit.prevent="create">
-      <input ref="nameField" v-model="name" class="field" aria-label="Name" placeholder="Name" @keydown.escape="making = false" />
+      <input ref="nameField" v-model="name" class="text-field" aria-label="Name" placeholder="Name" @keydown.escape="making = false" />
       <select v-model="template" aria-label="Template">
         <option v-for="t in state.templates" :key="t" :value="t">{{ t }}</option>
       </select>
@@ -128,7 +128,7 @@ li + li {
   padding: 16px;
 }
 
-.field,
+.text-field,
 select {
   height: 30px;
   padding: 0 8px;
@@ -140,11 +140,11 @@ select {
   font: inherit;
 }
 
-.field::placeholder {
+.text-field::placeholder {
   color: var(--muted);
 }
 
-.field:focus-visible,
+.text-field:focus-visible,
 select:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);

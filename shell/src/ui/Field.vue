@@ -65,7 +65,7 @@ defineExpose({ focus: () => input.value.focus(), select: () => input.value.selec
     <input
       ref="input"
       v-model="text"
-      class="field"
+      class="text-field"
       :class="{ invalid: error }"
       spellcheck="false"
       :aria-label="label"
@@ -77,7 +77,7 @@ defineExpose({ focus: () => input.value.focus(), select: () => input.value.selec
       @keydown.esc="onEscape"
       @blur="editing && commit()"
     />
-    <div v-if="error" class="field-error" role="alert">{{ error }}</div>
+    <div v-if="error" class="text-field-error" role="alert">{{ error }}</div>
   </div>
 </template>
 
@@ -86,7 +86,7 @@ defineExpose({ focus: () => input.value.focus(), select: () => input.value.selec
   min-width: 0;
 }
 
-.ui-field .field {
+.ui-field .text-field {
   width: 100%;
 }
 </style>

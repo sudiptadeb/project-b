@@ -113,7 +113,7 @@
 
 /* A text field: 30px high, a hairline, a 6px radius. An empty field's placeholder is muted;
    .invalid draws it in --danger while its error shows under it. */
-.field {
+.text-field {
   height: 30px;
   min-width: 0;
   padding: 0 8px;
@@ -125,11 +125,11 @@
   font: inherit;
 }
 
-.field::placeholder {
+.text-field::placeholder {
   color: var(--muted);
 }
 
-.field.invalid {
+.text-field.invalid {
   border-color: var(--danger);
 }
 
@@ -149,13 +149,13 @@ select {
   cursor: pointer;
 }
 
-.field:focus-visible,
+.text-field:focus-visible,
 select:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
-.field:disabled,
+.text-field:disabled,
 select:disabled {
   opacity: 0.5;
   cursor: default;
@@ -233,7 +233,7 @@ select:disabled {
 }
 
 /* A field's error, under it, while the typed text stays. */
-.field-error {
+.text-field-error {
   margin-top: 4px;
   color: var(--danger);
   font-size: 12px;

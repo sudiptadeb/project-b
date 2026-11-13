@@ -51,7 +51,7 @@ the order of building at the end says which steps are done.
   Profiles menu is. Choosing a workspace opens a new tab in it, at the end of the window in
   front. With no workspaces the item is disabled: the engine reads a submenu's lists when
   the menu holding it opens, and disables the submenu while they hold nothing
-  (`engine/browser/mac_app.mm`). Nothing in the app makes a workspace yet but the file.
+  (`engine/browser/mac_app.mm`).
 - A tab in a workspace shows a small dot in the workspace's colour after its title, in the
   sidebar and in the strip on top, named for the workspace to a screen reader. A tab in the
   default workspace, or in one the list doesn't hold, shows none. Every shell has the list
@@ -59,6 +59,14 @@ the order of building at the end says which steps are done.
   workspace is made or renamed, so the dots follow at once (`core/app/workspaces.go`,
   `shell/src/apps/shell/`). The mock's page fires a menu item by its action, as the menu
   bar does (`/mock/fire`, kind `menu`).
+- Settings has a Workspaces section, after Profile: each workspace's colour and name, which
+  can be changed, and New Workspace, with a name and a colour from a colour picker. Go
+  answers with the list as it is now (`createWorkspace`, `renameWorkspace`; the page and
+  every shell hear `{"t": "workspaces", ...}`), so the dots change at once and the Tab menu
+  has the change the next time it opens. No workspace can be deleted. Every copy has the
+  section, a copy on a folder named outright (`--user-data-dir`) too: the list is the
+  folder's, as its prefs are, and nothing about it needs the profile list
+  (`core/app/workspaces.go`, `shell/src/apps/settings/Workspaces.vue`).
 
 ## Decided
 
@@ -110,6 +118,8 @@ and network rules work in every workspace.
 2. A workspace is shown by a coloured dot on the tab, and by nothing else for now.
 3. A new profile starts with no workspaces but the default.
 
+The app is built as these three say.
+
 ## Order of building
 
 Each commit builds, leaves a working app, and carries its tests.
@@ -121,7 +131,7 @@ Each commit builds, leaves a working app, and carries its tests.
 3. Done. Go: the workspace list in the profile, tabs carrying their workspace, the Tab
    menu's list.
 4. Done. The shell: the dot on a tab.
-5. Settings: the Workspaces section.
+5. Done. Settings: the Workspaces section.
 
 ## Decided while building
 

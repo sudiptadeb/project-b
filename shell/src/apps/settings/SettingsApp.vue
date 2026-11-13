@@ -7,6 +7,7 @@ import Flags from './Flags.vue';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
 import Profile from './Profile.vue';
+import Workspaces from './Workspaces.vue';
 import { send, state } from './state.js';
 
 // The settings page: a page of its own over the whole window. Its colours come from the
@@ -19,6 +20,7 @@ const sections = computed(() =>
   [
     { id: 'general', label: 'General', component: General },
     state.profile && { id: 'profile', label: 'Profile', component: Profile },
+    { id: 'workspaces', label: 'Workspaces', component: Workspaces },
     { id: 'keyboard', label: 'Keyboard', component: Keyboard },
     extensionsSection?.shown() && extensionsSection,
     { id: 'flags', label: 'Flags', component: Flags },

@@ -976,3 +976,34 @@ func TestTheShellHearsTheWorkspaces(t *testing.T) {
 		t.Fatalf("after the rename the shell heard %v", m)
 	}
 }
+
+// The settings page's Workspaces section lists the workspaces, makes one with a name and a
+// colour and renames one: Go keeps them in the profile's list, and the page, the shells and
+// the Tab menu's list have them at once.
+func TestTheSettingsPageMakesAndRenamesWorkspaces(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	got, snap := r.openSettings()
+	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 0 {
+		t.Fatalf("the snapshot's workspaces: %v", snap["workspaces"])
+	}
+	r.settings(`{"t":"createWorkspace","text":"Work","color":"#c2410c"}`)
+	m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaces" })
+	w := m["workspaces"].([]any)[0].(map[string]any)
+	if w["name"] != "Work" || w["color"] != "#c2410c" {
+		t.Fatalf("the page heard %v", m)
+	}
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" })
+	r.settings(`{"t":"renameWorkspace","id":"` + w["id"].(string) + `","text":"Office"}`)
+	r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaces" })
+	var items engine.Menu
+	r.e.Post(func() { items = r.a.MenuList("workspaces") })
+	r.e.Settle()
+	if len(items) != 1 || items[0].Title != "Office" {
+		t.Fatalf("the Tab menu's list holds %+v", items)
+	}
+	if l := workspaces.New(dir).List(); len(l) != 1 || l[0].ID != w["id"] || l[0].Name != "Office" {
+		t.Fatalf("the profile's list holds %+v", l)
+	}
+}

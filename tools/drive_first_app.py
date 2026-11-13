@@ -1606,28 +1606,42 @@ def tabs_of(app):
 
 
 def workspace_menu_checks():
-    """Tab, New Tab in Workspace lists the profile's workspaces from their list in its
-    folder, and choosing one opens a new tab in that workspace in the window in front. With
-    no workspaces it is disabled."""
+    """Tab, New Tab in Workspace lists the profile's workspaces, read as the menu opens, and
+    choosing one opens a new tab in that workspace in the window in front. With no
+    workspaces it is disabled. A workspace made in settings is listed the next time the menu
+    opens; it is the profile folder's, here a folder named outright."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
     item = lambda: next(i for m in json.loads(app.cmd("menu")) if m["title"] == "Tab" for i in m["items"] if i != "-" and i["title"] == "New Tab in Workspace")
     check("with no workspaces, Tab, New Tab in Workspace is disabled and empty", not item()["enabled"] and item()["items"] == [], item())
-    app.close()
-    with open(os.path.join(profile, "workspaces.json"), "w") as f:
-        json.dump({"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}, {"id": "4e5f6a7b", "name": "Shopping", "color": "#c2410c"}]}, f)
-    app = App(profile)
-    check("it lists the profile's workspaces by name", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Work", "Shopping"], item())
+
+    settings = lambda expr: json.loads(app.cmd("evalsettings", expr))
+    app.cmd("key", "cmd+,")
+    deadline = time.time() + 10
+    while app.cmd("evalsettings", "!!document.querySelector('h1')") != "true":
+        if time.time() > deadline:
+            raise TimeoutError("the settings page never opened")
+        time.sleep(0.1)
+    settings("[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Workspaces').click()")
+    for name in ("Work", "Shopping"):
+        settings(f"(()=>{{const i=document.querySelector('[aria-label=\"New workspace\\'s name\"]');i.value={json.dumps(name)};i.dispatchEvent(new Event('input'));i.form.requestSubmit()}})()")
+    deadline = time.time() + 10
+    while [i["title"] for i in item()["items"]] != ["Work", "Shopping"] and time.time() < deadline:
+        time.sleep(0.1)
+    check("workspaces made in settings are listed the next time the menu opens", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Work", "Shopping"], item())
+    app.cmd("key", "cmd+w")
+    ids = {w["name"]: w["id"] for w in json.load(open(os.path.join(profile, "workspaces.json")))["workspaces"]}
+
     check("choosing one works", app.cmd("choosemenu", "Tab", "New Tab in Workspace > Shopping") == "ok")
     app.wait(f"{ROWS}===2")
     tabs = tabs_of(app)
     shopping = next(t for t in tabs["tabs"] if t["id"] == tabs["active"])
-    check("it opens a new tab, the active one, which Go has in that workspace", shopping["id"] != 1 and shopping.get("workspace") == "4e5f6a7b", tabs)
+    check("it opens a new tab, the active one, which Go has in that workspace", shopping["id"] != 1 and shopping.get("workspace") == ids["Shopping"], tabs)
     app.js(f"location.href={json.dumps(STORE)}", tab=shopping["id"])
     app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=shopping["id"])
     app.js("document.cookie='w=shopping; max-age=3600'", tab=shopping["id"])
     check("and the engine has it there: its cookie is that workspace's and not another's",
-          stored(app, open_in(app, "4e5f6a7b", STORE))[0] == "w=shopping" and stored(app, open_in(app, "0a1b2c3d", STORE))[0] == "", tabs_of(app))
+          stored(app, open_in(app, ids["Shopping"], STORE))[0] == "w=shopping" and stored(app, open_in(app, ids["Work"], STORE))[0] == "", tabs_of(app))
     app.close()
 
 

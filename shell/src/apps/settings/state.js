@@ -30,6 +30,9 @@ export const state = reactive({
   // This profile in the list: its name, the template it was made from or last reset to,
   // and the templates. null in a copy on a folder named outright, which isn't listed.
   profile: null,
+  // The profile's workspaces, each with its id, name and colour, in the order they were
+  // made.
+  workspaces: [],
 });
 
 export function connect() {
@@ -51,6 +54,7 @@ export function connect() {
             flags: m.flags,
             section: m.section,
             profile: m.profile || null,
+            workspaces: m.workspaces,
             ready: true,
           });
           mark('settings.snapshot');
@@ -84,6 +88,9 @@ export function connect() {
           break;
         case 'profile':
           state.profile = m.profile;
+          break;
+        case 'workspaces':
+          state.workspaces = m.workspaces;
           break;
       }
     },

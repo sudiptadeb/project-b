@@ -96,7 +96,7 @@ How these are built is in [profiles-build.md](profiles-build.md).
   across the profile: extensions, permissions, downloads, settings and history. Firefox and
   Brave share the same things.
 
-**Being built,** as [workspaces.md](workspaces.md) says, which also says what is done.
+**Built,** as [workspaces.md](workspaces.md) says.
 
 - *A workspace is a storage partition inside the profile's one browser context.* Content
   keeps a tab in its partition for the tab's life, across sites, frames and popups

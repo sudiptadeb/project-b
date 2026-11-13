@@ -90,6 +90,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell.AddPart(a.workspaceShellPart())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
+	a.Settings.AddPart(a.workspaceSettingsPart())
 	a.registerActions(e)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)
@@ -115,10 +116,12 @@ func Start(e engine.Engine, cfg Config) *App {
 		})
 		a.Settings.AddPart(a.profileSettingsPart(cfg.Profiles, cfg.Profile))
 	}
-	// A workspace made or renamed reaches every shell at once, for the dots; the Tab menu
-	// reads the list as it opens.
+	// A workspace made or renamed reaches every shell at once, for the dots, and every
+	// settings page; the Tab menu reads the list as it opens.
 	a.Workspaces.OnChanged(func() {
-		a.Shell.Send(map[string]any{"t": "workspaces", "workspaces": a.Workspaces.List()})
+		m := map[string]any{"t": "workspaces", "workspaces": a.Workspaces.List()}
+		a.Shell.Send(m)
+		a.Settings.Send(m)
 	})
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)

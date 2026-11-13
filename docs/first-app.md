@@ -170,8 +170,8 @@ own. See [profiles-build.md](profiles-build.md).
 
 A profile has workspaces: sets of tabs whose cookies and site storage are their own. Each
 is a storage partition of the profile's context, listed in `workspaces.json` in the profile
-folder. Tab, New Tab in Workspace opens a tab in one, and every tab that tab opens is in it
-too. See [workspaces.md](workspaces.md).
+folder. Settings, Workspaces makes and renames them; Tab, New Tab in Workspace opens a tab
+in one, and every tab that tab opens is in it too. See [workspaces.md](workspaces.md).
 
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
 started on the same profile writes nothing there: it hands the URLs

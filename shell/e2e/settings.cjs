@@ -222,6 +222,37 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-profile.png') });
 
+  // Workspaces: the list, New Workspace with a name and a colour, and rename. Go keeps them
+  // in the profile's folder, and the shell has them at once: a tab opened in one, as Tab,
+  // New Tab in Workspace does, shows its dot, and a rename reaches it.
+  const workspacesFile = () => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(profile, 'workspaces.json'), 'utf8')).workspaces;
+    } catch {
+      return [];
+    }
+  };
+  await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
+  const workspacesSection = page.getByRole('region', { name: 'Workspaces' });
+  check('Workspaces lists none at first, and New Workspace waits for a name',
+    (await workspacesSection.locator('.row').count()) === 1 && (await page.getByRole('button', { name: 'New Workspace' }).isDisabled()));
+  await page.getByLabel('New workspace\'s name').fill('Work');
+  await page.getByLabel('New workspace\'s colour').fill('#c2410c');
+  await page.getByRole('button', { name: 'New Workspace' }).click();
+  check('New Workspace makes one with its name and colour, kept in the profile', await until(() => workspacesFile().length === 1 && workspacesFile()[0].name === 'Work' && workspacesFile()[0].color === '#c2410c'), JSON.stringify(workspacesFile()));
+  check('and lists it', await until(async () => (await page.getByLabel('Name of Work').count()) === 1 && (await page.getByLabel('New workspace\'s name').inputValue()) === ''));
+  const made = workspacesFile()[0].id;
+  await fetch(`${base}/mock/fire`, { method: 'POST', body: new URLSearchParams({ kind: 'menu', value: 'workspaces:' + made }) });
+  const dot = ui.locator('[role=tab] .workspace');
+  check('a tab opened in it shows its dot in the shell at once', await until(async () => (await dot.count()) === 1 && (await dot.getAttribute('aria-label')) === 'In Work' &&
+    (await dot.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(194, 65, 12)'));
+  await page.getByLabel('Name of Work').fill('Office');
+  await page.getByLabel('Name of Work').press('Enter');
+  check('a new name is kept, under the same id', await until(() => workspacesFile()[0].name === 'Office' && workspacesFile()[0].id === made), JSON.stringify(workspacesFile()));
+  check('and the dot in the shell says it at once', await until(async () => (await dot.getAttribute('aria-label')) === 'In Office'));
+  await settle(page);
+  await page.screenshot({ path: path.join(out, 'settings-workspaces.png') });
+
   // Flags: saved for the next launch, with Relaunch offered until they are what runs.
   const flagsFile = () => {
     try {

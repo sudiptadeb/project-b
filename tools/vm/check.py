@@ -930,14 +930,18 @@ def save_update_logs():
         f.write(subprocess.run([TART, "exec", VM, "/bin/cat", "/tmp/pb-update.tgz"], capture_output=True, timeout=120).stdout)
 
 
-def update_checks():
+def update_checks(retry=False):
     """An update, end to end, from the release installed to the one the release manifest
     calls stable, the way the app does it for a person: with automatic updates on and two
     profiles open, each in a copy of its own, the update is found, downloaded and staged, and
     Relaunch in the bubble quits both copies, puts the new release in /Applications, and
     starts each profile again on it. It needs a later release than the one installed, and the
     VM to reach github.com. The Personal copy has the driver, only to find and press the
-    bubble's button, with the driver's click, which is routed as AppKit routes a click."""
+    bubble's button, with the driver's click, which is routed as AppKit routes a click.
+
+    With retry, the stable release starts out refused, as a download that failed its checks
+    leaves it: the automatic rounds hold it, and Check for updates in Settings, General tries
+    it again, and the update goes on from there."""
     before = app_version()
     manifest = json.loads(guest("/usr/bin/curl", "-sSL", "--max-time", "30", MANIFEST) or "{}")
     after = manifest.get("channels", {}).get("stable", "")
@@ -957,6 +961,10 @@ def update_checks():
     listed["profiles"].append({"id": "work", "name": "Work", "color": "#5b7fd6", "template": "Work"})
     guest("/bin/sh", "-c", f"mkdir -p {ROOT}/work && printf '%s' \"$1\" > {ROOT}/profiles.json && "
           f"echo '{{\"autoUpdate\": true}}' > {ROOT}/update/settings.json", "sh", json.dumps(listed))
+    if retry:
+        # amarit's state, which Reject writes when a download fails its checks.
+        guest("/bin/sh", "-c", f"mkdir -p {ROOT}/update/amarit && printf '%s' \"$1\" > {ROOT}/update/amarit/state.json",
+              "sh", json.dumps({"rejected": after}))
     guest("/usr/bin/open", "-n", APP, "--args", f"--root={ROOT}", "--profile=work")
     ask = driven(UPD, None, [f"--root={ROOT}", f"--profile={personal}"])
     js = lambda expr: json.loads(ask("eval", expr) or "null")
@@ -964,9 +972,21 @@ def update_checks():
     check(f"{before} runs two profiles, each in a copy of its own", len(old) == 2, str(old))
     # A round a minute, then the download and its checks.
     button = "document.querySelector('.update.ready button')"
+    if retry:
+        held = until(lambda: js(f"{button}?.textContent.trim() || ''"), bool, 100)
+        check(f"a refused {after} is held through the automatic rounds", held == "", held)
+        js("document.querySelector('button.settings').click()")
+        find = "[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Check for updates')"
+        shown = until(lambda: json.loads(ask("evalsettings", f"!!{find}") or "false"), bool, 15)
+        check("Settings, General shows Check for updates", shown)
+        ask("evalsettings", f"({find}.click(), 1)")
+        shot("u0-checked")
+        # Closed again, so the bubble's button is the shell's to press.
+        ask("evalsettings", "(document.querySelector('[aria-label=\"Close settings\"]').click(), 1)")
     offered = until(lambda: js(f"{button}?.textContent.trim() || ''"), bool, 600)
     shot("u1-ready")
-    check(f"with automatic updates on, {after} is found, downloaded and offered", after in offered, offered)
+    check(f"Check for updates tries the refused {after} again: it is downloaded and offered" if retry else
+          f"with automatic updates on, {after} is found, downloaded and offered", after in offered, offered)
     x, y = js(f"(b => [b.x + b.width / 2, b.y + b.height / 2])({button}.getBoundingClientRect())")
     ask("click", str(round(x)), str(round(y)))
     installed = until(app_version, lambda v: v == after, 120)
@@ -1161,9 +1181,9 @@ if sys.argv[1:] == ["profiles"]:
 
 # "check.py update" runs only the update from the installed release to the manifest's stable
 # one; it is never part of a whole run, as it needs a later release and the internet.
-if sys.argv[1:] == ["update"]:
+if sys.argv[1:] in (["update"], ["update-retry"]):
     try:
-        update_checks()
+        update_checks(retry=sys.argv[1:] == ["update-retry"])
     finally:
         save_update_logs()
     finished = True

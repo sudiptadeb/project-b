@@ -4,6 +4,7 @@
 #   tools/vm/run.sh <path or URL of a DMG> windows    # only the checks of several windows
 #   tools/vm/run.sh <path or URL of a DMG> profiles   # only the checks of several profiles
 #   tools/vm/run.sh <path or URL of a DMG> update     # an update from it to the stable release
+#   tools/vm/run.sh <path or URL of a DMG> update-retry # the same, with that release refused first
 #   tools/vm/run.sh <path or URL of a DMG> workspaces # only the checks of workspaces
 #   tools/vm/run.sh <path or URL of a DMG> regions    # only the Show window regions flag
 #   tools/vm/run.sh <path or URL of a DMG> shells     # only the terminal and fox shells

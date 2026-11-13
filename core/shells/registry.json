@@ -1,5 +1,6 @@
 [
   { "id": "standard", "name": "Standard" },
   { "id": "terminal", "name": "Terminal" },
+  { "id": "fox", "name": "Fox" },
   { "id": "example", "name": "Example", "example": true }
 ]

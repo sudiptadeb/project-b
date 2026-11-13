@@ -274,6 +274,27 @@ dense and square.
   message yet), dimming the pages of panes that aren't active, dragging panes between
   groups, broadcasting input, and the notice of the last run's crash.
 
+## The fox shell
+
+`fox` puts the tabs in a strip on top, a navigation bar under it with a wide centred
+address field, and a menu button at the far right, in our tones.
+
+- **The tab strip** is the title bar. Tabs share it between a minimum and a maximum width;
+  past the minimum it scrolls sideways, with arrows at its ends, New Tab fixed at its end,
+  and the active tab always scrolled into view. "List all tabs" at its right opens a menu
+  of every tab. A tab in a workspace has a line in the workspace's colour along its top.
+- **The navigation bar** has back, forward, and reload, which is Stop (`run nav.stop`)
+  while the page loads; the address field, centred, with the suggestions attached under it
+  and the active tab's workspace at its right end; the extensions; and the menu button,
+  whose commands each run an action Go has (`run`): New Tab, New Window, Zoom In, Zoom Out,
+  Actual Size, Full Screen, Settings.
+- The crash notice and the update notice are bars under the navigation bar.
+- **Its own data:** none. The strip's scroll position follows the active tab, so it never
+  calls `saveData`.
+- **Left out:** dragging tabs to reorder or tear off, pinned tabs, a tab's context menu,
+  a bookmarks bar, a sidebar, customising the toolbar, and print and find in the menu,
+  which have no action yet.
+
 ## Not in this step
 
 Keys and menu items for a shell's own commands, such as a split. Saving a shell's data

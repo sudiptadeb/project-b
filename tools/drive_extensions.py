@@ -371,7 +371,7 @@ def flag_off_checks():
     deadline = time.time() + 30
     while not again and time.time() < deadline:
         time.sleep(0.5)
-        ps = subprocess.run(["pgrep", "-f", "--", f"--profile={profile} "], capture_output=True, text=True).stdout.split()
+        ps = subprocess.run(["pgrep", "-f", "--", f"--user-data-dir={profile} "], capture_output=True, text=True).stdout.split()
         again = [int(p) for p in ps if int(p) != app.proc.pid]
     check("Relaunch ends the app and starts it again on the same profile", len(again) == 1, again)
     for pid in again:

@@ -21,6 +21,10 @@ class Extensions;
 // The profile folder, and the folder inside it that belongs to Chromium.
 base::FilePath ProfileDir();
 base::FilePath ChromiumDataDir();
+#if !BUILDFLAG(IS_ANDROID)
+// Go chooses the profile, before content starts.
+void SetProfileDir(const base::FilePath& dir);
+#endif
 
 // Content calls this at fixed moments. PreMainMessageLoopRun is our startup.
 class BrowserMainParts : public content::BrowserMainParts {

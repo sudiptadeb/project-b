@@ -58,6 +58,7 @@ import (
 	"projectb/engine"
 	"projectb/flags"
 	"projectb/instance"
+	"projectb/profiles"
 	"projectb/timeline"
 )
 
@@ -215,32 +216,52 @@ func (e *nativeEngine) Post(fn func()) {
 }
 
 var (
-	native *nativeEngine
-	hooks  *content.Hooks
-	theApp *app.App
-	owner  *instance.Owner
+	native  *nativeEngine
+	hooks   *content.Hooks
+	theApp  *app.App
+	owner   *instance.Owner
+	list    *profiles.Manager
+	profile profiles.Choice
 )
 
-// PBClaimProfile is the first call, before anything is written to the profile: it returns
-// 1 when this copy owns the profile folder, and 0 when another copy owns it and has been
-// handed urls, one per line, so this copy quits.
+// PBClaimProfile is the first call, before anything is written to the profile. It chooses
+// the profile from the command line's --root, --profile and --user-data-dir, each "" when
+// not given, and returns the profile's folder when this copy owns it. It returns nil when
+// another copy owns it and has been handed urls, one per line, so this copy quits.
 //
 //export PBClaimProfile
-func PBClaimProfile(profileDir, urls *C.char) C.int {
-	var list []string
+func PBClaimProfile(root, id, userDataDir, urls *C.char) *C.char {
+	var handed []string
 	if s := C.GoString(urls); s != "" {
-		list = strings.Split(s, "\n")
+		handed = strings.Split(s, "\n")
 	}
-	o, err := instance.Claim(C.GoString(profileDir), list)
+	list = profiles.New(rootOf(C.GoString(root)))
+	var err error
+	if dir := C.GoString(userDataDir); dir != "" {
+		profile = profiles.Named(dir)
+	} else if profile, err = list.Choose(C.GoString(id)); err != nil {
+		fmt.Fprintf(os.Stderr, "the profile: %v\n", err)
+		os.Exit(1)
+	}
+	o, err := instance.Claim(profile.Dir, handed)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "the profile folder: %v\n", err)
 		os.Exit(1)
 	}
 	if o == nil {
-		return 0
+		return nil
 	}
 	owner = o
-	return 1
+	return C.CString(profile.Dir)
+}
+
+// rootOf is the folder that holds the profiles: the one --root names, else ~/.project-b.
+func rootOf(root string) string {
+	if root != "" {
+		return root
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".project-b")
 }
 
 //export PBStart
@@ -258,12 +279,17 @@ func PBStart(calls *C.PBEngineCalls, profileDir, blockedHosts, hookTable *C.char
 	if s := C.GoString(blockedHosts); s != "" {
 		blocked = strings.Split(s, ",")
 	}
-	profile := C.GoString(profileDir)
+	dir := C.GoString(profileDir)
+	if profile.ID != "" {
+		if err := list.MarkUsed(profile.ID); err != nil {
+			timeline.Errorf("profiles: %v", err)
+		}
+	}
 	home, _ := os.UserHomeDir()
 	theApp = app.Start(native, app.Config{
-		ProfileDir:   profile,
+		ProfileDir:   dir,
 		BlockedHosts: blocked,
-		Update:       updateConfig(profile),
+		Update:       updateConfig(dir),
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
 	})
 	content.Wire(hooks, theApp)

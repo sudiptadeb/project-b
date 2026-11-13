@@ -6,6 +6,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/no_destructor.h"
 #include "base/run_loop.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -31,17 +32,21 @@
 
 namespace project_b {
 
-// --user-data-dir names the profile as it does for Chrome, so tools that drive Chrome
-// (ChromeDriver gives every session a fresh one) drive us the same way. --profile is
-// our older name for it.
+namespace {
+
+base::FilePath& Profile() {
+  static base::NoDestructor<base::FilePath> profile;
+  return *profile;
+}
+
+}  // namespace
+
 base::FilePath ProfileDir() {
-  const base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  base::FilePath profile = command_line->GetSwitchValuePath("user-data-dir");
-  if (profile.empty()) {
-    profile = command_line->GetSwitchValuePath("profile");
-  }
-  return profile.empty() ? base::GetHomeDir().Append(".project-b/default")
-                         : profile;
+  return Profile();
+}
+
+void SetProfileDir(const base::FilePath& dir) {
+  Profile() = dir;
 }
 
 base::FilePath ChromiumDataDir() {

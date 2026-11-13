@@ -40,14 +40,23 @@ int ProjectBMain(int argc, const char** argv, const PBGoCalls* go) {
 
   if (go) {
     project_b::SetGo(go);
-    // One copy of the app per profile folder. A copy started on a folder another copy
-    // owns hands it the URLs on its command line and quits, having written nothing there.
-    std::string urls =
-        base::JoinString(base::CommandLine::ForCurrentProcess()->GetArgs(), "\n");
-    if (!go->claim_profile(project_b::ProfileDir().value().c_str(),
-                           urls.c_str())) {
+    // Go chooses the profile. One copy of the app per profile folder: a copy started on
+    // a folder another copy owns hands it the URLs on its command line and quits, having
+    // written nothing there. --user-data-dir names the profile's folder as it does for
+    // Chrome, so tools that drive Chrome (ChromeDriver gives every session a fresh one)
+    // drive us the same way.
+    const base::CommandLine* switches = base::CommandLine::ForCurrentProcess();
+    std::string urls = base::JoinString(switches->GetArgs(), "\n");
+    char* profile_dir = go->claim_profile(
+        switches->GetSwitchValuePath("root").value().c_str(),
+        switches->GetSwitchValueASCII("profile").c_str(),
+        switches->GetSwitchValuePath("user-data-dir").value().c_str(),
+        urls.c_str());
+    if (!profile_dir) {
       return 0;
     }
+    project_b::SetProfileDir(base::FilePath(profile_dir));
+    free(profile_dir);
     project_b::timeline::Start(
         project_b::ProfileDir(),
         base::Time::Now() - base::Process::Current().CreationTime());

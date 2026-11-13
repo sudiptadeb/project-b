@@ -11,7 +11,10 @@
 extern "C" {
 #endif
 
-int PBClaimProfile(const char* profile_dir, const char* urls);
+char* PBClaimProfile(const char* root,
+                     const char* profile,
+                     const char* user_data_dir,
+                     const char* urls);
 void PBStart(const PBEngineCalls* calls,
              const char* profile_dir,
              const char* blocked_hosts,

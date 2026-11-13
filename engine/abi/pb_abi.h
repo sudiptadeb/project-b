@@ -214,10 +214,16 @@ typedef struct PBEngineCalls {
 // What the adapter can tell the Go core. The main binary fills it in from Go's exports
 // (pb_exports.h) and hands it to ProjectBMain. Helpers have no Go and no table.
 typedef struct PBGoCalls {
-  // The first call, before anything is written to the profile. Returns 1 when this copy
-  // owns the profile folder. Returns 0 when another copy owns it and has been handed
-  // urls, one per line, possibly none: this copy then quits.
-  int (*claim_profile)(const char* profile_dir, const char* urls);
+  // The first call, before anything is written to the profile. Go chooses the profile
+  // from the command line's switches, each "" when not given: root, the folder that holds
+  // the profiles and their list (--root); profile, a listed profile's id (--profile);
+  // user_data_dir, a folder that is the profile as it is (--user-data-dir). It returns the
+  // profile's folder, malloc'd, when this copy owns it. It returns NULL when another copy
+  // owns it and has been handed urls, one per line, possibly none: this copy then quits.
+  char* (*claim_profile)(const char* root,
+                         const char* profile,
+                         const char* user_data_dir,
+                         const char* urls);
 
   // hook_table is the hash of the generated hook list the adapter was built with; Go
   // refuses a library whose list differs from its own.

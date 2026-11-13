@@ -9,7 +9,7 @@ invent nothing here; where we differ from Chrome it is said below, with the reas
 
 | Switch | What it does | Chrome's source |
 |---|---|---|
-| `--user-data-dir=<dir>` | The profile folder. `--profile` is our older name for it and still works. | `chrome_paths` |
+| `--user-data-dir=<dir>` | The profile folder, used as it is. It never enters the profile list, so `--profile` (a listed profile's id) and `--root` don't apply. | `chrome_paths` |
 | `--remote-debugging-port=N` | Listens on `127.0.0.1:N`, or `[::1]:N` if that fails. `0` lets the system pick and writes `DevToolsActivePort` (port, then the browser target's path) into the profile. Prints `DevTools listening on ws://...` on stderr. | `chrome/browser/devtools/remote_debugging_server.cc` |
 | `--remote-debugging-pipe` | CDP over fds 3 and 4. The app closes when the pipe does. | same |
 | `--remote-allow-origins=<list>` | Which `Origin` headers may open a WebSocket. Content checks it, and the `Host` header too. | `content/browser/devtools/devtools_http_handler.cc` |

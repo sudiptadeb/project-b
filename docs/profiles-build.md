@@ -6,9 +6,17 @@ built so far, and the order of building at the end says which steps are done.
 
 ## Today
 
-- One profile folder: `--user-data-dir`, else `--profile`, else `~/.project-b/default`,
-  chosen in C++ before Go starts (`engine/browser/browser_main_parts.mm`). Everything Go
-  keeps takes that one folder (`core/app/app.go`).
+- Go chooses the profile, in `PBClaimProfile` before content starts (`core/profiles`,
+  `core/cmd/lib/main.go`): the folder `--user-data-dir` names, as it is and never listed;
+  else the listed profile `--profile=<id>` names, refusing an id that isn't listed; else
+  the profile used last. The list is `profiles.json` in the root, `~/.project-b` unless
+  `--root=<dir>` names another, beside the profile folders: each profile's id (its folder's
+  name), name, a copy of its frame colour, and when a copy last started on it. A first
+  start, with no list, makes it holding `default`, named Personal; a `default` that
+  already holds a `prefs.json` is left as it is. A list where no profile was used yet
+  starts the first listed. Every change to the list holds a lock on it
+  (`profiles.lock`), since several copies write it. Everything Go keeps for a profile
+  takes its one folder (`core/app/app.go`).
 - Prefs are four values in `<profile>/prefs.json`: where the tabs go, automatic updates,
   the frame colour, the theme (`core/prefs`).
 - One copy of the app per folder, with a handover (`core/instance`). Nothing starts a
@@ -95,8 +103,8 @@ back with a new tab, as a relaunch does today.
 Each commit builds, leaves a working app, and carries its tests.
 
 1. Done. Our own pages in the off-the-record context.
-2. The profile list beside the folders, and the start choosing the profile: named, else
-   used last, else a first one.
+2. Done. The profile list beside the folders, and the start choosing the profile: named,
+   else used last, else a first one.
 3. Templates, Personal and Work; the first profile is made from Personal.
 4. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
 5. The picker: a copy that hasn't chosen, its page, New Profile from a template.

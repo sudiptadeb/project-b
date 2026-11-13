@@ -155,8 +155,15 @@ fills the colour itself, faint.
 
 ## One copy per profile
 
+Go chooses the profile before content starts (`core/profiles`, through `PBClaimProfile`):
+the listed profile `--profile=<id>` names, else the one used last. The list is
+`profiles.json` in the root, `~/.project-b` unless `--root=<dir>` names another, beside the
+profile folders; a first start makes it holding `default`, named Personal, and leaves a
+`default` that already holds a profile as it is. `--user-data-dir=<dir>` is a folder used
+as the profile as it is, and never enters the list: ChromeDriver and the tests use it.
+
 One copy of the app owns a profile folder while it runs (`core/instance`). A second copy
-started on the same `--user-data-dir` or `--profile` writes nothing there: it hands the URLs
+started on the same profile writes nothing there: it hands the URLs
 on its command line to the running copy, whose window used last comes to the front and
 opens each in a new tab, and exits 0.
 

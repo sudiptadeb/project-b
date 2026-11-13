@@ -15,6 +15,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py windows    # only several windows
     python3 tools/drive_first_app.py move       # only moving a tab between windows
     python3 tools/drive_first_app.py bounds     # only a window's frame, set and read
+    python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -98,6 +99,8 @@ class App:
     running = []  # Every app started and not yet closed.
 
     def __init__(self, profile, extra=()):
+        """Starts the app on the folder profile, as it is, or with profile None on whatever
+        the start chooses from extra."""
         self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
         os.mkfifo(self.fifo)
         self.log = open(os.path.join(OUT, "app.log"), "a")
@@ -106,7 +109,7 @@ class App:
         self.next = 0
         self.started = time.time()
         self.proc = subprocess.Popen(
-            [BIN, f"--profile={profile}", f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
+            [BIN, *([f"--user-data-dir={profile}"] if profile else []), f"--block={BLOCKED}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows", *extra],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1,
         )
         App.running.append(self)
@@ -1104,7 +1107,7 @@ def window_checks():
     check("Cmd+T in the second window added a tab there, not in the first", app.js(f"{ROWS}") == 1)
 
     # The first window is the one used last now: a second start's URL opens there.
-    started = subprocess.run([BIN, f"--profile={profile}", PAGES + "clicks"], timeout=60, capture_output=True)
+    started = subprocess.run([BIN, f"--user-data-dir={profile}", PAGES + "clicks"], timeout=60, capture_output=True)
     check("a second start on the profile hands over and exits", started.returncode == 0, started.returncode)
     app.wait(f"{ROWS}===2&&{VALUE}==={json.dumps(PAGES + 'clicks')}", 20)
     check("its URL opens in a new tab in the window used last", True)
@@ -1206,6 +1209,33 @@ def bounds_checks():
     app.close()
 
 
+def profile_checks():
+    """The start chooses the profile in Go, from the list in a root of its own here: a first
+    start makes the list holding Personal in default, a listed profile is named by its id,
+    and --user-data-dir is a folder used as it is, which never enters the list."""
+    root = tempfile.mkdtemp(prefix="pb-root-")
+    listed = lambda: json.load(open(os.path.join(root, "profiles.json")))["profiles"]
+    app = App(None, [f"--root={root}"])
+    app.wait("!!document.querySelector('input')", 30)
+    first = listed()
+    check("a first start makes the list holding Personal, in default",
+          [(p["id"], p["name"]) for p in first] == [("default", "Personal")], first)
+    check("and runs on that folder", os.path.exists(os.path.join(root, "default", "timeline.log")), os.listdir(root))
+    check("the list records when the profile was used last", first[0].get("lastUsed", "") != "", first)
+    started = subprocess.run([BIN, f"--root={root}", "--profile=default", PAGES + "clicks"], timeout=60, capture_output=True)
+    check("a start naming the running profile by its id hands over and exits", started.returncode == 0, started.returncode)
+    app.wait(f"{ROWS}===2&&{VALUE}==={json.dumps(PAGES + 'clicks')}", 20)
+    check("and its URL opens in the running copy", True)
+    app.close()
+    started = subprocess.run([BIN, f"--root={root}", "--profile=nobody"], timeout=60, capture_output=True, text=True)
+    check("a profile that isn't listed is refused", started.returncode == 1 and "no profile \"nobody\"" in started.stderr, (started.returncode, started.stderr[-300:]))
+    other = tempfile.mkdtemp(prefix="pb-root-")
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"), [f"--root={other}"])
+    app.wait("!!document.querySelector('input')", 30)
+    check("a folder named with --user-data-dir leaves the root alone", os.listdir(other) == [], os.listdir(other))
+    app.close()
+
+
 def cookie_checks():
     """A cookie a page sets is saved in the profile and sent back after a restart."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
@@ -1222,5 +1252,5 @@ def cookie_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, cookie_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, cookie_checks]))

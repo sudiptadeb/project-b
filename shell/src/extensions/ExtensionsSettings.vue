@@ -64,11 +64,14 @@ function remove() {
     <section aria-labelledby="pbx-installed">
       <div class="pbx-heading">
         <h2 id="pbx-installed">Installed</h2>
-        <button id="pbx-load-unpacked" type="button" class="text-button" @click="send({ t: 'extensionLoadUnpacked' })">Load unpacked</button>
+        <button id="pbx-load-unpacked" type="button" class="text-button" @click="send({ t: 'extensionLoadUnpacked' })">Load unpacked…</button>
         <button type="button" class="text-button" @click="send({ t: 'extensionInstallPackage' })">Install package…</button>
       </div>
-      <p v-if="view.error" class="pbx-message" role="alert">{{ view.error }}</p>
       <div ref="list" class="card">
+        <div v-if="view.error" class="row" role="alert">
+          <span class="label pbx-error" :title="view.error">Couldn't add the extension.</span>
+          <button type="button" class="text-button quiet" @click="send({ t: 'extensionDismissError' })">Dismiss</button>
+        </div>
         <div v-if="!installed.length" class="row">
           <span class="label pbx-muted">No extensions installed</span>
         </div>
@@ -147,21 +150,21 @@ function remove() {
 </template>
 
 <style scoped>
-/* Like Chrome's developer bar: the ways to add an extension sit beside its heading. */
+/* The heading row: the ways to add an extension on its right, at the 30px every heading
+   row has. */
 .pbx-heading {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 30px;
 }
 
 .pbx-heading h2 {
   flex: 1;
 }
 
-.pbx-message {
-  margin: 8px 0 0;
+.pbx-error {
   color: var(--danger);
-  font-size: 13px;
   font-weight: 400;
 }
 

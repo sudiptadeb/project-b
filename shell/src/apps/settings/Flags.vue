@@ -1,14 +1,17 @@
 <script setup>
+import { computed } from 'vue';
 import Field from '@/ui/Field.vue';
 import { send, state } from './state.js';
 
 // Flags, as core/flags/registry.json defines them, each drawn by its type: a switch for a
-// boolean, a select for an enum, a field for the rest. A change waits for the next launch,
-// so Relaunch shows beside each flag whose saved value isn't the one running.
+// boolean, a select for an enum, a field for the rest. A change waits for the next launch:
+// each changed flag says so, and one Relaunch at the top applies them all.
 
 function set(flag, text) {
   send({ t: 'setFlag', id: flag.id, text });
 }
+
+const pending = computed(() => state.flags.filter((f) => f.pending).length);
 
 // pattern is a flag's pattern as a JavaScript one. Go's syntax and JavaScript's agree on
 // the simple patterns the registry has; one they don't is left to Go to check.
@@ -43,15 +46,20 @@ function error(flag, text) {
 </script>
 
 <template>
-  <section aria-labelledby="flags">
-    <h2 id="flags">Flags</h2>
+  <section aria-label="Flags">
     <div class="card">
+      <div v-if="pending" class="row">
+        <span class="label">Relaunch to apply {{ pending }} {{ pending === 1 ? 'change' : 'changes' }}</span>
+        <button type="button" class="text-button" @click="send({ t: 'relaunch' })">Relaunch</button>
+      </div>
       <div v-for="f in state.flags" :key="f.id" class="row">
-        <label class="label" :for="'flag-' + f.id">
-          {{ f.name }}
-          <span class="note">{{ f.built ? f.description : 'Not in this build' }}</span>
+        <label class="label" :for="f.type === 'boolean' || f.type === 'enum' || !f.built ? 'flag-' + f.id : undefined">
+          <span class="name">
+            {{ f.name }}
+            <span v-if="f.pending" class="tag">Relaunch to apply</span>
+          </span>
+          <span class="secondary">{{ f.built ? f.description : 'Not in this build' }}</span>
         </label>
-        <button v-if="f.pending" type="button" class="text-button primary" @click="send({ t: 'relaunch' })">Relaunch</button>
         <input
           v-if="f.type === 'boolean'"
           :id="'flag-' + f.id"
@@ -84,11 +92,10 @@ function error(flag, text) {
 </template>
 
 <style scoped>
-.note {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted);
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .value {

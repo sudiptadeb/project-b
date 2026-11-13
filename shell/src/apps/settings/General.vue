@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { phone } from '@/phone.js';
+import Segmented from '@/ui/Segmented.vue';
 import { send, state } from './state.js';
 
 // General settings: what Go owns, shown, and the user's changes sent back. It changes only
@@ -61,31 +62,13 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
     <section aria-labelledby="appearance">
       <h2 id="appearance">Appearance</h2>
       <div class="card">
-        <div class="row" role="radiogroup" aria-labelledby="theme">
-          <span id="theme" class="label">Theme</span>
-          <label v-for="t in themes" :key="t.value" class="choice">
-            <input
-              type="radio"
-              name="theme"
-              :value="t.value"
-              :checked="state.theme === t.value"
-              @change="send({ t: 'setTheme', text: t.value })"
-            />
-            {{ t.label }}
-          </label>
+        <div class="row">
+          <span class="label">Theme</span>
+          <Segmented label="Theme" :options="themes" :model-value="state.theme" @update:model-value="send({ t: 'setTheme', text: $event })" />
         </div>
-        <div v-if="!phone" class="row" role="radiogroup" aria-labelledby="tab-layout">
-          <span id="tab-layout" class="label">Tab layout</span>
-          <label v-for="l in layouts" :key="l.value" class="choice">
-            <input
-              type="radio"
-              name="tabLayout"
-              :value="l.value"
-              :checked="state.tabLayout === l.value"
-              @change="send({ t: 'setTabLayout', text: l.value })"
-            />
-            {{ l.label }}
-          </label>
+        <div v-if="!phone" class="row">
+          <span class="label">Tab layout</span>
+          <Segmented label="Tab layout" :options="layouts" :model-value="state.tabLayout" @update:model-value="send({ t: 'setTabLayout', text: $event })" />
         </div>
       </div>
     </section>
@@ -233,18 +216,6 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
   border: 0;
   opacity: 0;
   cursor: pointer;
-}
-
-.choice {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.choice input {
-  margin: 0;
-  accent-color: var(--accent);
 }
 
 /* On a phone the colours take a line of their own, at a finger's size. */

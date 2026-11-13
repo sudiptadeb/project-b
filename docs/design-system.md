@@ -9,13 +9,14 @@ How every piece of our own UI looks: the shell, the settings page, and any app a
 |---|---|
 | `shell/src/tones.js` | Every colour, made from the one frame colour Go owns, light and dark |
 | `shell/src/theme.js` | Puts those colours on the root as CSS variables and follows light or dark |
-| `shell/src/design.css` | Type, the floating shadow, the focus ring, and the shared controls: `.icon-button`, `.text-button` with `.primary` and `.quiet`, and their touch sizes |
-| `shell/src/apps/settings/SettingsApp.vue` | The settings page's own parts: `.nav-item`, `.card`, `.row`, `.label`, `select`, `.switch` |
-| `shell/src/extensions/InstallPrompt.vue` | The reference dialog |
-| `shell/src/extensions/ExtensionsToolbar.vue` | The reference floating menu (`.pbx-menu`) |
+| `shell/src/design.css` | Type, the floating shadow, the focus ring, and the shared controls: `.icon-button`, `.text-button` with `.primary`, `.quiet` and `.danger`, `.field`, `select`, `.switch`, `.tag`, `.secondary`, `.field-error`, and their touch sizes |
+| `shell/src/ui/` | The shared parts that need behaviour: `Dialog`, `RowMenu`, `Field`, `Segmented`, `Swatches`, and `escape.js`, which gives Escape to the innermost thing open |
+| `shell/src/apps/settings/SettingsApp.vue` | The settings page's own layout: `.nav-item`, `.card`, `.row`, `.label`, `h2` |
+| `shell/src/extensions/ExtensionsToolbar.vue` | The toolbar's floating menu (`.pbx-menu`) |
 
 Each app's `main.js` imports `@/design.css` before mounting. A class two apps need goes into
-`design.css`, never into one app's global style. That is how the install prompt once drew
+`design.css`, never into one app's global style, and a part with behaviour two sections
+need goes into `shell/src/ui/`, never copied. That is how the install prompt once drew
 browser-default buttons: it used `.text-button`, which only the settings page defined, and the
 shell shows the prompt over a web page, where that class did not exist.
 
@@ -50,7 +51,8 @@ Never write a colour literal in a component. Use these variables, which `tones.j
 | `--icon` | Icons |
 | `--line` | Every hairline border and divider |
 | `--hover`, `--press` | The toolbar's own hover and press |
-| `--danger` | Errors, and only errors |
+| `--danger` | Errors, and a destructive answer or menu item |
+| `--on-danger` | Text on `--danger`: a Delete button's words |
 
 Text on `--accent` is `--on-accent`, never a fixed colour: the accent's lightness follows the
 frame, so white reads on slate and not on amber, and the near-black ink the other way round.
@@ -86,7 +88,7 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 | Text button | 30px high, 12px side padding, radius 6 |
 | Settings nav item | 34px high, radius 6 |
 | Menu item | 32px high, radius 4 |
-| Settings row | at least 48px high, padding 8px 14px |
+| Settings row | at least 48px high, padding 8px 16px |
 | Gaps | 4px between toolbar buttons, 8px between buttons in a group, 12px between an icon and its text in a header |
 | Touch | buttons grow to 40px; hover does nothing |
 
@@ -101,25 +103,108 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 
 ## Controls
 
-Use these classes; never leave a `<button>`, `<select>` or `<input>` to the browser's look.
+Use these; never leave a `<button>`, `<select>`, `<input>` or radio to the browser's look.
 
-- `.icon-button`: an icon alone, with an `aria-label`.
-- `.text-button`: words. Add `.primary` for the one answer a dialog wants, and only there.
-  Add `.quiet` for an action inside a row (Details, Remove, Reset).
-- `.switch`: a checkbox drawn as a switch (settings).
-- `select`: settings' style.
-- A text input: 30px high, a hairline, radius 6, `Off` as its placeholder when empty means
-  off (`.field` in `Flags.vue`).
+| Need | Use | Not |
+|---|---|---|
+| An icon alone | `.icon-button` with an `aria-label` | |
+| Words | `.text-button`; `.quiet` inside a row | |
+| The one answer a dialog wants | `.text-button.primary` | a primary button on a row |
+| A destructive answer (Delete, Discard, Remove) | `.text-button.danger`, in a dialog | |
+| On or off | `.switch` | a checkbox |
+| Two to four short choices | `Segmented` (Theme: System, Light, Dark) | radio buttons |
+| Five or more choices, or long ones | `select` | |
+| A colour | `Swatches`: presets, and with `custom` the system's picker behind a + | a bare colour input |
+| A name, a number, a value | `Field` (`.field`); empty means Off where Off makes sense | a section's own input style |
+| A row's actions | `RowMenu`: a ⋯ button and its menu | a row of quiet buttons |
+| A label on an item (Hidden, Locked, Not in this build) | `.tag` | |
+| A second line under a label | `.secondary` | a section's own class |
+| A question | `Dialog` | `confirm()`, or a section's own `<dialog>` |
 
 ## Patterns
 
-- **Dialog** (`InstallPrompt.vue`): a modal `<dialog>`, 360px wide, padding 20. A head with a
-  32px icon and a 15px title, the body, then the buttons at the bottom right: Cancel as
-  `.text-button`, the answer as `.text-button.primary`. Escape cancels. A list goes in a
-  hairline box with radius 6 that scrolls.
-- **Menu** (`.pbx-menu`): floating, 280px wide, padding 4, items 32px high.
-- **Settings section:** an `h2` heading in `--muted`, then a `.card` of `.row`s. A row is a
-  `.label`, then its control on the right.
+From the settings audit of 2026-11-13 (owner approved). Every section follows them.
+
+### Saving
+
+- **Everything saves the moment it changes.** No Save buttons, and no select that waits for
+  a button.
+- **A text field saves on Enter or when you leave it** (`Field`). Escape puts the saved
+  value back and leaves the field; it never closes the page from inside one.
+- **A choice that throws something away goes inside the confirm dialog,** not in a select
+  on the row.
+- **What applies only after a relaunch** says so on its row, and one Relaunch button at
+  the top of the section applies them all.
+
+### Lists
+
+- **A list is a `.card` of `.row`s.** A row: a leading mark (a colour dot, an icon), the
+  name as text, an optional `.secondary` line, then at most one inline control (usually a
+  switch) and a `RowMenu`. Names are never always-open fields.
+- **The row's menu holds every action on it:** Edit…, Move up and Move down where order
+  matters, Details, then a separator and the destructive one last, in `--danger`.
+  Right-clicking the row opens the same menu.
+- **Adding:** a "New …" button on the right of the list's heading row, in the same place
+  for every list. Never a form row after the items.
+- **Create and edit share one `Dialog`** with the item's fields, titled "New workspace" or
+  "Edit workspace". Enter saves, Escape cancels.
+- **A new item gets the next colour no other item has.** Names are unique in a list; a
+  duplicate is refused under the field.
+- **An empty list is one muted row:** "No workspaces yet". The add button stays where it is.
+- **A long name is one line with an ellipsis,** the full name in its tooltip.
+
+### Rows and headings
+
+- **A row** is at least 48px high, padding 8px 16px: the label on the left, the control on
+  the right.
+- **The nav names the section; the content never repeats it.** An `h2` names a group of
+  rows, and a section with one group has none. A heading row may carry one action on its
+  right, and is 30px high with or without it.
+- **More under a row:** the row is the button, with a chevron on its right that turns
+  when it opens. The panel sits under the row on `--accent-tint`. Escape closes it.
+
+### Destructive actions
+
+- **Confirm whatever deletes the user's data or more than one of their changes** in a
+  `Dialog` that says what is lost: "Discard 4 changed shortcuts?". The button names the
+  action (Delete, Discard, Remove), never OK.
+- **A small edit that is easily redone** (one key, one switch) needs no confirm.
+
+### Errors and status
+
+- **Check a value where the rule is known** (required, unique, min, max, pattern, a key in
+  use). The error shows under the field in `.field-error`, the typed text stays, and Enter
+  keeps focus there.
+- **A system error is one plain sentence** in a row of the card it is about, with the
+  technical detail in its tooltip. Never a raw Go or system message.
+- **A status that asks the user to act carries that action on its own row.** An update
+  that is ready has Relaunch there; one that failed has Try again; a key in use links to
+  the action that has it.
+
+### Keyboard and focus
+
+- **One focus ring,** `--focus-ring`; inside a menu, the inset one.
+- **A group of choices** (`Segmented`, `Swatches`) is one Tab stop, and the arrow keys move
+  in it.
+- **When an action removes what had focus,** focus goes to a stated place: the next row, or
+  the button that opened it. A `Dialog` gives focus back to what opened it.
+- **Escape closes the innermost thing open:** a menu, then a dialog, then a field's edit or
+  an open row, then the page (`ui/escape.js`).
+
+### Copy
+
+- **Sentence case** everywhere: "New workspace", not "New Workspace".
+- **An ellipsis** when the button asks for more before it acts ("New workspace…", "Load
+  unpacked…"), none when it acts at once.
+- **Plain words for errors.**
+
+### The look ahead
+
+From the owner's reference designs, for the sidebar and toolbar work that follows: soft
+surfaces tinted from the frame colour rather than grey; thin line icons, 16px at a 1.5px
+stroke; colour carrying identity, a workspace or a tab group as a coloured pill or dot, a
+profile as a pill on the toolbar; room to breathe, sidebar rows 36px; the address field a
+rounded surface with the page's own actions inside its right end.
 
 ## Adding UI
 

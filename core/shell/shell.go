@@ -22,6 +22,9 @@ type command struct {
 	Text string          `json:"text"`
 	ID   int64           `json:"id"`
 	Data json.RawMessage `json:"data"`
+	// Workspace is where newTab opens its tab: a workspace's id, or "" for the default.
+	// Without it the tab opens in the workspace of the window's active tab.
+	Workspace *string `json:"workspace"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -151,7 +154,13 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "reload":
 		m.tabs.Reload()
 	case "newTab":
-		m.Interaction(w, "tab.new", func() { m.tabs.CreateIn(w, "") })
+		m.Interaction(w, "tab.new", func() {
+			if c.Workspace == nil {
+				m.tabs.Create(w)
+			} else {
+				m.tabs.CreateIn(w, *c.Workspace)
+			}
+		})
 	case "closeTab":
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":

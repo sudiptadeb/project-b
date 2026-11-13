@@ -40,7 +40,7 @@ func TestCreateCloseAndActivate(t *testing.T) {
 	lists := 0
 	m.OnListChanged(func() { lists++ })
 
-	a, b, c := m.Create(), m.Create(), m.Create()
+	a, b, c := m.Create(1), m.Create(1), m.Create(1)
 	if m.ActiveID() != c || !slices.Equal(ids(m.All()), []engine.TabID{a, b, c}) {
 		t.Fatalf("after create: active %v all %v", m.ActiveID(), ids(m.All()))
 	}
@@ -83,7 +83,7 @@ func TestClosingTheLastTabEmptiesTheList(t *testing.T) {
 	m := oneWindow(e)
 	empty := false
 	m.OnEmpty(func(w engine.WindowID) { empty = w == 1 })
-	m.Create()
+	m.Create(1)
 	m.CloseActive()
 	if !empty || len(m.All()) != 0 || m.ActiveID() != 0 {
 		t.Fatalf("empty %v all %v active %v", empty, m.All(), m.ActiveID())
@@ -93,7 +93,7 @@ func TestClosingTheLastTabEmptiesTheList(t *testing.T) {
 func TestATabAPageOpensIsShownOnlyInTheForeground(t *testing.T) {
 	e := &fakeEngine{}
 	m := oneWindow(e)
-	a := m.Create()
+	a := m.Create(1)
 	m.HandleTabOpened(a, 7, "https://b.test/", "", false)
 	if m.ActiveID() != a || m.All()[1].URL != "https://b.test/" {
 		t.Fatalf("background open: active %v all %v", m.ActiveID(), m.All())
@@ -106,7 +106,7 @@ func TestATabAPageOpensIsShownOnlyInTheForeground(t *testing.T) {
 
 func TestFaviconFollowsThePage(t *testing.T) {
 	m := oneWindow(&fakeEngine{})
-	id := m.Create()
+	id := m.Create(1)
 	m.HandleNavigationStarting(id, "https://a.test/")
 	m.HandleFaviconChanged(id, "data:image/png;base64,AAAA")
 	if m.Active().Favicon == "" {
@@ -147,7 +147,7 @@ func (l *loads) LoadURL(_ engine.TabID, u string) { l.urls = append(l.urls, u) }
 func TestANewTabHoldsTheBlankPageAndReadsAsEmpty(t *testing.T) {
 	e := &loads{}
 	m := oneWindow(e)
-	id := m.Create()
+	id := m.Create(1)
 	if !slices.Equal(e.urls, []string{BlankURL}) {
 		t.Fatalf("loaded %v", e.urls)
 	}
@@ -170,12 +170,12 @@ func TestANewTabHoldsTheBlankPageAndReadsAsEmpty(t *testing.T) {
 func TestWindowsKeepTheirOwnTabs(t *testing.T) {
 	e := &fakeEngine{}
 	m := oneWindow(e)
-	a, b := m.Create(), m.Create()
+	a, b := m.Create(1), m.Create(1)
 	m.AddWindow(2)
 	if m.Front() != 2 || m.ActiveID() != 0 {
 		t.Fatalf("a new window is in front, with no tabs: front %v active %v", m.Front(), m.ActiveID())
 	}
-	c := m.Create()
+	c := m.Create(2)
 	if m.WindowOf(c) != 2 || !slices.Equal(ids(m.AllIn(2)), []engine.TabID{c}) || !slices.Equal(ids(m.AllIn(1)), []engine.TabID{a, b}) {
 		t.Fatalf("window 1 %v, window 2 %v", ids(m.AllIn(1)), ids(m.AllIn(2)))
 	}
@@ -220,9 +220,9 @@ func TestWindowsKeepTheirOwnTabs(t *testing.T) {
 func TestRemovingAWindowClosesItsTabs(t *testing.T) {
 	e := &fakeEngine{}
 	m := oneWindow(e)
-	a := m.Create()
+	a := m.Create(1)
 	m.AddWindow(2)
-	b, c := m.Create(), m.Create()
+	b, c := m.Create(2), m.Create(2)
 	m.RemoveWindow(2)
 	if m.Front() != 1 || m.ActiveID() != a || !slices.Equal(m.Windows(), []engine.WindowID{1}) {
 		t.Fatalf("front %v active %v windows %v", m.Front(), m.ActiveID(), m.Windows())
@@ -237,9 +237,9 @@ func TestRemovingAWindowClosesItsTabs(t *testing.T) {
 func TestMovingATabBetweenWindows(t *testing.T) {
 	e := &fakeEngine{}
 	m := oneWindow(e)
-	a, b := m.Create(), m.Create()
+	a, b := m.Create(1), m.Create(1)
 	m.AddWindow(2)
-	c := m.Create()
+	c := m.Create(2)
 	var emptied []engine.WindowID
 	m.OnEmpty(func(w engine.WindowID) { emptied = append(emptied, w) })
 
@@ -274,7 +274,20 @@ func TestATabKeepsItsWorkspace(t *testing.T) {
 	if m.WindowOf(work) != 2 || workspace(work) != "0a1b2c3d" || m.AllIn(2)[0].Workspace != "0a1b2c3d" {
 		t.Fatalf("after the move: window %v, %+v", m.WindowOf(work), m.AllIn(2))
 	}
-	if m.Create(); workspace(m.ActiveID()) != "" {
-		t.Fatalf("a new tab is in %q", workspace(m.ActiveID()))
+}
+
+// New Tab opens in the workspace of its window's active tab, and in the default one in a
+// window with no tab.
+func TestANewTabTakesTheActiveTabsWorkspace(t *testing.T) {
+	m := oneWindow(&fakeEngine{})
+	workspace := func(id engine.TabID) string { t, _ := m.Get(id); return t.Workspace }
+	first := m.Create(1)
+	work := m.CreateIn(1, "0a1b2c3d")
+	fromWork := m.Create(1)
+	m.Activate(first)
+	fromDefault := m.Create(1)
+	got := []string{workspace(first), workspace(work), workspace(fromWork), workspace(fromDefault)}
+	if !slices.Equal(got, []string{"", "0a1b2c3d", "0a1b2c3d", ""}) {
+		t.Fatalf("workspaces %q", got)
 	}
 }

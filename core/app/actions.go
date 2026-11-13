@@ -27,7 +27,7 @@ func (a *App) registerActions(e engine.Engine) {
 	})
 	add("profile.picker", "Profiles…", func() { relaunch.Copy("--root="+a.profiles.Root(), "--picker") })
 
-	add("tab.new", "New Tab", func() { a.Shell.Interaction(a.Tabs.Front(), "tab.new", func() { a.Tabs.Create() }) })
+	add("tab.new", "New Tab", func() { a.Shell.Interaction(a.Tabs.Front(), "tab.new", func() { a.Tabs.Create(a.Tabs.Front()) }) })
 	add("address.focus", "Open Location…", func() { a.Shell.FocusAddressBar(a.Tabs.Front()) })
 	add("window.new", "New Window", func() { a.NewWindow("") })
 	add("window.close", "Close Window", func() { a.Window.Request(a.Tabs.Front(), engine.WindowClose) })

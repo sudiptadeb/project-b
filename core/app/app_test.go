@@ -957,6 +957,44 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 	}
 }
 
+// New Tab, by Cmd+T or the shell's newTab, opens in the workspace of the window's active
+// tab. The shell's newTab can name a workspace instead, "" for the default.
+func TestANewTabOpensInTheActiveTabsWorkspace(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var work workspaces.Workspace
+	r.e.Post(func() { work, _ = r.a.Workspaces.Create("Work", "#5b7fd6") })
+	r.e.Settle()
+	// opens runs a step and checks it opened one tab, active, in want, in Go and in the
+	// engine.
+	n := 1
+	opens := func(step string, do func(), want string) {
+		t.Helper()
+		do()
+		r.e.Settle()
+		var tab tabs.Tab
+		var count int
+		var in string
+		r.e.Post(func() {
+			tab, count = r.a.Tabs.Active(), len(r.a.Tabs.All())
+			in = r.e.Workspace(tab.ID)
+		})
+		r.e.Settle()
+		n++
+		if count != n || tab.Workspace != want || in != want {
+			t.Fatalf("%s: %d tabs, the active one in %q, in %q in the engine; want %q", step, count, tab.Workspace, in, want)
+		}
+	}
+	cmdT := func() { r.e.Fire(1, 0, "key", "newTab") }
+	shellNewTab := func() { r.shell(`{"t":"newTab"}`) }
+	opens("the shell names a workspace", func() { r.shell(`{"t":"newTab","workspace":"` + work.ID + `"}`) }, work.ID)
+	opens("Cmd+T from a tab in it", cmdT, work.ID)
+	opens("the shell's newTab from a tab in it", shellNewTab, work.ID)
+	opens("the shell names the default", func() { r.shell(`{"t":"newTab","workspace":""}`) }, "")
+	opens("Cmd+T from a tab in the default", cmdT, "")
+	opens("the shell's newTab from a tab in the default", shellNewTab, "")
+}
+
 // Every shell has the workspaces from its snapshot on, and hears of one made or renamed at
 // once, so the dot on a tab in one is in its colour.
 func TestTheShellHearsTheWorkspaces(t *testing.T) {

@@ -97,7 +97,7 @@ canGoForward, workspace}`. The snapshot also has `frameWidth`, `running` (the ve
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH` | The regions: the shell's, the controls inside the drag bars, and the drag bars; and the tabs shown with their rectangles. The kit sends it |
-| `newTab` | | Opens a tab in this window and makes it active |
+| `newTab` | `workspace`, optional: a workspace's id, `""` for the default | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |

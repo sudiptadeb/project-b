@@ -168,9 +168,12 @@ func (m *Manager) WindowOf(id engine.TabID) engine.WindowID { return m.windowOf[
 // front is the window in front's tabs.
 func (m *Manager) front() *window { return m.windows[m.Front()] }
 
-// Create opens a new tab at the end of the window in front, on the blank page, in the
-// default workspace, and makes it active.
-func (m *Manager) Create() engine.TabID { return m.CreateIn(m.Front(), "") }
+// Create is New Tab: it opens a new tab at the end of window w, on the blank page, in the
+// workspace of w's active tab, or in the default one when w has none, and makes it active.
+func (m *Manager) Create(w engine.WindowID) engine.TabID {
+	active, _ := m.Get(m.ActiveIn(w))
+	return m.CreateIn(w, active.Workspace)
+}
 
 // CreateIn opens a new tab at the end of window w, on the blank page, in a workspace, by
 // its id, or in the default one for "", and makes it active.

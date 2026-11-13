@@ -1,9 +1,9 @@
 # Workspaces: tabs that share no cookies with the rest of the profile
 
 A design note, 2026-11-13, for the fourth step of [profiles.md](profiles.md). The owner
-decided what a workspace is; how it is built and the first way to use it are proposed here,
-and the three defaults under "Proposed defaults" wait for his word. Built for macOS;
-Android gets the signatures. The research behind it is
+decided what a workspace is and where a new tab opens; how it is built and the first way to
+use it are proposed here, and the two defaults under "Proposed defaults" wait for his word.
+Built for macOS; Android gets the signatures. The research behind it is
 `project-b-research/workspaces-container-tabs.md`. "Today" is the app as built so far, and
 the order of building at the end says which steps are done.
 
@@ -43,9 +43,12 @@ the order of building at the end says which steps are done.
   in what the shell and every other manager hear of a tab, left out for the default). It is
   given when the tab is made, `tabs.Manager.CreateIn(window, workspace)`; a tab a page
   opens, and a copy, take the one the engine says. Moving a tab to another window keeps it.
-  A new tab (Cmd+T, File, New Tab, the shell's button), a link from another app, a
-  handover, a new window's first tab, an extension's tab and a tab made over DevTools open
-  in the default. History is the profile's one: a visit in a workspace goes in as any other.
+  New Tab (Cmd+T, File, New Tab, the shell's button) opens in the workspace of the window's
+  active tab, and in the default in a window with no tab (`tabs.Manager.Create(window)`).
+  The shell's `newTab` can name a workspace instead, by its id, "" for the default, so a
+  button can open a tab in a chosen one. A link from another app, a handover, a new
+  window's first tab, an extension's tab and a tab made over DevTools open in the default.
+  History is the profile's one: a visit in a workspace goes in as any other.
 - The Tab menu has New Tab in Workspace, a submenu holding the list `workspaces`
   (`{"list": "workspaces"}` in the menu template), read when the menu opens, as the
   Profiles menu is. Choosing a workspace opens a new tab in it, at the end of the window in
@@ -75,6 +78,8 @@ the order of building at the end says which steps are done.
 - Separate per workspace: cookies, local storage, IndexedDB, caches, service workers.
   Shared across the profile: extensions, permissions, downloads, settings and history.
 - The first way to use a feature is a simple command; other ways come later.
+- New Tab (Cmd+T) opens in the workspace of the window's active tab. The shell can name a
+  workspace for a new tab instead, so a button can open one in a chosen workspace.
 
 ## What changes
 
@@ -97,8 +102,12 @@ an opener, which content would otherwise put in the default workspace
 (`content/browser/web_contents/web_contents_impl.cc`). How the last one is closed, a
 delegate override or a small Chromium patch, is decided from the code when it is built.
 
-**Everything else opens in the default workspace:** a new tab (Cmd+T), a link from another
-app, a tab made over DevTools, a new window's first tab.
+**A new tab takes the workspace of its window's active tab.** Cmd+T from a tab in a
+workspace opens in it, and from a tab in the default, in the default. The shell can name a
+workspace for a new tab instead, for a button that opens one in a chosen workspace.
+
+**Everything else opens in the default workspace:** a link from another app, a tab made
+over DevTools, a new window's first tab.
 
 **Using it, first version.**
 - Tab menu: "New Tab in Workspace", a list of the workspaces read when the menu opens, as
@@ -113,12 +122,10 @@ and network rules work in every workspace.
 
 ## Proposed defaults, for the owner's word
 
-1. Cmd+T opens in the default workspace, as Firefox does, not in the workspace of the tab
-   in front.
-2. A workspace is shown by a coloured dot on the tab, and by nothing else for now.
-3. A new profile starts with no workspaces but the default.
+1. A workspace is shown by a coloured dot on the tab, and by nothing else for now.
+2. A new profile starts with no workspaces but the default.
 
-The app is built as these three say.
+The app is built as these two say.
 
 ## Order of building
 
@@ -132,6 +139,8 @@ Each commit builds, leaves a working app, and carries its tests.
    menu's list.
 4. Done. The shell: the dot on a tab.
 5. Done. Settings: the Workspaces section.
+6. Done. New Tab in the workspace of the window's active tab, and the shell's `newTab`
+   naming one.
 
 ## Decided while building
 

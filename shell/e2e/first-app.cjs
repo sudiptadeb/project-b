@@ -601,7 +601,8 @@ const stopServer = lib.stop;
   releaseServer.close();
 
   // A tab in a workspace shows a dot in the workspace's colour, in both layouts; a tab in
-  // the default workspace shows none. The tab is opened as Tab, New Tab in Workspace does.
+  // the default workspace shows none. The tab is opened as Tab, New Tab in Workspace does,
+  // and New Tab from it opens in it too.
   await stopServer();
   fs.writeFileSync(path.join(profile, 'workspaces.json'), JSON.stringify({ workspaces: [{ id: '0a1b2c3d', name: 'Work', color: '#5b7fd6' }] }));
   await startServer();
@@ -627,6 +628,9 @@ const stopServer = lib.stop;
   await page.screenshot({ path: path.join(out, '12-workspace-dot-top.png') });
   await ui.getByRole('button', { name: 'Tabs on the side' }).click();
   await ui.locator('nav').waitFor();
+  await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
+  check('New Tab from a tab in a workspace opens in it',
+    await until(async () => (await sideRows.count()) === 3 && (await sideRows.nth(2).locator('.workspace').count()) === 1));
 
   check('no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();

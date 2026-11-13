@@ -851,6 +851,90 @@ def picker_checks():
     guest("/usr/bin/killall", "project_b")
 
 
+UPD = "/tmp/pb-update"  # In the guest: the Personal copy's driver pipe and output, for update_checks.
+MANIFEST = "https://github.com/sudiptadeb/project-b/releases/latest/download/releases.json"
+
+
+def app_version():
+    return guest("/usr/bin/defaults", "read", APP + "/Contents/Info", "CFBundleShortVersionString")
+
+
+def copies():
+    """The running copies of the app, as {pid: command line}, helpers left out."""
+    found = {}
+    for line in guest("/bin/ps", "-axo", "pid=,command=").splitlines():
+        pid, _, command = line.strip().partition(" ")
+        if "/Contents/MacOS/project_b" in command and "--type=" not in command:
+            found[pid] = command
+    return found
+
+
+def save_update_logs():
+    """What the copies wrote, beside the shots: the driven copy's output, and each profile's
+    timeline.log, which holds every copy's update and relaunch lines."""
+    for name, path in [("personal-out.txt", f"{UPD}/out"), ("personal-err.txt", f"{UPD}/err")]:
+        with open(os.path.join(SHOTS, name), "w") as f:
+            f.write(guest("/bin/cat", path))
+    for folder in guest("/bin/sh", "-c", f"ls -d {ROOT}/*/ 2>/dev/null").split():
+        name = os.path.basename(folder.rstrip("/"))
+        text = guest("/bin/sh", "-c", f"cat {folder}timeline.log* 2>/dev/null")
+        if text:
+            with open(os.path.join(SHOTS, f"timeline-{name}.log"), "w") as f:
+                f.write(text)
+
+
+def update_checks():
+    """An update, end to end, from the release installed to the one the release manifest
+    calls stable, the way the app does it for a person: with automatic updates on and two
+    profiles open, each in a copy of its own, the update is found, downloaded and staged, and
+    Relaunch in the bubble quits both copies, puts the new release in /Applications, and
+    starts each profile again on it. It needs a later release than the one installed, and the
+    VM to reach github.com. The Personal copy has the driver, only to find and press the
+    bubble's button, with the driver's click, which is routed as AppKit routes a click."""
+    before = app_version()
+    manifest = json.loads(guest("/usr/bin/curl", "-sSL", "--max-time", "30", MANIFEST) or "{}")
+    after = manifest.get("channels", {}).get("stable", "")
+    number = lambda v: tuple(int(p) for p in v.split(".")) if re.fullmatch(r"\d+(\.\d+)*", v) else ()
+    if not number(after) or number(after) <= number(before):
+        screen.refuse(f"can't run the update checks: {before} is installed and the manifest's stable "
+                      f"release is {after or 'unreadable'}. They need a later release to update to.")
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    launch()
+    time.sleep(1.5)
+    window_or_stop("the app starts on its first profile")
+    guest("/usr/bin/killall", "project_b")
+    until(lambda: copies(), lambda c: not c, 10)
+    listed = json.loads(guest("/bin/cat", f"{ROOT}/profiles.json"))
+    personal = listed["profiles"][0]["id"]
+    listed["profiles"].append({"id": "work", "name": "Work", "color": "#5b7fd6", "template": "Work"})
+    guest("/bin/sh", "-c", f"mkdir -p {ROOT}/work && printf '%s' \"$1\" > {ROOT}/profiles.json && "
+          f"echo '{{\"autoUpdate\": true}}' > {ROOT}/update/settings.json", "sh", json.dumps(listed))
+    guest("/usr/bin/open", "-n", APP, "--args", f"--root={ROOT}", "--profile=work")
+    ask = driven(UPD, None, [f"--root={ROOT}", f"--profile={personal}"])
+    js = lambda expr: json.loads(ask("eval", expr) or "null")
+    old = until(copies, lambda c: len(c) == 2, 20)
+    check(f"{before} runs two profiles, each in a copy of its own", len(old) == 2, str(old))
+    # A round a minute, then the download and its checks.
+    button = "document.querySelector('.update.ready button')"
+    offered = until(lambda: js(f"{button}?.textContent.trim() || ''"), bool, 600)
+    shot("u1-ready")
+    check(f"with automatic updates on, {after} is found, downloaded and offered", after in offered, offered)
+    x, y = js(f"(b => [b.x + b.width / 2, b.y + b.height / 2])({button}.getBoundingClientRect())")
+    ask("click", str(round(x)), str(round(y)))
+    installed = until(app_version, lambda v: v == after, 120)
+    new = until(copies, lambda c: len(c) == 2 and not set(c) & set(old), 60)
+    profiles = sorted(re.search(r"--profile=(\S+)", c).group(1) for c in new.values() if "--profile=" in c)
+    check(f"Relaunch puts {after} in /Applications", installed == after, f"{installed}")
+    check("and quits both copies, then starts each profile again, Personal and Work",
+          len(new) == 2 and not set(new) & set(old) and profiles == sorted([personal, "work"]), f"{old} -> {new}")
+    until(windows, lambda w: len(w) == 2, 30)
+    time.sleep(2)
+    shot("u2-relaunched")
+    check("each profile's copy comes back with a window", len(windows()) == 2, str(windows()))
+    guest("/usr/bin/killall", "project_b")
+
+
 if why := missing():
     screen.refuse(f"can't run the VM checks: {why}. See docs/vm-testing.md.")
 os.makedirs(SHOTS, exist_ok=True)
@@ -879,6 +963,16 @@ time.sleep(1)
 if sys.argv[1:] == ["profiles"]:
     profile_checks()
     picker_checks()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
+
+# "check.py update" runs only the update from the installed release to the manifest's stable
+# one; it is never part of a whole run, as it needs a later release and the internet.
+if sys.argv[1:] == ["update"]:
+    try:
+        update_checks()
+    finally:
+        save_update_logs()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 

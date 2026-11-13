@@ -2,6 +2,8 @@
 # Runs the VM checks on one DMG from start to end, with nobody watching:
 #   tools/vm/run.sh <path or URL of a DMG>
 #   tools/vm/run.sh <path or URL of a DMG> windows    # only the checks of several windows
+#   tools/vm/run.sh <path or URL of a DMG> profiles   # only the checks of several profiles
+#   tools/vm/run.sh <path or URL of a DMG> update     # an update from it to the stable release
 #
 # It takes the VM's lock, starts the VM if it isn't running, readies it (prepare.py), installs
 # the DMG, runs check.py,

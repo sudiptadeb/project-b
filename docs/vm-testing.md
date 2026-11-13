@@ -217,6 +217,19 @@ screen's pixels in each icon's corner. They run alone with
 
 On 2026-11-13 all seven passed on this branch's build.
 
+### An update
+
+An update from the installed release to the one the release manifest calls stable, as it
+comes to a person: automatic updates on, Personal and Work each open in a copy of its own,
+the update found, downloaded and offered in the bubble, then Relaunch. It passes when the
+new release is in /Applications and both profiles are running again from it, each in a new
+copy with a window. The Personal copy has the driver, only to find and press the bubble's
+button. It needs a release later than the DMG's, and the VM to reach github.com, so it is
+never part of a whole run, and it stops with exit 2, saying so, when there is no later
+release. Run it with the older release's DMG:
+
+    tools/vm/run.sh <DMG of the release to update from> update
+
 ### A second VM
 
 `PB_VM` names the VM every script here works on, `pb-test` by default. Each VM is a deskrig

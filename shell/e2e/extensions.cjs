@@ -137,7 +137,7 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   // A package file, which the engine asks about before it installs.
   const pick = async () => {
     await fire('choose', '', packaged);
-    await page.getByRole('button', { name: 'Install package' }).click();
+    await page.getByRole('button', { name: 'Install package…' }).click();
   };
   const dialog = page.getByRole('dialog');
   await pick();
@@ -159,20 +159,28 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   await pick();
   await ui.getByRole('dialog').getByRole('button', { name: 'Add extension' }).dispatchEvent('click');
   const rows = installed.getByRole('group', { name });
+  // A row's actions are in its menu: Details, Pin and Remove….
+  const act = async (row, item) => {
+    await row.getByRole('button', { name: `Actions for ${name}` }).click();
+    await page.getByRole('menuitem', { name: item, exact: true }).click();
+  };
   check('Add extension, in the shell, installs it', await until(async () => (await rows.count()) === 1 && (await ui.getByRole('dialog').count()) === 0));
-  await rows.first().getByRole('button', { name: 'Details' }).click();
+  await act(rows.first(), 'Details');
   const details = page.getByRole('definition');
   check('Details shows its ID, source and toolbar button', (await details.allTextContents()).join('|').startsWith(`${id}|1.0|Package|`) && (await page.locator('.pbx-details').textContent()).includes('Yes'), (await details.allTextContents()).join('|'));
-  await rows.first().getByRole('button', { name: 'Details' }).click();
+  await act(rows.first(), 'Hide details');
 
   await fire('choose', '', unpacked);
-  await page.getByRole('button', { name: 'Load unpacked' }).click();
+  await page.getByRole('button', { name: 'Load unpacked…' }).click();
   check('Load unpacked adds a second one', await until(async () => (await rows.count()) === 2));
-  await rows.nth(1).getByRole('button', { name: 'Details' }).click();
+  await act(rows.nth(1), 'Details');
   check('which says where it was loaded from', (await page.locator('.pbx-details').textContent()).includes(`Unpacked, from ${unpacked}`), await page.locator('.pbx-details').textContent());
   await page.screenshot({ path: path.join(out, 'extensions-settings.png'), fullPage: true });
-  await rows.nth(1).getByRole('button', { name: `Remove ${name}` }).click();
-  check('Remove takes the unpacked one away', await until(async () => (await rows.count()) === 1));
+  await act(rows.nth(1), 'Remove…');
+  const removeDialog = page.getByRole('dialog', { name: `Remove ${name}?` });
+  check('Remove asks first', await until(async () => (await removeDialog.count()) === 1) && (await rows.count()) === 2);
+  await removeDialog.getByRole('button', { name: 'Remove', exact: true }).click();
+  check('and then takes the unpacked one away', await until(async () => (await rows.count()) === 1));
 
   // The settings page covers the toolbar, as in the real window, so it closes before the
   // toolbar's checks; the test's own copy of it still turns the extension off and on.
@@ -256,7 +264,9 @@ const same = (a, b) => !!a && !!b && ['x', 'y', 'w', 'h'].every((k) => Math.abs(
   await menu.getByRole('button', { name: 'Manage extensions' }).dispatchEvent('click');
   check('and goes back there when it is already open', await until(async () => (await nav('Extensions').getAttribute('aria-current')) === 'page'));
 
-  await page.getByRole('region', { name: 'Installed' }).getByRole('button', { name: `Remove ${name}` }).click();
+  await page.getByRole('region', { name: 'Installed' }).getByRole('button', { name: `Actions for ${name}` }).click();
+  await page.getByRole('menuitem', { name: 'Remove…' }).click();
+  await page.getByRole('dialog', { name: `Remove ${name}?` }).getByRole('button', { name: 'Remove', exact: true }).click();
   check('Remove takes it away', await until(async () => await page.getByRole('region', { name: 'Installed' }).getByText('No extensions installed').isVisible()));
   await puzzle.dispatchEvent('click');
   check('and from the menu', await until(async () => (await menu.textContent()).includes('No extensions installed')));

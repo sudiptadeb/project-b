@@ -250,6 +250,30 @@ the registry (`tools/drive_first_app.py`): the app starts on the shell and marks
 `app.ready`; switching to it live leaves the tabs loaded; the page shows through the
 shell's unpainted part; a press in each shown page gives that page the keyboard.
 
+## The terminal shell
+
+`terminal`: a minimal shell laid out as a terminal emulator with split panes. Monospace,
+dense and square.
+
+- **Go's tabs are panes, in groups.** One group shows at a time and fills the window. A
+  group is a tree: a split is a row or a column of parts with their shares, a leaf is one
+  tab. The strip on top has a chip per group, with a segment per pane, each the tab's
+  `role="tab"` element; the chips follow Go's order. Each pane has a title bar with split
+  right, split down and close; a press on it makes the pane active. The prompt line at the
+  foot is the address bar, with back, forward and reload, and the update when one is ready.
+- **The active tab is the focused pane,** and the group shown is the one that holds it.
+  Closing the active pane makes the pane that takes its room active first, so its group
+  stays shown.
+- **A new tab is a new group,** unless a pane's split asked for it: then it goes beside
+  that pane. Dividers drag to resize, no pane smaller than 80px.
+- **Its own data** is `{groups}`, each group's tree, naming tabs by id, and nothing Go
+  has. It is fitted to Go's list on the snapshot and on every `tabs`: a tab that is gone
+  leaves its tree, its share going to the part before it; a split left with one part
+  becomes that part.
+- **It leaves out** keys and menu items to split and close (a shell's own commands have no
+  message yet), dimming the pages of panes that aren't active, dragging panes between
+  groups, broadcasting input, and the notice of the last run's crash.
+
 ## Not in this step
 
 Keys and menu items for a shell's own commands, such as a split. Saving a shell's data

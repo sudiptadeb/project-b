@@ -162,7 +162,8 @@ def answer_prompt(app, yes=True):
     it said."""
     app.wait("!!document.querySelector('.pbx-prompt')", 60)
     text = app.js("document.querySelector('.pbx-prompt').innerText")
-    menu_click(app, ".pbx-prompt " + (".primary" if yes else "button:not(.primary)"))
+    # The answer is the last button, Add or Remove, however it is drawn; Cancel the first.
+    menu_click(app, ".pbx-prompt-buttons button:" + ("last-child" if yes else "first-child"))
     app.wait("!document.querySelector('.pbx-prompt')", 20)
     return text
 

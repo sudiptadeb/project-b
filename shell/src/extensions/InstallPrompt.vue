@@ -39,7 +39,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true));
     <p class="pbx-prompt-text">Its data is deleted too.</p>
     <div class="pbx-prompt-buttons">
       <button type="button" class="text-button" @click="answer(false)">Cancel</button>
-      <button type="button" class="text-button primary" @click="answer(true)">Remove</button>
+      <button type="button" class="text-button danger" @click="answer(true)">Remove</button>
     </div>
   </dialog>
   <dialog v-else ref="dialog" class="pbx-prompt" :aria-label="`Add ${prompt.name}`">

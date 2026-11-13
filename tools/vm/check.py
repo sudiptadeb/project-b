@@ -924,6 +924,10 @@ def save_update_logs():
         if text:
             with open(os.path.join(SHOTS, f"timeline-{name}.log"), "w") as f:
                 f.write(text)
+    # The updater's folder as the run left it: the download, what was unpacked and its state.
+    guest("/bin/sh", "-c", f"cd {ROOT} && /usr/bin/tar czf /tmp/pb-update.tgz update")
+    with open(os.path.join(SHOTS, "update.tgz"), "wb") as f:
+        f.write(subprocess.run([TART, "exec", VM, "/bin/cat", "/tmp/pb-update.tgz"], capture_output=True, timeout=120).stdout)
 
 
 def update_checks():

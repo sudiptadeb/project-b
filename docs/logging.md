@@ -146,8 +146,8 @@ In the order they happen on a Mac:
 | `tab.committed`, `tab.first_paint` | C++ | Any tab's page committed; first painted something. `tab=1` is the first tab |
 
 `app.ready` is the line the test drivers wait for before they begin, as printed:
-`  290.512000 mark  go       app.ready`. The shell sends `shown` once Vue has drawn the
-snapshot, and Go marks it the first time.
+`  290.512000 mark  go       app.ready`. Once Vue has drawn the snapshot, the shell sends its
+layout, so clicks reach the right view, then `shown`, and Go marks it the first time.
 
 The shell's first paint and the first tab race the lines around them. Android has no
 `window.shown`: its window is on screen before content starts.

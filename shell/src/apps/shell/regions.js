@@ -27,11 +27,17 @@ function rectOf(el) {
 function schedule() {
   if (!scheduled) {
     scheduled = true;
-    requestAnimationFrame(measure);
+    requestAnimationFrame(() => measure());
   }
 }
 
-function measure() {
+// The layout as it is now, sent even if it hasn't changed: the shell sends it before it
+// says it shows Go's state, so the manager has the regions before anything is clicked.
+export function reportLayout() {
+  measure(true);
+}
+
+function measure(always = false) {
   scheduled = false;
 
   const tab = pageTab();
@@ -44,7 +50,7 @@ function measure() {
     viewH: window.innerHeight,
   };
   const json = JSON.stringify(layout);
-  if (json !== last) {
+  if (always || json !== last) {
     last = json;
     send(layout);
   }

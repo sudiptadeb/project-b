@@ -4,6 +4,7 @@
 import { computed, nextTick, reactive } from 'vue';
 import { end, listen, mark, painted, send } from '@/bridge.js';
 import { extensionsMessage } from '@extensions';
+import { reportLayout } from './regions.js';
 
 import { phone } from '@/phone.js';
 import { measureNow } from './regions.js';
@@ -114,8 +115,12 @@ export function connect() {
           state.platform = m.platform;
           state.keys = m.keys;
           mark('shell.snapshot');
-          // Once the page shows it, Go marks the app ready.
-          nextTick(() => send({ t: 'shown' }));
+          // Once the page shows it, and Go has its regions to route clicks, Go marks the
+          // app ready.
+          nextTick(() => {
+            reportLayout();
+            send({ t: 'shown' });
+          });
           break;
         // Go asks for a span to end once what it just sent is drawn.
         case 'paint':

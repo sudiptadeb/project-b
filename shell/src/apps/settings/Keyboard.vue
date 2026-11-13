@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { comboOf, shown } from '@/keys.js';
 import Dialog from '@/ui/Dialog.vue';
 import { pushEscape } from '@/ui/escape.js';
@@ -77,6 +77,22 @@ function toggle(id) {
   taken.value = null;
   open.value = open.value === id ? '' : id;
 }
+
+// Escape closes the open editor before it closes the page, and focus goes back to its row.
+async function closeEditor() {
+  const id = open.value;
+  toggle(id);
+  await nextTick();
+  document.getElementById('action-' + id)?.focus();
+}
+let popEditor = null;
+watch(open, (id) => {
+  if (id && !popEditor) popEditor = pushEscape(closeEditor);
+  if (!id && popEditor) {
+    popEditor();
+    popEditor = null;
+  }
+});
 
 // Going to another action, from a clash or the notice: its editor opens, and its row
 // scrolls into view and takes focus.
@@ -192,6 +208,13 @@ async function onRecordKey(e, action) {
   backToAdd();
 }
 
+// Leaving the section ends a recording and takes this page's Escape layers off.
+onUnmounted(() => {
+  stopRecording();
+  popRecording?.();
+  popEditor?.();
+});
+
 function addKey(action, combo) {
   const reserve = action.keys.find((k) => !k.locked)?.reserve || 'page';
   send({ t: 'addKey', id: action.id, text: combo, reserve });
@@ -258,6 +281,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
               </template>
               <span v-if="shared(a) !== null && tagText(a.keys[0])" class="tag" :class="{ locked: a.keys[0].locked }">{{ tagText(a.keys[0]) }}</span>
             </span>
+            <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
           </button>
 
           <div v-if="open === a.id" class="editor" :aria-label="`Edit ${a.title}`">
@@ -338,10 +362,10 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 </template>
 
 <style scoped>
-/* One grid for every row: the action, then its keys with any priority tags. */
+/* One grid for every row: the action, its keys with any tags, and the chevron. */
 .action {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 220px 1fr 16px;
   align-items: center;
   column-gap: 16px;
 }
@@ -368,9 +392,19 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
   background: var(--accent-tint);
 }
 
+/* --focus-ring drawn inward, so the card's edge can't clip it. */
 .action:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 3px var(--accent-soft);
+}
+
+.chevron {
+  color: var(--icon);
+  transition: transform 120ms;
+}
+
+.action[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
 }
 
 .card > .action:first-child {

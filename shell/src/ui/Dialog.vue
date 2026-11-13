@@ -62,8 +62,9 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
-/* A field in a dialog: its label above it, 12px and muted. */
-.ui-dialog label {
+/* A field in a dialog: its label above it, 12px and muted. A swatch that is a label
+   keeps its own box. */
+.ui-dialog label:not(.ui-swatch) {
   display: block;
   margin: 0 0 4px;
   color: var(--muted);

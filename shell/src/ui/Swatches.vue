@@ -17,7 +17,7 @@ function onKey(e) {
   const i = props.colors.indexOf(props.modelValue);
   const next = props.colors[(i + step + props.colors.length) % props.colors.length];
   emit('update:modelValue', next);
-  requestAnimationFrame(() => group.value.querySelector('[aria-checked="true"]')?.focus());
+  requestAnimationFrame(() => group.value?.querySelector('[aria-checked="true"]')?.focus());
 }
 </script>
 

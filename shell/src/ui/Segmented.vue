@@ -16,7 +16,7 @@ function onKey(e) {
   const i = props.options.findIndex((o) => o.value === props.modelValue);
   const next = props.options[(i + step + props.options.length) % props.options.length];
   emit('update:modelValue', next.value);
-  requestAnimationFrame(() => group.value.querySelector('[aria-checked="true"]')?.focus());
+  requestAnimationFrame(() => group.value?.querySelector('[aria-checked="true"]')?.focus());
 }
 </script>
 

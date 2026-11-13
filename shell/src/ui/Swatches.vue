@@ -114,7 +114,7 @@ async function onKey(e) {
 
 .ui-swatch.custom.on::before,
 .ui-swatch.custom.on::after {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface);
 }
 
 .ui-swatch.custom input {

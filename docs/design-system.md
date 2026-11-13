@@ -159,7 +159,8 @@ From the settings audit of 2026-11-13 (owner approved). Every section follows th
 - **A row** is at least 48px high, padding 8px 16px: the label on the left, the control on
   the right.
 - **The nav names the section; the content never repeats it.** An `h2` names a group of
-  rows, and a section with one group has none. A heading row may carry one action on its
+  rows, and a section with one group has none, unless it is a list whose heading row
+  carries its New button (Workspaces). A heading row may carry one action on its
   right, and is 30px high with or without it.
 - **More under a row:** the row is the button, with a chevron on its right that turns
   when it opens. The panel sits under the row on `--accent-tint`. Escape closes it.

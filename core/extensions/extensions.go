@@ -210,6 +210,15 @@ func (m *Manager) AnswerPrompt(accept bool) {
 	m.changed()
 }
 
+// DismissError forgets why the last install or load failed, once the user has read it.
+func (m *Manager) DismissError() {
+	if m.failure == "" {
+		return
+	}
+	m.failure = ""
+	m.changed()
+}
+
 // HandleInstallDone keeps the reason when an install or a load failed.
 func (m *Manager) HandleInstallDone(r engine.InstallResult) {
 	m.failure = r.Error

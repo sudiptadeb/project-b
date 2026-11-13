@@ -130,6 +130,8 @@ func extensionsSettingsPart(a *App, m *extensions.Manager) settings.Part {
 				m.LoadUnpacked(w)
 			case "extensionInstallPackage":
 				m.InstallPackage(w)
+			case "extensionDismissError":
+				m.DismissError()
 			case "extensionRemove":
 				m.Remove(c.ID)
 			case "extensionSetEnabled":

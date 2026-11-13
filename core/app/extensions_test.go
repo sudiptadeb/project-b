@@ -217,6 +217,10 @@ func TestLoadUnpackedAndInstallAPackageFile(t *testing.T) {
 			t.Fatalf("%d installed", n)
 		}
 	})
+
+	// Dismissed, it goes.
+	r.on(func() { r.m.DismissError() })
+	r.until("the error dismissed", func() bool { return r.m.View().Error == "" })
 }
 
 func TestPinsButtonsAndThePopup(t *testing.T) {

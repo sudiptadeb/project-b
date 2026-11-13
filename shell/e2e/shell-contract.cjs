@@ -1,7 +1,7 @@
 // The check every shell passes: "What every shell does" in docs/shells.md, rule by rule, on
 // the mock engine in a real browser. It knows nothing of a shell but what the rules say: the
-// tabs are role=tab with data-tab, pages show where the layout puts them, and Go's state
-// comes through the mock (/mock/regions, /mock/fire).
+// tabs are role=tab with data-tab, a control is named Settings, pages show where the layout
+// puts them, and Go's state comes through the mock (/mock/regions, /mock/fire).
 // Run: node shell/e2e/shell-contract.cjs [id]   (from the repo root, after `npm run build`
 // in shell/; with no id, every shell in core/shells/registry.json)
 
@@ -25,6 +25,7 @@ const rules = [
   'Some space is marked v-drag, and no page lies under the native window buttons',
   'Reloaded, it comes back showing the same pages',
   'Switched to and away from, it starts from Go\'s data alone',
+  'Settings is one press away, or two: a control named Settings, on the shell or in a menu one of its controls opens, opens the settings page',
   'It logs no errors',
 ];
 
@@ -95,7 +96,7 @@ const rules = [
     // A check that throws fails the rule it was checking, and leaves the rest unchecked.
     let current = 2;
     if (!ready) {
-      for (let n = 2; n <= 10; n++) rule(n, 'not checked: the shell never came up', false);
+      for (let n = 2; n <= 11; n++) rule(n, 'not checked: the shell never came up', false);
     } else {
       try {
         await activeShows('at the start');
@@ -211,14 +212,33 @@ const rules = [
         ready = await until(up, 10000);
         rule(10, 'switched back, it comes up from Go\'s data: its tabs, and the active one shown', ready, JSON.stringify(await drawn().catch((e) => e.message)));
         await insideAndApart('after switching back');
+
+        // 11. Settings: a control named so, on the shell or in a menu one of its controls
+        // opens. A menu item may show its key after the name.
+        current = 11;
+        const named = /^Settings\b/;
+        const settings = ui.getByRole('button', { name: named }).or(ui.getByRole('menuitem', { name: named })).filter({ visible: true });
+        // None on the shell: each control that opens something is pressed in turn, until
+        // one shows it.
+        const openers = await ui.locator('[aria-haspopup], [aria-expanded]').filter({ visible: true }).all();
+        while ((await settings.count()) === 0 && openers.length > 0) await openers.shift().click();
+        const found = (await settings.count()) > 0;
+        rule(11, 'a control named Settings is on the shell, or in a menu one of its controls opens', found);
+        if (found) {
+          await settings.first().click();
+          rule(11, 'pressed, it opens the settings page', await until(async () => (await regions()).settingsOpen === true));
+          // Closed again with the page's own button, as settings.cjs closes it.
+          await page.frameLocator('iframe.mock-settings').getByRole('button', { name: 'Close settings' }).click();
+          await until(async () => (await regions()).settingsOpen === false);
+        }
       } catch (e) {
         rule(current, 'its checks ran to their end', false, e.message.split('\n')[0]);
-        for (let n = current + 1; n <= 10; n++) rule(n, 'not checked: an earlier check ended the run', false);
+        for (let n = current + 1; n <= 11; n++) rule(n, 'not checked: an earlier check ended the run', false);
       }
     }
 
-    // 11.
-    rule(11, 'it logged no errors', w.errors.length === 0, w.errors.join(' | '));
+    // 12.
+    rule(12, 'it logged no errors', w.errors.length === 0, w.errors.join(' | '));
 
     await w.page.close();
     await lib.stop();

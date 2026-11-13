@@ -149,7 +149,9 @@ The check holds every shell to these, knowing nothing else about it.
 8. Some space is marked `v-drag`, and no page lies under the native window buttons.
 9. Reloaded, it comes back showing the same pages: what it needs to do so it saved.
 10. Switched to and away from, it starts from Go's data alone.
-11. It logs no errors.
+11. **Settings is one press away, or two:** a control named Settings, on the shell or in a
+    menu one of its controls opens, opens the settings page.
+12. It logs no errors.
 
 Every shell also mounts `ExtensionsToolbar`: without it the extensions' buttons and the
 install prompt have nowhere to show.
@@ -160,9 +162,9 @@ install prompt have nowhere to show.
    `core/shells/registry.json`.
 2. In `main.js`: import `@/design.css` and mount the app with the three directives. The
    app calls `connect()` as it is made.
-3. Draw `state.tabs`; mark what is the shell's with `v-shell`, the top bar with `v-drag`
-   (its gaps move the window, its controls stay the shell's), and each place a page shows
-   with `v-page`.
+3. Draw `state.tabs`, and a control named Settings that runs `app.settings`; mark what is
+   the shell's with `v-shell`, the top bar with `v-drag` (its gaps move the window, its
+   controls stay the shell's), and each place a page shows with `v-page`.
 4. Run it on the mock (below) and make the check pass.
 
 The smallest shell is the example, `shell/src/apps/shell/example/`: the one to copy. It is
@@ -193,6 +195,7 @@ connect({ focusAddressBar: () => address.value.focus() });
     <input ref="address" aria-label="Address"
       @keydown.enter="send({ t: 'navigate', text: $event.target.value })">
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" />
+    <button @click="send({ t: 'run', text: 'app.settings' })">Settings</button>
   </header>
   <main v-page="state.active" :style="{ margin: `0 ${state.frameWidth}px ${state.frameWidth}px` }"></main>
 </template>

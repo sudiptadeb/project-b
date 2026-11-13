@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { closesOutside } from './dismiss.js';
 import { keyOf } from './hints.js';
-import { send } from '@/kit/shell.js';
+import { send } from '@/sdk/vue.js';
 
 // The menu button's panel: commands, each an action Go has, run as its menu item would
 // run it, with the key that action shows.

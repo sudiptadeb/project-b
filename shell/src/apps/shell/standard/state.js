@@ -1,8 +1,8 @@
 // What only the standard shell keeps: whether the sidebar is open, and where the tabs go.
-// Everything else is Go's, in the kit's state.
+// Everything else is Go's, in the SDK's state.
 
 import { computed, reactive } from 'vue';
-import { state } from '@/kit/shell.js';
+import { state } from '@/sdk/vue.js';
 import { phone } from '@/phone.js';
 
 export { phone };

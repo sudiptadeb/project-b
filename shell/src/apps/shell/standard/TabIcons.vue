@@ -1,5 +1,5 @@
 <script setup>
-import { send, state, tabLabel } from '@/kit/shell.js';
+import { send, state, tabLabel } from '@/sdk/vue.js';
 
 // A phone's tabs: one favicon each, in a row under the toolbar. A tap shows that tab; the
 // sidebar button opens the full list. A tab with no favicon yet shows its label's first

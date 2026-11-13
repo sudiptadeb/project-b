@@ -1,9 +1,12 @@
-// What every shell is built on: its copy of Go's state, the channel to Go, and the helpers
-// every shell needs to draw tabs. The managers own the truth: the state is only ever
-// replaced by what they send, and a shell starts from a snapshot (docs/shells.md).
+// The SDK every shell may build on: its copy of Go's state, the channel to Go, and the
+// helpers every shell needs to draw tabs. It has no framework in it: the state is a
+// plain object, and onChange says what changed, so a view in any framework, or in none,
+// follows it (docs/shells.md). The managers own the truth: the state is only ever
+// replaced by what they send, and a shell starts from a snapshot.
 
-import { computed, nextTick, reactive } from 'vue';
 import { extensionsMessage } from '@extensions';
+import { shown } from '@/keys.js';
+import { paintTheme } from '@/theme.js';
 import { channel, send } from './channel.js';
 import { measureNow, reportLayout } from './regions.js';
 
@@ -15,8 +18,9 @@ mark('shell.script');
 
 const emptyTab = { id: 0, url: '', title: '', loading: false, blocked: false, crashed: false, error: '' };
 
-// state is everything Go sends, as it last sent it.
-export const state = reactive({
+// state is everything Go sends, as it last sent it. Each field is replaced whole when it
+// changes, never changed in place: a tab's new state comes as a new tabs list.
+export const state = {
   // This window's tabs in order, and the active one's id.
   tabs: [],
   active: 0,
@@ -52,35 +56,60 @@ export const state = reactive({
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
-});
+};
 
 // The messages that are only state: each sets the fields it carries.
 const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout']);
 
-// activeTab is the tab the address bar, back, forward and reload act on.
-export const activeTab = computed(() => state.tabs.find((t) => t.id === state.active) || emptyTab);
+const listeners = [];
+
+// onChange calls fn after each change to state, with the fields that changed and their
+// new values: on each message from Go that carries state, and on saveData.
+export function onChange(fn) {
+  listeners.push(fn);
+}
+
+function change(fields) {
+  Object.assign(state, fields);
+  for (const fn of listeners) fn(fields);
+}
+
+// The root's colours follow the frame colour and the theme.
+onChange((fields) => {
+  if ('windowColor' in fields || 'theme' in fields) paintTheme(state.windowColor, state.theme);
+});
 
 // saveData keeps value, any JSON, as this window's copy of the shell's own data, in place
 // of what it was. Go keeps it and never reads it.
 export function saveData(value) {
-  state.data = value;
+  change({ data: value });
   send({ t: 'data', data: value });
 }
 
+// How the shell's view waits until it has drawn what just changed: what connect was given.
+let afterDraw;
+
 // focusPage gives the keyboard to the active tab's page. The layout goes first, so the
-// window already shows the tab when it gets the keyboard: once Vue has drawn the change
-// that asked for it, as a v-page learns the tab it shows only then. A watcher on the
-// active tab runs before that.
+// window already shows the tab when it gets the keyboard: once the view has drawn the
+// change that asked for it, as a page marker learns the tab it shows only then.
 export function focusPage() {
-  nextTick(() => {
+  afterDraw(() => {
     measureNow();
     send({ t: 'focusTab', id: state.active });
   });
 }
 
+// The helpers below each read the state they are given: the SDK's, or a framework's
+// reactive copy of it, which then knows what was read.
+
+// activeTab is the tab the address bar, back, forward and reload act on.
+export function activeTab(s) {
+  return s.tabs.find((t) => t.id === s.active) || emptyTab;
+}
+
 // workspaceOf is the workspace a tab is in, or undefined for the default one.
-export function workspaceOf(tab) {
-  return state.workspaces.find((w) => w.id === tab.workspace);
+export function workspaceOf(s, tab) {
+  return s.workspaces.find((w) => w.id === tab.workspace);
 }
 
 // tabLabel is what a tab's entry says: the title, else the host while the page is on its
@@ -97,24 +126,34 @@ export function tabLabel(tab) {
   return 'New Tab';
 }
 
+// keyLabel is the key an action shows, as the menus show it, or '' when it has none.
+export function keyLabel(s, action) {
+  const keys = s.keys[action];
+  return keys ? shown(keys, s.platform) : '';
+}
+
 // How much room each end of the top row leaves: the native window controls' space on
 // whichever side they are, counted from inside the 4px window frame, and 8px, the same
 // gap the controls get, on an end without them.
-export const controlSpace = computed(() => {
+export function controlSpace(s) {
   const frame = 4;
-  const c = state.controls;
+  const c = s.controls;
   if (c.w <= 0) return { left: '8px', right: '8px' };
   const onLeft = c.x + c.w / 2 < window.innerWidth / 2;
   return onLeft
     ? { left: c.x + c.w + 8 - frame + 'px', right: '8px' }
     : { left: '8px', right: window.innerWidth - c.x + 8 - frame + 'px' };
-});
+}
 
-// connect says ready, and from then on keeps state as Go sends it. Once the snapshot is
-// drawn it reports the layout and says shown. handlers are the shell's own, by message
-// kind, each called with the message after state has it: suggestions, focusAddressBar,
-// or any other. Call it once, as the shell's app is made.
-export function connect(handlers = {}) {
+// connect says ready, and from then on keeps state as Go sends it. handlers are the
+// shell's own, by message kind, each called with the message after state has it and
+// onChange has heard of it: suggestions, focusAddressBar, or any other. Once the snapshot
+// is drawn it reports the layout and says shown. afterDraw(fn) calls fn once the view
+// has drawn what changed: Vue's nextTick, Svelte's tick. Left out, the view is taken to
+// draw as it hears of a change, as a shell with no framework does in its onChange. Call
+// it once, as the shell's view is made.
+export function connect(handlers = {}, drawn = (fn) => fn()) {
+  afterDraw = drawn;
   mark('shell.mounted');
   firstPaint();
   inputs();
@@ -124,32 +163,32 @@ export function connect(handlers = {}) {
       switch (m.t) {
         case 'snapshot': {
           const { t, ...all } = m;
-          Object.assign(state, all);
+          change(all);
           mark('shell.snapshot');
-          // Once the page shows it, and Go has its regions to route clicks, Go marks the
-          // app ready.
-          nextTick(() => {
-            reportLayout();
-            send({ t: 'shown' });
-          });
           break;
         }
         // Go asks for a span to end once what it just sent is drawn.
         case 'paint':
           painted(() => end(m.span));
           break;
-        case 'tab': {
-          const i = state.tabs.findIndex((t) => t.id === m.tab.id);
-          if (i >= 0) state.tabs[i] = m.tab;
+        case 'tab':
+          change({ tabs: state.tabs.map((t) => (t.id === m.tab.id ? m.tab : t)) });
           break;
-        }
         default:
           if (updates.has(m.t)) {
             const { t, ...fields } = m;
-            Object.assign(state, fields);
+            change(fields);
           }
       }
       handlers[m.t]?.(m);
+      // Once the page shows it, and Go has its regions to route clicks, Go marks the app
+      // ready.
+      if (m.t === 'snapshot') {
+        afterDraw(() => {
+          reportLayout();
+          send({ t: 'shown' });
+        });
+      }
     },
     () => send({ t: 'ready' }),
   );

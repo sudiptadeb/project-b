@@ -5,9 +5,8 @@ import Sidebar from './Sidebar.vue';
 import TabIcons from './TabIcons.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
-import { state } from '@/kit/shell.js';
+import { state } from '@/sdk/vue.js';
 import { phone, tabsOnTop, view } from './state.js';
-import { useTheme } from '@/theme.js';
 
 // Every layout shows the same tabs from the same state; only where they sit differs. On a
 // phone they are favicons under the toolbar, and the sidebar is a drawer over everything.
@@ -17,7 +16,6 @@ import { useTheme } from '@/theme.js';
 // width the window paints natively, so there is one source for both, and every other
 // tone of the shell derives from that colour. The curve over the corners is the window's
 // own border, drawn by the engine. Light or dark follows Go's theme pref.
-useTheme(state);
 watchEffect(() => {
   document.documentElement.style.setProperty('--frame-width', state.frameWidth + 'px');
   document.documentElement.style.setProperty('--window-radius', state.cornerRadius + 'px');

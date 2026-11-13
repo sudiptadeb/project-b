@@ -1,5 +1,5 @@
 import { shown } from '@/keys.js';
-import { state } from '@/kit/shell.js';
+import { state } from '@/sdk/vue.js';
 
 // keyOf is the key an action shows, as the menus show it, or '' when it has none.
 export function keyOf(action) {

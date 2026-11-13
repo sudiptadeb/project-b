@@ -1,10 +1,8 @@
 <script setup>
 import { ref } from 'vue';
-import { connect, controlSpace, send, state, tabLabel } from '@/kit/shell.js';
+import { connect, controlSpace, send, state, tabLabel } from '@/sdk/vue.js';
 import { ExtensionsToolbar } from '@extensions';
-import { useTheme } from '@/theme.js';
 
-useTheme(state);
 const address = ref(null);
 connect({ focusAddressBar: () => address.value.focus() });
 </script>

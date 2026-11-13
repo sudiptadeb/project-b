@@ -1,5 +1,5 @@
 <script setup>
-import { send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
+import { send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { shown } from '@/keys.js';
 import { view } from './state.js';
 

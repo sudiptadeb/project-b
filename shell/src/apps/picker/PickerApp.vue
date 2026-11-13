@@ -1,11 +1,11 @@
 <script setup>
-import { nextTick, ref } from 'vue';
-import { useTheme } from '@/theme.js';
+import { nextTick, ref, watchEffect } from 'vue';
+import { paintTheme } from '@/theme.js';
 import { send, state } from './state.js';
 
 // The picker: a copy of the app that hasn't chosen its profile shows this in its one
 // window. Choosing a profile opens it; New Profile makes one from a template and opens it.
-useTheme(state);
+watchEffect(() => paintTheme(state.windowColor, state.theme));
 
 const making = ref(false);
 const name = ref('');

@@ -1,8 +1,7 @@
 import { createApp } from 'vue';
 import '@/design.css';
 import App from './App.vue';
-import { vDrag, vPage, vShell } from '@/kit/regions.js';
-import { connect } from '@/kit/shell.js';
+import { connect, vDrag, vPage, vShell } from '@/sdk/vue.js';
 import { addressBar, phone } from './state.js';
 
 document.documentElement.classList.toggle('touch', phone);

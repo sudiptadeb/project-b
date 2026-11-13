@@ -1,6 +1,6 @@
 <script setup>
 import { shown } from '@/keys.js';
-import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
+import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 
 // The strip is the title bar when the tabs are on top: it sits on the frame colour,
 // leaves the native window controls their space, and moves the window wherever it has no

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { addressField } from './address.js';
-import { activeTab, focusPage, send, state, workspaceOf } from '@/kit/shell.js';
+import { activeTab, focusPage, send, state, workspaceOf } from '@/sdk/vue.js';
 
 // The active tab's address. Focused, it selects everything and grows a little; typing
 // asks Go for suggestions, which open in a panel attached under it, as wide as it. Up and

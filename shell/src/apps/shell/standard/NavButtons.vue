@@ -1,5 +1,5 @@
 <script setup>
-import { activeTab, focusPage, send } from '@/kit/shell.js';
+import { activeTab, focusPage, send } from '@/sdk/vue.js';
 
 function act(t) {
   send({ t });

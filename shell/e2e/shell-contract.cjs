@@ -30,8 +30,8 @@ const rules = [
 ];
 
 (async () => {
-  // What a control is, as the kit has it: the same selector it finds them in a drag bar by.
-  const { controls: control } = await import('../src/kit/controls.js');
+  // What a control is, as the SDK has it: the same selector it finds them in a drag bar by.
+  const { controls: control } = await import('../src/sdk/controls.js');
   const browser = await chromium.launch();
   const summary = [];
   for (const id of ids) {

@@ -1,6 +1,6 @@
 // How a page of ours talks to the managers: chrome.send, and a global the engine calls
 // with each message. Nothing else knows. Each page has a channel: 'shell' for every
-// shell (through @/kit/shell.js), 'settings' or 'picker'.
+// shell (through @/sdk/shell.js), 'settings' or 'picker'.
 
 import { timeline } from '@/timeline.js';
 

@@ -1,7 +1,7 @@
 <script setup>
 import CrashNotice from './CrashNotice.vue';
 import UpdateStatus from './UpdateStatus.vue';
-import { state } from '@/kit/shell.js';
+import { state } from '@/sdk/vue.js';
 </script>
 
 <!-- The page hole shows the active tab. -->

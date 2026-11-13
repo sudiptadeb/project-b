@@ -4,7 +4,7 @@
 // The groups are the shell's own data; Go's tab list is the truth they follow.
 
 import { computed, reactive } from 'vue';
-import { saveData, send, state } from '@/kit/shell.js';
+import { saveData, send, state } from '@/sdk/vue.js';
 
 export const groups = reactive([]);
 

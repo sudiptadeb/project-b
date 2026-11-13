@@ -1,6 +1,6 @@
 <script setup>
 import { shown as keyShown } from '@/keys.js';
-import { controlSpace, send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
+import { controlSpace, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { ExtensionsToolbar } from '@extensions';
 import { chips, shown } from './panes.js';
 

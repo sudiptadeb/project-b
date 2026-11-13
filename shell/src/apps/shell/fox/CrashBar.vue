@@ -1,5 +1,5 @@
 <script setup>
-import { send, state } from '@/kit/shell.js';
+import { send, state } from '@/sdk/vue.js';
 
 // Says the last run crashed, where its log is and where macOS's report is, until the user
 // closes it. Go decides whether there is one.

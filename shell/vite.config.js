@@ -6,7 +6,7 @@ import { apps as allApps } from './apps.js';
 
 // Each page is an app of its own, as pweb's pages are: src/apps/<app>/index.html, with
 // what apps share in src/ (imported as @/). Each shell is an app too, src/apps/shell/<id>/,
-// built from src/kit/ (apps.js lists them). `VITE_APP=<app> vite build` builds one app into
+// built on src/sdk/ (apps.js lists them). `VITE_APP=<app> vite build` builds one app into
 // dist/<app>/ as index.html, <name>.js and <name>.css, where name is the app's own folder:
 // dist/settings/settings.js, dist/shell/standard/standard.js. `npm run build` builds every
 // app (build.js). `npm run dev` serves them all, with hot reload, against core/cmd/dev on

@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AllTabs from './AllTabs.vue';
 import TabIcon from './TabIcon.vue';
 import { withKey } from './hints.js';
-import { controlSpace, send, state, tabLabel, workspaceOf } from '@/kit/shell.js';
+import { controlSpace, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 
 // The top row is the title bar: the native window buttons' space, the tabs, New Tab right
 // after the last one, then empty space that drags the window, and the list of all tabs.

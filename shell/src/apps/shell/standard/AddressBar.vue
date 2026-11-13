@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { activeTab, focusPage, send, state } from '@/kit/shell.js';
+import { activeTab, focusPage, send, state } from '@/sdk/vue.js';
 import { addressBar } from './state.js';
 
 const input = ref(null);

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { send, state } from '@/kit/shell.js';
+import { send, state } from '@/sdk/vue.js';
 
 // What the updater is doing, in a bar under the navigation bar while something is
 // happening: a download and how far it is, a release ready to relaunch into, or why one

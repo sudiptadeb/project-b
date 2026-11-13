@@ -2,11 +2,13 @@
 // drag the window and which of the controls in those stay the shell's, and which tabs
 // show and where. The manager decides what each point does; this only measures.
 //
-// A shell marks what is its own with v-shell, a bar or an empty space in the top row that
-// should move the window with v-drag, and each place a tab's page shows with
-// v-page="tabId". One batcher measures once per frame, and only when something may have
-// changed, and sends only when the layout differs. ResizeObserver misses moves, so a
-// running animation or transition keeps it measuring until it ends, and a drag bar's
+// A shell marks what is its own with shell, a bar or an empty space in the top row that
+// should move the window with drag, and each place a tab's page shows with page. Each
+// marker has mark(el) and unmark(el), called as the element comes and goes, and page has
+// update(el, tab) for another tab there; a framework's adapter calls them as its view
+// draws (sdk/vue.js). One batcher measures once per frame, and only when something may
+// have changed, and sends only when the layout differs. ResizeObserver misses moves, so
+// a running animation or transition keeps it measuring until it ends, and a drag bar's
 // subtree is watched, so a control that comes or goes in it is measured without the
 // shell doing anything.
 
@@ -14,9 +16,9 @@ import { send } from './channel.js';
 import { controls } from './controls.js';
 
 const marked = new Set();
-// Each element marked v-drag, and what watches its subtree.
+// Each element marked drag, and what watches its subtree.
 const draggable = new Map();
-// Each element marked v-page, and the tab whose page shows there: 0 or none for no tab.
+// Each element marked page, and the tab whose page shows there: 0 or none for no tab.
 const pages = new Map();
 let scheduled = false;
 let animations = 0;
@@ -30,7 +32,7 @@ function rectOf(el) {
 const shown = (r) => r.w > 0 && r.h > 0;
 
 // The parts of a drag bar that stay the shell's: each control in it that shows, and
-// anything in it marked v-shell, such as a list that floats out of it.
+// anything in it marked shell, such as a list that floats out of it.
 function claimedIn(bar) {
   const found = [...bar.querySelectorAll(controls)].filter((el) => el.checkVisibility({ visibilityProperty: true }));
   for (const el of marked) {
@@ -95,32 +97,32 @@ document.addEventListener('animationstart', () => { animations++; schedule(); })
 document.addEventListener('animationend', () => { animations = Math.max(0, animations - 1); schedule(); });
 document.addEventListener('animationcancel', () => { animations = Math.max(0, animations - 1); schedule(); });
 
-// v-shell: this element belongs to the shell, wherever it sits in the page.
-export const vShell = {
-  mounted(el) {
+// shell: this element belongs to the shell, wherever it sits in the page.
+export const shell = {
+  mark(el) {
     marked.add(el);
     observer.observe(el);
     schedule();
   },
-  unmounted(el) {
+  unmark(el) {
     marked.delete(el);
     observer.unobserve(el);
     schedule();
   },
 };
 
-// v-drag: this element moves the window wherever it has no control: an empty space in the
+// drag: this element moves the window wherever it has no control: an empty space in the
 // top row, or a whole bar of controls, whose gaps then drag. Its controls, and what it
-// holds marked v-shell, stay the shell's.
-export const vDrag = {
-  mounted(el) {
+// holds marked shell, stay the shell's.
+export const drag = {
+  mark(el) {
     const watch = new MutationObserver(schedule);
     watch.observe(el, { subtree: true, childList: true, attributes: true, characterData: true });
     draggable.set(el, watch);
     observer.observe(el);
     schedule();
   },
-  unmounted(el) {
+  unmark(el) {
     draggable.get(el).disconnect();
     draggable.delete(el);
     observer.unobserve(el);
@@ -128,22 +130,22 @@ export const vDrag = {
   },
 };
 
-// v-page="tabId": this tab's page shows here. It isn't shell, so a press on it reaches the
-// page. Another tab shown here goes in the layout at once, so the window shows it before
-// anything asks for its keyboard.
-export const vPage = {
-  mounted(el, { value }) {
-    pages.set(el, value);
+// page: tab's page shows in this element; 0 for none. It isn't shell, so a press on it
+// reaches the page. update(el, tab) shows another tab there, and that goes in the layout
+// at once, so the window shows it before anything asks for its keyboard.
+export const page = {
+  mark(el, tab) {
+    pages.set(el, tab);
     observer.observe(el);
     schedule();
   },
-  updated(el, { value, oldValue }) {
-    pages.set(el, value);
-    if (value !== oldValue) {
+  update(el, tab) {
+    if (pages.get(el) !== tab) {
+      pages.set(el, tab);
       measure();
     }
   },
-  unmounted(el) {
+  unmark(el) {
     pages.delete(el);
     observer.unobserve(el);
     schedule();

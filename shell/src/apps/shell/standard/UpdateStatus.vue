@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { send, state } from '@/kit/shell.js';
+import { send, state } from '@/sdk/vue.js';
 import { phone } from './state.js';
 
 // The update manager's state, shown the way a browser shows a link's address: a small

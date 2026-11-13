@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import TabIcon from './TabIcon.vue';
 import { closesOutside } from './dismiss.js';
-import { send, state, tabLabel } from '@/kit/shell.js';
+import { send, state, tabLabel } from '@/sdk/vue.js';
 
 // Every tab of the window in one floating menu, the active one marked; choosing one makes
 // it active. It reaches the tabs the strip has scrolled out of sight.

@@ -1,8 +1,8 @@
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watchEffect } from 'vue';
 import { extensionsSection } from '@extensions';
 import { phone } from '@/phone.js';
-import { useTheme } from '@/theme.js';
+import { paintTheme } from '@/theme.js';
 import Flags from './Flags.vue';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
@@ -12,7 +12,7 @@ import { send, state } from './state.js';
 
 // The settings page: a page of its own over the whole window. Its colours come from the
 // frame colour and the theme, as the shell's do.
-useTheme(state);
+watchEffect(() => paintTheme(state.windowColor, state.theme));
 
 // The page shows state.section when it is one of these, else the first. Profile is there
 // in a copy on a listed profile; Extensions when the build has them and their flag is on.

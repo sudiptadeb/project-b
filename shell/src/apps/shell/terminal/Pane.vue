@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { send, state, tabLabel } from '@/kit/shell.js';
+import { send, state, tabLabel } from '@/sdk/vue.js';
 import { close, split } from './panes.js';
 
 // One pane: a title bar over the place its tab's page shows. A press on the bar makes the

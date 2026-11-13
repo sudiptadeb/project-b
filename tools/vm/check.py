@@ -999,6 +999,71 @@ time.sleep(1)
 
 # "check.py windows" runs only the checks of several windows.
 # "check.py profiles" runs only the checks of several profiles.
+# The Show window regions flag's colours, docs/windows.md.
+REGION_COLOURS = {"drag": (37, 99, 235), "shell": (220, 38, 38), "page": (22, 163, 74),
+                  "window buttons": (168, 85, 247), "settings page": (249, 115, 22)}
+
+
+def outlines(win):
+    """How many pixels of each kind's outline colour the window shows."""
+    box = crop(desk.image(), *win)
+    return {name: int(near(box, rgb, 24).sum()) for name, rgb in REGION_COLOURS.items()}
+
+
+def region_checks():
+    """--pb-show-regions outlines each kind of region in its colour, in both layouts and over
+    the settings page, and the window drags and takes clicks just as it does without them."""
+    global V, home, PX, PY, W, H, TOP, NEUTRAL
+    V, T = layout()
+    fresh_profile()
+    guest("/usr/bin/open", APP, "--args", "--pb-show-regions")
+    until(window, bool, 30)
+    time.sleep(2)
+    home = window_or_stop("the app opens with the regions flag")
+    PX, PY, W, H = home
+    TOP = middle(V["field"])[1]
+    NEUTRAL = (PX + W / 2, PY + H / 2)
+    shot("regions-side")
+    seen = outlines(home)
+    for name in ("drag", "shell", "page", "window buttons"):
+        check(f"the {name} outlines show, tabs on the side", seen[name] > 20, str(seen))
+    check("no settings page outline while settings is closed", seen["settings page"] <= 20, str(seen))
+
+    L = lights(desk.image(), home)
+    check("the window buttons are visible under their outline", L is not None, str(L))
+    if L is None:
+        sys.exit("no window buttons found: the window isn't active")
+    for place in (("the gap right of the buttons", L["zoom"][0] + L["zoom"][2] / 2 + 4, 14),
+                  ("the end of the top row", W - 6, TOP), ("the top frame edge", W / 2, 2)):
+        drags(*place, home)
+    drags("the empty sidebar", 100, H - 40, home, "leaves the window alone")
+    # With the tabs on top, the strip is the frame's colour across the top row: the click
+    # went through the outlines to the shell.
+    click_on(V["layout"], right=True)
+    need = 400 * 30 * 0.5 * desk.scale * desk.scale
+    strip = lambda: int(near(crop(desk.image(), PX + 400, PY + 10, W - 500, 30), FRAME, 12).sum())
+    check("a click reaches the shell's layout button: the tabs move to the top",
+          until(strip, lambda n: n > need, 5) > need, f"frame-coloured pixels in the top row {strip()}")
+    time.sleep(1)
+    shot("regions-top")
+    seen = outlines(home)
+    for name in ("drag", "shell", "page"):
+        check(f"the {name} outlines show, tabs on top", seen[name] > 20, str(seen))
+
+    click_on(T["settings"], right=True)
+    time.sleep(1.5)
+    shot("regions-settings")
+    seen = outlines(home)
+    check("the settings page's outline shows while it is open", seen["settings page"] > 20, str(seen))
+    quit_app()
+
+
+# "check.py regions" runs only the checks of the Show window regions flag.
+if sys.argv[1:] == ["regions"]:
+    region_checks()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
+
 if sys.argv[1:] == ["profiles"]:
     profile_checks()
     picker_checks()

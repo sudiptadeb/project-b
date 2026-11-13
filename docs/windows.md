@@ -94,3 +94,22 @@ Each commit builds and leaves a working app.
    Cmd+`.
 5. Done. Moving a tab to another window.
 6. Done. Extensions' `chrome.windows` and DevTools' window calls with real windows.
+
+## Seeing the regions
+
+The Show window regions flag (`--pb-show-regions`) has each native window draw a 1px
+border around every rectangle the window manager tracks, from the layout it last
+applied and its own state, over everything else:
+
+| Kind | Border |
+|---|---|
+| The window buttons | purple `#a855f7` |
+| Drag areas | blue `#2563eb`, dashed |
+| Shell areas | red `#dc2626` |
+| Each shown tab's page | green `#16a34a`, labelled `tab <id>` |
+| The settings page, while it is open | orange `#f97316` |
+| The frame band's inner edge | grey `#9ca3af`, dashed |
+
+It only draws: it takes no presses and claims no part of the title bar, so the window
+drags and clicks as it does without it. It is macOS's `PBRegionOutlineView` in
+`engine/browser/window_mac.mm`.

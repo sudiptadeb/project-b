@@ -36,6 +36,7 @@ The flags today:
 | Extensions | `boolean`, `build` | `--pb-extensions` |
 | Remote debugging port | `number`, 1024 to 65535 | `--remote-debugging-port=<port>` |
 | Chromium features | `strings` | `--enable-features=<list>` |
+| Show window regions | `boolean` | `--pb-show-regions` |
 
 ## Build flags
 

@@ -59,6 +59,7 @@ class Window {
   struct Page {
     raw_ptr<content::WebContents> contents;
     gfx::RectF rect;
+    int64_t tab;  // Its id, for the region outlines.
   };
   struct State {
     gfx::SizeF size;  // The content area.

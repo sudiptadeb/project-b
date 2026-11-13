@@ -413,7 +413,7 @@ void Engine::ShowTabs(AppWindow* window, std::vector<VisibleTab> tabs) {
   std::erase_if(tabs, [this](const VisibleTab& v) { return !tab(v.tab); });
   std::vector<Window::Page> pages;
   for (const VisibleTab& v : tabs) {
-    pages.push_back({tab(v.tab)->contents(), v.rect});
+    pages.push_back({tab(v.tab)->contents(), v.rect, v.tab});
   }
   window->window->SetPages(pages);
   for (const VisibleTab& v : window->visible) {

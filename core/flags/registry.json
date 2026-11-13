@@ -23,5 +23,12 @@
     "switch": "enable-features",
     "type": "strings",
     "pattern": "^[A-Za-z0-9_.:<>]+$"
+  },
+  {
+    "id": "showRegions",
+    "name": "Show window regions",
+    "description": "Outline every area the window manager tracks: window buttons, drag, shell, pages and the settings page",
+    "switch": "pb-show-regions",
+    "type": "boolean"
   }
 ]

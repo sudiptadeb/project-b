@@ -6,7 +6,9 @@
 #include <cmath>
 #include <string_view>
 #include <utility>
+#include <vector>
 
+#include "base/command_line.h"
 #include "base/functional/callback.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/time/time.h"
@@ -30,6 +32,111 @@
 
 - (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
   return self.bounds;
+}
+
+@end
+
+namespace {
+
+// Everything the window manager tracks in a window, as the region outlines draw it.
+struct Outlines {
+  std::vector<project_b::Window::Region> regions;
+  // Each shown page's tab and where it is. Not the pages themselves: a tab can close
+  // while its outline is still drawn.
+  std::vector<std::pair<int64_t, gfx::RectF>> pages;
+  gfx::RectF controls;
+  bool overlay = false;
+  double frame_width = 0;
+};
+
+NSColor* Hex(uint32_t rgb) {
+  return [NSColor colorWithSRGBRed:((rgb >> 16) & 0xff) / 255.0
+                             green:((rgb >> 8) & 0xff) / 255.0
+                              blue:(rgb & 0xff) / 255.0
+                             alpha:1];
+}
+
+}  // namespace
+
+// --pb-show-regions, the Show window regions flag: a 1px border around every rectangle
+// the window manager tracks, one colour per kind, over everything else. It only draws:
+// hitTest: never returns it, and it claims no part of the title bar, so the window drags
+// and takes presses exactly as it does without it.
+@interface PBRegionOutlineView : NSView
+- (void)setOutlines:(const Outlines&)outlines;
+@end
+
+@implementation PBRegionOutlineView {
+  Outlines _outlines;
+}
+
+- (void)setOutlines:(const Outlines&)outlines {
+  _outlines = outlines;
+  self.needsDisplay = YES;
+}
+
+// Shell coordinates measure y from the top, so this view does too.
+- (BOOL)isFlipped {
+  return YES;
+}
+
+- (NSView*)hitTest:(NSPoint)point {
+  return nil;
+}
+
+- (NSRect)_opaqueRectForWindowMoveWhenInTitlebar {
+  return NSZeroRect;
+}
+
+- (void)stroke:(gfx::RectF)r color:(uint32_t)rgb dash:(CGFloat)dash {
+  if (r.IsEmpty()) {
+    return;
+  }
+  NSBezierPath* path = [NSBezierPath
+      bezierPathWithRect:NSInsetRect(NSMakeRect(r.x(), r.y(), r.width(), r.height()),
+                                     0.5, 0.5)];
+  path.lineWidth = 1;
+  if (dash > 0) {
+    const CGFloat pattern[] = {dash, dash * 0.75};
+    [path setLineDash:pattern count:2 phase:0];
+  }
+  [Hex(rgb) setStroke];
+  [path stroke];
+}
+
+// Bottom to top: the frame band, the pages, the shell, the drag areas, the window
+// buttons, and the settings page over everything while it is open.
+- (void)drawRect:(NSRect)dirty {
+  const NSSize size = self.bounds.size;
+  const double band = _outlines.frame_width;
+  [self stroke:gfx::RectF(band, band, size.width - 2 * band, size.height - 2 * band)
+         color:0x9ca3af
+          dash:2];
+  NSDictionary* label = @{
+    NSFontAttributeName : [NSFont systemFontOfSize:10],
+    NSForegroundColorAttributeName : Hex(0x16a34a),
+    NSBackgroundColorAttributeName : [NSColor colorWithWhite:1 alpha:0.85],
+  };
+  for (const auto& [tab, rect] : _outlines.pages) {
+    [self stroke:rect color:0x16a34a dash:0];
+    [[NSString stringWithFormat:@"tab %lld", tab]
+           drawAtPoint:NSMakePoint(rect.x() + 3, rect.y() + 2)
+        withAttributes:label];
+  }
+  for (const project_b::Window::Region& r : _outlines.regions) {
+    if (r.area == project_b::Window::Area::kShell) {
+      [self stroke:r.rect color:0xdc2626 dash:0];
+    }
+  }
+  for (const project_b::Window::Region& r : _outlines.regions) {
+    if (r.area == project_b::Window::Area::kDrag) {
+      [self stroke:r.rect color:0x2563eb dash:4];
+    }
+  }
+  [self stroke:_outlines.controls color:0xa855f7 dash:0];
+  if (_outlines.overlay) {
+    [self stroke:gfx::RectF(0, 0, size.width, size.height) color:0xf97316 dash:0];
+  }
 }
 
 @end
@@ -291,6 +398,23 @@ struct Window::Impl {
   // The mode SetMode asked for from full screen, which comes once it has left it, or -1.
   int after_full_screen = -1;
   State last_state;
+  // The region outlines, with --pb-show-regions only.
+  PBRegionOutlineView* __strong outline;
+  Outlines outlines;
+
+  // Hands the outline view what the window tracks now, and keeps it over every other
+  // view, which each of the window's other calls may have just added.
+  void Outline() {
+    if (!outline) {
+      return;
+    }
+    outlines.controls = Controls();
+    outlines.overlay = container.overlayView != nil;
+    [outline setOutlines:outlines];
+    if (container.subviews.lastObject != outline) {
+      [container addSubview:outline positioned:NSWindowAbove relativeTo:nil];
+    }
+  }
 
   // The close and zoom buttons bound the controls. In full screen macOS hides them.
   gfx::RectF Controls() const {
@@ -360,6 +484,7 @@ struct Window::Impl {
     last_state = state;
     // The frame band the container draws follows the window's curve.
     container.layer.cornerRadius = state.corner_radius;
+    Outline();
     on_state.Run(state);
   }
 };
@@ -411,6 +536,13 @@ Window::Window(base::OnceClosure on_close,
   impl_->container.pages = [[NSView alloc] initWithFrame:impl_->container.bounds];
   impl_->container.pages.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   [impl_->container addSubview:impl_->container.pages];
+
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch("pb-show-regions")) {
+    impl_->outline =
+        [[PBRegionOutlineView alloc] initWithFrame:impl_->container.bounds];
+    impl_->outline.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [impl_->container addSubview:impl_->outline];
+  }
 }
 
 Window::~Window() {
@@ -452,6 +584,7 @@ void Window::SetShellView(gfx::NativeView view) {
   shell.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   impl_->container.shellView = shell;
   [impl_->container addSubview:shell];
+  impl_->Outline();
 }
 
 // A page's view joins the holder the first time the window shows it, and moves here
@@ -480,6 +613,13 @@ void Window::SetPages(const std::vector<Page>& pages) {
       other.hidden = YES;
     }
   }
+  if (impl_->outline) {
+    impl_->outlines.pages.clear();
+    for (const Page& p : pages) {
+      impl_->outlines.pages.emplace_back(p.tab, p.rect);
+    }
+    impl_->Outline();
+  }
 }
 
 void Window::RemovePageView(gfx::NativeView view) {
@@ -492,6 +632,7 @@ void Window::SetOverlayView(gfx::NativeView view) {
   overlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   impl_->container.overlayView = overlay;
   [impl_->container addSubview:overlay];
+  impl_->Outline();
 }
 
 #if BUILDFLAG(PB_EXTENSIONS)
@@ -523,6 +664,7 @@ void Window::SetPopupView(gfx::NativeView view,
   container.popupView.frame = NSMakeRect(
       x, bounds.size.height - top - size.height(), size.width(), size.height());
   contents.frame = container.popupView.bounds;
+  impl_->Outline();
 }
 
 void Window::RemovePopupView(gfx::NativeView view) {
@@ -559,9 +701,15 @@ void Window::RemoveOverlayView(gfx::NativeView view) {
     impl_->container.overlayView = nil;
   }
   [overlay removeFromSuperview];
+  impl_->Outline();
 }
 
 bool Window::SetLayout(Layout layout) {
+  if (impl_->outline) {
+    impl_->outlines.regions = layout.regions;
+    impl_->outlines.frame_width = layout.frame_width;
+    impl_->Outline();
+  }
   [impl_->container setRegions:std::move(layout.regions)];
 
   if (layout.frame_rgb != impl_->frame_rgb ||

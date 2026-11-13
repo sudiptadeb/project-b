@@ -1161,8 +1161,53 @@ def shell_checks():
     shot("fox")
     quit_app()
 
+    for shell in ("minimal-svelte", "minimal-js"):
+        basic_shell_checks(shell)
 
-# "check.py shells" runs only the checks of the terminal and fox shells.
+
+def named(name, role="button"):
+    """A shell control's rectangle, found by its role and the start of its name, as
+    docs/shells.md's rule 12 names the basic controls."""
+    tag = {"button": "button,[role=button]", "tab": "[role=tab]"}[role]
+    return (f"(()=>{{const e=[...document.querySelectorAll('{tag}')].find(e=>/^{name}\\b/.test(e.getAttribute('aria-label')||e.textContent.trim()));"
+            f"if(!e)return null;const b=e.getBoundingClientRect();return [b.x,b.y,b.width,b.height]}})()")
+
+
+def basic_shell_checks(shell):
+    """What every listed shell does on a real screen, found by role and name only: it
+    starts, New Tab opens a tab, a click in the page gives it the keyboard, and the top
+    row's empty space drags the window and zooms it."""
+    ask, js = on_shell(shell)
+    win = window_or_stop(f"the app starts on the {shell} shell")
+    check(f"the app starts on the {shell} shell", js("location.pathname") == f"/{shell}/", js("location.href"))
+    new_tab = js(named("New Tab"))
+    check(f"{shell}: a New Tab button is there", new_tab is not None)
+    if new_tab is None:
+        quit_app()
+        return
+    desk.click(win[0] + middle(new_tab)[0], win[1] + middle(new_tab)[1])
+    tabs = until(lambda: js("document.querySelectorAll('[role=tab]').length"), lambda n: n == 2, 10)
+    check(f"{shell}: a click on New Tab opens a second tab", tabs == 2, f"{tabs} tabs")
+    go_to(BRAVO)
+    until(titles, lambda t: t == ["Bravo"])
+    shot(f"{shell}")
+    active = js("+document.querySelector('[role=tab][aria-selected=true]').dataset.tab")
+    desk.click(win[0] + win[2] / 2, win[1] + win[3] / 2)
+    focused = until(lambda: json.loads(ask("evaltab", str(active), "document.hasFocus()") or "false"), bool, 5)
+    check(f"{shell}: a click in the page gives it the keyboard", focused)
+    # The top row's empty space, found from the right as the window says a press there
+    # moves it.
+    spot = next(((x, y) for y in (10, 17, 24) for x in range(int(win[2]) - 30, int(win[2]) // 2, -8)
+                 if ask("press", str(x), str(y)) in ("moves", "titlebar")), None)
+    check(f"{shell}: the top row has empty space that drags", spot is not None)
+    if spot:
+        place = (f"the {shell} shell's top row", *spot)
+        drags(*place, win)
+        zooms(*place, win)
+    quit_app()
+
+
+# "check.py shells" runs only the checks of the shells besides the standard one.
 if sys.argv[1:] == ["shells"]:
     shell_checks()
     finished = True

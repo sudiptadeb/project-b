@@ -2,5 +2,6 @@
   { "id": "standard", "name": "Standard" },
   { "id": "terminal", "name": "Terminal" },
   { "id": "fox", "name": "Fox" },
-  { "id": "example", "name": "Example", "example": true }
+  { "id": "example", "name": "Example", "example": true },
+  { "id": "minimal-svelte", "name": "Minimal (Svelte)", "example": true }
 ]

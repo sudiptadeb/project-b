@@ -26,7 +26,9 @@ type Profile struct {
 	Name string `json:"name"`
 	// Color is a copy of the profile's frame colour, so a profile that isn't running
 	// can be shown in it.
-	Color    string    `json:"color"`
+	Color string `json:"color"`
+	// Template is the name of the template it was made from, kept only to show it.
+	Template string    `json:"template"`
 	LastUsed time.Time `json:"lastUsed,omitzero"`
 }
 
@@ -173,13 +175,22 @@ func (m *Manager) Choose(id string) (Choice, error) {
 	return Choice{Dir: m.Dir(last.ID), ID: last.ID}, nil
 }
 
-// makeFirst makes the list holding the first profile, Personal. Its folder may already
-// hold a profile, kept as it is, from before there was a list.
+// makeFirst makes the list holding the first profile, from the Personal template. Its
+// folder may already hold a profile, kept as it is, from before there was a list.
 func (m *Manager) makeFirst() error {
-	return m.change(func(list []Profile) []Profile {
+	var err error
+	if e := m.change(func(list []Profile) []Profile {
 		if list != nil {
 			return list
 		}
-		return []Profile{{ID: First, Name: "Personal", Color: prefs.New(m.Dir(First)).FrameColor()}}
-	})
+		dir := m.Dir(First)
+		if _, statErr := os.Stat(filepath.Join(dir, "prefs.json")); errors.Is(statErr, os.ErrNotExist) {
+			t, _ := TemplateNamed(Personal)
+			err = t.writePrefs(dir)
+		}
+		return []Profile{{ID: First, Name: Personal, Color: prefs.New(dir).FrameColor(), Template: Personal}}
+	}); e != nil {
+		return e
+	}
+	return err
 }

@@ -1211,7 +1211,7 @@ def bounds_checks():
 
 def profile_checks():
     """The start chooses the profile in Go, from the list in a root of its own here: a first
-    start makes the list holding Personal in default, a listed profile is named by its id,
+    start makes the list holding Personal in default, from the Personal template, a listed profile is named by its id,
     and --user-data-dir is a folder used as it is, which never enters the list."""
     root = tempfile.mkdtemp(prefix="pb-root-")
     listed = lambda: json.load(open(os.path.join(root, "profiles.json")))["profiles"]
@@ -1221,6 +1221,9 @@ def profile_checks():
     check("a first start makes the list holding Personal, in default",
           [(p["id"], p["name"]) for p in first] == [("default", "Personal")], first)
     check("and runs on that folder", os.path.exists(os.path.join(root, "default", "timeline.log")), os.listdir(root))
+    made = json.load(open(os.path.join(root, "default", "prefs.json")))
+    check("made from the Personal template: its prefs are Personal's, and the list says so",
+          made == {"tabLayout": "vertical", "frameColor": "#4f9e9e", "theme": "system"} and first[0]["template"] == "Personal", (made, first))
     check("the list records when the profile was used last", first[0].get("lastUsed", "") != "", first)
     started = subprocess.run([BIN, f"--root={root}", "--profile=default", PAGES + "clicks"], timeout=60, capture_output=True)
     check("a start naming the running profile by its id hands over and exits", started.returncode == 0, started.returncode)

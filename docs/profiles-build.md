@@ -12,11 +12,18 @@ built so far, and the order of building at the end says which steps are done.
   the profile used last. The list is `profiles.json` in the root, `~/.project-b` unless
   `--root=<dir>` names another, beside the profile folders: each profile's id (its folder's
   name), name, a copy of its frame colour, and when a copy last started on it. A first
-  start, with no list, makes it holding `default`, named Personal; a `default` that
-  already holds a `prefs.json` is left as it is. A list where no profile was used yet
+  start, with no list, makes it holding `default`, named Personal, from the Personal
+  template; a `default` that already holds a `prefs.json` is left as it is. A list where no profile was used yet
   starts the first listed. Every change to the list holds a lock on it
   (`profiles.lock`), since several copies write it. Everything Go keeps for a profile
   takes its one folder (`core/app/app.go`).
+- Templates are files of values in `core/commands/templates/profile/`, beside the keymap
+  and menu templates and built in the same way: a name and pref values, nothing else.
+  Personal is today's defaults; Work has the tabs on top and the frame colour `#5b7fd6`.
+  They hold the profile's own prefs only (the tabs, the frame colour, the theme), not
+  automatic updates, which become app-wide. Making a profile from one writes its values as
+  the profile's `prefs.json`; the list keeps the template's name only to show it
+  (`core/profiles/templates.go`).
 - Prefs are four values in `<profile>/prefs.json`: where the tabs go, automatic updates,
   the frame colour, the theme (`core/prefs`).
 - One copy of the app per folder, with a handover (`core/instance`). Nothing starts a
@@ -105,7 +112,7 @@ Each commit builds, leaves a working app, and carries its tests.
 1. Done. Our own pages in the off-the-record context.
 2. Done. The profile list beside the folders, and the start choosing the profile: named,
    else used last, else a first one.
-3. Templates, Personal and Work; the first profile is made from Personal.
+3. Done. Templates, Personal and Work; the first profile is made from Personal.
 4. Opening another profile: the Profiles menu, the second copy, the Dock icon's dot.
 5. The picker: a copy that hasn't chosen, its page, New Profile from a template.
 6. The Profile section in settings: the name, and reset to a template.

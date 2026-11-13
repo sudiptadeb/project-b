@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -109,6 +110,18 @@ type MenuFile struct {
 
 //go:embed templates
 var templateFS embed.FS
+
+// ProfileTemplates is the profile templates, templates/profile, built in beside the keymap
+// and menu templates. The profiles package reads them.
+var ProfileTemplates = mustSub("templates/profile")
+
+func mustSub(dir string) fs.FS {
+	sub, err := fs.Sub(templateFS, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}
 
 // keymapTemplates reads every keymap template, by name.
 func keymapTemplates() map[string]Keymap {

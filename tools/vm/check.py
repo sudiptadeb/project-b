@@ -1062,6 +1062,87 @@ def region_checks():
     quit_app()
 
 
+SHELLS = "/tmp/pb-shells"  # In the guest: the driver's pipe and output, and a profile, for shell_checks.
+
+
+def on_shell(shell):
+    """Opens the app with its driver on a fresh profile whose shell pref names shell. Returns
+    the driver's ask and js, which evaluates in the shell and decodes the answer."""
+    guest("/usr/bin/killall", "project_b")
+    profile = f"{SHELLS}-profile"  # Beside SHELLS, which driven() empties.
+    fresh_profile(profile, profile)
+    guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {profile}/prefs.json", "sh", json.dumps({"shell": shell}))
+    ask = driven(SHELLS, profile, [f"--user-data-dir={profile}"])
+    return ask, lambda expr: json.loads(ask("eval", expr) or "null")
+
+
+RECT = "(e=>{const b=e.getBoundingClientRect();return [b.x,b.y,b.width,b.height]})"
+
+
+def shell_checks():
+    """The terminal and fox shells on a real screen (docs/shells.md): the terminal shell splits
+    a pane by its title bar's button and a click in each page gives that page the keyboard;
+    the fox shell opens a tab from its strip and opens its menu. In both, a drag on the
+    strip's empty end moves the window and a double-click there zooms."""
+    ask, js = on_shell("terminal")
+    win = window_or_stop("the app starts on the terminal shell")
+    check("the app starts on the terminal shell", js("location.pathname") == "/terminal/", js("location.href"))
+    go_to(ALPHA)
+    until(titles, lambda t: t == ["Alpha"])
+    split = js(f"{RECT}(document.querySelector('[aria-label=\"Split right\"]'))")
+    desk.click(win[0] + middle(split)[0], win[1] + middle(split)[1])
+    panes = until(lambda: js("document.querySelectorAll('.pane').length"), lambda n: n == 2, 10)
+    check("a click on Split right splits the pane in two", panes == 2, f"{panes} panes")
+    go_to(BRAVO)
+    until(titles, lambda t: t == ["Bravo"])
+    shot("terminal-split")
+    pages = js("[...document.querySelectorAll('.pane')].map(p=>({tab:+p.querySelector('.title').dataset.pane,"
+               f"page:{RECT}(p.querySelector('.page'))}}))")
+    for pane in pages:
+        x, y = middle(pane["page"])
+        desk.click(win[0] + x, win[1] + y)
+        tab = pane["tab"]
+        focused = until(lambda: json.loads(ask("evaltab", str(tab), "document.hasFocus()") or "false"), bool, 5)
+        active = js("+document.querySelector('[role=tab][aria-selected=true]').dataset.tab")
+        check(f"a click in pane {tab}'s page gives it the keyboard and makes it active", focused and active == tab,
+              f"focus {focused}, active {active}")
+    rest = js(f"{RECT}(document.querySelector('.strip .rest'))")
+    end = ("the terminal strip's empty end", rest[0] + rest[2] - 20, middle(rest)[1])
+    drags(*end, win)
+    zooms(*end, win)
+    quit_app()
+
+    ask, js = on_shell("fox")
+    win = window_or_stop("the app starts on the fox shell")
+    check("the app starts on the fox shell", js("location.pathname") == "/fox/", js("location.href"))
+    new_tab = js(f"{RECT}(document.querySelector('.new-tab'))")
+    desk.click(win[0] + middle(new_tab)[0], win[1] + middle(new_tab)[1])
+    tabs = until(lambda: js("document.querySelectorAll('[role=tab]').length"), lambda n: n == 2, 10)
+    check("a click on New Tab opens a second tab", tabs == 2, f"{tabs} tabs")
+    go_to(BRAVO)
+    until(titles, lambda t: t == ["Bravo"])
+    menu = js(f"{RECT}(document.querySelector('[aria-label=Menu]'))")
+    desk.click(win[0] + middle(menu)[0], win[1] + middle(menu)[1])
+    opened = until(lambda: js("!!document.querySelector('.menu[role=menu]')"), bool, 5)
+    shot("fox-menu")
+    check("a click on the menu button opens the menu", opened)
+    desk.key("escape")
+    desk.click(win[0] + middle(menu)[0], win[1] + middle(menu)[1])
+    until(lambda: js("!document.querySelector('.menu[role=menu]')"), bool, 5)
+    rest = js(f"{RECT}(document.querySelector('.strip .rest'))")
+    end = ("the fox strip's empty end", rest[0] + rest[2] - 20, middle(rest)[1])
+    drags(*end, win)
+    zooms(*end, win)
+    shot("fox")
+    quit_app()
+
+
+# "check.py shells" runs only the checks of the terminal and fox shells.
+if sys.argv[1:] == ["shells"]:
+    shell_checks()
+    finished = True
+    sys.exit(1 if counts()["FAIL"] else 0)
+
 # "check.py regions" runs only the checks of the Show window regions flag.
 if sys.argv[1:] == ["regions"]:
     region_checks()
@@ -1309,7 +1390,7 @@ drags("the empty sidebar", 100, H - 40, home, "leaves the window alone")
 for place in RESIZE_EDGES:
     drags(*place, home, "resizes the window")
 selects_text(home)
-for place in SIDE_PLACES:
+for place in SIDE_PLACES + (SIDE_GAP,):
     zooms(*place, home)
 
 # Full screen, both ways in.
@@ -1561,5 +1642,6 @@ state_checks()
 profile_checks()
 picker_checks()
 workspace_checks()
+shell_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

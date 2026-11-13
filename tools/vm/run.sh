@@ -6,6 +6,7 @@
 #   tools/vm/run.sh <path or URL of a DMG> update     # an update from it to the stable release
 #   tools/vm/run.sh <path or URL of a DMG> workspaces # only the checks of workspaces
 #   tools/vm/run.sh <path or URL of a DMG> regions    # only the Show window regions flag
+#   tools/vm/run.sh <path or URL of a DMG> shells     # only the terminal and fox shells
 #
 # It takes the VM's lock, starts the VM if it isn't running, readies it (prepare.py), installs
 # the DMG, runs check.py,

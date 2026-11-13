@@ -474,9 +474,17 @@ def button_words(app, kind):
 
 
 def click_store_button(app, kind):
-    x, y = app.js(f"(()=>{{const b={store_button(kind)};b.scrollIntoView({{block:'center'}});const r=b.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
-    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
+    # Google's "Sign in" callout, an iframe under its account bar, can lie over the
+    # buttons and take the click. It comes and goes as Google decides, so it goes, and the
+    # click waits until the button itself is under the point.
+    b = store_button(kind)
+    app.js(f"{b}.scrollIntoView({{block:'center'}});0", page=True)
     time.sleep(0.5)
+    app.wait(f"(()=>{{document.querySelectorAll('iframe[name=callout]').forEach(f=>f.parentElement.remove());"
+             f"const b={b};const r=b.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button')===b}})()",
+             10, page=True)
+    x, y = app.js(f"(()=>{{const r={b}.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()", page=True)
+    px, py = json.loads(app.cmd("bounds"))["reported"][:2]
     app.cmd("click", px + x, py + y)
 
 

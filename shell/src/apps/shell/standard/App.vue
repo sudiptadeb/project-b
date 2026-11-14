@@ -2,6 +2,7 @@
 import { watchEffect } from 'vue';
 import FloatMenu from './FloatMenu.vue';
 import PageMenu from './PageMenu.vue';
+import TabMenu from './TabMenu.vue';
 import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
@@ -38,6 +39,7 @@ watchEffect(() => {
     <div class="edge bottom"></div>
     <FloatMenu />
     <PageMenu />
+    <TabMenu />
   </div>
 </template>
 

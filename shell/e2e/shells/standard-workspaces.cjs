@@ -72,6 +72,15 @@ const WORK = '0a1b2c3d';
   check('choosing All lists every tab again', await until(async () => (await ui.locator('.strip [role=tab]').count()) === 5));
   await fire('menu', 'view.tabsSide');
 
+  // A tab's workspace is fixed: its menu opens the same address in another workspace.
+  await until(async () => (await tabs.count()) === 5);
+  await tabs.first().click({ button: 'right' });
+  const tabMenu = ui.locator('.ui-context-menu').first();
+  await tabMenu.getByRole('menuitem', { name: 'Open in Workspace' }).click();
+  await ui.locator('.ui-context-menu').nth(1).getByRole('menuitem', { name: 'Work', exact: true }).click();
+  check('Open in Workspace opens the address in a tab of that workspace', await until(async () => (await tabs.count()) === 6));
+  await page.screenshot({ path: path.join(lib.out, 'standard-tab-menu.png') });
+
   // Keyboard: Shift+F10 opens it with the first item focused; Escape closes it.
   await until(async () => (await button.count()) === 1);
   await button.focus();

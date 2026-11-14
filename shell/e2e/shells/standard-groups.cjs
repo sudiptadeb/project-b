@@ -30,22 +30,30 @@ const sites = ['docs.example.com', 'mail.example.com', 'news.example.org', 'shop
   const header = (i = 0) => ui.locator('.sidebar .group').nth(i);
   const tabRow = (id) => ui.locator(`.sidebar [role=tab][data-tab="${id}"]`);
   const menu = ui.locator('.ui-menu.float');
+  // The tab's own menu, the shared context menu, and its submenu.
+  const tabMenu = ui.locator('.ui-context-menu').first();
+  const subMenu = ui.locator('.ui-context-menu').nth(1);
+  const toGroup = async (id, name) => {
+    await tabRow(id).click({ button: 'right' });
+    await tabMenu.getByRole('menuitem', { name: 'Add Tab to Group' }).click();
+    await subMenu.getByRole('menuitem', { name, exact: true }).click();
+  };
 
-  // A group from the tab's menu: Add to new group.
+  // A group from the tab's menu: Add Tab to Group, New Group.
   await tabRow(ids[1]).click({ button: 'right' });
-  check('a right-click on a tab opens its menu', await menu.isVisible());
-  const box = await menu.boundingBox();
+  check('a right-click on a tab opens its menu', await tabMenu.isVisible());
+  check('it holds the tab\'s actions', JSON.stringify(await tabMenu.getByRole('menuitem').allInnerTexts()).includes('Duplicate Tab') &&
+    (await tabMenu.getByRole('menuitem', { name: 'Close Other Tabs' }).count()) === 1, JSON.stringify(await tabMenu.getByRole('menuitem').allInnerTexts()));
+  const box = await tabMenu.boundingBox();
   check('and over the page the menu is the shell\'s while open', await until(async () => (await lib.regions({ x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height - 8) })).hit === 'shell'), JSON.stringify(box));
-  await menu.getByRole('menuitem', { name: 'Add to new group' }).click();
-  check('Add to new group draws a group with a header, the tab under it', await until(async () => (await header().count()) === 1 && (await tabRow(ids[1]).evaluate((e) => e.classList.contains('grouped')))));
-  check('the menu closes once it has run', (await menu.count()) === 0);
+  await tabMenu.getByRole('menuitem', { name: 'Add Tab to Group' }).click();
+  await subMenu.getByRole('menuitem', { name: 'New Group', exact: true }).click();
+  check('New Group draws a group with a header, the tab under it', await until(async () => (await header().count()) === 1 && (await tabRow(ids[1]).evaluate((e) => e.classList.contains('grouped')))));
+  check('the menu closes once it has run', (await ui.locator('.ui-context-menu').count()) === 0);
 
   // Another tab joins it from its menu.
-  await tabRow(ids[2]).click({ button: 'right' });
-  const join = menu.getByRole('menuitem', { name: 'Add to group of 1 tab' });
-  check('the tab\'s menu offers the window\'s other groups', (await menu.getByRole('menuitem').count()) >= 3);
-  await join.click();
-  check('and Add to puts the tab in that group', await until(async () => (await tabRow(ids[2]).evaluate((e) => e.classList.contains('grouped')))));
+  await toGroup(ids[2], '1 tab');
+  check('and choosing the group puts the tab in it', await until(async () => (await tabRow(ids[2]).evaluate((e) => e.classList.contains('grouped')))));
 
   // The group's menu names and colours it.
   await header().click({ button: 'right' });
@@ -96,11 +104,9 @@ const sites = ['docs.example.com', 'mail.example.com', 'news.example.org', 'shop
   await header().click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Ungroup' }).click();
   check('Ungroup ends the group and keeps its tabs', await until(async () => (await header().count()) === 0 && (await ui.locator('.sidebar [role=tab]').count()) === sites.length + 1));
-  await tabRow(ids[3]).click({ button: 'right' });
-  await menu.getByRole('menuitem', { name: 'Add to new group' }).click();
+  await toGroup(ids[3], 'New Group');
   await until(async () => (await header().count()) === 1);
-  await tabRow(ids[4]).click({ button: 'right' });
-  await menu.getByRole('menuitem', { name: 'Add to group of 1 tab' }).click();
+  await toGroup(ids[4], '1 tab');
   await until(async () => (await ui.locator('.sidebar [role=tab].grouped').count()) === 2);
   await header().click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Close group' }).click();
@@ -109,11 +115,20 @@ const sites = ['docs.example.com', 'mail.example.com', 'news.example.org', 'shop
   // The keyboard: Shift+F10 on a tab opens its menu with the first item focused.
   await tabRow(ids[0]).focus();
   await page.keyboard.press('Shift+F10');
-  check('Shift+F10 on a tab opens its menu, the first item focused', await until(async () => (await menu.isVisible()) && (await menu.getByRole('menuitem').first().evaluate((e) => e === document.activeElement))));
+  check('Shift+F10 on a tab opens its menu, the first item focused', await until(async () => (await tabMenu.isVisible()) && (await tabMenu.getByRole('menuitem').first().evaluate((e) => e === document.activeElement))));
   await page.keyboard.press('ArrowDown');
-  check('the arrow keys move through it', !(await menu.getByRole('menuitem').first().evaluate((e) => e === document.activeElement)));
+  check('the arrow keys move through it', !(await tabMenu.getByRole('menuitem').first().evaluate((e) => e === document.activeElement)));
   await page.keyboard.press('Escape');
-  check('Escape closes it', await until(async () => (await menu.count()) === 0));
+  check('Escape closes it', await until(async () => (await ui.locator('.ui-context-menu').count()) === 0));
+
+  // Close Other Tabs closes the window's other tabs; Duplicate opens a copy.
+  const before = await ui.locator('.sidebar [role=tab]').count();
+  await tabRow(ids[0]).click({ button: 'right' });
+  await tabMenu.getByRole('menuitem', { name: 'Duplicate Tab' }).click();
+  check('Duplicate Tab opens a copy of the tab', await until(async () => (await ui.locator('.sidebar [role=tab]').count()) === before + 1));
+  await tabRow(ids[0]).click({ button: 'right' });
+  await tabMenu.getByRole('menuitem', { name: 'Close Other Tabs' }).click();
+  check('Close Other Tabs leaves only that tab', await until(async () => (await ui.locator('.sidebar [role=tab]').count()) === 1 && (await tabRow(ids[0]).count()) === 1));
 
   check('no errors in the pages', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();

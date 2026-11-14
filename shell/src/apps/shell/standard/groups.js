@@ -11,13 +11,15 @@ export function groupLabel(g) {
 }
 
 // entries turns the window's tabs into what the list draws, in order: { tab } for a tab in
-// no group, { group, tabs } for a group, tabs being the ones it shows.
-export function entries(state) {
-  const byId = new Map(state.tabs.map((t) => [t.id, t]));
+// no group, { group, tabs } for a group, tabs being the ones it shows. With workspace, only
+// that workspace's tabs; a group is in one workspace, so it comes whole or not at all.
+export function entries(state, workspace = null) {
+  const shown = workspace === null ? state.tabs : state.tabs.filter((t) => t.workspace === workspace);
+  const byId = new Map(shown.map((t) => [t.id, t]));
   const groups = new Map((state.groups || []).map((g) => [g.id, g]));
   const done = new Set();
   const out = [];
-  for (const tab of state.tabs) {
+  for (const tab of shown) {
     const g = tab.group && groups.get(tab.group);
     if (!g) {
       out.push({ tab });

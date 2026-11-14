@@ -4,10 +4,12 @@ import { computed } from 'vue';
 import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { entries, groupLabel } from './groups.js';
 import { openMenu } from './menu.js';
+import { newTab, view, workspaces } from './state.js';
+import WorkspaceButton from './WorkspaceButton.vue';
 
 // The strip, flat: a group's chip, then its tabs, which carry the group for their rule.
 const items = computed(() =>
-  entries(state).flatMap((e) => (e.group ? [{ chip: e.group }, ...e.tabs.map((tab) => ({ tab, group: e.group }))] : [e])),
+  entries(state, view.workspace).flatMap((e) => (e.group ? [{ chip: e.group }, ...e.tabs.map((tab) => ({ tab, group: e.group }))] : [e])),
 );
 
 // The strip is the title bar when the tabs are on top: it sits on the bar, leaves the
@@ -19,6 +21,7 @@ const items = computed(() =>
 <template>
   <div v-shell v-drag class="strip" role="tablist" aria-label="Open tabs">
     <div class="space" :style="{ width: controls.left }"></div>
+    <WorkspaceButton v-if="workspaces.length" class="strip-ws" compact />
     <template v-for="it in items" :key="it.chip ? 'g' + it.chip.id : it.tab.id">
     <button
       v-if="it.chip"
@@ -58,7 +61,7 @@ const items = computed(() =>
       </button>
     </div>
     </template>
-    <button class="new-tab" type="button" aria-label="New Tab" :title="state.keys['tab.new'] ? `New Tab (${shown(state.keys['tab.new'], state.platform)})` : 'New Tab'" @click="send({ t: 'newTab' })">
+    <button class="new-tab" type="button" aria-label="New Tab" :title="state.keys['tab.new'] ? `New Tab (${shown(state.keys['tab.new'], state.platform)})` : 'New Tab'" @click="newTab">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
     </button>
     <div class="space end" :style="{ width: controls.right }"></div>

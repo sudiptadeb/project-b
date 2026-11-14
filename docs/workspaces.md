@@ -41,7 +41,9 @@ as built so far, and the order of building at the end says which steps are done.
   (`engine.Engine.SetFirstWorkspace`): a tab made over DevTools, and one an extension opens
   through the engine, its options page or the page it names for after it is removed
   (`OpenTab`). A window an extension's own page opens stays in the profile's own storage
-  (see "Decided while building").
+  (see "Decided while building"). What opens about the page a tab shows is in that tab's
+  workspace: View Source loads the page again, and in another workspace would load it
+  without the tab's cookies (`tabs.Manager.OpenFor`). The store button opens in the first.
 - The tab-opened event says which workspace the new tab is in (`PB_EVENT_TAB_OPENED`,
   `engine.Listener.TabOpened`); the engine reads it from the tab's partition. The driver
   opens a tab in a workspace by id (`opentab`, "" for the profile's own storage). The mock

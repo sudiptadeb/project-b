@@ -472,9 +472,21 @@ func (m *Manager) Open(u string) { m.OpenIn(u, true) }
 // OpenIn opens a URL in a new last tab of the window in front, in the first workspace,
 // shown or behind the active one.
 func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
-	workspace := m.first()
+	return m.open(m.ActiveID(), u, m.first(), foreground)
+}
+
+// OpenFor opens a URL about a tab's page, such as its source, in a new last tab of that
+// tab's window, in its workspace, and shows it. The URL loads the page again, so in another
+// workspace it would load it without the tab's cookies.
+func (m *Manager) OpenFor(tab engine.TabID, u string) {
+	if t := m.tabs[tab]; t != nil {
+		m.open(tab, u, t.Workspace, true)
+	}
+}
+
+func (m *Manager) open(opener engine.TabID, u, workspace string, foreground bool) engine.TabID {
 	id := m.eng.CreateTab(workspace)
-	m.HandleTabOpened(m.ActiveID(), id, u, workspace, foreground)
+	m.HandleTabOpened(opener, id, u, workspace, foreground)
 	m.eng.LoadURL(id, u)
 	return id
 }

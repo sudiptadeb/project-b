@@ -1052,6 +1052,33 @@ func TestATabNothingPlacesOpensInTheFirstWorkspace(t *testing.T) {
 	}
 }
 
+// View Source opens in the workspace of the tab whose source it shows, in Go and in the
+// engine: the source is the page fetched again, with that workspace's cookies.
+func TestViewSourceOpensInItsTabsWorkspace(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	var work workspaces.Workspace
+	r.e.Post(func() {
+		work, _ = r.a.Workspaces.Create("Work", "#5b7fd6")
+		r.a.Tabs.CreateIn(1, work.ID)
+	})
+	m := r.waitFor(isTabs(2))
+	r.show(m["tabs"].([]any)[1].(map[string]any)["id"].(float64))
+	r.visit("https://work.test/")
+	r.e.Post(func() { r.a.MenuChosen("dev.viewSource") })
+	m = r.waitFor(isTabs(3))
+	source := m["tabs"].([]any)[2].(map[string]any)
+	r.waitForTab(func(t map[string]any) bool {
+		return t["url"] == "view-source:https://work.test/" && strings.HasPrefix(t["title"].(string), "Mock")
+	})
+	var in string
+	r.e.Post(func() { in = r.e.Workspace(engine.TabID(source["id"].(float64))) })
+	r.e.Settle()
+	if source["workspace"] != work.ID || in != work.ID || m["active"] != source["id"] {
+		t.Fatalf("the source's tab %v, active %v, is in %q in the engine", source, m["active"], in)
+	}
+}
+
 // Every shell has the workspaces from its snapshot on, and hears of one made or renamed at
 // once, so the dot on a tab in one is in its colour.
 func TestTheShellHearsTheWorkspaces(t *testing.T) {

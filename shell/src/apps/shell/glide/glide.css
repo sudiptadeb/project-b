@@ -96,3 +96,9 @@
   font-size: 12px;
   pointer-events: none;
 }
+
+/* A page in full screen, across the whole window, with nothing of Glide's round it. */
+.glide .page-full {
+  position: fixed;
+  inset: 0;
+}

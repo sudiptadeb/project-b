@@ -27,8 +27,16 @@
   });
 
   function choose(item) {
+    if (item.disabled) return;
     g.ui.menu = null;
     item.run();
+  }
+
+  // Gone without a choice: the cover pressed, or Escape. A page's menu tells Go.
+  function dismiss() {
+    const m = menu;
+    g.ui.menu = null;
+    m.onclose?.();
   }
 
   function onkeydown(e) {
@@ -38,19 +46,19 @@
       e.preventDefault();
       all[(i + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length]?.focus();
     } else if (e.key === 'Escape') {
-      g.ui.menu = null;
+      dismiss();
     }
   }
 </script>
 
-<div class="cover" use:shell role="presentation" onpointerdown={() => (g.ui.menu = null)} oncontextmenu={(e) => e.preventDefault()}></div>
+<div class="cover" use:shell role="presentation" onpointerdown={dismiss} oncontextmenu={(e) => e.preventDefault()}></div>
 <div bind:this={box} class="menu" use:shell role="menu" aria-label={menu.label} tabindex="-1" style:left="{left}px" style:top="{top}px" {onkeydown}>
   {#each items as item, i (i)}
     {#if item.separator}
       <div class="sep" role="separator"></div>
     {:else}
       {@const key = item.action ? keyLabel(go, item.action) : ''}
-      <button role="menuitem" class="item" onclick={() => choose(item)}>
+      <button role="menuitem" class="item" disabled={item.disabled} aria-disabled={item.disabled ? 'true' : undefined} onclick={() => choose(item)}>
         <span>{item.label}</span>
         {#if key}<span class="key">{key}</span>{/if}
       </button>
@@ -119,5 +127,10 @@
   .sep:last-child,
   .sep + .sep {
     display: none;
+  }
+
+  .item:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 </style>

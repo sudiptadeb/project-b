@@ -1,5 +1,6 @@
 <script>
   import { activeTab, controlSpace, drag, send, shell, state } from '@/sdk/svelte.svelte.js';
+  import Downloads from './Downloads.svelte';
   import Icon from './Icon.svelte';
   import Nav from './Nav.svelte';
   import * as g from './glide.svelte.js';
@@ -20,6 +21,7 @@
   {#if tab.url}<button class="g-icon" aria-label="Copy Address" onclick={oncopy}><Icon name="link" /></button>{/if}
   <span class="gap"></span>
   <button class="g-icon" aria-label="New Tab" title={hint('New Tab', 'tab.new')} onclick={() => send({ t: 'newTab', workspace: g.spaceId() })}><Icon name="plus" /></button>
+  <Downloads />
   <button class="g-icon" aria-label="Settings" onclick={() => send({ t: 'run', text: 'app.settings' })}><Icon name="gear" /></button>
 </div>
 

@@ -1,5 +1,5 @@
 <script>
-  import { activeTab, connect, focusPage, send, setFrame, state as go } from '@/sdk/svelte.svelte.js';
+  import { activeTab, chooseContextItem, closeContextMenu, connect, contextMenuPoint, focusPage, page, send, setFrame, state as go } from '@/sdk/svelte.svelte.js';
   import CommandBar from './CommandBar.svelte';
   import Menu from './Menu.svelte';
   import Panes from './Panes.svelte';
@@ -22,6 +22,52 @@
   const tokens = $derived(styleOf(glideTones(g.space().color, dark)));
 
   let bar = $state();
+  let find = $state();
+
+  // A page in full screen has the whole window: nothing of Glide's shows.
+  const pageFull = $derived(go.pageFullScreen !== 0 && go.pageFullScreen === go.active);
+
+  // Go's right-click menu, in Glide's own: its actions in Go's order, a line between
+  // groups, a Space for each workspace to open a link in.
+  const lines = { 'link.copy': 'keep', 'link.saveAs': 'keep', 'edit.undo': 'undo', 'edit.redo': 'undo' };
+  $effect(() => {
+    const m = go.contextMenu;
+    if (!m) {
+      if (g.ui.menu?.page) g.ui.menu = null;
+      return;
+    }
+    const items = [];
+    let section = '';
+    for (const a of m.actions) {
+      const s = lines[a.id] || a.group;
+      if (section && s !== section) items.push({ separator: true });
+      section = s;
+      for (const one of a.actions ? a.actions.map((w) => ({ ...w, title: `Open Link in ${w.title}` })) : [a]) {
+        items.push({
+          label: one.title,
+          disabled: !one.enabled,
+          action: one.id.startsWith('edit.') ? one.id : '',
+          run: () => {
+            chooseContextItem(m, one.id);
+            focusPage();
+          },
+        });
+      }
+    }
+    const at = contextMenuPoint(m);
+    send({ t: 'focusShell' });
+    g.ui.menu = {
+      x: at.x,
+      y: at.y,
+      label: m.link ? 'Link' : m.src ? 'Image' : m.editable ? 'Text field' : m.selection ? 'Selection' : 'Page',
+      items,
+      page: true,
+      onclose: () => {
+        closeContextMenu(m);
+        focusPage();
+      },
+    };
+  });
   // The tab last made active, so each change of it is seen once.
   let active = 0;
 
@@ -107,6 +153,7 @@
       if (m.tab.id === go.active && bar?.mode === 'address' && !bar.typed && m.tab.url && m.tab.url !== bar.text) g.ui.bar = null;
     },
     focusAddressBar: () => openBar('address'),
+    focusFind: () => find?.focus(),
     suggestions: (m) => bar?.suggestions(m),
     action: (m) => actions[m.id]?.(),
   });
@@ -114,11 +161,18 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === 'Escape' && g.ui.menu) g.ui.menu = null;
+    if (e.key === 'Escape' && g.ui.menu) {
+      const m = g.ui.menu;
+      g.ui.menu = null;
+      m.onclose?.();
+    }
   }}
 />
 
 <div class="glide" style={tokens} class:dark>
+  {#if pageFull}
+    <main class="page-full" use:page={go.active}></main>
+  {:else}
   {#if g.win.hidden}
     <TopBar onaddress={() => openBar('address')} oncopy={copyAddress} />
   {/if}
@@ -126,8 +180,9 @@
     {#if !g.win.hidden}
       <Sidebar onaddress={() => openBar('address')} oncopy={copyAddress} onnew={() => send({ t: 'newTab', workspace: g.spaceId() })} onclosebar={() => (g.ui.bar = null)} />
     {/if}
-    <Panes hidden={g.win.hidden} />
+    <Panes hidden={g.win.hidden} bind:find />
   </div>
+  {/if}
   {#if g.ui.bar}
     <CommandBar bind:this={bar} close={closeBar} />
   {/if}

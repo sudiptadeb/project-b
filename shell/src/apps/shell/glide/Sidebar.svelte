@@ -3,6 +3,7 @@
   import { activeTab, controlSpace, drag, send, shell, state, tabLabel } from '@/sdk/svelte.svelte.js';
   import Extensions from './Extensions.svelte';
   import Favicon from './Favicon.svelte';
+  import Downloads from './Downloads.svelte';
   import Icon from './Icon.svelte';
   import Nav from './Nav.svelte';
   import TabRow from './TabRow.svelte';
@@ -191,6 +192,7 @@
       {/each}
     </div>
     <button class="g-icon" aria-label="New Space" title={hint('New Space', 'glide.newSpace')} onclick={newSpace}><Icon name="plus" /></button>
+    <Downloads />
     <button class="g-icon" aria-label="Settings" title={hint('Settings', 'app.settings')} onclick={() => send({ t: 'run', text: 'app.settings' })}><Icon name="gear" /></button>
   </div>
 </aside>

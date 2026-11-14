@@ -1,6 +1,8 @@
 <script>
   import { drag, page, shell, state as go } from '@/sdk/svelte.svelte.js';
   import * as g from './glide.svelte.js';
+  import FindBar from './FindBar.svelte';
+  import PageDialog from './PageDialog.svelte';
 
   // The pages: the active tab as a card inset in the frame, or the tabs of its split side
   // by side, 8px apart, the active one ringed in the accent; a press in a pane's page makes
@@ -10,7 +12,7 @@
   // so the cards keep the frame's 8px on every side. The cards' corners are concentric
   // with the window's: its radius less the 8px inset (18 on macOS 26), and the design
   // system's 8 where the window has square corners, as in full screen.
-  let { hidden } = $props();
+  let { hidden, find = $bindable() } = $props();
 
   const radius = $derived(Math.max(go.cornerRadius - 8, 8));
 
@@ -56,6 +58,8 @@
       {/if}
       <div class="card" style:flex="{sizes[i] ?? 1} 1 0" class:focused={ids.length > 1 && id === go.active}>
         <main use:page={id}></main>
+        <PageDialog tab={id} />
+        {#if id === go.active}<FindBar bind:this={find} />{/if}
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
         <span class="ring"></span>
       </div>

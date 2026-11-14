@@ -1,5 +1,6 @@
 <script setup>
 import CrashNotice from './CrashNotice.vue';
+import PageDialog from './PageDialog.vue';
 import UpdateStatus from './UpdateStatus.vue';
 import { state } from '@/sdk/vue.js';
 </script>
@@ -9,6 +10,7 @@ import { state } from '@/sdk/vue.js';
   <div class="main">
     <div v-page="state.active" class="page-view"></div>
     <CrashNotice />
+    <PageDialog />
     <UpdateStatus />
   </div>
 </template>

@@ -4,7 +4,7 @@ import { send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { shown } from '@/keys.js';
 import { entries, groupLabel } from './groups.js';
 import { openMenu } from './menu.js';
-import { newTab, view, workspaces } from './state.js';
+import { newTab, view, waiting, workspaces } from './state.js';
 import WorkspaceButton from './WorkspaceButton.vue';
 
 // The list, flat: a group's header, then its tabs, which carry the group for their rule.
@@ -59,7 +59,8 @@ const rows = computed(() =>
             <img v-if="r.tab.favicon" :src="r.tab.favicon" alt="" width="16" height="16" />
           </span>
           <span class="title" :class="{ muted: !r.tab.title }">{{ tabLabel(r.tab) }}</span>
-          <span v-if="workspaceOf(r.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(r.tab).name}`" :title="workspaceOf(r.tab).name" :style="{ background: workspaceOf(r.tab).color }"></span>
+          <span v-if="waiting(r.tab)" class="waiting" role="img" aria-label="Waiting for an answer" title="Waiting for an answer"></span>
+          <span v-else-if="workspaceOf(r.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(r.tab).name}`" :title="workspaceOf(r.tab).name" :style="{ background: workspaceOf(r.tab).color }"></span>
           <button class="close" type="button" :aria-label="`Close ${tabLabel(r.tab)}`" @click.stop="send({ t: 'closeTab', id: r.tab.id })">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
           </button>
@@ -211,6 +212,18 @@ const rows = computed(() =>
   width: 2px;
   border-radius: 1px;
   background: var(--group);
+}
+
+/* A page waiting on a dialog while another tab shows: an accent dot, ringed, in the
+   workspace dot's place. */
+.waiting {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 /* The workspace a tab is in, as a dot in its colour. */

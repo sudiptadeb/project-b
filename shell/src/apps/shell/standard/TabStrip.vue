@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { entries, groupLabel } from './groups.js';
 import { openMenu } from './menu.js';
-import { newTab, view, workspaces } from './state.js';
+import { newTab, view, waiting, workspaces } from './state.js';
 import WorkspaceButton from './WorkspaceButton.vue';
 
 // The strip, flat: a group's chip, then its tabs, which carry the group for their rule.
@@ -55,7 +55,8 @@ const items = computed(() =>
     >
       <img v-if="it.tab.favicon" class="icon" :src="it.tab.favicon" alt="" width="16" height="16" />
       <span class="title">{{ tabLabel(it.tab) }}</span>
-      <span v-if="workspaceOf(it.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(it.tab).name}`" :title="workspaceOf(it.tab).name" :style="{ background: workspaceOf(it.tab).color }"></span>
+      <span v-if="waiting(it.tab)" class="waiting" role="img" aria-label="Waiting for an answer" title="Waiting for an answer"></span>
+      <span v-else-if="workspaceOf(it.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(it.tab).name}`" :title="workspaceOf(it.tab).name" :style="{ background: workspaceOf(it.tab).color }"></span>
       <button class="close" type="button" :aria-label="`Close ${tabLabel(it.tab)}`" @click.stop="send({ t: 'closeTab', id: it.tab.id })">
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
       </button>
@@ -181,6 +182,18 @@ const items = computed(() =>
 
 .tab.active {
   background: var(--accent-soft);
+}
+
+/* A page waiting on a dialog while another tab shows: an accent dot, ringed, in the
+   workspace dot's place. */
+.waiting {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 /* The workspace a tab is in, as a dot in its colour. */

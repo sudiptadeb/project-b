@@ -139,11 +139,42 @@ const { check, fire, regions, settle, until } = lib;
   await list.getByRole('button', { name: 'Clear' }).click();
   check('Clear empties the list, and the control goes', await until(async () => (await control.count()) === 0));
 
+  // A page's dialogs: drawn over the window while its tab shows, answered back to Go.
+  const ask = ui.getByRole('alertdialog');
+  await fire('prompt', 'Your name?');
+  check('a prompt shows as an alertdialog with its words and a field', await until(async () => (await ask.isVisible()) && (await ask.innerText()).includes('Your name?') && (await ask.getByRole('textbox').count()) === 1));
+  check('its field starts with the page\'s text', (await ask.getByRole('textbox').inputValue()) === 'mock');
+  await shoot('prompt');
+  const t1 = (await regions()).active;
+  await ui.getByRole('button', { name: 'New Tab' }).first().click();
+  check('another tab shown hides it', await until(async () => (await ask.count()) === 0 && (await regions()).active !== t1));
+  check('and its tab\'s row says it waits', await until(async () => (await ui.locator(`[role=tab][data-tab="${t1}"] [aria-label="Waiting for an answer"]`).count()) === 1));
+  await ui.locator(`[role=tab][data-tab="${t1}"]`).click();
+  check('and showing its tab brings it back', await until(() => ask.isVisible()));
+  await ask.getByRole('textbox').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  check('Tab goes round the card\'s controls', await ask.getByRole('textbox').evaluate((el) => el === document.activeElement));
+  await ask.getByRole('textbox').fill('Ada');
+  await ask.getByRole('button', { name: 'OK' }).click();
+  check('OK answers the page with the text', await until(async () => JSON.stringify((await regions()).dialogAnswers) === JSON.stringify([{ id: 1, ok: true, text: 'Ada' }])), JSON.stringify((await regions()).dialogAnswers));
+  check('and the dialog goes', await until(async () => (await ask.count()) === 0));
+  await fire('alert', 'Saved.');
+  await until(() => ask.isVisible());
+  check('an alert has only OK', (await ask.getByRole('button').count()) === 1);
+  await page.keyboard.press('Escape');
+  check('Escape dismisses it', await until(async () => (await ask.count()) === 0 && (await regions()).dialogAnswers?.length === 2));
+  await fire('beforeunload', '');
+  await until(() => ask.isVisible());
+  check('leaving asks with Leave and Cancel', (await ask.getByRole('button', { name: 'Leave' }).count()) === 1 && (await ask.getByRole('button', { name: 'Cancel' }).count()) === 1);
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  check('Cancel answers no', await until(async () => (await regions()).dialogAnswers?.[2]?.ok === false));
+
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();
   await lib.done();
 })().catch(async (e) => {
-  console.error(e);
-  process.exitCode = 1;
+  check('the checks ran to their end', false, e.message.split('\n').slice(0, 12).join(' / '));
   await lib.done();
 });

@@ -44,6 +44,10 @@ export function newTab() {
   send(view.workspace === null ? { t: 'newTab' } : { t: 'newTab', workspace: view.workspace });
 }
 
+// waiting says a tab's page waits on a dialog while another tab shows, for its row to say
+// so: showing the tab brings the dialog back.
+export const waiting = (tab) => tab.id !== state.active && state.dialogs.some((d) => d.tab === tab.id);
+
 // tabsOnTop says the tabs are a strip above the toolbar rather than a sidebar.
 export const tabsOnTop = computed(() => state.tabLayout === 'horizontal');
 

@@ -72,6 +72,11 @@ export const state = {
   // total, paused}: state is progress, done, cancelled or failed, and total -1 when
   // unknown. downloads.js acts on one (docs/daily-driver.md).
   downloads: [],
+  // The dialogs pages wait on, oldest first, each {id, tab, kind, title, message,
+  // defaultText, ok, cancel}: kind is alert, confirm, prompt or beforeunload; ok and cancel
+  // are the buttons' words, cancel "" for an alert. A shell shows its active tab's and
+  // answers with answerDialog (dialogs.js).
+  dialogs: [],
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
@@ -81,7 +86,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads', 'dialogs']);
 
 const listeners = [];
 

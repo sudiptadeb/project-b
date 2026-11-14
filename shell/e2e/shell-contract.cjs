@@ -29,6 +29,7 @@ const rules = {
   11: 'Settings is one press away, or two: a control named Settings, on the shell or in a menu one of its controls opens, opens the settings page',
   12: 'The basic controls are somewhere in the shell, found by role and name, and each does its job',
   13: 'It logs no errors',
+  15: 'A page\'s alert, confirm and prompt show as an alertdialog with Go\'s buttons by name, a prompt with a field; the answer reaches the page; another tab shown hides it, and back shows it',
   16: 'On a desktop, a right click in a page opens a menu of Go\'s actions there; choosing one makes Go do it; Escape, or a press outside, closes it',
   17: 'On a desktop, a control named Downloads shows once there is a download, and opens a list of them by file name, a finished one with Open and Show in Finder',
 };
@@ -43,6 +44,19 @@ const noMenuYet = {
   'minimal-js': 'r4 brings it',
   'minimal-vue': 'r4 brings it',
   example: 'r4 brings it',
+};
+
+// The shells that don't draw a page's dialogs yet, and who brings each. Rule 15 holds
+// every other shell to them.
+const noDialogsYet = {
+  glide: 'r6 brings it',
+  terminal: 'r4 brings it',
+  fox: 'r4 brings it',
+  'minimal-svelte': 'r4 brings it',
+  'minimal-js': 'r4 brings it',
+  'minimal-vue': 'r4 brings it',
+  example: 'r4 brings it',
+  mobile: 'r3 brings it, with the dialogs on Android',
 };
 
 // The desktop shells that don't draw the downloads list yet, and who brings it to each.
@@ -386,6 +400,36 @@ const noDownloadsYet = {
       } catch (e) {
         rule(current, 'its checks ran to their end', false, e.message.split('\n')[0]);
         for (let n = current + 1; n <= 12; n++) rule(n, 'not checked: an earlier check ended the run', false);
+      }
+    }
+
+    // 15. A page's dialogs, on every shell.
+    if (noDialogsYet[id]) {
+      rule(15, `not checked yet: ${noDialogsYet[id]}`, true);
+    } else {
+      try {
+        const ask = ui.getByRole('alertdialog');
+        const answers = async () => (await regions()).dialogAnswers || [];
+        const before = (await answers()).length;
+        await fire('confirm', 'Go on?');
+        rule(15, 'a confirm shows as an alertdialog with its words', await until(async () => (await ask.isVisible()) && (await ask.innerText()).includes('Go on?')));
+        rule(15, "with Go's buttons, OK and Cancel, by name", (await ask.getByRole('button', { name: 'OK' }).count()) === 1 && (await ask.getByRole('button', { name: 'Cancel' }).count()) === 1);
+        const home = (await regions()).active;
+        await fire('menu', 'tab.new');
+        rule(15, 'another tab shown hides it', await until(async () => (await regions()).active !== home && (await ask.count()) === 0));
+        await ui.locator(`[role=tab][data-tab="${home}"]`).first().click({ force: true });
+        rule(15, 'and showing its tab again brings it back', await until(() => ask.isVisible()));
+        await ask.getByRole('button', { name: 'OK' }).click();
+        rule(15, 'OK answers the page yes', await until(async () => (await answers()).length === before + 1 && (await answers()).at(-1).ok === true));
+        await fire('prompt', 'Name?');
+        await until(() => ask.isVisible());
+        const field = ask.getByRole('textbox');
+        rule(15, 'a prompt has a field', (await field.count()) === 1);
+        await field.fill('Ada');
+        await ask.getByRole('button', { name: 'OK' }).click();
+        rule(15, "and OK answers with the field's text", await until(async () => (await answers()).at(-1)?.text === 'Ada'));
+      } catch (e) {
+        rule(15, 'its checks ran to their end', false, e.message.split('\n')[0]);
       }
     }
 

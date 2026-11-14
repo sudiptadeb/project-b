@@ -11,6 +11,7 @@ import * as regions from './regions.js';
 export { activeTab, controlSpace, focusPage, keyLabel, saveData, saveProfileData, send, setFrame, tabLabel, workspaceOf } from './shell.js';
 export { chooseContextItem, closeContextMenu, contextMenuPoint } from './contextmenu.js';
 export { clearDownloads, downloadAction } from './downloads.js';
+export { answerDialog, dialogFor } from './dialogs.js';
 
 export const state = $state({ ...sdk.state });
 sdk.onChange((fields) => Object.assign(state, fields));

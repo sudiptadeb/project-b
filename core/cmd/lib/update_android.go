@@ -33,6 +33,12 @@ func updateConfig(c profiles.Choice) update.Config {
 		Releases: releaseManifest,
 		StateDir: filepath.Join(c.Dir, "updates"),
 		Install: func(apk string) {
+			// The installer ends this process to replace the app, which isn't a crash:
+			// the run counts as stopped cleanly from here. A user who cancels goes on
+			// without crash.log, so a crash later in that run goes unreported.
+			if theApp != nil {
+				theApp.Crash.Stop()
+			}
 			c := C.CString(apk)
 			defer C.free(unsafe.Pointer(c))
 			C.call_install_update(native.calls, c)

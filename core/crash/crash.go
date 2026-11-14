@@ -105,7 +105,7 @@ func reportPID(name string) int {
 
 // Stop says this run ends cleanly: there is no crash to report next time.
 func (m *Manager) Stop() {
-	if err := os.Remove(m.current); err != nil {
+	if err := os.Remove(m.current); err != nil && !os.IsNotExist(err) {
 		timeline.Errorf("crash: %v", err)
 	}
 }

@@ -196,6 +196,21 @@ const { check, fire, regions, settle, until } = lib;
   check('Shift+Cmd+D: the new pane under it, in the same column', near(s[t6].x, s[t7].x) && near(s[t6].w, s[t7].w) && s[t6].y + s[t6].h <= s[t7].y, JSON.stringify(s));
   check('the keys split within the shown group', (await chips.count()) === 2 && (await ui.locator('.chip.shown [role=tab]').count()) === 3 && await insideAndApart());
 
+  // Cmd+W is Go's Close Tab, which activates the closed tab's neighbour in Go's list: here
+  // t4, in the other group. The shell makes the pane that takes the room active instead, and
+  // never shows the other group on the way.
+  await ui.locator(`[role=tab][data-tab="${t1}"]`).click();
+  await until(async () => (await regions()).active === t1);
+  await w.shell().evaluate(() => {
+    window.shownGroups = [];
+    new MutationObserver(() => window.shownGroups.push([...document.querySelectorAll('.title[data-pane]')].map((el) => Number(el.dataset.pane))))
+      .observe(document.body, { subtree: true, childList: true });
+  });
+  await fire('key', 'closeTab');
+  check('Cmd+W in a split makes the pane that takes its room active', await until(async () => (await regions()).active === t6 && (await showsOnly([t6, t7]))), JSON.stringify(await regions().then((r) => ({ active: r.active, tabs: r.tabs.map((t) => t.id) }))));
+  check('and, empty, it wants an address', await until(() => prompt.evaluate((el) => el === document.activeElement)));
+  check('and the other group never showed', !(await w.shell().evaluate(() => window.shownGroups)).some((ids) => ids.includes(t4)), JSON.stringify(await w.shell().evaluate(() => window.shownGroups)));
+
   // The gear at the strip's far end opens the settings page.
   check('settings starts closed', (await regions()).settingsOpen === false);
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();

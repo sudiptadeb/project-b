@@ -485,8 +485,9 @@ dense and square.
   actions `terminal.splitRight` and `terminal.splitDown`; the split buttons' titles show
   the keys.
 - **The active tab is the focused pane,** and the group shown is the one that holds it.
-  Closing the active pane makes the pane that takes its room active first, so its group
-  stays shown.
+  When the active pane closes, by its button or by Go's Close Tab (Cmd+W), the pane that
+  takes its room becomes active, whichever tab Go chose from its own list, so its group
+  stays shown; the body shows that pane's group at once, never Go's choice on the way.
 - **A new tab is a new group,** unless a pane's split asked for it: then it goes beside
   that pane. Dividers drag to resize, no pane smaller than 80px.
 - **Its own data** is `{groups}`, each group's tree, naming tabs by id, and nothing Go

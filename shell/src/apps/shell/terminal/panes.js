@@ -3,7 +3,7 @@
 // a row or a column of parts, each with its share of the split, the shares adding up to 1.
 // The groups are the shell's own data; Go's tab list is the truth they follow.
 
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { saveData, send, state } from '@/sdk/vue.js';
 
 export const groups = reactive([]);
@@ -13,6 +13,11 @@ export const groups = reactive([]);
 let asked = null;
 // The groups as last saved, so an unchanged tree isn't sent again.
 let saved = '';
+// The tab that was active when Go's list last came, to tell when the active pane closed.
+let was = 0;
+// The pane the shell asked Go to make active in place of the one that closed, shown at once
+// so the body never shows the group Go chose for a moment; 0 once Go agrees.
+export const heirAsked = ref(0);
 
 export function tabsOf(node) {
   return node.parts ? node.parts.flatMap(tabsOf) : [node.tab];
@@ -30,21 +35,30 @@ export const chips = computed(() => {
     .sort((a, b) => index.get(a.tabs[0].id) - index.get(b.tabs[0].id));
 });
 
-// The group that holds the active tab, the one the body shows.
-export const shown = computed(() => groups.find((root) => tabsOf(root).includes(state.active)));
+// The pane the body shows the group of: the active one, or its heir while Go makes it so.
+export const focused = computed(() => heirAsked.value || state.active);
+
+// The group that holds that pane, the one the body shows.
+export const shown = computed(() => groups.find((root) => tabsOf(root).includes(focused.value)));
 
 // load takes the groups from the data Go handed back, none for a new window or a new
 // shell, and fits them to Go's tabs.
 export function load(data) {
   groups.splice(0, groups.length, ...(data ? data.groups : []));
   saved = JSON.stringify(groups);
+  was = 0;
   follow();
 }
 
 // follow fits the groups to Go's tabs: a tab Go no longer lists leaves its tree, and a tab
 // the groups lack goes beside the pane a split asked for, or into a group of its own.
+//
+// When the active pane closed, by its button or by Go's own Close Tab, the pane that takes
+// its room becomes active, whatever Go chose from its own list: Go picks a neighbour in
+// its order, which can be in another group.
 export function follow() {
   const live = new Set(state.tabs.map((t) => t.id));
+  const next = was && !live.has(was) ? heir(was, live) : 0;
   for (let i = groups.length - 1; i >= 0; i--) {
     const kept = prune(groups[i], live);
     if (!kept) groups.splice(i, 1);
@@ -59,6 +73,13 @@ export function follow() {
     placed.add(t.id);
   }
   save();
+  if (next && next !== state.active) {
+    heirAsked.value = next;
+    send({ t: 'activateTab', id: next });
+  } else if (!live.has(heirAsked.value) || heirAsked.value === state.active) {
+    heirAsked.value = 0;
+  }
+  was = heirAsked.value || state.active;
 }
 
 // prune is node without the tabs that are gone, or null when none is left. A part that
@@ -126,14 +147,18 @@ function parentOf(node, tab) {
 }
 
 // heir is the pane that takes the room of tab's when it closes: the nearest pane of the
-// part before it, or after it when it is first. 0 for a pane alone in its group.
-function heir(tab) {
+// part before it, or after it when it is first, among the tabs still live; failing that,
+// any live pane of its group. 0 for a pane alone in its group.
+function heir(tab, live) {
   const root = groups.find((r) => tabsOf(r).includes(tab));
+  if (!root) return 0;
   const parent = parentOf(root, tab);
-  if (!parent) return 0;
-  const j = parent.parts.findIndex((p) => p.tab === tab);
-  const ids = j > 0 ? tabsOf(parent.parts[j - 1]) : tabsOf(parent.parts[1]);
-  return j > 0 ? ids[ids.length - 1] : ids[0];
+  if (parent) {
+    const j = parent.parts.findIndex((p) => p.tab === tab);
+    const ids = (j > 0 ? tabsOf(parent.parts[j - 1]).reverse() : tabsOf(parent.parts[1])).filter((id) => live.has(id));
+    if (ids.length) return ids[0];
+  }
+  return tabsOf(root).find((id) => live.has(id)) || 0;
 }
 
 // split asks Go for a new tab, to land beside the pane of tab: to its right for 'row',
@@ -143,11 +168,8 @@ export function split(tab, dir) {
   send({ t: 'newTab' });
 }
 
-// close closes the pane of tab. Closing the active pane first makes its heir active, so
-// the group stays shown rather than Go choosing a neighbour in its own list.
+// close closes the pane of tab; follow makes its heir active when it was the active one.
 export function close(tab) {
-  const next = heir(tab);
-  if (tab === state.active && next) send({ t: 'activateTab', id: next });
   send({ t: 'closeTab', id: tab });
 }
 

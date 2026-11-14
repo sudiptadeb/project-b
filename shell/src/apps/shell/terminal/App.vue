@@ -4,7 +4,7 @@ import PaneTree from './PaneTree.vue';
 import PromptLine from './PromptLine.vue';
 import TopStrip from './TopStrip.vue';
 import { connect, setFrame, state } from '@/sdk/vue.js';
-import { follow, load, shown, split } from './panes.js';
+import { follow, heirAsked, load, shown, split } from './panes.js';
 import { prompt } from './prompt.js';
 
 // A terminal's window: a strip of groups on top, the shown group's panes in the body, and
@@ -28,11 +28,11 @@ connect({
 });
 
 // A pane that becomes active with nothing in it wants an address; one with a page wants
-// the keyboard in its page.
+// the keyboard in its page. Not while Go is being asked for the heir of a pane that closed.
 watch(
   () => state.active,
   () => {
-    if (state.active !== 0) prompt.activated();
+    if (state.active !== 0 && !heirAsked.value) prompt.activated();
   },
 );
 </script>

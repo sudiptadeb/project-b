@@ -7,8 +7,8 @@ How every piece of our own UI looks: the shell, the settings page, and any app a
 
 | File | What it holds |
 |---|---|
-| `shell/src/tones.js` | Every colour, made from the one frame colour Go owns, light and dark |
-| `shell/src/theme.js` | Puts those colours on the root as CSS variables and follows light or dark |
+| `core/tones` | Every colour, made from the one frame colour Go owns, light and dark. Go sends both palettes with the colour (`tones`, beside `windowColor`), and each workspace's with it, so web and native shells paint the same tones |
+| `shell/src/theme.js` | Puts the light or dark palette on the root as CSS variables, as the theme pref and the system say |
 | `shell/src/design.css` | Type, the floating shadow, the focus ring, and the shared controls: `.icon-button`, `.text-button` with `.primary`, `.quiet` and `.danger`, `.text-field`, `select`, `.switch`, `.tag`, `.secondary`, `.text-field-error`, and their touch sizes |
 | `shell/src/ui/` | The shared parts that need behaviour: `Dialog`, `RowMenu`, `Field`, `Segmented`, `Swatches`, and `escape.js`, which gives Escape to the innermost thing open |
 | `shell/src/apps/settings/SettingsApp.vue` | The settings page's own layout: `.nav-item`, `.card`, `.row`, `.label`, `h2` |
@@ -38,7 +38,7 @@ From the owner:
 The colours come from the profile's frame colour and theme, which are Go's prefs, not a
 shell's ([shells.md](shells.md#colours)).
 
-Never write a colour literal in a component. Use these variables, which `tones.js` sets:
+Never write a colour literal in a component. Use these variables, which Go's tones set:
 
 | Variable | Use |
 |---|---|
@@ -59,13 +59,13 @@ Never write a colour literal in a component. Use these variables, which `tones.j
 
 Text on `--accent` is `--on-accent`, never a fixed colour: the accent's lightness follows the
 frame, so white reads on slate and not on amber, and the near-black ink the other way round.
-`tones.js` picks whichever of the two contrasts more, and holds it to WCAG's 4.5 for text. Where
+`core/tones` picks whichever of the two contrasts more, and holds it to WCAG's 4.5 for text. Where
 neither reaches 4.5 (the red preset in dark, a mid blue like Work's in light) it moves the accent
 away from the label it picked, a little at a time, until it does; so the accent can differ
 slightly from the frame. `shell/e2e/settings.cjs` checks every preset, light and dark.
 
 Check light and dark with three frame colours: the default `#4f9e9e`, a dark one and a light
-one. `tones.js` must keep every pair readable.
+one. `core/tones` must keep every pair readable.
 
 ## Type
 
@@ -253,7 +253,7 @@ rounded surface with the page's own actions inside its right end.
 ## Adding UI
 
 1. Use the classes and variables above. If something is missing, add it to `design.css` (or
-   to `tones.js` for a colour) and to this page, then use it.
+   to `core/tones` for a colour, in both palettes) and to this page, then use it.
 2. Prefix a feature's own classes (`pbx-` for extensions) and keep them `scoped`.
 3. Look at it in the real app, light and dark, and zoom in on the pixels: seams and default
    controls show there first.

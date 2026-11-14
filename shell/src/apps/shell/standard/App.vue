@@ -40,8 +40,8 @@ watchEffect(() => {
 <style>
 /* Colours from the Ulaa Browser design. The frame's colour and width come from Go with the
    snapshot, the same values the window paints natively, and the frame colour's tones
-   (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint) are set from it by
-   tones.js. Icons and the sidebar's New Tab take a deeper ink, so the frame is the one
+   (--frame, --accent, --bar, --icon, --accent-soft, --accent-tint), which Go makes from it
+   (core/tones), are set on the root by the SDK. Icons and the sidebar's New Tab take a deeper ink, so the frame is the one
    thing in the full accent. The root has no background: the page shows through wherever
    nothing is painted. */
 .app {

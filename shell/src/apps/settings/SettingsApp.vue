@@ -77,7 +77,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 
 <style>
 /* Surfaces from the Ulaa preferences design, at a page's size. Type and the controls are
-   design.css's; the frame colour's tones come from tones.js. */
+   design.css's; the frame colour's tones come from Go (core/tones). */
 body {
   background: var(--bar);
 }

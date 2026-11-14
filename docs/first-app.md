@@ -155,8 +155,8 @@ The frame colour is a pref, `frameColor`, by default a dusty teal, `#4f9e9e`. Th
 offers it and the frames of the Ulaa design's modes (Personal's teal, Work's blue, Kids'
 amber, Open Season's red, Incognito's slate), and a colour input for any other. The
 window manager paints the window's frame with it through the next `SetWindowLayout` and tells the
-shell, so both change together, and `shell/src/tones.js` derives the shell's other tones
-from it: the bar and surfaces toward white, the icons' ink toward black, the accent's soft
+shell, so both change together, and Go derives the shell's other tones from it
+(`core/tones`, sent with the colour): the bar and surfaces toward white, the icons' ink toward black, the accent's soft
 fills the colour itself, faint.
 
 ## One copy per profile

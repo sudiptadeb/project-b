@@ -430,7 +430,7 @@ and so on).
 
 Settings has a Theme row: System, Light or Dark. Go's prefs keep it (`theme` in
 `prefs.json`). The shell and the settings page take their tones from the frame colour in
-either theme (`shell/src/tones.js`, applied by `shell/src/theme.js`); the frame keeps the
+either theme (`core/tones`, sent with the colour and applied by `shell/src/theme.js`); the frame keeps the
 colour the user picked. The window's own buttons and title bar follow it
 (`NSWindow.appearance`). Web pages keep following the system, since NSApp's appearance,
 which content reads, is left alone.

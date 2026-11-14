@@ -83,7 +83,7 @@ of it.
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
 | `@/sdk/vue.js` | The Vue adapter: `state`, a reactive copy that follows the SDK's; `activeTab` and `controlSpace` as computeds; `workspaceOf(tab)` and `keyLabel(action)`; `connect(handlers)`, which waits for Vue's `nextTick`; the directives `v-shell`, `v-drag` and `v-page="tab.id"`; and `send`, `saveData`, `focusPage`, `setFrame`, `tabLabel`. |
 | `@/sdk/svelte.svelte.js` | The Svelte 5 adapter: `state`, a `$state` copy that follows the SDK's; `connect(handlers)`, which waits for Svelte's `tick`; the actions `use:shell`, `use:drag` and `use:page={tab.id}`; and the SDK's helpers, given that `state`. |
-| `@/theme.js`, `@/tones.js`, `@/design.css` | The colours, made from the frame colour, and the shared controls ([design-system.md](design-system.md)). |
+| `@/theme.js`, `@/design.css` | Painting Go's tones, light or dark, and the shared controls ([design-system.md](design-system.md)). |
 | `@extensions` | `ExtensionsToolbar`: the Vue shells' extensions buttons, their menu and the install prompt, drawn from `state.extensions`. `extensionsBuilt`: whether the build has extensions. |
 
 The SDK measures the marked elements and sends the layout by itself, once a frame and only
@@ -113,7 +113,7 @@ gives the page the same two.
 | `tabs` | `tabs`, `active`, `groups`: this window's tabs in order, the active one's id, and its tab groups | Tabs open, close, move, another becomes active, or a group changes |
 | `tab` | `tab`: one tab's new state | Its title, address, loading, favicon or history changed |
 | `theme` | `theme`: `system`, `light` or `dark` | The pref changed |
-| `windowColor` | `windowColor`: `#rrggbb` | The frame colour changed |
+| `windowColor` | `windowColor`: `#rrggbb`, and `tones`: `{light, dark}`, every colour made from it, each palette the design system's tokens by name (`core/tones`) | The frame colour changed |
 | `controls` | `controls`, `cornerRadius` | The native window buttons moved, or full screen |
 | `keys` | `keys`: the key each action shows, by action id | The keymap changed |
 | `workspaces` | `workspaces`: id, name and colour of each | The list changed |
@@ -146,7 +146,7 @@ none. The snapshot also has `running` (the version), `platform`
   `ready` or `failed`.
 - `keys` is the key each action shows, by action id, written as the keymap writes it
   (`Cmd+T`); `@/keys.js` and `keyLabel` show it as the menus do.
-- `workspaces` is each workspace's `{id, name, color}`, in the user's order, one at least.
+- `workspaces` is each workspace's `{id, name, color, tones}`, `tones` its colour's as `windowColor` carries the frame's, in the user's order, one at least.
   Main, the profile's own storage, has the id `""`. A tab's `workspace` is its workspace's
   id. Every shell and the settings page hear the list again whenever it changes, whoever
   changed it. The workspace messages are the settings page's, and keep its rules: a name
@@ -231,8 +231,9 @@ The SDK does these for a shell on it. A shell that talks to Go itself does them 
 5. While `extensions.popup` names an open popup, a press anywhere in the shell sends
    `extensionClosePopup`, except a press on that popup's own button, which goes to Go as
    `extensionClick` and closes it there.
-6. It paints its own colours from `windowColor` and `theme`, or with `tones()` from
-   `@/tones.js`, as the SDK does.
+6. It paints its own colours from `tones` and `theme`: `tones` is Go's two palettes of the
+   frame colour, light and dark, and the theme pref, or the system while it says `system`,
+   picks one, as the SDK does.
 7. For the timeline only: it answers `paint` with a `timeline` entry of kind `end` and that
    span once it has drawn. Without it the span stays open.
 
@@ -245,8 +246,8 @@ prefs itself".
 - **The profile's colour is Go's:** the frame colour pref (`frameColor`), which the window's
   band, the Dock and the profile list follow, and which reaches a shell as `windowColor`.
   The theme is Go's too (`theme`). The settings page is where the user changes them.
-- **Standard uses Go's prefs and keeps no colour of its own,** painting from `windowColor`
-  and `theme` through `tones.js`.
+- **Standard uses Go's prefs and keeps no colour of its own,** painting the `tones` Go makes
+  from `windowColor`, light or dark as `theme` says.
 - **Another shell may keep colours of its own** for its own look, in its own data, but the
   frame colour stays the profile's.
 - **A shell may change Go's colour pref** from a page of its own: shells are privileged,

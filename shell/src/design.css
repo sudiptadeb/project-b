@@ -1,6 +1,6 @@
 /* The shared look of every app in shell/src/apps: the type, the floating shadow, the focus
    ring and the controls. Each app's main.js imports it. docs/design-system.md describes
-   it; the colours are tones.js's, set on the root by theme.js. */
+   it; the colours are Go's tones (core/tones), set on the root by theme.js. */
 
 :root {
   font: 14px/1.4 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;

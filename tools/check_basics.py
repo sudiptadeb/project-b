@@ -353,13 +353,15 @@ def a21(app):
 
 
 def a22(app):
-    go(app, P + "/a")
-    s = page_socket(devtools(app.profile), "/a")
-    cdp_click(s, 200, 200, button="right")
+    # On a link: Go leaves a right-click on plain text to content, by design.
+    go(app, P + "/link")
+    s = page_socket(devtools(app.profile), "/link")
+    x, y = app.js("(r => [r.x + r.width / 2, r.y + r.height / 2])(document.querySelector('a').getBoundingClientRect())", page=True)
+    cdp_click(s, x, y, button="right")
     time.sleep(1)
-    stats = json.loads(app.cmd("stats"))
-    asked = stats.get("hooks", {}).get("HandleContextMenu", 0)
-    return asked > 0, "a right-click never reaches Go (HandleContextMenu isn't carried)"
+    shown = app.js("!!document.querySelector('[role=menu]')")
+    asked = json.loads(app.cmd("stats")).get("hooks", {}).get("HandleContextMenu", 0)
+    return shown, f"no menu in the shell after a right-click on a link; Go was asked {asked} time(s)"
 
 
 def a23(app):
@@ -535,7 +537,7 @@ AREAS = [
     (19, "keyboard: Cmd+T opens a tab when a page swallows keys", a19, ()),
     (20, "focus: a page can't take focus from the address bar while typing", a20, ()),
     (21, "hit-testing: the page and the top row's empty space", a21, ()),
-    (22, "context menu: right-click on a page", a22, ("--remote-debugging-port=0",)),
+    (22, "context menu: right-click on a link shows a menu", a22, ("--remote-debugging-port=0",)),
     (23, "profiles and contexts: a second browser context", a23, ("--remote-debugging-port=0",)),
     (24, "cookies: a persistent cookie survives a restart", a24, ()),
     (25, "internal pages: a tab can't navigate to chrome://shell/standard/", a25, ()),

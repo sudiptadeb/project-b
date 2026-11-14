@@ -6,7 +6,8 @@
 
   // The group strip, while the active tab is in a group: the group's dot, which opens its
   // sheet; its tabs as favicons, the active one on a pill with an × on it; and + for a new
-  // tab in the group. A tap on a favicon goes to its tab, a long press closes it.
+  // tab in the group. A tap on a favicon goes to its tab, a tap on the active one closes
+  // it, and a long press closes any.
   let { group, tabs, active, onsheet, onpick, onclosetab, onnewtab } = $props();
   let strip;
 
@@ -23,33 +24,35 @@
   </button>
   <div class="tabs" bind:this={strip}>
     {#each tabs as tab (tab.id)}
-      <span class="slot" class:on={tab.id === active}>
-        <button
-          class="tab"
-          data-tab={tab.id}
-          aria-label="Go to {tabLabel(tab)}"
-          aria-current={tab.id === active ? 'page' : undefined}
-          onclick={() => onpick(tab.id)}
-          oncontextmenu={(e) => {
-            e.preventDefault();
-            onclosetab(tab.id);
-          }}
-        ><Favicon {tab} /></button>
-        {#if tab.id === active}
-          <button class="x" aria-label="Close {tabLabel(tab)}" onclick={() => onclosetab(tab.id)}><Icon name="close" size={10} /></button>
-        {/if}
-      </span>
+      <!-- The active one closes at a tap: the whole 48px favicon is its close button, the
+           × on it only says so. -->
+      <button
+        class="tab"
+        class:on={tab.id === active}
+        data-tab={tab.id}
+        aria-label={tab.id === active ? `Close ${tabLabel(tab)}` : `Go to ${tabLabel(tab)}`}
+        aria-current={tab.id === active ? 'page' : undefined}
+        onclick={() => (tab.id === active ? onclosetab(tab.id) : onpick(tab.id))}
+        oncontextmenu={(e) => {
+          e.preventDefault();
+          onclosetab(tab.id);
+        }}
+      >
+        <Favicon {tab} />
+        {#if tab.id === active}<span class="x" aria-hidden="true"><Icon name="close" size={10} /></span>{/if}
+      </button>
     {/each}
     <button class="add" aria-label="New tab in group" onclick={onnewtab}><Icon name="plus" /></button>
   </div>
 </div>
 
 <style>
+  /* Every target is 48px square, Android's least for a finger. */
   .strip {
     flex: none;
     display: flex;
     align-items: center;
-    height: 44px;
+    height: 49px;
     padding: 0 4px;
     box-sizing: border-box;
     background: var(--bar);
@@ -61,21 +64,21 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 4px;
     height: 100%;
     overflow-x: auto;
     scrollbar-width: none;
   }
 
   button {
+    position: relative;
     flex: none;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
-    border-radius: 12px;
+    border-radius: 14px;
     background: none;
     color: var(--icon);
   }
@@ -86,25 +89,26 @@
     border-radius: 50%;
   }
 
-  .slot {
-    position: relative;
-    flex: none;
-  }
-
-  .slot.on .tab {
+  /* The active favicon on a pill inside its target. */
+  .tab.on::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 12px;
     background: var(--surface);
     box-shadow: 0 0 0 1px var(--line);
   }
 
-  /* The × on the active favicon: a small round badge, its target 24px. */
+  .tab :global(img),
+  .tab :global(.letter) {
+    position: relative;
+  }
+
   .x {
     position: absolute;
-    top: -2px;
-    right: -6px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: none;
+    top: 0;
+    right: 0;
+    display: grid;
   }
 
   .x :global(svg) {

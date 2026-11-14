@@ -552,6 +552,22 @@ def long_press(point):
     adb("shell", "input", "swipe", str(point[0]), str(point[1]), str(point[0]), str(point[1]), "1000")
 
 
+def small_targets():
+    """The shell's controls on screen smaller than 48dp either way, Android's least for a
+    finger, by their labels."""
+    density = int(re.findall(r"\d+", adb("shell", "wm", "density"))[-1]) / 160
+    view = screen_parts().get("shell")
+    small = []
+    for node in view.iter("node") if view is not None else ():
+        if node.get("clickable") != "true":
+            continue
+        left, top, right, bottom = box(node)
+        if min(right - left, bottom - top) < 48 * density - 2:
+            small.append("%s %dx%ddp" % (node.get("content-desc") or node.get("text") or node.get("class"),
+                                         (right - left) / density, (bottom - top) / density))
+    return small
+
+
 def mobile_shell():
     """The Mobile shell's own: the back key closes each of its sheets; a long press on a link
     opens its menu, whose Open in new tab in group gathers the tabs in the strip behind the
@@ -559,8 +575,12 @@ def mobile_shell():
     launch()
     go(BASE + "/a")
     asked("/a")
+    small = small_targets()
+    check("every control of the toolbar is 48dp or more each way", not small, ", ".join(small))
     press("Tabs")
     see("shell", label="Close Page A")
+    small = small_targets()
+    check("every control of the switcher is 48dp or more each way", not small, ", ".join(small))
     key(4)
     check("the back key closes the switcher", bool(until(lambda: find("shell", label="Close Page A") is None)))
     press("Menu")
@@ -586,6 +606,8 @@ def mobile_shell():
           asked("/b") and until(lambda: find("shell", label=lambda l: (l or "").startswith("Group "))) is not None
           and find("page", label="to b") is not None)
     shot("21-strip")
+    small = small_targets()
+    check("every control of the group strip is 48dp or more each way", not small, ", ".join(small))
     tap(middle(see("shell", label="Go to Page B \U0001F642")))
     check("a tap on a favicon in the strip shows that tab", until(lambda: find("page", text="b")) is not None)
 
@@ -617,6 +639,11 @@ def mobile_shell():
     menu("Settings")
     tap(middle(see("settings", text="System")))
     key(4)
+    # The active favicon in the strip closes its tab at a tap; a group of one then ends.
+    until(lambda: "settings" not in screen_parts())
+    tap(middle(see("shell", label=lambda l: (l or "").startswith("Close Page"), kind="android.widget.Button")))
+    check("a tap on the active favicon in the strip closes its tab, and the group of one left ends",
+          until(lambda: find("shell", label=lambda l: (l or "").startswith("Group ")) is None) is not None)
 
 
 def history_after_a_restart():

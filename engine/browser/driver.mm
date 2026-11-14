@@ -2,6 +2,7 @@
 
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <memory>
 #include <string>
@@ -885,6 +886,20 @@ void Capture(const std::string& id, const std::string& path) {
 
 void StartDriver(const base::FilePath& fifo) {
   UseWindow(g_window);
+  // A driver that exits or dies without closing the app would leave it running, its
+  // window on the screen, with nothing to drive it. So the app quits, as Cmd+Q does, once
+  // the process that started it is gone.
+  static dispatch_source_t driver_process = nil;
+  const pid_t driver = getppid();
+  driver_process = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, driver,
+                                          DISPATCH_PROC_EXIT, dispatch_get_main_queue());
+  dispatch_source_set_event_handler(driver_process, ^{
+    fprintf(stderr, "driver: the process that started the app is gone; quitting\n");
+    if (Engine* engine = Engine::Get()) {
+      engine->Quit();
+    }
+  });
+  dispatch_resume(driver_process);
   const std::string path = fifo.value();
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     // Opened read-write so it doesn't see end-of-file between writers.

@@ -80,9 +80,14 @@ class Pages(http.server.BaseHTTPRequestHandler):
             # Links to itself: in this tab, in a new tab without its opener, as target=_blank
             # is by default and rel=noopener says outright.
             "/store": b'<!doctype html><title>Store</title><a id=link href=/store>Here</a> <a id=blank target=_blank href=/store>Blank</a> <a id=noopener target=_blank rel=noopener href=/store>No opener</a>',
+            # A copy button, as sites make them: a click writes to the clipboard.
+            "/copy": b'<!doctype html><title>Copy</title><button id=copy style="width:300px;height:100px" onclick="navigator.clipboard.writeText(\'copied\').then(()=>document.title=\'copied\',e=>document.title=\'refused \'+e.name)">Copy</button>',
+            # A service worker that sets the app's badge as it starts, as push handlers do.
+            "/badge-worker": b'<!doctype html><title>Worker</title><script>navigator.serviceWorker.register("/badge-sw.js")</script>',
+            "/badge-sw.js": b'self.oninstall = () => navigator.setAppBadge(1)',
         }.get(self.path, b'<!doctype html><title>Links</title><a href="chrome://shell/standard/">The shell</a>')
         self.send_response(200)
-        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Type", "text/javascript" if self.path.endswith(".js") else "text/html")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -1940,6 +1945,53 @@ def glide_checks():
     app.close()
 
 
+# Web APIs whose browser side is Chrome's. Content kills a renderer that asks for an interface
+# the browser has no binder for, so a page calling one of these crashes. Found by
+# docs/research/web-features/.
+KILLERS = {
+    "setAppBadge": "navigator.setAppBadge(3)",
+    "clearAppBadge": "navigator.clearAppBadge()",
+    "on-device SpeechRecognition.available": "SpeechRecognition.available({langs: ['en-US'], processLocally: true})",
+    "SpeechRecognition.install": "SpeechRecognition.install({langs: ['en-US'], processLocally: true})",
+}
+
+
+def web_api_checks():
+    """A page that calls a web API whose browser side is Chrome's keeps its renderer, and a
+    copy button's click puts its text on the clipboard."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    log = os.path.join(OUT, "app.log")
+    for name, call in KILLERS.items():
+        visit(app, PAGES + "store")
+        start = os.path.getsize(log)
+        app.js(f"(() => {{ try {{ Promise.resolve({call}).catch(() => 0) }} catch (e) {{}} return 1 }})()", page=True)
+        time.sleep(2)
+        try:
+            alive = app.js("document.title", page=True, timeout=5) == "Store"
+        except (RuntimeError, TimeoutError):
+            alive = False
+        with open(log, errors="replace") as f:
+            f.seek(start)
+            killed = [l.split("Received bad user message: ", 1)[-1].strip() for l in f if "bad Mojo message" in l]
+        check(f"a page that calls {name} keeps its renderer", alive and not killed, "; ".join(killed) or ("" if alive else "the page stopped answering"))
+    visit(app, PAGES + "badge-worker")
+    start = os.path.getsize(log)
+    time.sleep(3)
+    with open(log, errors="replace") as f:
+        f.seek(start)
+        killed = [l.split("Received bad user message: ", 1)[-1].strip() for l in f if "bad Mojo message" in l]
+    check("a service worker that calls setAppBadge keeps its process", not killed, "; ".join(killed))
+    visit(app, PAGES + "copy")
+    page_click(app, "#copy")
+    try:
+        app.wait("document.title !== 'Copy'", 5, page=True)
+    except TimeoutError:
+        pass
+    title = app.js("document.title", page=True)
+    check("a copy button's click puts its text on the clipboard", title == "copied", title)
+    app.close()
+
+
 def quit_checks():
     """Quitting from the Dock is a clean stop: crash.log, which says the app is running, is
     gone, and the next start has no crash to report."""
@@ -1966,5 +2018,5 @@ def quit_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"driver": [driver_checks], "settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "glide": [glide_checks], "quit": [quit_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, driver_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, glide_checks, quit_checks]))
+    parts = {"driver": [driver_checks], "settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "glide": [glide_checks], "webapis": [web_api_checks], "quit": [quit_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, driver_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, glide_checks, web_api_checks, quit_checks]))

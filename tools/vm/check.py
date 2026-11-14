@@ -819,7 +819,7 @@ def profile_checks():
 
 WORK_DOT = (194, 65, 12)  # The colour workspace_checks gives Work.
 MAIN_DOT = (52, 112, 208)  # Main's, #3470d0.
-WORK, SHOPPING = "0a1b2c3d", "4e5f6a7b"
+WORK_ID, SHOPPING_ID = "0a1b2c3d", "4e5f6a7b"  # The workspaces the workspace checks list.
 
 
 def new_tab_in(workspace):
@@ -851,7 +851,7 @@ def workspace_checks():
     check("a fresh profile's tab shows no workspace dot", blue <= 4, f"{blue} pixels of Main's blue")
     guest("/usr/bin/killall", "project_b")
     until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10)
-    listed = {"workspaces": [{"id": WORK, "name": "Work", "color": "#c2410c"}, {"id": SHOPPING, "name": "Shopping", "color": "#7c3aed"}]}
+    listed = {"workspaces": [{"id": WORK_ID, "name": "Work", "color": "#c2410c"}, {"id": SHOPPING_ID, "name": "Shopping", "color": "#7c3aed"}]}
     guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {PROFILE}/workspaces.json", "sh", json.dumps(listed))
     launch()
     time.sleep(1.5)
@@ -886,8 +886,8 @@ def workspace_delete_checks():
     profile = f"{WSDEL}-profile"  # Beside WSDEL, which driven() empties.
     fresh_profile(profile, profile)
     listed = {"version": 2, "workspaces": [{"id": "", "name": "Main", "color": "#3470d0"},
-                                           {"id": WORK, "name": "Work", "color": "#c2410c"},
-                                           {"id": SHOPPING, "name": "Shopping", "color": "#7c3aed"}]}
+                                           {"id": WORK_ID, "name": "Work", "color": "#c2410c"},
+                                           {"id": SHOPPING_ID, "name": "Shopping", "color": "#7c3aed"}]}
     guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {profile}/workspaces.json", "sh", json.dumps(listed))
     ask = driven(WSDEL, profile, [f"--user-data-dir={profile}"])
     js = lambda expr: json.loads(ask("eval", expr) or "null")
@@ -929,7 +929,7 @@ def workspace_delete_checks():
     check("Delete… asks first, naming its open tabs",
           "Delete Work?" in asked and "Its 2 open tabs close, and its cookies and site data are erased." in asked, asked)
     click("[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='Delete')")
-    gone = until(lambda: settings(f"!document.querySelector({row(WORK)})"), bool, 10)
+    gone = until(lambda: settings(f"!document.querySelector({row(WORK_ID)})"), bool, 10)
     check("Delete removes it and closes its tabs, with settings still open", gone and until(tabs, lambda n: n == 1) == 1, f"{gone} {tabs()}")
 
     click(actions("Main"))
@@ -944,7 +944,7 @@ def workspace_delete_checks():
     off = settings(f"(e=>!!e&&(e.disabled||e.getAttribute('aria-disabled')==='true'))({delete_item})")
     click(delete_item)
     check("with one workspace left, Delete… can't be chosen",
-          off and not settings("!!document.querySelector('dialog[open]')") and settings(f"!!document.querySelector({row(SHOPPING)})"), str(off))
+          off and not settings("!!document.querySelector('dialog[open]')") and settings(f"!!document.querySelector({row(SHOPPING_ID)})"), str(off))
     guest("/usr/bin/killall", "project_b")
 
 

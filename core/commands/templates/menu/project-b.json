@@ -126,6 +126,17 @@
           ]
         },
         {
+          "title": "Terminal",
+          "items": [
+            {
+              "action": "terminal.splitRight"
+            },
+            {
+              "action": "terminal.splitDown"
+            }
+          ]
+        },
+        {
           "separator": true
         },
         {

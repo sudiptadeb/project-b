@@ -397,6 +397,12 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('a key the browser wins carries a tag, and a page-first key none', await until(async () => (await page.locator('button.action', { hasText: 'Close Tab' }).textContent()).includes('Browser first, not in full screen') && !(await page.locator('button.action', { hasText: 'Open Location' }).textContent()).includes('Browser first')));
   check('the list has no buttons of its own: no plus, remove or reset', (await page.getByRole('button', { name: /^(Add a key for|Remove |Reset (?!all))/ }).count()) === 0);
   check('the keymap follows its template until an edit', keymapFile() === null);
+  check('a shell\'s own actions are listed with their keys, hidden from the menu', await until(async () => {
+    const row = (name) => page.getByRole('region', { name: 'View › Terminal', exact: true }).locator('button.action', { hasText: name }).textContent();
+    const right = await row('Split Right');
+    const down = await row('Split Down');
+    return right.includes('⌘D') && right.includes('Hidden') && down.includes('⇧⌘D') && down.includes('Hidden');
+  }));
   await openRow('New Tab');
   await page.getByRole('button', { name: 'Add key' }).click();
   await page.keyboard.press('Meta+Shift+KeyK');

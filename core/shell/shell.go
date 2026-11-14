@@ -260,6 +260,11 @@ func (m *Manager) FocusAddressBar(w engine.WindowID) {
 	m.send(w, map[string]any{"t": "focusAddressBar"})
 }
 
+// Action asks window w's shell to run one of its own actions, by id.
+func (m *Manager) Action(w engine.WindowID, id string) {
+	m.send(w, map[string]any{"t": "action", "id": id})
+}
+
 // Send sends one message to every shell, for a part.
 func (m *Manager) Send(v any) { m.sendAll(v) }
 

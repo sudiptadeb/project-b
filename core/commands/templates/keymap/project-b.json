@@ -498,6 +498,24 @@
         }
       ]
     },
+    "terminal.splitRight": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Cmd+D",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.splitDown": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Shift+Cmd+D",
+          "reserve": "page"
+        }
+      ]
+    },
     "nav.back": {
       "mac": [
         {

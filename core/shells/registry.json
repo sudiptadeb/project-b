@@ -1,6 +1,6 @@
 [
   { "id": "standard", "name": "Standard" },
-  { "id": "terminal", "name": "Terminal" },
+  { "id": "terminal", "name": "Terminal", "actions": [{ "id": "terminal.splitRight", "title": "Split Right" }, { "id": "terminal.splitDown", "title": "Split Down" }] },
   { "id": "fox", "name": "Fox" },
   { "id": "minimal-svelte", "name": "Minimal (Svelte)" },
   { "id": "minimal-js", "name": "Minimal (JS)" },

@@ -24,8 +24,9 @@ the real app; "What the real app adds" lists the little the mock can't show.
 
 - **A shell is one folder,** `shell/src/apps/shell/<id>/`, with an `index.html` and a
   `main.js`, and **one line in `core/shells/registry.json`:** its id and the name the user
-  sees, and `"example": true` for a shell that is built but offered nowhere. The id is
-  lower-case letters, digits and dashes.
+  sees, `"example": true` for a shell that is built but offered nowhere, and its own
+  actions, if it has any ([below](#a-shells-own-actions)). The id is lower-case letters,
+  digits and dashes.
 - Each shell builds into `shell/<id>/` beside the other pages, and loads at
   `chrome://shell/<id>/` in the real app and at `/shell/<id>/` on the mock. Nothing in the
   engine names a shell: it serves `chrome://shell/<id>/` from that folder.
@@ -98,6 +99,7 @@ gives the page the same two.
 | `crashLog` | `crashLog`, `crashReport` | The notice of the last run's crash was closed |
 | `tabLayout` | `tabLayout` | The standard shell's tab position changed |
 | `focusAddressBar` | | The user asked for the address bar |
+| `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
@@ -192,6 +194,21 @@ now, and will be saved with the windows and tabs when sessions are.
 
 A shell's data names tabs by id. A tab in the data that Go no longer lists is gone, and a
 tab Go lists that the data doesn't have is new: Go's list is the truth.
+
+## A shell's own actions
+
+A shell may have actions of its own, with keys, such as the terminal's splits. Each is an
+ordinary action in the keymap ([menus-shortcuts.md](menus-shortcuts.md#a-shells-own-actions)):
+
+- **The shell declares them** in its entry in `core/shells/registry.json`, each an id and
+  the title its menu item shows: `"actions": [{"id": "terminal.splitRight", "title":
+  "Split Right"}]`. The id starts with the shell's id and a dot, and never changes once
+  released.
+- Go registers them, and each is enabled only while its shell is the profile's. Their keys
+  are in the keymap templates and their place in the menu tree, as any action's.
+- **Running one sends the shell `action`** with its id. The shell handles it as it would
+  its own control: with the SDK, `connect({ action: (m) => ... })`. With another shell on,
+  the action is disabled: its key goes on to the page and no shell hears it.
 
 ## What every shell does
 
@@ -402,9 +419,10 @@ address field, and a menu button at the far right, in our tones.
 
 ## Not in this step
 
-Keys and menu items for a shell's own commands, such as a split. Saving a shell's data
-across a restart. A shell from outside the app. A shell per window. Dropping the tab
-position pref, which only the standard shell reads.
+Keys and menu items for a shell's own commands, such as a split, which came later
+([A shell's own actions](#a-shells-own-actions)). Saving a shell's data across a restart. A
+shell from outside the app. A shell per window. Dropping the tab position pref, which only
+the standard shell reads.
 
 ## Order of building
 

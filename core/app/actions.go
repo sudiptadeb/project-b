@@ -7,6 +7,7 @@ import (
 	"projectb/engine"
 	"projectb/prefs"
 	"projectb/relaunch"
+	"projectb/shells"
 )
 
 // registerActions gives every action its title and the one manager call it makes. Which
@@ -45,6 +46,15 @@ func (a *App) registerActions(e engine.Engine) {
 	side.Checked = func() bool { return a.Prefs.TabLayout() == prefs.TabsVertical }
 	top := add("view.tabsTop", "Tabs on Top", func() { a.Shell.SwitchTabLayout(prefs.TabsHorizontal) })
 	top.Checked = func() bool { return a.Prefs.TabLayout() == prefs.TabsHorizontal }
+	// Each shell's own actions, as the registry lists them. One runs only while its shell
+	// is the profile's, and asks the shell in front to run it; with another shell on, its
+	// keys go on to the page.
+	for _, s := range shells.All() {
+		for _, sa := range s.Actions {
+			act := add(sa.ID, sa.Title, func() { a.Shell.Action(a.Tabs.Front(), sa.ID) })
+			act.Enabled = func() bool { return a.Prefs.Shell() == s.ID }
+		}
+	}
 
 	stop := add("nav.stop", "Stop", a.Tabs.Stop)
 	stop.Enabled = func() bool { return a.Tabs.Active().Loading }

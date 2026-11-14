@@ -1225,3 +1225,48 @@ func TestAShellsOwnDataIsKeptPerWindow(t *testing.T) {
 		t.Fatalf("the next shell has %v", m["data"])
 	}
 }
+
+// A shell's own action runs only while its shell is the profile's, and sends that shell
+// action with its id. With another shell on, its key isn't taken, so the page keeps it, and
+// the shell hears nothing.
+func TestAShellsOwnActionRunsOnlyWhileItsShellIsOn(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	took := func(k engine.Key) bool {
+		var ok bool
+		r.e.Post(func() { ok = r.a.Key(k, engine.KeyUnhandled, engine.SurfacePage) })
+		r.e.Settle()
+		return ok
+	}
+	cmdD := engine.Key{Code: 'D', Mods: engine.ModCmd}
+	shiftCmdD := engine.Key{Code: 'D', Mods: engine.ModCmd | engine.ModShift}
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if took(cmdD) || took(shiftCmdD) {
+		t.Fatal("with the standard shell on, the terminal's keys were taken")
+	}
+	r.e.Post(func() { r.a.MenuChosen("terminal.splitRight") })
+	r.e.Settle()
+	for len(r.got) > 0 {
+		var m map[string]any
+		json.Unmarshal(<-r.got, &m)
+		if m["t"] == "action" {
+			t.Fatalf("the standard shell heard %v", m)
+		}
+	}
+
+	r.e.Post(func() { r.a.MenuChosen("shells:terminal") })
+	r.shell(`{"t":"ready"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if !took(cmdD) {
+		t.Fatal("with the terminal shell on, Cmd+D wasn't taken")
+	}
+	if m := r.waitFor(func(m map[string]any) bool { return m["t"] == "action" }); m["id"] != "terminal.splitRight" {
+		t.Fatalf("Cmd+D sent %v", m)
+	}
+	if !took(shiftCmdD) {
+		t.Fatal("with the terminal shell on, Shift+Cmd+D wasn't taken")
+	}
+	if m := r.waitFor(func(m map[string]any) bool { return m["t"] == "action" }); m["id"] != "terminal.splitDown" {
+		t.Fatalf("Shift+Cmd+D sent %v", m)
+	}
+}

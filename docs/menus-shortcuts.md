@@ -353,7 +353,8 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
   Force Reload This Page, Shift+Cmd+R; Full Screen, Ctrl+Cmd+F, `always` (checked); Actual
   Size, Cmd+0; Zoom In, Cmd+= and Shift+Cmd+=; Zoom Out, Cmd+-; Developer: View Source,
   Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;
-  Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up.
+  Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up; Terminal (hidden), the
+  terminal shell's own: Split Right, Cmd+D, and Split Down, Shift+Cmd+D.
 - **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
 - **Tab**: Select Next Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*; Select
   Previous Tab, the mirror keys*; Select Recent Tab, Ctrl+Tab*; Select Recent Tab
@@ -368,6 +369,30 @@ Full History, a Help menu.
 
 Counted from Chrome's source, Chrome has 194 actions: 58 need only Go and the shell, 49 a
 content call, 13 come from the OS, and 74 open features we don't have.
+
+## A shell's own actions
+
+The owner, 2026-11-14: a shell that is on may take keys, as long as the keymap stays as it
+is. So a shell's key is an ordinary action's, and nothing about how keys are matched,
+reserved, stored, edited or merged changes. The first are the terminal shell's splits,
+Cmd+D and Shift+Cmd+D, as iTerm has them.
+
+- **Declared in the registry.** A shell lists its actions in its entry in
+  `core/shells/registry.json`, each an id and a title: `"actions": [{"id":
+  "terminal.splitRight", "title": "Split Right"}]`. The id starts with the shell's id and a
+  dot, and never changes once released, like any action's.
+- **Registered by Go** with the rest (`core/app/actions.go`), every shell's in the
+  registry, before Load. Each is enabled only while its shell is the profile's: the live one, so View, Shell
+  turns them on and off as it switches.
+- **Run by sending the shell `action`.** Running one sends the shell of the window in
+  front `{"t": "action", "id": "<id>"}`, as Open Location sends it `focusAddressBar`, and
+  the shell does the rest ([shells.md](shells.md#a-shells-own-actions)).
+- **Keys in the templates.** `project-b.json` and `chrome.json` bind them on Mac, `page`
+  first, and `hidden`, so they have no menu item. They sit in the tree under View,
+  Terminal, which they need for their keys to apply, and the Keyboard settings list them
+  there to rebind like any other. An owned keymap gets them through the update merge.
+- **Disabled, the key goes on.** With another shell on the action is disabled, so `Key`
+  doesn't take its key and the page gets it, as before.
 
 ## From the guidelines, not yet discussed
 

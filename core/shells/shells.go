@@ -1,6 +1,6 @@
 // Package shells is the list of shells the app is built with: each one's id, the folder
-// it builds from, shell/src/apps/shell/<id>/, and the page it loads as, and the name the
-// user sees. Which one a profile loads is its shell pref (docs/shells.md).
+// it builds from, shell/src/apps/shell/<id>/, and the page it loads as, the name the user
+// sees, and its own actions. Which one a profile loads is its shell pref (docs/shells.md).
 package shells
 
 import (
@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // Shell is one shell of the registry.
@@ -17,6 +18,17 @@ type Shell struct {
 	// Example is a shell that is built and can be loaded, but is offered nowhere: the one
 	// to copy to build another.
 	Example bool `json:"example,omitempty"`
+	// Actions are the shell's own, such as the terminal's splits. Go registers each with
+	// the others, enabled only while this shell is the profile's; running one sends the
+	// shell action with its id. An id starts with the shell's and a dot.
+	Actions []Action `json:"actions,omitempty"`
+}
+
+// Action is one of a shell's own actions: its id, which never changes once released, and
+// the title its menu item shows.
+type Action struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
 
 //go:embed registry.json
@@ -34,6 +46,11 @@ var all = func() []Shell {
 	for _, s := range out {
 		if !id.MatchString(s.ID) || s.Name == "" {
 			panic(fmt.Sprintf("shells: registry.json: %+v", s))
+		}
+		for _, a := range s.Actions {
+			if !strings.HasPrefix(a.ID, s.ID+".") || a.Title == "" {
+				panic(fmt.Sprintf("shells: registry.json: %s: %+v", s.ID, a))
+			}
 		}
 	}
 	return out

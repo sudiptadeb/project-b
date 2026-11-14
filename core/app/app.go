@@ -143,10 +143,11 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Flags.OnChanged(a.Settings.FlagsChanged)
 	a.Commands.OnChanged(a.Shell.KeysChanged)
 	// What the menu shows enabled or checked follows the window in front: its active tab
-	// and full screen, and the layout.
+	// and full screen, the layout, and the shell.
 	a.Tabs.OnChanged(func(tabs.Tab) { a.Commands.RefreshMenu() })
 	a.Tabs.OnListChanged(a.Commands.RefreshMenu)
 	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
+	a.Prefs.OnShellChanged(func(string) { a.Commands.RefreshMenu() })
 	a.Window.OnControlsChanged(func(engine.WindowID, engine.Rect, float64) { a.Commands.RefreshMenu() })
 	a.Commands.Load()
 	for _, start := range starters {

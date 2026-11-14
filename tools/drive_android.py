@@ -518,11 +518,13 @@ def mobile_shell():
     tap(middle(see("shell", label="Go to Page B \U0001F642")))
     check("a tap on a favicon in the strip shows that tab", until(lambda: find("page", text="b")) is not None)
 
-    # Each screen in light and dark.
-    for mode in ("no", "yes"):
-        adb("shell", "cmd", "uimode", "night", mode)
-        time.sleep(2)
-        scheme = "dark" if mode == "yes" else "light"
+    # Each screen in light and dark, the theme chosen in settings.
+    for scheme in ("light", "dark"):
+        menu("Settings")
+        tap(middle(see("settings", text=scheme.capitalize())))
+        key(4)
+        until(lambda: "settings" not in screen_parts())
+        time.sleep(1)
         shot("30-page-" + scheme)
         press("Tabs")
         see("shell", label="New Tab")
@@ -541,7 +543,9 @@ def mobile_shell():
         shot("34-suggestions-" + scheme)
         key(4)
         key(4)
-    adb("shell", "cmd", "uimode", "night", "no")
+    menu("Settings")
+    tap(middle(see("settings", text="System")))
+    key(4)
 
 
 def history_after_a_restart():

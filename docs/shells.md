@@ -476,6 +476,7 @@ address field, and a menu button at the far right, in our tones.
 `project-b-research/mobile-shell/spec.md`.
 
 - **The registry marks it `"phone": true`.** A phone offers and loads only phone shells,
+  and the APK carries only those (owner, 2026-11-14: more phone shells can join it later),
   so it starts on Mobile even where a profile's pref names `standard`, as the templates do;
   a desktop offers none, though it loads one named outright, as the mock does for the
   shell's tests in a phone-sized window.

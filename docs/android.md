@@ -15,8 +15,7 @@ All Chromium paths below are in the 155.0.8059.41 tree (`chromium/src`).
   every process loads. Go goes in another that only the main window loads, so renderers, the GPU process and the
   app zygote never start Go. Checked on the emulator, in `/proc/<pid>/maps`.
 - **The shell on `main` runs on it.** Tabs, favicons, the content hooks, the settings page with the frame colour
-  and the theme, and the window manager's one layout, on `main` at 0.2.15. A touch screen gets bigger targets and no hover, and a
-  phone shows its tabs as favicons under the toolbar with the full list as a drawer.
+  and the theme, and the window manager's one layout, on `main` at 0.2.15. A phone runs the Mobile shell, made for it.
 - **System WebView was tried first and dropped.** It ran the same managers and shell in a 2.5 MB APK, but it can't
   gate every request, and the shell shares a renderer with the page. What it showed is in
   [the alternatives](#6-the-alternatives-behind-the-same-engine-interface).
@@ -331,19 +330,12 @@ adapter here, with `Window` as the one Android file (`engine/android/window_andr
 | `WindowState` | The window's size in CSS pixels, no buttons, square corners, and `full_screen` true |
 | Updates | The same manager and the same `amarit.Client`, every minute, on the `android/arm64` asset. The APK is downloaded into the profile, size and sha256 checked by amarit, and the bubble and the settings panel offer to install it: see [Updates on a phone](#updates-on-a-phone) |
 
-**The Mobile shell.** A phone loads only the shells the registry marks `phone`, so it starts on `mobile`
+**The Mobile shell.** A phone loads only the shells the registry marks `phone`, and the APK carries only those
+and the settings page, so it starts on `mobile`
 ([shells.md](shells.md#the-mobile-shell)), even where a profile's prefs name `standard`, as the templates do: one
 bar at the foot, a tab switcher, tab groups in a strip, the long-press link menu the shell draws, and the bars
 hiding on scroll. The phone's back key closes the shell's sheet or ends its address editing first
 (`set_shell_back`), then settings', then goes back in the page. Settings, General has Address bar, Top or Bottom.
-
-**Tabs on a phone, in the standard shell.** Kept in the code, though a phone no longer loads it. A sidebar would
-take half a phone's width, so on a touch screen (`shell/src/phone.js`)
-the tabs are favicons in a row of their own under the toolbar (`apps/shell/standard/TabIcons.vue`), the shown one marked as in the sidebar;
-a tap shows that tab, and a tab with no favicon yet shows its title's first letter. The sidebar button opens the
-sidebar's own list as a drawer over the toolbar and the page: choosing a tab or New Tab closes it, a tap outside closes
-it, and a tab's close button leaves it open. Every tab's close button shows, since there's no hover. The tab layout
-setting and the toolbar's layout button aren't shown, because neither layout applies. Desktop is unchanged.
 
 ### Updates on a phone
 
@@ -384,7 +376,7 @@ Open:
 - **The colour before Go starts.** The window shows the default frame colour from `styles.xml` until Go's first
   layout, so a phone set to another colour sees the default for about a second at a cold start.
 
-`tools/drive_android.py` checks this shell too: New Tab in the drawer, the strip switching tabs, and settings
+`tools/drive_android.py` checks this shell too: New Tab in the menu, the switcher switching tabs, and settings
 opening over the window and closing with the back key, along with everything under
 [What was tested](#what-was-tested). It holds no positions. Content fills Android's accessibility tree with the
 shell's controls by their labels, the settings page and the shown page, each with its place on the screen, and the

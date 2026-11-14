@@ -121,18 +121,12 @@ repack("pak") {
 
 android_assets("assets") {
   sources = [ "$root_out_dir/project_b.pak" ]
-  # Each app of shell/src/apps, and each shell, as tools/package.sh lays them out for the
-  # Mac.
+  # The settings page and the phone's shells, the registry's "phone": true, laid out as
+  # tools/package.sh lays them out for the Mac. A phone loads no other shell.
   renaming_sources = [
     "../../shell/dist/settings/index.html",
     "../../shell/dist/settings/settings.css",
     "../../shell/dist/settings/settings.js",
-    "../../shell/dist/shell/standard/index.html",
-    "../../shell/dist/shell/standard/standard.css",
-    "../../shell/dist/shell/standard/standard.js",
-    "../../shell/dist/shell/example/index.html",
-    "../../shell/dist/shell/example/example.css",
-    "../../shell/dist/shell/example/example.js",
     "../../shell/dist/shell/mobile/index.html",
     "../../shell/dist/shell/mobile/mobile.css",
     "../../shell/dist/shell/mobile/mobile.js",
@@ -141,12 +135,6 @@ android_assets("assets") {
     "shell/settings/index.html",
     "shell/settings/settings.css",
     "shell/settings/settings.js",
-    "shell/shell/standard/index.html",
-    "shell/shell/standard/standard.css",
-    "shell/shell/standard/standard.js",
-    "shell/shell/example/index.html",
-    "shell/shell/example/example.css",
-    "shell/shell/example/example.js",
     "shell/shell/mobile/index.html",
     "shell/shell/mobile/mobile.css",
     "shell/shell/mobile/mobile.js",

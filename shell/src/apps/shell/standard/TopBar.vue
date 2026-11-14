@@ -99,10 +99,9 @@ function switchLayout() {
   background: var(--bar);
 }
 
-/* Under the tab strip the bar's corners meet the strip with the tabs' radius. */
-
+/* Under the tab strip, a hairline parts the bar from the tabs. */
 .top.toolbar .bar {
-  border-radius: 8px 8px 0 0;
+  box-shadow: inset 0 1px 0 var(--line);
 }
 
 .space {

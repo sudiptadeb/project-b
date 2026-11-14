@@ -142,6 +142,7 @@
         sheet = 'card';
       }}
       ongroup={(id) => openGroup(id)}
+      ondrop={(id, to) => send(to.group ? { t: 'addToGroup', id, group: to.group } : { t: 'createGroup', ids: [to.tab, id] })}
       onclosegroup={(id) => openGroup(id, true)}
     />
   </div>

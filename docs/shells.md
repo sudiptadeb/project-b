@@ -475,7 +475,8 @@ address field, and a menu button at the far right, in our tones.
   In the switcher a group is one card, its colour along the top and its tabs' favicons in
   it, which are their `role="tab"` elements. A long press on a card opens its menu: Add to
   group (the groups of its workspace, or a new one with a new tab), Remove from group,
-  Close. A swipe along the bar stays in the group.
+  Close. Held and dragged onto another card, a card joins that card's group or starts one
+  with it; swiped sideways, it closes. A swipe along the bar stays in the group.
 - **The menu sheet:** Back, Forward, Reload or Stop, New tab, New tab in group while the
   tab is in one; then Workspaces (where new
   tabs open), Extensions while their flag is on, the update when one is ready, and

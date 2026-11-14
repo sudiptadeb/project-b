@@ -2,16 +2,28 @@
   import { shell, state, tabLabel } from '@/sdk/svelte.svelte.js';
   import Favicon from './Favicon.svelte';
   import Icon from './Icon.svelte';
+  import { gesture } from './gesture.js';
   import { groupLabel, groupOf } from './groups.js';
 
   // The tab switcher, over the page: the workspaces as chips while there are any, which
   // choose the cards shown, and New tab; then two columns of cards, the active one ringed.
-  // A tab's card: a tap shows it, its × closes it, a long press opens its menu (oncard). A
+  // A tab's card: a tap shows it, its × or a swipe sideways closes it, a long press opens
+  // its menu (oncard), and held and dragged onto another card it joins that one's group or
+  // starts one with it (ondrop). A
   // group is one card where its first tab is, with its colour along the top and its tabs'
   // favicons, a tap on which goes to that tab; a tap elsewhere on it opens the group's
   // sheet. It stays in the document while closed, so every tab is always an element
   // (docs/shells.md, rule 4).
-  let { open, groups, workspace = $bindable(), onpick, onclosetab, onnewtab, oncard, ongroup, onclosegroup } = $props();
+  let { open, groups, workspace = $bindable(), onpick, onclosetab, onnewtab, oncard, ongroup, onclosegroup, ondrop } = $props();
+
+  // Where a card was let go: on a group's card, or one of its tabs, it joins that group;
+  // on a tab's card, that tab's group, or a new one of the two.
+  function dropped(id, target) {
+    if (target.dataset.group) return ondrop(id, { group: target.dataset.group });
+    const other = Number(target.dataset.tab);
+    const g = groupOf(groups, other);
+    ondrop(id, g ? { group: g.id } : { tab: other });
+  }
 
   // What the grid shows, in Go's order: a tab, or a group at its first tab.
   const items = $derived.by(() => {
@@ -73,6 +85,7 @@
           aria-selected={tab.id === state.active}
           onclick={() => onpick(tab.id)}
           oncontextmenu={(e) => menu(e, tab)}
+          use:gesture={{ onclose: () => onclosetab(tab.id), onmenu: () => oncard(tab.id), ondrop: (target) => dropped(tab.id, target) }}
           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onpick(tab.id)}
         >
           <div class="top">
@@ -224,6 +237,16 @@
     background: var(--surface);
     overflow: hidden;
     outline: none;
+  }
+
+  .card {
+    touch-action: pan-y;
+  }
+
+  .card:global(.lifted) {
+    z-index: 2;
+    box-shadow: var(--shadow-float);
+    transition: box-shadow 150ms;
   }
 
   .card[hidden] {

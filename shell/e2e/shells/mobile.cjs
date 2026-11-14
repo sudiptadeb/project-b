@@ -269,6 +269,44 @@ const H = 915;
   await confirm.getByRole('button', { name: 'Close', exact: true }).tap();
   check('and Close closes them', await until(async () => (await regions()).tabs.length === before - 2), String((await regions()).tabs.length));
 
+  // Slice 3: a swipe sideways closes a card; a card held and dragged onto another makes a
+  // group of the two.
+  const swipeCard = async (card, by) => {
+    const b = await card.boundingBox();
+    const y = b.y + b.height / 2;
+    await page.mouse.move(b.x + b.width / 2, y);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + b.width / 2 + (by * i) / 6, y);
+    await page.mouse.up();
+  };
+  const dragCard = async (from, to) => {
+    const a = await from.boundingBox();
+    const b = await to.boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(500);
+    for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + a.width / 2 + ((b.x - a.x) * i) / 8, a.y + a.height / 2 + ((b.y - a.y) * i) / 8);
+    await page.mouse.up();
+  };
+  for (let i = (await regions()).tabs.length; i < 4; i++) await fire('menu', 'tab.new');
+  await tabCount(4);
+  for (const t of (await regions()).tabs) if (!t.url) await fire('navigate', `https://example.com/card/${t.id}`, { tab: t.id });
+  await until(async () => (await regions()).tabs.every((t) => t.url && !t.loading));
+  await tabsButton.tap();
+  const visibleCards = switcher.locator('.card:not([data-group])').filter({ visible: true });
+  await until(async () => (await visibleCards.count()) >= 3 && (await box('.switcher')).bottom === H - 48);
+  const doomed = Number(await visibleCards.last().getAttribute('data-tab'));
+  await swipeCard(visibleCards.last(), -170);
+  check('a swipe sideways closes a card', await until(async () => !(await regions()).tabs.some((t) => t.id === doomed)) && await switcher.isVisible(), JSON.stringify({ doomed, tabs: (await regions()).tabs.map((t) => t.id), open: await switcher.isVisible() }));
+  const small = Number(await visibleCards.nth(0).getAttribute('data-tab'));
+  await swipeCard(visibleCards.nth(0), 40);
+  check('a short one puts it back, and does not open it', await until(async () => (await regions()).tabs.some((t) => t.id === small)) && await switcher.isVisible());
+  const [x, y2] = [Number(await visibleCards.nth(0).getAttribute('data-tab')), Number(await visibleCards.nth(1).getAttribute('data-tab'))];
+  await dragCard(visibleCards.nth(0), visibleCards.nth(1));
+  check('a card held and dropped on another makes a group of the two', await until(async () => (await switcher.locator('[data-group]').filter({ visible: true }).count()) === 1 &&
+    (await switcher.locator('[data-group] [role=tab]').evaluateAll((els) => els.map((e) => Number(e.dataset.tab)).sort().join())) === [x, y2].sort().join()));
+  await page.keyboard.press('Escape');
+
   // Settings, from the menu.
   await menuButton.tap();
   await menu.getByRole('menuitem', { name: 'Settings' }).tap();
@@ -286,9 +324,9 @@ const H = 915;
     const b = await box('.toolbar');
     return b && Math.round(b.y) === topY && b.height === 48;
   }), JSON.stringify(await box('.toolbar')));
-  check('the page lies under it, down to the foot', await until(async () => {
+  check('the page lies under it, down to the foot or the strip', await until(async () => {
     const v = (await regions()).visible[0].rect;
-    return v.y === topY + 48 && v.y + v.h === H;
+    return v.y === topY + 48 && v.y + v.h === H - ((await strip.isVisible()) ? 44 : 0);
   }), JSON.stringify((await regions()).visible));
   await fire('menu', 'tab.new');
   await until(inField);

@@ -4,7 +4,7 @@ import PaneTree from './PaneTree.vue';
 import PromptLine from './PromptLine.vue';
 import TopStrip from './TopStrip.vue';
 import { connect, setFrame, state } from '@/sdk/vue.js';
-import { follow, heirAsked, load, shown, split } from './panes.js';
+import { focusToward, follow, heirAsked, load, resizeToward, shown, split, zoom, zoomed } from './panes.js';
 import { prompt } from './prompt.js';
 
 // A terminal's window: a strip of groups on top, the shown group's panes in the body, and
@@ -12,11 +12,21 @@ import { prompt } from './prompt.js';
 // 4px band.
 setFrame(4);
 
-// Its own actions, as the registry lists them, which Go sends while this shell is on: each
-// splits the active pane, as its buttons do.
+// Its own actions, as the registry lists them, which Go sends while this shell is on: the
+// splits, as the panes' buttons do; moving to the pane beside, by Ctrl+Cmd and an arrow;
+// moving a divider, with Shift too; and zooming the active pane.
 const actions = {
   'terminal.splitRight': () => split(state.active, 'row'),
   'terminal.splitDown': () => split(state.active, 'column'),
+  'terminal.focusLeft': () => focusToward('left'),
+  'terminal.focusRight': () => focusToward('right'),
+  'terminal.focusUp': () => focusToward('up'),
+  'terminal.focusDown': () => focusToward('down'),
+  'terminal.resizeLeft': () => resizeToward('left'),
+  'terminal.resizeRight': () => resizeToward('right'),
+  'terminal.resizeUp': () => resizeToward('up'),
+  'terminal.resizeDown': () => resizeToward('down'),
+  'terminal.zoom': () => zoom(),
 };
 
 connect({
@@ -47,7 +57,7 @@ watch(
       <div class="inner">
         <TopStrip />
         <div class="body">
-          <PaneTree v-if="shown" :node="shown" />
+          <PaneTree v-if="shown" :node="zoomed ? { tab: zoomed } : shown" />
         </div>
         <PromptLine />
       </div>

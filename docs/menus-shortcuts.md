@@ -359,7 +359,9 @@ there. Choosing it is the user's, in Keyboard settings; the shell doesn't choose
   Size, Cmd+0; Zoom In, Cmd+= and Shift+Cmd+=; Zoom Out, Cmd+-; Developer: View Source,
   Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;
   Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up; Terminal (hidden), the
-  terminal shell's own: Split right, Cmd+D, and Split down, Shift+Cmd+D.
+  terminal shell's own: Split right, Cmd+D; Split down, Shift+Cmd+D; Focus pane left,
+  right, above and below, Ctrl+Cmd and the arrow; Move divider left, right, up and down,
+  Ctrl+Shift+Cmd and the arrow; Zoom pane, Shift+Cmd+Enter.
 - **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
 - **Tab**: Select Next Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*; Select
   Previous Tab, the mirror keys*; Select Recent Tab, Ctrl+Tab*; Select Recent Tab

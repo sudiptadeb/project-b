@@ -133,6 +133,33 @@
             },
             {
               "action": "terminal.splitDown"
+            },
+            {
+              "action": "terminal.focusLeft"
+            },
+            {
+              "action": "terminal.focusRight"
+            },
+            {
+              "action": "terminal.focusUp"
+            },
+            {
+              "action": "terminal.focusDown"
+            },
+            {
+              "action": "terminal.resizeLeft"
+            },
+            {
+              "action": "terminal.resizeRight"
+            },
+            {
+              "action": "terminal.resizeUp"
+            },
+            {
+              "action": "terminal.resizeDown"
+            },
+            {
+              "action": "terminal.zoom"
             }
           ]
         },

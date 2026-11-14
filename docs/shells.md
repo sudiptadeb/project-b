@@ -484,20 +484,28 @@ dense and square.
   strip's far end are the extensions and a gear that opens settings. Each pane has a title
   bar with split right, split down and close; a press on it makes the pane active. The
   prompt line at the foot is the address bar, with back, forward and reload, and the update
-  when one is ready. Cmd+D splits the active pane right and Shift+Cmd+D down, its own
-  actions `terminal.splitRight` and `terminal.splitDown`; the split buttons' titles show
-  the keys.
+  when one is ready.
+- **Its keys are chords, with no prefix key** (owner, 2026-11-14), each one of its own
+  actions: Cmd+D splits the active pane right and Shift+Cmd+D down (`terminal.splitRight`,
+  `terminal.splitDown`); Ctrl+Cmd and an arrow makes the pane that way active, the nearest
+  sharing most of its height or width (`terminal.focusLeft` and so on); Ctrl+Shift+Cmd and
+  an arrow moves a divider of the active pane 32px that way, the one on that side of it,
+  else the one on its other side (`terminal.resizeLeft` and so on); Shift+Cmd+Enter zooms
+  the active pane to fill the body and back (`terminal.zoom`). A zoom ends when another
+  pane becomes active, on a split, or when the pane closes, and is kept in the shell's
+  data. A pane's title bar has Zoom beside the splits while its group has more than one
+  pane; the buttons' titles show the keys.
 - **The active tab is the focused pane,** and the group shown is the one that holds it.
   When the active pane closes, by its button or by Go's Close Tab (Cmd+W), the pane that
   takes its room becomes active, whichever tab Go chose from its own list, so its group
   stays shown; the body shows that pane's group at once, never Go's choice on the way.
 - **A new tab is a new group,** unless a pane's split asked for it: then it goes beside
   that pane. Dividers drag to resize, no pane smaller than 80px.
-- **Its own data** is `{groups}`, each group's tree, naming tabs by id, and nothing Go
+- **Its own data** is `{groups, zoomed}`, each group's tree and the zoomed pane, naming tabs by id, and nothing Go
   has. It is fitted to Go's list on the snapshot and on every `tabs`: a tab that is gone
   leaves its tree, its share going to the part before it; a split left with one part
   becomes that part.
-- **It leaves out** a key to close a pane, dimming the pages of panes that aren't active,
+- **It leaves out** a prefix key, a key to close a pane other than Cmd+W, dimming the pages of panes that aren't active,
   dragging panes between groups, broadcasting input, and the notice of the last run's
   crash.
 

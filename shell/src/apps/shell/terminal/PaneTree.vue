@@ -1,14 +1,12 @@
 <script setup>
 import { ref } from 'vue';
 import Pane from './Pane.vue';
-import { save } from './panes.js';
+import { save, shift } from './panes.js';
 
 // A node of a group's tree: a pane, or a split's parts with a divider between each two.
 // Dragging a divider moves the share between the parts either side of it.
 const props = defineProps({ node: { type: Object, required: true } });
 
-// No part is dragged smaller than this, in pixels, so no page vanishes.
-const smallest = 80;
 const box = ref(null);
 let drag = null;
 
@@ -25,10 +23,10 @@ function start(e, i) {
 function move(e) {
   if (!drag) return;
   const { i, row, room, from, a, b } = drag;
-  const least = smallest / room;
-  const delta = Math.min(Math.max(((row ? e.clientX : e.clientY) - from) / room, least - a), b - least);
-  props.node.sizes[i] = a + delta;
-  props.node.sizes[i + 1] = b - delta;
+  // From where the drag began, no part smaller than its smallest.
+  props.node.sizes[i] = a;
+  props.node.sizes[i + 1] = b;
+  shift(props.node, i, (row ? e.clientX : e.clientY) - from, room);
 }
 
 function end() {

@@ -49,6 +49,15 @@ var Keys = map[string]engine.Key{
 	"settings":        {Code: 0xBC, Mods: engine.ModCmd},
 	"splitRight":      {Code: 'D', Mods: engine.ModCmd},
 	"splitDown":       {Code: 'D', Mods: engine.ModCmd | engine.ModShift},
+	"paneLeft":        {Code: 0x25, Mods: engine.ModCtrl | engine.ModCmd},
+	"paneRight":       {Code: 0x27, Mods: engine.ModCtrl | engine.ModCmd},
+	"paneUp":          {Code: 0x26, Mods: engine.ModCtrl | engine.ModCmd},
+	"paneDown":        {Code: 0x28, Mods: engine.ModCtrl | engine.ModCmd},
+	"dividerLeft":     {Code: 0x25, Mods: engine.ModCtrl | engine.ModShift | engine.ModCmd},
+	"dividerRight":    {Code: 0x27, Mods: engine.ModCtrl | engine.ModShift | engine.ModCmd},
+	"dividerUp":       {Code: 0x26, Mods: engine.ModCtrl | engine.ModShift | engine.ModCmd},
+	"dividerDown":     {Code: 0x28, Mods: engine.ModCtrl | engine.ModShift | engine.ModCmd},
+	"zoomPane":        {Code: 0x0D, Mods: engine.ModShift | engine.ModCmd},
 }
 
 // tab is one mock tab's session history and what its page shows.

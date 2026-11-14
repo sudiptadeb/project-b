@@ -3,7 +3,7 @@
 // a row or a column of parts, each with its share of the split, the shares adding up to 1.
 // The groups are the shell's own data; Go's tab list is the truth they follow.
 
-import { computed, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { saveData, send, state } from '@/sdk/vue.js';
 
 export const groups = reactive([]);
@@ -18,6 +18,14 @@ let was = 0;
 // The pane the shell asked Go to make active in place of the one that closed, shown at once
 // so the body never shows the group Go chose for a moment; 0 once Go agrees.
 export const heirAsked = ref(0);
+// The pane zoomed to fill the body, 0 for none. Another pane becoming active, a split, or
+// the pane closing ends it.
+export const zoomed = ref(0);
+
+// No pane is made narrower or shorter than these, in pixels, by a drag or a key.
+export const smallest = { row: 80, column: 80 };
+// How far a resize key moves a divider, in pixels.
+const step = 32;
 
 export function tabsOf(node) {
   return node.parts ? node.parts.flatMap(tabsOf) : [node.tab];
@@ -48,7 +56,8 @@ export const shown = computed(() => groups.find((root) => tabsOf(root).includes(
 // shell, and fits them to Go's tabs.
 export function load(data) {
   groups.splice(0, groups.length, ...(data ? data.groups : []));
-  saved = JSON.stringify(groups);
+  zoomed.value = data?.zoomed || 0;
+  saved = JSON.stringify({ groups, zoomed: zoomed.value });
   was = 0;
   follow();
 }
@@ -75,6 +84,7 @@ export function follow() {
     asked = null;
     placed.add(t.id);
   }
+  if (zoomed.value && zoomed.value !== (next || state.active)) zoomed.value = 0;
   save();
   order();
   if (next && next !== state.active) {
@@ -168,6 +178,7 @@ function heir(tab, live) {
 // split asks Go for a new tab, to land beside the pane of tab: to its right for 'row',
 // under it for 'column'.
 export function split(tab, dir) {
+  zoomed.value = 0;
   asked = { beside: tab, dir };
   send({ t: 'newTab' });
 }
@@ -196,8 +207,105 @@ export function close(tab) {
 
 // save hands Go the groups when they changed.
 export function save() {
-  const json = JSON.stringify(groups);
+  const json = JSON.stringify({ groups, zoomed: zoomed.value });
   if (json === saved) return;
   saved = json;
-  saveData({ groups: JSON.parse(json) });
+  saveData(JSON.parse(json));
+}
+
+// zoom fills the body with the pane of tab, the active one unless a pane's button says
+// which, or ends the zoom. A pane alone in its group has nothing to zoom over.
+export function zoom(tab = state.active) {
+  if (zoomed.value) zoomed.value = 0;
+  else if (shown.value?.parts) zoomed.value = tab;
+  save();
+}
+
+// The element a pane's page and title bar are in.
+function paneOf(tab) {
+  return document.querySelector(`.title[data-pane="${tab}"]`)?.parentElement;
+}
+
+// focusToward makes the pane next to the active one, in the direction of an arrow, active:
+// the nearest that lies that way and shares some of its height (left, right) or width (up,
+// down), the one sharing most when two are as near. A zoom ends first.
+export async function focusToward(dir) {
+  if (!shown.value) return;
+  if (zoomed.value) {
+    zoomed.value = 0;
+    save();
+    await nextTick();
+  }
+  const from = paneOf(state.active)?.getBoundingClientRect();
+  if (!from) return;
+  const across = dir === 'left' || dir === 'right';
+  let best = null;
+  for (const id of tabsOf(shown.value)) {
+    if (id === state.active) continue;
+    const r = paneOf(id)?.getBoundingClientRect();
+    if (!r) continue;
+    const gap = { left: from.left - r.right, right: r.left - from.right, up: from.top - r.bottom, down: r.top - from.bottom }[dir];
+    const shared = across
+      ? Math.min(from.bottom, r.bottom) - Math.max(from.top, r.top)
+      : Math.min(from.right, r.right) - Math.max(from.left, r.left);
+    if (gap < -2 || shared <= 0) continue;
+    if (!best || gap < best.gap - 2 || (Math.abs(gap - best.gap) <= 2 && shared > best.shared)) best = { id, gap, shared };
+  }
+  if (best) send({ t: 'activateTab', id: best.id });
+}
+
+// pathTo is the splits from root down to the pane of tab, each with the place of the part
+// that leads to it.
+function pathTo(node, tab) {
+  if (!node.parts) return node.tab === tab ? [] : null;
+  for (let i = 0; i < node.parts.length; i++) {
+    const rest = pathTo(node.parts[i], tab);
+    if (rest) return [{ node, i }, ...rest];
+  }
+  return null;
+}
+
+// resizeToward moves a divider of the active pane in the direction of an arrow: the one on
+// that side of it, in the innermost split that has one, else the one on its other side. So
+// Right widens a pane with room to its right, and narrows one at the right edge.
+export function resizeToward(dir) {
+  if (!shown.value || zoomed.value) return;
+  const path = pathTo(shown.value, state.active);
+  if (!path) return;
+  const axis = dir === 'left' || dir === 'right' ? 'row' : 'column';
+  const ahead = dir === 'right' || dir === 'down';
+  const find = (wantAhead) => {
+    for (let k = path.length - 1; k >= 0; k--) {
+      const { node, i } = path[k];
+      if (node.dir !== axis) continue;
+      if (wantAhead && i < node.parts.length - 1) return { k, divider: i };
+      if (!wantAhead && i > 0) return { k, divider: i - 1 };
+    }
+    return null;
+  };
+  const pick = find(ahead) || find(!ahead);
+  if (!pick) return;
+  // The split's element is the pick's place among the pane's enclosing splits, innermost
+  // first.
+  const splits = [];
+  for (let el = paneOf(state.active)?.parentElement; el; el = el.parentElement) {
+    if (el.classList.contains('split')) splits.push(el);
+  }
+  const box = splits[path.length - 1 - pick.k];
+  if (!box) return;
+  const r = box.getBoundingClientRect();
+  const node = path[pick.k].node;
+  shift(node, pick.divider, ahead ? step : -step, (axis === 'row' ? r.width : r.height) - (node.parts.length - 1));
+  save();
+}
+
+// shift moves the divider after part i of a split by px, out of room pixels the parts
+// share, keeping both parts either side of it at their smallest or more.
+export function shift(node, i, px, room) {
+  const least = smallest[node.dir] / room;
+  const a = node.sizes[i];
+  const b = node.sizes[i + 1];
+  const delta = Math.min(Math.max(px / room, Math.min(0, least - a)), Math.max(0, b - least));
+  node.sizes[i] = a + delta;
+  node.sizes[i + 1] = b - delta;
 }

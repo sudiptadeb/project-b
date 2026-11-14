@@ -516,6 +516,87 @@
         }
       ]
     },
+    "terminal.focusLeft": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Cmd+Left",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.focusRight": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Cmd+Right",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.focusUp": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Cmd+Up",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.focusDown": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Cmd+Down",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.resizeLeft": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Cmd+Left",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.resizeRight": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Cmd+Right",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.resizeUp": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Cmd+Up",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.resizeDown": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+Cmd+Down",
+          "reserve": "page"
+        }
+      ]
+    },
+    "terminal.zoom": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Shift+Cmd+Enter",
+          "reserve": "page"
+        }
+      ]
+    },
     "nav.back": {
       "mac": [
         {

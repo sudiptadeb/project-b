@@ -1,6 +1,7 @@
 <script setup>
 import { watchEffect } from 'vue';
 import FloatMenu from './FloatMenu.vue';
+import PageMenu from './PageMenu.vue';
 import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
 import TabStrip from './TabStrip.vue';
@@ -36,6 +37,7 @@ watchEffect(() => {
     </div>
     <div class="edge bottom"></div>
     <FloatMenu />
+    <PageMenu />
   </div>
 </template>
 

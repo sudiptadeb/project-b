@@ -9,6 +9,7 @@ import * as sdk from './shell.js';
 import { drag, page, shell } from './regions.js';
 
 export { focusPage, saveData, saveProfileData, send, setFrame, tabLabel } from './shell.js';
+export { chooseContextItem, closeContextMenu, contextMenuPoint } from './contextmenu.js';
 
 export const state = reactive({ ...sdk.state });
 sdk.onChange((fields) => Object.assign(state, fields));

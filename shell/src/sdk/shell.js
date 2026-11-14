@@ -63,6 +63,11 @@ export const state = {
   // an install or a removal waiting for the user's answer, {id, name, version, icon,
   // permissions, remove}, or null.
   extensions: null,
+  // The open right-click menu, or null (docs/daily-driver.md): its id, the tab and the
+  // point in its page, what the press was on (link, linkText, src, media, selection,
+  // editable), and actions, what can run there, each {id, title, group, enabled}, a
+  // submenu with actions of its own. contextmenu.js answers it.
+  contextMenu: null,
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
@@ -72,7 +77,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu']);
 
 const listeners = [];
 

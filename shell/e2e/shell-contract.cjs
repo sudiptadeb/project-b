@@ -15,21 +15,34 @@ const { regions, fire, settle, until } = lib;
 const registry = JSON.parse(fs.readFileSync(path.join(lib.root, 'core/shells/registry.json'), 'utf8'));
 const ids = process.argv[2] ? [process.argv[2]] : registry.map((s) => s.id);
 
-const rules = [
-  'It says ready, draws the snapshot, and says shown',
-  "The active tab's page shows, after every change, and no page is given the keyboard before it shows",
-  "The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of this window",
-  'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active, on the shell or in a sheet one of its controls opens',
-  'focusAddressBar puts the keyboard in the field named Address, where an address and Enter take the active tab there',
-  'Every control it draws is the shell\'s: a press on it reaches the shell',
-  'A press in the middle of a page it shows reaches that page',
-  'Some space is marked drag, and no page lies under the native window buttons',
-  'Reloaded, it comes back showing the same pages',
-  'Switched to and away from, it starts from Go\'s data alone',
-  'Settings is one press away, or two: a control named Settings, on the shell or in a menu one of its controls opens, opens the settings page',
-  'The basic controls are somewhere in the shell, found by role and name, and each does its job',
-  'It logs no errors',
-];
+const rules = {
+  1: 'It says ready, draws the snapshot, and says shown',
+  2: "The active tab's page shows, after every change, and no page is given the keyboard before it shows",
+  3: "The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of this window",
+  4: 'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active, on the shell or in a sheet one of its controls opens',
+  5: 'focusAddressBar puts the keyboard in the field named Address, where an address and Enter take the active tab there',
+  6: 'Every control it draws is the shell\'s: a press on it reaches the shell',
+  7: 'A press in the middle of a page it shows reaches that page',
+  8: 'Some space is marked drag, and no page lies under the native window buttons',
+  9: 'Reloaded, it comes back showing the same pages',
+  10: 'Switched to and away from, it starts from Go\'s data alone',
+  11: 'Settings is one press away, or two: a control named Settings, on the shell or in a menu one of its controls opens, opens the settings page',
+  12: 'The basic controls are somewhere in the shell, found by role and name, and each does its job',
+  13: 'It logs no errors',
+  16: 'On a desktop, a right click in a page opens a menu of Go\'s actions there; choosing one makes Go do it; Escape, or a press outside, closes it',
+};
+
+// The desktop shells that don't draw the right-click menu yet, and who brings it to each
+// (docs/daily-driver.md). Rule 16 holds every other desktop shell to it.
+const noMenuYet = {
+  glide: 'r6 brings it',
+  terminal: 'r4 brings it',
+  fox: 'r4 brings it',
+  'minimal-svelte': 'r4 brings it',
+  'minimal-js': 'r4 brings it',
+  'minimal-vue': 'r4 brings it',
+  example: 'r4 brings it',
+};
 
 (async () => {
   // What a control is, as the SDK has it: the same selector it finds them in a drag bar by.
@@ -363,12 +376,43 @@ const rules = [
       }
     }
 
+    // 16. The right-click menu, on a desktop shell.
+    const shell = registry.find((s) => s.id === id);
+    if (shell.phone) {
+      rule(16, 'not for a phone: a long press keeps its own sheet', true);
+    } else if (noMenuYet[id]) {
+      rule(16, `not checked yet: ${noMenuYet[id]}`, true);
+    } else {
+      try {
+        const menu = ui.getByRole('menu').first();
+        const open = async (link) => {
+          await fire('contextMenu', JSON.stringify({ x: 60, y: 60, link }));
+          return until(() => menu.isVisible());
+        };
+        const closed = () => until(async () => (await ui.getByRole('menu').count()) === 0);
+        rule(16, 'a right click on a link opens a role=menu', await open('https://contract.test/menu'));
+        const copy = ui.getByRole('menuitem', { name: /^Copy Link/ });
+        rule(16, "Go's Copy Link is a menuitem by its title", (await copy.count()) === 1, JSON.stringify(await ui.getByRole('menuitem').allInnerTexts()));
+        await copy.click();
+        rule(16, 'choosing it makes Go do it, and the menu goes', (await until(async () => (await regions()).clipboard === 'https://contract.test/menu')) && (await closed()));
+        await open('https://contract.test/escape');
+        await menu.press('Escape');
+        rule(16, 'Escape closes it', await closed());
+        await open('https://contract.test/outside');
+        const v = (await regions()).visible[0].rect;
+        await page.mouse.click(v.x + v.w - 20, v.y + v.h - 20);
+        rule(16, 'a press outside closes it, and nothing ran', (await closed()) && (await regions()).clipboard === 'https://contract.test/menu');
+      } catch (e) {
+        rule(16, 'its checks ran to their end', false, e.message.split('\n')[0]);
+      }
+    }
+
     // 13.
     rule(13, 'it logged no errors', w.errors.length === 0, w.errors.join(' | '));
 
     await w.page.close();
     await lib.stop();
-    rules.forEach((name, i) => summary.push(`${broken.has(i + 1) ? 'FAIL' : 'ok  '} ${id} ${i + 1}. ${name}`));
+    for (const [n, name] of Object.entries(rules)) summary.push(`${broken.has(+n) ? 'FAIL' : 'ok  '} ${id} ${n}. ${name}`);
   }
   await browser.close();
   console.log('\n' + summary.join('\n'));

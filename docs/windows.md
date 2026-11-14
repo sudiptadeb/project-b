@@ -76,11 +76,45 @@ front.
 - Quit closes every window at once, with no question.
 - A link from another app, or from a second start of the app, opens as a new tab in the
   window used last.
-- Settings is per window, over the window whose button opened it.
+- Settings is a tab of the window, one per window ([below](#our-own-pages-are-tabs-decided-2026-11-14)).
 - A window a page opens (`window.open`) stays a tab, as today.
 - Ctrl+Tab stays within a window.
 - A tab in a minimised window is told it is hidden.
 - A shell's own data, when shells have any, is kept per window.
+
+### Our own pages are tabs (decided 2026-11-14)
+
+The owner's words: "no we ahould move the settings also to be similar to other internals
+pages... clean simple rules that you mentioned... address bar can be changed to a title
+with option to close it so no typing allowed any links in internals pages can naviagte to
+ingernal pages or new tab for extenal pages". Settings is the first such page; history,
+bookmarks and downloads follow it.
+
+- **An internal tab is a tab Go marks as ours.** It runs in our pages' own context, not the
+  profile's, and is in no workspace. It remembers the workspace of the tab it was opened
+  from: New Tab from it, and a page it opens, go there (the first workspace if that one is
+  gone). Its kind is fixed for life: an internal tab never becomes a web tab, and a web tab
+  never becomes an internal one, so no tab swaps its WebContents between the two contexts.
+- **One per page per window.** Opening settings (Cmd+, the menu, a shell's Settings
+  button) in a window that has a settings tab switches to it; otherwise a new one opens
+  beside the active tab and becomes active.
+- **It closes as any tab closes:** Close Tab, Cmd+W, its tab's close. Nothing about it is
+  special to focus, the keyboard or closing; settings no longer covers the window.
+- **No typing.** For an internal tab a shell shows no address field: in its place the page's
+  title (which the page may make "Downloads › In progress") and a way to close the tab.
+- **One navigation rule:** a link in an internal page to another of our pages navigates
+  that tab; anything else opens a new tab beside it, in the workspace the internal tab
+  remembers. One check in our pages' context does it, for every way a navigation can
+  start there: a link, a link dragged onto the page, an extension, DevTools or ChromeDriver
+  (so a WebDriver navigation of an internal tab yields a new tab). A web tab asked to load
+  one of our addresses opens or switches to the internal tab instead.
+- **Pinning, moving to another window and duplicating keep a tab's kind,** which its
+  address says.
+- **To a shell an internal tab is a tab:** drawn, switched, closed and laid out as any
+  other. The shell's state says which tabs are ours, and the contract holds a shell to
+  showing a title, not a text field, where the address goes for one.
+- **Extensions don't see internal tabs:** they live in another context, as Chrome keeps
+  its own pages out of reach of extensions.
 
 ## Order of building
 

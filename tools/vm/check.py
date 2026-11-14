@@ -122,9 +122,17 @@ def guest(*cmd):
     return subprocess.run([TART, "exec", VM, *cmd], capture_output=True, text=True, timeout=60).stdout.strip()
 
 
+# The checks are written against the standard shell, and Glide is the default: a fresh
+# profile gets the Personal template's prefs, as a first start writes them, on the standard
+# shell. A first start keeps a profile's prefs.json when there is one.
+STANDARD_PREFS = {**json.load(open(os.path.join(os.path.dirname(__file__), "../../core/commands/templates/profile/personal.json")))["prefs"],
+                  "shell": "standard"}
+
+
 def fresh_profile(path=PROFILE, wipe=ROOT):
     updates = f"{ROOT}/update" if wipe == ROOT else f"{path}/updates"
-    guest("/bin/sh", "-c", f"rm -rf '{wipe}' && mkdir -p '{path}' '{updates}' && echo '{UPDATE_OFF}' > '{updates}/settings.json'")
+    guest("/bin/sh", "-c", f"rm -rf '{wipe}' && mkdir -p '{path}' '{updates}' && echo '{UPDATE_OFF}' > '{updates}/settings.json' && "
+          f"printf '%s' \"$1\" > '{path}/prefs.json'", "sh", json.dumps(STANDARD_PREFS))
 
 
 def serve_pages():

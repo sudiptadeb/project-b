@@ -154,18 +154,25 @@ const { check, fire, regions, settle, until } = lib;
   check('its chip is the one marked', await ui.locator('.chip.shown [role=tab]').count() === 3);
   await shoot('groups');
 
-  // A tab a page opens is a group of its own.
-  await fire('open', 'https://opened.test/', { tab: t2 });
-  check('a tab a page opens becomes its own group', await until(async () => (await regions()).tabs.length === 5 && (await chips.count()) === 3));
-  const t5 = (await regions()).active;
-  check('and shows alone', await until(() => showsOnly([t5])));
+  // A split's tabs are a tab group of Go's: the shell's window is the group.
+  const groupOf = async (id) => (await regions()).tabs.find((t) => t.id === id).group;
+  check('the split\'s tabs are one tab group in Go', (await groupOf(t1)) && (await groupOf(t1)) === (await groupOf(t2)) && (await groupOf(t1)) === (await groupOf(t3)));
+  check('and the lone tab is in none', !(await groupOf(t4)));
 
-  // Closing a group's last pane removes the group and shows another.
-  await title(t5).getByRole('button', { name: /^Close/ }).click();
-  check('closing a group\'s last pane removes the group', await until(async () => (await regions()).tabs.length === 4 && (await chips.count()) === 2));
+  // A tab a page opens from a tab in no group is a window of its own.
+  await ui.locator(`[role=tab][data-tab="${t4}"]`).click();
+  await until(async () => (await regions()).active === t4);
+  await fire('open', 'https://opened.test/', { tab: t4 });
+  check('a tab a page opens from a lone tab becomes its own window', await until(async () => (await regions()).tabs.length === 5 && (await chips.count()) === 3));
+  const t5b = (await regions()).tabs.find((t) => ![t1, t2, t3, t4].includes(t.id)).id;
+  check('and shows alone', await until(async () => (await regions()).active === t5b && (await showsOnly([t5b]))));
+
+  // Closing a window's last pane removes the window and shows another.
+  await title(t5b).getByRole('button', { name: /^Close/ }).click();
+  check('closing a window\'s last pane removes the window', await until(async () => (await regions()).tabs.length === 4 && (await chips.count()) === 2));
   check('and shows another', await until(async () => {
     const r = await regions();
-    return r.active !== t5 && r.visible.some((v) => v.tab === r.active);
+    return r.active !== t5b && r.visible.some((v) => v.tab === r.active);
   }));
 
   // Closing a pane gives its room to its sibling, and its sibling becomes active.
@@ -177,6 +184,20 @@ const { check, fire, regions, settle, until } = lib;
   s = await shown();
   check('its sibling takes its room', near(s[t1].y, three[t1].y) && near(s[t1].y + s[t1].h, three[t3].y + three[t3].h) && near(s[t1].w, three[t1].w), JSON.stringify({ three, s }));
   check('and becomes the active pane', (await regions()).active === t1 && await marked(t1));
+  // A tab a page opens from a pane joins its group in Go, so it is a pane of that window,
+  // beside its opener.
+  const room2 = (await shown())[t2];
+  await fire('open', 'https://opened.test/', { tab: t2 });
+  check('a tab a page opens from a pane joins its window', await until(async () => (await regions()).tabs.length === 4 && (await chips.count()) === 2));
+  const t5 = (await regions()).tabs.find((t) => ![t1, t2, t3, t4].includes(t.id)).id;
+  check('as a pane of the window, in its group', await until(async () => (await showsOnly([t1, t2, t5])) && (await groupOf(t5)) === (await groupOf(t2))), JSON.stringify(await shown()));
+  // The opener is taller than wide, so the new pane goes under it, the two sharing its room.
+  s = await shown();
+  check('under its opener, sharing its room', near(s[t5].x, room2.x) && near(s[t5].w, room2.w) && near(s[t2].y, room2.y) && s[t2].y + s[t2].h <= s[t5].y && near(s[t5].y + s[t5].h, room2.y + room2.h), JSON.stringify({ room2, s }));
+  check('pages inside the frame and apart', await insideAndApart());
+  await title(t5).getByRole('button', { name: /^Close/ }).click();
+  check('closed, the window is as it was', await until(async () => (await regions()).tabs.length === 3 && (await showsOnly([t1, t2]))));
+
   await title(t2).getByRole('button', { name: /^Close/ }).click();
   check('closing the other leaves one pane with the body to itself', await until(async () => JSON.stringify((await shown())[t1]) === JSON.stringify(one)), JSON.stringify({ one, now: await shown() }));
 
@@ -273,6 +294,20 @@ const { check, fire, regions, settle, until } = lib;
   check('Shift+Cmd+] is the next on the strip', await until(async () => (await regions()).active === t4 && (await showsOnly([t4, t8]))));
   await fire('key', 'tab9');
   check('Cmd+9 is the last on the strip, the split\'s new pane', await until(async () => (await regions()).active === t8));
+
+  // Go's groups are the truth: a group ended anywhere, by another shell or a menu, breaks
+  // the window into a window per tab, and a group made of two lone tabs makes them one.
+  const goSend = (msg) => fetch(`${lib.base}/shell/send`, { method: 'POST', body: JSON.stringify(msg) });
+  await goSend({ t: 'ungroup', group: await groupOf(t4) });
+  check('a group ended in Go breaks its window into a window per tab', await until(async () => (await chips.count()) === 3 && !(await groupOf(t4))));
+  check('the active pane shows alone', await until(async () => showsOnly([(await regions()).active])));
+  await goSend({ t: 'createGroup', ids: [t4, t8] });
+  check('a group made in Go of two lone tabs makes them one window', await until(async () => (await chips.count()) === 2 && (await groupOf(t4)) && (await groupOf(t4)) === (await groupOf(t8))));
+  check('its panes side by side', await until(async () => {
+    const v = await shown();
+    return v[t4] && v[t8] && near(v[t4].y, v[t8].y) && v[t4].x + v[t4].w <= v[t8].x;
+  }), JSON.stringify(await shown()));
+  check('pages inside the frame and apart', await insideAndApart());
 
   // The gear at the strip's far end opens the settings page.
   check('settings starts closed', (await regions()).settingsOpen === false);

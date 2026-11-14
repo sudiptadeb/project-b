@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import Pane from './Pane.vue';
 import { save, shift } from './panes.js';
 
-// A node of a group's tree: a pane, or a split's parts with a divider between each two.
+// A node of a window's tree: a pane, or a split's parts with a divider between each two.
 // Dragging a divider moves the share between the parts either side of it.
 const props = defineProps({ node: { type: Object, required: true } });
 

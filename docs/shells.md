@@ -474,17 +474,19 @@ shell's unpainted part; a press in each shown page gives that page the keyboard.
 `terminal`: a minimal shell laid out as a terminal emulator with split panes. Monospace,
 dense and square.
 
-- **Go's tabs are panes, in groups.** One group shows at a time and fills the window. A
-  group is a tree: a split is a row or a column of parts with their shares, a leaf is one
-  tab. The strip on top has a chip per group, with a segment per pane, each the tab's
-  `role="tab"` element, in the order the panes lie on screen. The chips follow Go's order,
-  and the shell keeps Go's order the strip's: a split's new tab, which Go puts at the end
-  of its list, is moved (`moveTab`) beside its pane's, so Cmd+1 to 9 and the next and
-  previous tab keys go where the strip says. New Tab follows the chips, and at the
-  strip's far end are the extensions and a gear that opens settings. Each pane has a title
-  bar with split right, split down and close; a press on it makes the pane active. The
-  prompt line at the foot is the address bar, with back, forward and reload, and the update
-  when one is ready.
+- **Go's tabs are panes, in windows,** as tmux calls them. One window shows at a time and
+  fills the body. **A window is one of Go's tab groups, or a tab in none** (owner,
+  2026-11-14: "panes are a shell feature... termy should use tab groups for split paned
+  tabs"): a split's tabs are a group, so every other shell sees them together. How a
+  window's panes lie is the shell's own, a tree: a split is a row or a column of parts with
+  their shares, a leaf is one tab. The strip on top has a chip per window, with a segment
+  per pane, each the tab's `role="tab"` element, in the order the panes lie on screen. The
+  chips follow Go's order, and the shell keeps Go's order the strip's: a tab Go puts
+  elsewhere is moved (`moveTab`) to its place, so Cmd+1 to 9 and the next and previous tab
+  keys go where the strip says. New Tab follows the chips, and at the strip's far end are
+  the extensions and a gear that opens settings. Each pane has a title bar with split
+  right, split down and close; a press on it makes the pane active. The prompt line at the
+  foot is the address bar, with back, forward and reload, and the update when one is ready.
 - **Its keys are chords, with no prefix key** (owner, 2026-11-14), each one of its own
   actions: Cmd+D splits the active pane right and Shift+Cmd+D down (`terminal.splitRight`,
   `terminal.splitDown`); Ctrl+Cmd and an arrow makes the pane that way active, the nearest
@@ -495,19 +497,26 @@ dense and square.
   pane becomes active, on a split, or when the pane closes, and is kept in the shell's
   data. A pane's title bar has Zoom beside the splits while its group has more than one
   pane; the buttons' titles show the keys.
-- **The active tab is the focused pane,** and the group shown is the one that holds it.
+- **The active tab is the focused pane,** and the window shown is the one that holds it.
   When the active pane closes, by its button or by Go's Close Tab (Cmd+W), the pane that
-  takes its room becomes active, whichever tab Go chose from its own list, so its group
-  stays shown; the body shows that pane's group at once, never Go's choice on the way.
-- **A new tab is a new group,** unless a pane's split asked for it: then it goes beside
-  that pane. Dividers drag to resize, no pane smaller than 80px.
-- **Its own data** is `{groups, zoomed}`, each group's tree and the zoomed pane, naming tabs by id, and nothing Go
-  has. It is fitted to Go's list on the snapshot and on every `tabs`: a tab that is gone
-  leaves its tree, its share going to the part before it; a split left with one part
-  becomes that part.
-- **It leaves out** a prefix key, a key to close a pane other than Cmd+W, dimming the pages of panes that aren't active,
-  dragging panes between groups, broadcasting input, and the notice of the last run's
-  crash.
+  takes its room becomes active, whichever tab Go chose from its own list, so its window
+  stays shown; the body shows that pane's window at once, never Go's choice on the way.
+- **A split** is `newTab` with `groupWith` the pane's tab: Go puts the new tab in that
+  tab's group, starting one of the two when it is in none, and the shell puts its pane
+  beside the one split. **A tab Go puts in a group**, such as one a page opens from a pane,
+  is a pane of that window, beside the tab before it in Go's list: to its right when that
+  pane is wider than tall, else under it. **A tab in no group** is a window of its own. A
+  group ended anywhere breaks its window into a window per tab, as a tab taken out of one
+  leaves it; a group made of lone tabs makes them one window. A window holds one pane
+  when Go ends a group at one tab. Dividers drag to resize, no pane smaller than 80px.
+- **Its own data** is `{windows, zoomed}`, each window's tree and the zoomed pane, naming
+  tabs by id, and nothing Go has. It is fitted to Go's tabs and groups on the snapshot and
+  on every `tabs`: a tab that is gone, or no longer in its window's group, leaves its tree,
+  its share going to the part before it; a split left with one part becomes that part; a
+  tree holding the tabs of two windows keeps the one most of them are in.
+- **It leaves out** a prefix key, a key to close a pane other than Cmd+W, dimming the
+  pages of panes that aren't active, dragging panes between windows, broadcasting input,
+  and the notice of the last run's crash.
 
 ## The fox shell
 

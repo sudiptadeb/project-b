@@ -7,7 +7,7 @@ import { connect, setFrame, state } from '@/sdk/vue.js';
 import { focusToward, follow, heirAsked, load, resizeToward, shown, split, zoom, zoomed } from './panes.js';
 import { prompt } from './prompt.js';
 
-// A terminal's window: a strip of groups on top, the shown group's panes in the body, and
+// A terminal's window: a strip of windows on top, the shown window's panes in the body, and
 // a prompt line at the foot that is the active pane's address bar, inside the window's
 // 4px band.
 setFrame(4);

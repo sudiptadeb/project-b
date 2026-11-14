@@ -1,22 +1,23 @@
-// The terminal shell's own model: Go's tabs are panes, arranged in groups, one group shown
-// at a time. A group is a tree. A node is a pane, {tab}, or a split, {dir, parts, sizes}:
-// a row or a column of parts, each with its share of the split, the shares adding up to 1.
-// The groups are the shell's own data; Go's tab list is the truth they follow.
+// The terminal shell's own model: Go's tabs are panes, arranged in windows, as tmux calls
+// them, one shown at a time. A window is one of Go's tab groups, or a tab in none; how its
+// panes lie is a tree, the shell's own data. A node is a pane, {tab}, or a split, {dir,
+// parts, sizes}: a row or a column of parts, each with its share of the split, the shares
+// adding up to 1. Go's tabs and groups are the truth the trees follow.
 
 import { computed, nextTick, reactive, ref } from 'vue';
 import { saveData, send, state } from '@/sdk/vue.js';
 
-export const groups = reactive([]);
+export const windows = reactive([]);
 
 // The pane a split control asked a new tab to land beside, and which way, until the next
 // new tab arrives.
 let asked = null;
-// The groups as last saved, so an unchanged tree isn't sent again.
+// The windows as last saved, so an unchanged tree isn't sent again.
 let saved = '';
 // The tab that was active when Go's list last came, to tell when the active pane closed.
 let was = 0;
 // The pane the shell asked Go to make active in place of the one that closed, shown at once
-// so the body never shows the group Go chose for a moment; 0 once Go agrees.
+// so the body never shows the window Go chose for a moment; 0 once Go agrees.
 export const heirAsked = ref(0);
 // The pane zoomed to fill the body, 0 for none. Another pane becoming active, a split, or
 // the pane closing ends it.
@@ -31,7 +32,7 @@ export function tabsOf(node) {
   return node.parts ? node.parts.flatMap(tabsOf) : [node.tab];
 }
 
-// The groups in the order of Go's list, each by its first tab there, with its tabs in the
+// The windows in the order of Go's list, each by its first tab there, with its tabs in the
 // order they lie on screen, left to right and top to bottom. The shell moves Go's tabs to
 // that order (order, below), so the strip, Cmd+1 to 9 and the next and previous tab keys
 // all agree.
@@ -39,51 +40,74 @@ export const chips = computed(() => {
   const index = new Map(state.tabs.map((t, i) => [t.id, i]));
   const byId = new Map(state.tabs.map((t) => [t.id, t]));
   const first = (ids) => Math.min(...ids.map((id) => index.get(id)));
-  return groups
+  return windows
     .map((root) => ({ root, ids: tabsOf(root).filter((id) => byId.has(id)) }))
     .filter((c) => c.ids.length)
     .sort((a, b) => first(a.ids) - first(b.ids))
     .map(({ root, ids }) => ({ root, tabs: ids.map((id) => byId.get(id)) }));
 });
 
-// The pane the body shows the group of: the active one, or its heir while Go makes it so.
+// The pane the body shows the window of: the active one, or its heir while Go makes it so.
 export const focused = computed(() => heirAsked.value || state.active);
 
-// The group that holds that pane, the one the body shows.
-export const shown = computed(() => groups.find((root) => tabsOf(root).includes(focused.value)));
+// The window that holds that pane, the one the body shows.
+export const shown = computed(() => windows.find((root) => tabsOf(root).includes(focused.value)));
 
-// load takes the groups from the data Go handed back, none for a new window or a new
+// load takes the windows from the data Go handed back, none for a new window or a new
 // shell, and fits them to Go's tabs.
 export function load(data) {
-  groups.splice(0, groups.length, ...(data ? data.groups : []));
+  windows.splice(0, windows.length, ...(data ? data.windows : []));
   zoomed.value = data?.zoomed || 0;
-  saved = JSON.stringify({ groups, zoomed: zoomed.value });
+  saved = JSON.stringify({ windows, zoomed: zoomed.value });
   was = 0;
   follow();
 }
 
-// follow fits the groups to Go's tabs: a tab Go no longer lists leaves its tree, and a tab
-// the groups lack goes beside the pane a split asked for, or into a group of its own.
+// follow fits the windows to Go's tabs and tab windows. Go says which tabs make a window: a
+// tab group's tabs are one, and a tab in no group is one alone. The trees only lay them
+// out. A tab Go no longer lists, or that left its window's group, leaves its tree; a tab a
+// tree lacks goes into its window's tree beside the pane a split asked for, or beside the
+// tab before it in Go's list, or makes a window of its own. A tree holding the tabs of
+// two windows keeps the window most of them are in, and two trees of one window become
+// one.
 //
 // When the active pane closed, by its button or by Go's own Close Tab, the pane that takes
 // its room becomes active, whatever Go chose from its own list: Go picks a neighbour in
-// its order, which can be in another group.
+// its order, which can be in another window.
 export function follow() {
   const live = new Set(state.tabs.map((t) => t.id));
   const next = was && !live.has(was) ? heir(was, live) : 0;
-  for (let i = groups.length - 1; i >= 0; i--) {
-    const kept = prune(groups[i], live);
-    if (!kept) groups.splice(i, 1);
-    else if (kept !== groups[i]) groups[i] = kept;
+  const home = new Map(state.tabs.map((t) => [t.id, t.group ? `group ${t.group}` : `tab ${t.id}`]));
+  const kept = [];
+  const taken = new Set();
+  for (const root of windows) {
+    const ids = tabsOf(root).filter((id) => live.has(id));
+    const counts = new Map();
+    for (const id of ids) if (!taken.has(home.get(id))) counts.set(home.get(id), (counts.get(home.get(id)) || 0) + 1);
+    let which = null;
+    for (const [k, n] of counts) if (which === null || n > counts.get(which)) which = k;
+    if (which === null) continue;
+    taken.add(which);
+    kept.push(prune(root, new Set(ids.filter((id) => home.get(id) === which))));
   }
-  const placed = new Set(groups.flatMap(tabsOf));
-  for (const t of state.tabs) {
-    if (placed.has(t.id)) continue;
-    if (asked && placed.has(asked.beside)) insert(asked.beside, t.id, asked.dir);
-    else groups.push({ tab: t.id });
-    asked = null;
+  if (kept.length !== windows.length || kept.some((root, i) => root !== windows[i])) windows.splice(0, windows.length, ...kept);
+  const placed = new Set(windows.flatMap(tabsOf));
+  state.tabs.forEach((t, k) => {
+    if (placed.has(t.id)) return;
+    const root = windows.find((r) => home.get(tabsOf(r)[0]) === home.get(t.id));
+    if (!root) {
+      windows.push({ tab: t.id });
+    } else if (asked && tabsOf(root).includes(asked.beside)) {
+      insert(asked.beside, t.id, asked.dir);
+      asked = null;
+    } else {
+      const ids = tabsOf(root);
+      const before = state.tabs.slice(0, k).reverse().find((b) => ids.includes(b.id));
+      const beside = before ? before.id : ids[ids.length - 1];
+      insert(beside, t.id, fit(beside));
+    }
     placed.add(t.id);
-  }
+  });
   if (zoomed.value && zoomed.value !== (next || state.active)) zoomed.value = 0;
   save();
   order();
@@ -133,12 +157,12 @@ function prune(node, live) {
 // insert puts tab beside the pane of beside, after it in a row or under it in a column,
 // the two sharing what beside had.
 function insert(beside, tab, dir) {
-  const i = groups.findIndex((root) => tabsOf(root).includes(beside));
-  if (groups[i].tab === beside) {
-    groups[i] = { dir, parts: [groups[i], { tab }], sizes: [0.5, 0.5] };
+  const i = windows.findIndex((root) => tabsOf(root).includes(beside));
+  if (windows[i].tab === beside) {
+    windows[i] = { dir, parts: [windows[i], { tab }], sizes: [0.5, 0.5] };
     return;
   }
-  const parent = parentOf(groups[i], beside);
+  const parent = parentOf(windows[i], beside);
   const j = parent.parts.findIndex((p) => p.tab === beside);
   const half = parent.sizes[j] / 2;
   if (parent.dir === dir) {
@@ -147,6 +171,13 @@ function insert(beside, tab, dir) {
   } else {
     parent.parts[j] = { dir, parts: [parent.parts[j], { tab }], sizes: [0.5, 0.5] };
   }
+}
+
+// fit is the way a pane is split when nothing asked: beside it when it is wider than tall,
+// else under it; beside it when it isn't on screen.
+function fit(tab) {
+  const r = paneOf(tab)?.getBoundingClientRect();
+  return r && r.height > r.width ? 'column' : 'row';
 }
 
 // parentOf is the split whose parts hold the pane of tab.
@@ -162,9 +193,9 @@ function parentOf(node, tab) {
 
 // heir is the pane that takes the room of tab's when it closes: the nearest pane of the
 // part before it, or after it when it is first, among the tabs still live; failing that,
-// any live pane of its group. 0 for a pane alone in its group.
+// any live pane of its window. 0 for a pane alone in its window.
 function heir(tab, live) {
-  const root = groups.find((r) => tabsOf(r).includes(tab));
+  const root = windows.find((r) => tabsOf(r).includes(tab));
   if (!root) return 0;
   const parent = parentOf(root, tab);
   if (parent) {
@@ -175,12 +206,12 @@ function heir(tab, live) {
   return tabsOf(root).find((id) => live.has(id)) || 0;
 }
 
-// split asks Go for a new tab, to land beside the pane of tab: to its right for 'row',
-// under it for 'column'.
+// split asks Go for a new tab in the tab group of tab, starting one of the two when it is
+// in none, to land beside the pane of tab: to its right for 'row', under it for 'column'.
 export function split(tab, dir) {
   zoomed.value = 0;
   asked = { beside: tab, dir };
-  send({ t: 'newTab' });
+  send({ t: 'newTab', groupWith: tab });
 }
 
 // The move last asked of Go, with its list as it was, so one Go doesn't make isn't asked
@@ -205,16 +236,16 @@ export function close(tab) {
   send({ t: 'closeTab', id: tab });
 }
 
-// save hands Go the groups when they changed.
+// save hands Go the windows when they changed.
 export function save() {
-  const json = JSON.stringify({ groups, zoomed: zoomed.value });
+  const json = JSON.stringify({ windows, zoomed: zoomed.value });
   if (json === saved) return;
   saved = json;
   saveData(JSON.parse(json));
 }
 
 // zoom fills the body with the pane of tab, the active one unless a pane's button says
-// which, or ends the zoom. A pane alone in its group has nothing to zoom over.
+// which, or ends the zoom. A pane alone in its window has nothing to zoom over.
 export function zoom(tab = state.active) {
   if (zoomed.value) zoomed.value = 0;
   else if (shown.value?.parts) zoomed.value = tab;

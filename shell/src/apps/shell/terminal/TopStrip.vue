@@ -4,14 +4,14 @@ import { controlSpace, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { ExtensionsToolbar } from '@extensions';
 import { chips, shown } from './panes.js';
 
-// The title bar: one chip per group, a segment per pane in it. A segment is the pane's tab;
-// pressing it makes that tab active, which shows its group.
+// The title bar: one chip per window, a segment per pane in it. A segment is the pane's tab;
+// pressing it makes that tab active, which shows its window.
 </script>
 
 <template>
   <div v-shell class="strip">
     <div v-drag class="space" :style="{ width: controlSpace.left }"></div>
-    <div class="chips" role="tablist" aria-label="Groups">
+    <div class="chips" role="tablist" aria-label="Windows">
       <div v-for="chip in chips" :key="chip.tabs[0].id" class="chip" :class="{ shown: chip.root === shown }">
         <button
           v-for="tab in chip.tabs"
@@ -84,7 +84,7 @@ import { chips, shown } from './panes.js';
   scrollbar-width: none;
 }
 
-/* A group: its panes side by side, in a hairline box. The shown one is the surface, with
+/* A window: its panes side by side, in a hairline box. The shown one is the surface, with
    the accent along its foot. */
 .chip {
   display: flex;

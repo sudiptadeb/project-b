@@ -49,6 +49,8 @@ class Engine {
     // The visible tab whose page has, or last had, the keyboard here, or 0. The window
     // is titled after it.
     int64_t focused_tab = 0;
+    // Whether the phone's back key goes to the shell first (set_shell_back).
+    bool shell_back = false;
   };
 
   // Makes the profile's context, with Chromium's files in a folder of the profile's.

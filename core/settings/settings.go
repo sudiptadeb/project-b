@@ -135,17 +135,18 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			section = p.section
 		}
 		snapshot := map[string]any{
-			"t":            "snapshot",
-			"windowColor":  m.window.Color(),
-			"controls":     m.window.Controls(w),
-			"cornerRadius": m.window.CornerRadius(w),
-			"tabLayout":    m.prefs.TabLayout(),
-			"theme":        m.prefs.Theme(),
-			"autoUpdate":   m.update.Auto(),
-			"update":       m.update.State(),
-			"running":      m.update.Running(),
-			"keyboard":     m.commands.View(),
-			"flags":        m.flags.View(),
+			"t":                  "snapshot",
+			"windowColor":        m.window.Color(),
+			"controls":           m.window.Controls(w),
+			"cornerRadius":       m.window.CornerRadius(w),
+			"tabLayout":          m.prefs.TabLayout(),
+			"theme":              m.prefs.Theme(),
+			"addressBarPosition": m.prefs.AddressBarPosition(),
+			"autoUpdate":         m.update.Auto(),
+			"update":             m.update.State(),
+			"running":            m.update.Running(),
+			"keyboard":           m.commands.View(),
+			"flags":              m.flags.View(),
 		}
 		snapshot["section"] = section
 		for _, p := range m.parts {
@@ -161,6 +162,8 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.prefs.SetTabLayout(c.Text)
 	case "setTheme":
 		m.prefs.SetTheme(c.Text)
+	case "setAddressBarPosition":
+		m.prefs.SetAddressBarPosition(c.Text)
 	case "setAutoUpdate":
 		m.update.SetAuto(c.On)
 	case "setFrameColor":
@@ -206,6 +209,10 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 // window w's.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+func (m *Manager) AddressBarPositionChanged(at string) {
+	m.sendAll(map[string]any{"t": "addressBarPosition", "addressBarPosition": at})
 }
 
 func (m *Manager) ThemeChanged(theme string) {

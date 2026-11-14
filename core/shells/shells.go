@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -18,6 +19,10 @@ type Shell struct {
 	// Example is a shell that is built and can be loaded, but is offered nowhere: the one
 	// to copy to build another.
 	Example bool `json:"example,omitempty"`
+	// Phone is a shell made for a phone: a phone offers and loads only these, and a desktop
+	// offers none of them, though it loads one named outright, as the mock does for a
+	// phone-sized test.
+	Phone bool `json:"phone,omitempty"`
 	// Actions are the shell's own, such as the terminal's splits. Go registers each with
 	// the others, enabled only while this shell is the profile's; running one sends the
 	// shell action with its id. An id starts with the shell's and a dot.
@@ -30,6 +35,10 @@ type Action struct {
 	ID    string `json:"id"`
 	Title string `json:"title"`
 }
+
+// OnPhone is whether this app runs on a phone. Android is a phone: the app has no tablet
+// layout.
+var OnPhone = runtime.GOOS == "android"
 
 //go:embed registry.json
 var registry []byte
@@ -59,15 +68,32 @@ var all = func() []Shell {
 // All is every shell, in the registry's order.
 func All() []Shell { return append([]Shell(nil), all...) }
 
-// Listed is the shells the user can choose: every one but the examples.
+// Listed is the shells the user can choose: every one made for this kind of device, but
+// the examples.
 func Listed() []Shell {
 	var out []Shell
 	for _, s := range all {
-		if !s.Example {
+		if !s.Example && s.Phone == OnPhone {
 			out = append(out, s)
 		}
 	}
 	return out
+}
+
+// Default is the shell a profile loads until it chooses one: the first the user can
+// choose on this kind of device.
+func Default() string { return Listed()[0].ID }
+
+// Fits says whether a profile whose pref names id loads it. A desktop loads any shell
+// named outright, an example or a phone's; a phone only a phone's, so the desktop's that
+// the profile templates name loads Default there.
+func Fits(id string) bool {
+	for _, s := range all {
+		if s.ID == id {
+			return s.Phone || !OnPhone
+		}
+	}
+	return false
 }
 
 // Has says whether id is a shell's.

@@ -38,6 +38,7 @@ void PBTimelineRecord(int32_t kind,
                       const char* text,
                       size_t text_length);
 void PBTimelinePageOrigin(const char* page, int64_t t);
+void PBFree(void* p);
 
 #ifdef __cplusplus
 }

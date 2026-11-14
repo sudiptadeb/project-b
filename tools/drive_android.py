@@ -120,9 +120,9 @@ def asked(path, timeout=15):
 # tab's page. A node's attributes are Android's: class, text, content-desc (an aria-label),
 # focused, selected, and bounds in device pixels.
 PARTS = {
-    "shell": lambda labels: "Reload" in labels,
+    "shell": lambda labels: "Menu" in labels,
     "settings": lambda labels: "Close settings" in labels,
-    "page": lambda labels: "Reload" not in labels and "Close settings" not in labels,
+    "page": lambda labels: "Menu" not in labels and "Close settings" not in labels,
 }
 
 
@@ -180,6 +180,22 @@ def press(label):
     tap(middle(see("shell", label=label)))
 
 
+def menu(label):
+    """Taps an item of the Mobile shell's menu sheet, which the ⋯ button opens. A tap the
+    shell missed, as it can while it draws again after the GPU process died, is tried once
+    more."""
+    for _ in range(3):
+        press("Menu")
+        if until(lambda: find("shell", label=label), 5) is not None:
+            break
+    press(label)
+
+
+def host(address):
+    """What the Mobile shell's address pill shows of an address at rest: its host."""
+    return re.sub(r"^https?://(www\.)?", "", address).split("/")[0]
+
+
 def key(code):
     adb("shell", "input", "keyevent", str(code))
 
@@ -219,13 +235,15 @@ def launch(block=""):
         args += ["--es", "block", block]
     adb(*args)
     # Content starts in the background, so the window shows before the shell does.
-    see("shell", timeout=60, label="Reload")
+    see("shell", timeout=60, label="Menu")
     # A run that ended in a kill leaves a notice over the top of the page. It is shell, so
     # it would take the touches meant for the page.
-    notice = find("shell", label="Close")
+    # The Mobile shell's has Dismiss.
+    dismiss = lambda: find("shell", label="Close") or find("shell", text="Dismiss")
+    notice = dismiss()
     if notice is not None:
         tap(middle(notice))
-        until(lambda: find("shell", label="Close") is None)
+        until(lambda: dismiss() is None)
 
 
 def processes():
@@ -293,9 +311,9 @@ def check(name, ok, detail=""):
 
 
 def status(url, word):
-    """Waits for the address field to show url, then says whether the shell marks it with
-    this word: Blocked, Failed or Crashed."""
-    see("shell", kind=FIELD, text=url)
+    """Waits for the address pill to show url's host, then says whether the shell marks it
+    with this word: Blocked, Failed or Crashed."""
+    see("shell", kind=FIELD, text=host(url))
     return until(lambda: find("shell", text=word) is not None)
 
 
@@ -338,32 +356,34 @@ def browsing():
     check("a tap on a link in the page reaches the page", asked("/b"))
     shot("03-link-tapped")
 
-    # Back, forward, reload through the shell's own buttons.
+    # Back, forward, reload through the shell's menu sheet.
     served.clear()
-    press("Back")
+    menu("Back")
     check("back returns to the page before", asked("/a"), str(served))
     served.clear()
-    press("Forward")
+    menu("Forward")
     check("forward returns to the page after", asked("/b"), str(served))
     served.clear()
-    press("Reload")
+    menu("Reload")
     check("reload asks the server again", asked("/b"), str(served))
     check("an emoji in a title reaches Go whole", until(lambda: history_title(url("/b")) == "Page B \U0001F642"),
           repr(history_title(url("/b"))))
 
-    # Tabs: New Tab is in the drawer, and the strip under the toolbar has an icon per tab.
-    press("Show sidebar")
-    tap(middle(see("shell", kind="android.widget.Button", text="New Tab")))
+    # Tabs: New Tab is in the menu, the count opens the switcher, a card per tab.
+    menu("New Tab")
     see("shell", kind=FIELD, text="", focused="true")
     go(BASE + "/c")
-    check("New Tab in the drawer opens a tab, and the strip shows it as the one in front",
-          asked("/c") and until(lambda: find("shell", label="Page C", selected="true")) is not None)
-    shot("06b-two-tabs")
-    tap(middle(see("shell", label="Page B \U0001F642")))
-    check("a tap on a tab's icon in the strip shows that tab", until(lambda: find("shell", kind=FIELD, text=url("/b"))) is not None)
+    check("New Tab in the menu opens a tab", asked("/c"))
+    press("Tabs")
+    check("the count opens the switcher, a card per tab", until(lambda: find("shell", label="Close Page C")) is not None and
+          find("shell", label="Close Page B \U0001F642") is not None)
+    shot("06b-switcher")
+    served.clear()
+    tap(middle(see("shell", text="Page B \U0001F642")))
+    check("a tap on a card shows that tab", until(lambda: find("page", text="b")) is not None and find("shell", label="Close Page C") is None)
 
     # Settings is a page of its own over the window.
-    press("Settings")
+    menu("Settings")
     check("the settings button opens settings over the window", until(lambda: find("settings", label="Close settings")) is not None)
     shot("06c-settings")
     key(4)
@@ -399,6 +419,11 @@ def browsing():
     adb("shell", "input", "swipe", str(across), str(top + high * 3 // 4), str(across), str(top + high // 4), "300")
     check("a swipe scrolls the page under the shell", asked("/scrolled"), str(served[:3]))
     shot("10-scrolled")
+    check("scrolling down, the shell's bars give the page their room", until(lambda: box(see("page"))[3] > bottom + 100) is not None,
+          "%d then %d" % (bottom, box(see("page"))[3]))
+    shot("10a-bars-away")
+    adb("shell", "input", "swipe", str(across), str(top + high // 4), str(across), str(top + high * 3 // 4), "300")
+    check("scrolling back up brings them back", until(lambda: box(see("page"))[3] == bottom) is not None, "%d then %d" % (bottom, box(see("page"))[3]))
 
     # Typing into a page goes through the keyboard to the page, not the shell.
     go(BASE + "/input")
@@ -452,6 +477,77 @@ def browsing():
     shot("14-failed")
 
 
+def long_press(point):
+    adb("shell", "input", "swipe", str(point[0]), str(point[1]), str(point[0]), str(point[1]), "1000")
+
+
+def mobile_shell():
+    """The Mobile shell's own: the back key closes each of its sheets; a long press on a link
+    opens its menu, whose Open in new tab in group gathers the tabs in the strip behind the
+    page being read; and each screen in light and dark, for the owner."""
+    launch()
+    go(BASE + "/a")
+    asked("/a")
+    press("Tabs")
+    see("shell", label="Close Page A")
+    key(4)
+    check("the back key closes the switcher", bool(until(lambda: find("shell", label="Close Page A") is None)))
+    press("Menu")
+    see("shell", label="Settings")
+    key(4)
+    check("the back key closes the menu", bool(until(lambda: find("shell", label="Settings") is None)))
+    tap(middle(see("shell", kind=FIELD)))
+    see("shell", kind=FIELD, focused="true")
+    key(4)  # The keyboard goes first.
+    key(4)
+    check("the back key ends editing the address", bool(until(lambda: find("shell", kind=FIELD, focused="true") is None)))
+
+    long_press(middle(see("page", label="to b")))
+    item = see("shell", text="Open in new tab in group")
+    check("a long press on a link opens the shell's menu, Open in new tab in group first", item is not None)
+    shot("20-link-menu")
+    key(4)
+    check("the back key closes it", bool(until(lambda: find("shell", text="Open in new tab in group") is None)))
+    served.clear()
+    long_press(middle(see("page", label="to b")))
+    tap(middle(see("shell", text="Open in new tab in group")))
+    check("Open in new tab in group opens the link behind the page, and the strip shows the group",
+          asked("/b") and until(lambda: find("shell", label=lambda l: (l or "").startswith("Group "))) is not None
+          and find("page", label="to b") is not None)
+    shot("21-strip")
+    tap(middle(see("shell", label="Go to Page B \U0001F642")))
+    check("a tap on a favicon in the strip shows that tab", until(lambda: find("page", text="b")) is not None)
+
+    # Each screen in light and dark, the theme chosen in settings.
+    for scheme in ("light", "dark"):
+        menu("Settings")
+        tap(middle(see("settings", text=scheme.capitalize())))
+        key(4)
+        until(lambda: "settings" not in screen_parts())
+        time.sleep(1)
+        shot("30-page-" + scheme)
+        press("Tabs")
+        see("shell", label="New Tab")
+        shot("31-switcher-" + scheme)
+        key(4)
+        press("Menu")
+        see("shell", label="Settings")
+        shot("32-menu-" + scheme)
+        key(4)
+        tap(middle(see("shell", kind="android.widget.Button", label=lambda l: (l or "").startswith("Group "))))
+        see("shell", text="Ungroup")
+        shot("33-group-" + scheme)
+        key(4)
+        type_in_bar("page")
+        see("shell", text=lambda shown: (shown or "").startswith("Page"))
+        shot("34-suggestions-" + scheme)
+        key(4)
+        key(4)
+    menu("Settings")
+    tap(middle(see("settings", text="System")))
+    key(4)
+
+
 def history_after_a_restart():
     launch()
     type_in_bar("page")
@@ -489,7 +585,7 @@ def the_page_renderer_dies():
     check("a page whose renderer died is marked Crashed, and the app lives", status(url("/a"), "Crashed") and alive())
     shot("16-after-page-renderer-kill")
     served.clear()
-    press("Reload")
+    menu("Reload")
     check("reload recovers after a crash", asked("/a"), str(served))
     shot("17-reloaded-after-crash")
 
@@ -507,7 +603,7 @@ def the_shell_renderer_dies():
     if not alive():
         return
     served.clear()
-    press("Reload")
+    menu("Reload")
     check("the shell works again after its renderer died", asked("/a"), str(served))
 
 
@@ -522,7 +618,7 @@ def the_gpu_process_dies():
     until(lambda: privileged() - before)
     shot("17c-after-gpu-kill")
     served.clear()
-    press("Reload")
+    menu("Reload")
     check("the app works after the GPU process died", asked("/a"), str(served))
     shot("17d-reload-after-gpu-kill")
 
@@ -561,7 +657,7 @@ def main():
     adb("shell", "pm", "clear", PACKAGE)
 
     # Each part starts the app again, so one that the app doesn't survive costs only itself.
-    for part in (browsing, history_after_a_restart, where_go_runs, the_page_renderer_dies, the_shell_renderer_dies,
+    for part in (browsing, mobile_shell, history_after_a_restart, where_go_runs, the_page_renderer_dies, the_shell_renderer_dies,
                  the_gpu_process_dies, a_page_spins, the_real_web):
         try:
             part()

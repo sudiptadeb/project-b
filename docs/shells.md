@@ -96,7 +96,7 @@ gives the page the same two.
 | `t` | Carries | When |
 |---|---|---|
 | `snapshot` | Everything below at once, and `data` | In answer to `ready` |
-| `tabs` | `tabs`, `active`: this window's tabs in order, and the active one's id | Tabs open, close, move, or another becomes active |
+| `tabs` | `tabs`, `active`, `groups`: this window's tabs in order, the active one's id, and its tab groups | Tabs open, close, move, another becomes active, or a group changes |
 | `tab` | `tab`: one tab's new state | Its title, address, loading, favicon or history changed |
 | `theme` | `theme`: `system`, `light` or `dark` | The pref changed |
 | `windowColor` | `windowColor`: `#rrggbb` | The frame colour changed |
@@ -106,14 +106,19 @@ gives the page the same two.
 | `update` | `update`: what the updater is doing | It changed |
 | `crashLog` | `crashLog`, `crashReport` | The notice of the last run's crash was closed |
 | `tabLayout` | `tabLayout` | The standard shell's tab position changed |
+| `addressBarPosition` | `addressBarPosition`: `bottom` or `top` | The Mobile shell's address bar moved, from settings on a phone |
 | `focusAddressBar` | | The user asked for the address bar |
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
+| `contextMenu` | `tab`, `x`, `y`, `link`, `linkText`, `src`, `media`, `selection` | A long press or a right click in a tab's page was on a link or an image (content's `HandleContextMenu`, which Go answers as handled, so the shell draws the menu); `media` is `image`, `video` and so on |
+| `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
+| `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
 
 A tab is `{id, url, title, loading, progress, blocked, crashed, error, favicon, canGoBack,
-canGoForward, workspace}`. The snapshot also has `running` (the version), `platform`
+canGoForward, workspace, group}`, `group` the id of its tab group, absent when it is in
+none. The snapshot also has `running` (the version), `platform`
 (`mac`, as the keymap names it) and `data`, and `extensions` only while their flag is on.
 
 - `controls` is `{x, y, w, h}`, where the native window buttons are, zero size when there
@@ -128,6 +133,9 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
   changed it. The workspace messages are the settings page's, and keep its rules: a name
   no other workspace has, whatever its case, and never deleting the last. A shell names
   the workspace by `workspace`, as `newTab` does, where the settings page says `id`.
+- `groups` is each of the window's tab groups, `{id, name, color, collapsed, tabs}`, in the
+  order they were made, `tabs` its tabs' ids in the group's own order
+  ([groups.md](groups.md)).
 - `suggestions` has the `id` the shell asked with and `items`, each `{url, title}`.
 - `extensions` is `{buttons, popup, prompt}`. A button is `{id, name, title, icon, badge,
   badgeColor, badgeTextColor, enabled, pinned}`, in the order the menu lists them; `popup`
@@ -142,12 +150,16 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH`, `frame` | The regions, the pages shown, and the band. Below. The SDK sends it |
-| `newTab` | `workspace`, optional: a workspace's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab |
+| `newTab` | `workspace`, optional: a workspace's id; or `groupWith`, a tab's id; optional `text` and `background` | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab. With `groupWith`, in that tab's workspace and group, starting a group of the two when it has none. With `text`, the tab goes there, an address or a search; with `background`, it opens behind the active tab, as a link opened in a new tab does |
 | `createWorkspace` | `text`, `color` | Makes a workspace with that name and `#rrggbb` colour, at the end of the list |
 | `renameWorkspace` | `workspace`, `text` | Renames a workspace, by its id |
 | `editWorkspace` | `workspace`, `text`, `color` | Renames and recolours a workspace together; a name refused changes neither |
 | `moveWorkspace` | `workspace`, `by`: -1 or 1 | Moves a workspace one place up or down the list |
 | `deleteWorkspace` | `workspace` | Deletes a workspace: Go takes it out of the list, gives a window whose every tab is in it a new tab in the first workspace, closes its tabs in every window, and erases its storage. The last one is refused |
+| `createGroup` | `ids`, optional `name` and `color` | Makes a group of the tabs: the first's window and workspace, and the rest that share them |
+| `addToGroup`, `removeFromGroup` | `id`, and `group` to add to | Puts a tab in a group, or takes it out |
+| `editGroup` | `group`, and any of `name`, `color`, `collapsed` | Changes what is sent |
+| `ungroup`, `closeGroup` | `group` | Ends a group, its tabs staying; or closes its tabs |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |
@@ -160,6 +172,8 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `data` | `data`: any JSON | Replaces this window's copy of the shell's own data |
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
+| `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
+| `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
 | `extensionClick` | `extension`, `rect` | A press on an extension's button at `rect`: Go opens its popup under it, closes it when it is the one open, or tells the extension it was clicked |
 | `extensionPin` | `extension`, `on` | Puts the extension's button on the toolbar, or takes it off |
 | `extensionsManage` | | Opens settings at its Extensions section |
@@ -240,7 +254,11 @@ The check holds every shell to these, knowing nothing else about it.
 3. The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of
    this window.
 4. **Each tab of the window is an element with `role="tab"` and `data-tab="<id>"`,** the
-   active one with `aria-selected="true"`. A click on it makes that tab active.
+   active one with `aria-selected="true"`. A click on it makes that tab active. It may
+   lie in a sheet one of the shell's controls opens, as a phone's tab switcher does: it is
+   always in the document, hidden while the sheet is closed. Tabs in a group
+   ([groups.md](groups.md)) are no different: a shell that draws no groups lists them as
+   any other, and every tab stays one click or one sheet away.
 5. **`focusAddressBar` puts the keyboard in the field named Address,** where an address
    and Enter take the active tab there.
 6. **Every control it draws is the shell's,** a control as `@/sdk/controls.js` says: it
@@ -437,6 +455,55 @@ address field, and a menu button at the far right, in our tones.
 - **Left out:** dragging tabs to reorder or tear off, pinned tabs, a tab's context menu,
   a bookmarks bar, a sidebar, customising the toolbar, and print and find in the menu,
   which have no action yet.
+
+## The mobile shell
+
+`mobile`: the phone's shell, in Svelte, everything at the thumb. Its guideline is
+`project-b-research/mobile-shell/spec.md`.
+
+- **The registry marks it `"phone": true`.** A phone offers and loads only phone shells,
+  so it starts on Mobile even where a profile's pref names `standard`, as the templates do;
+  a desktop offers none, though it loads one named outright, as the mock does for the
+  shell's tests in a phone-sized window.
+- **One bar at the foot, 48px:** the address pill, which shows the host and the lock and
+  becomes the field when tapped, with the suggestions over it, the closest nearest the
+  thumb; the tab count, which opens the switcher; and ⋯, the menu sheet. A swipe along
+  the bar goes to the tab before or after. Back is the phone's back key, and in the menu
+  while there is somewhere to go back to. While a sheet is open or the address is
+  edited, the back key closes that first (`backCloses`).
+- **A long press on a link** in the page opens the shell's sheet for it, since a phone
+  has no menu of its own: Open in new tab in group first, as Chrome has it, then Open in
+  new tab, Open in workspace, and Copy link; on an image, Open image in new tab and Copy
+  image address. Tabs opened from it open behind, so the group's strip gathers them while
+  the user reads on. A long press on text keeps Android's own selection.
+- **The pill's end** says Blocked, Crashed or Failed when the page is, as the standard
+  shell's address bar does.
+- **The switcher** lies over the page, the bar still under it: a card per tab in two
+  columns, the workspaces as chips that choose which cards show and where + opens a tab.
+  Its cards are the tabs' `role="tab"` elements, kept in the document while it is closed.
+  Closing the last tab leaves a new one: the window never has none.
+- **Tab groups** are Go's ([groups.md](groups.md)). While the active tab is in one, a strip
+  of 44px over the bar shows the group: its dot, which opens the group's sheet (name,
+  colour, its tabs, New tab, Ungroup, Close group with a confirm), its tabs' favicons, the
+  active one with an ×, and + for a new tab in it. A long press on a favicon closes its tab.
+  In the switcher a group is one card, its colour along the top and its tabs' favicons in
+  it, which are their `role="tab"` elements. A long press on a card opens its menu: Add to
+  group (the groups of its workspace, or a new one with a new tab), Remove from group,
+  Close. Held and dragged onto another card, a card joins that card's group or starts one
+  with it; swiped sideways, it closes. A swipe along the bar stays in the group.
+- **The menu sheet:** Back, Forward, Reload or Stop, New tab, New tab in group while the
+  tab is in one; then Workspaces (where new
+  tabs open), Extensions while their flag is on, the update when one is ready, and
+  Settings.
+- **The address bar on top** is a setting, `addressBarPosition`, in Settings, General on a
+  phone: the bar moves under the status bar, the suggestions grow down from it, and the
+  group strip stays at the foot, as Chrome's does. Sheets stay at the foot.
+- **The bars hide on scroll.** While the active tab's page scrolls down, the toolbar and
+  the strip slide off the screen in 150ms, and then give their room to the page: one
+  layout, so the page is resized once, not every frame. They come back when it scrolls
+  up, for another tab, the address, or a sheet. With reduced motion they don't slide.
+- **The band:** none. A desktop window's buttons, as on the mock, get a strip of their
+  own above the page, which a phone has no need of.
 
 ## Not in this step
 

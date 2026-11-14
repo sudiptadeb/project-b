@@ -38,6 +38,7 @@ static inline void call_set_window_layout(const PBEngineCalls* c, int64_t window
 static inline void call_focus_tab(const PBEngineCalls* c, int64_t tab) { c->focus_tab(tab); }
 static inline void call_focus_shell(const PBEngineCalls* c, int64_t window) { c->focus_shell(window); }
 static inline void call_send_to_shell(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_shell(window, json, length); }
+static inline void call_set_shell_back(const PBEngineCalls* c, int64_t window, int on) { c->set_shell_back(window, on); }
 static inline void call_set_hook_subscribed(const PBEngineCalls* c, int32_t hook, int on) { c->set_hook_subscribed(hook, on); }
 static inline void call_post_wakeup(const PBEngineCalls* c) { c->post_wakeup(); }
 static inline void native_nil_deref(void) { *(volatile int*)0 = 1; }
@@ -231,6 +232,14 @@ func (e *nativeEngine) withLayout(l engine.WindowLayout, call func(*C.PBWindowLa
 func (e *nativeEngine) FocusTab(tab engine.TabID) { C.call_focus_tab(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) FocusShell(w engine.WindowID) { C.call_focus_shell(e.calls, C.int64_t(w)) }
+
+func (e *nativeEngine) SetShellBack(w engine.WindowID, on bool) {
+	n := 0
+	if on {
+		n = 1
+	}
+	C.call_set_shell_back(e.calls, C.int64_t(w), C.int(n))
+}
 
 func (e *nativeEngine) SendToShell(w engine.WindowID, msg []byte) {
 	if len(msg) == 0 {
@@ -507,6 +516,12 @@ func PBGoStats() *C.char {
 	})
 	return C.CString(string(b))
 }
+
+// PBFree frees a string Go returned, for the engine, whose own free may be another
+// allocator's.
+//
+//export PBFree
+func PBFree(p unsafe.Pointer) { C.free(p) }
 
 // PBVersion is what --version prints first: the release this build is, or "development
 // build" for one that isn't a release. The caller frees the string.

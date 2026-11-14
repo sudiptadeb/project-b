@@ -25,6 +25,19 @@ type command struct {
 	// Workspace is where newTab opens its tab, by the workspace's id. Without it the tab
 	// opens in the workspace of the window's active tab, or the first in a window with none.
 	Workspace *string `json:"workspace"`
+	// The tab groups' (tabs/groups.go): GroupWith is the tab newTab opens beside in its
+	// group; Group a group's id; IDs the tabs createGroup groups; and what editGroup
+	// changes, each only when sent.
+	GroupWith engine.TabID   `json:"groupWith"`
+	Group     string         `json:"group"`
+	IDs       []engine.TabID `json:"ids"`
+	Name      *string        `json:"name"`
+	Color     *string        `json:"color"`
+	Collapsed *bool          `json:"collapsed"`
+	On        bool           `json:"on"`
+	// Background opens newTab's tab behind the active one, as a link opened in a new
+	// tab is.
+	Background bool `json:"background"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -115,21 +128,23 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "ready":
 		m.heard[w] = true
 		snapshot := map[string]any{
-			"t":            "snapshot",
-			"tabs":         m.tabs.AllIn(w),
-			"active":       m.tabs.ActiveIn(w),
-			"windowColor":  m.window.Color(),
-			"controls":     m.window.Controls(w),
-			"cornerRadius": m.window.CornerRadius(w),
-			"tabLayout":    m.prefs.TabLayout(),
-			"theme":        m.prefs.Theme(),
-			"update":       m.update.State(),
-			"running":      m.update.Running(),
-			"crashLog":     m.crash.Last(),
-			"crashReport":  m.crash.Report(),
-			"platform":     m.os,
-			"keys":         m.keys(),
-			"data":         m.data[w],
+			"t":                  "snapshot",
+			"tabs":               m.tabs.AllIn(w),
+			"active":             m.tabs.ActiveIn(w),
+			"groups":             m.tabs.GroupsIn(w),
+			"windowColor":        m.window.Color(),
+			"controls":           m.window.Controls(w),
+			"cornerRadius":       m.window.CornerRadius(w),
+			"tabLayout":          m.prefs.TabLayout(),
+			"theme":              m.prefs.Theme(),
+			"addressBarPosition": m.prefs.AddressBarPosition(),
+			"update":             m.update.State(),
+			"running":            m.update.Running(),
+			"crashLog":           m.crash.Last(),
+			"crashReport":        m.crash.Report(),
+			"platform":           m.os,
+			"keys":               m.keys(),
+			"data":               m.data[w],
 		}
 		for _, p := range m.parts {
 			p.Snapshot(snapshot)
@@ -154,18 +169,51 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.tabs.Reload()
 	case "newTab":
 		m.Interaction(w, "tab.new", func() {
-			if c.Workspace == nil {
-				m.tabs.Create(w)
-			} else {
-				m.tabs.CreateIn(w, *c.Workspace)
+			var id engine.TabID
+			switch {
+			case c.GroupWith != 0:
+				id = m.tabs.CreateWith(c.GroupWith, !c.Background)
+			case c.Workspace == nil:
+				// The active tab's workspace, or the first when the window has no tab.
+				workspace := m.tabs.FirstWorkspace()
+				if active, ok := m.tabs.Get(m.tabs.ActiveIn(w)); ok {
+					workspace = active.Workspace
+				}
+				id = m.tabs.Add(w, workspace, !c.Background)
+			default:
+				id = m.tabs.Add(w, *c.Workspace, !c.Background)
+			}
+			// With text, the new tab goes there: an address or a search.
+			if c.Text != "" {
+				m.tabs.Load(id, tabs.NormalizeInput(c.Text))
 			}
 		})
 	case "closeTab":
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":
 		m.Interaction(w, "tab.activate", func() { m.tabs.Activate(engine.TabID(c.ID)) })
+	case "createGroup":
+		m.tabs.CreateGroup(c.IDs, derefOr(c.Name), derefOr(c.Color))
+	case "addToGroup":
+		m.tabs.AddToGroup(engine.TabID(c.ID), c.Group)
+	case "removeFromGroup":
+		m.tabs.RemoveFromGroup(engine.TabID(c.ID))
+	case "editGroup":
+		m.tabs.EditGroup(c.Group, c.Name, c.Color, c.Collapsed)
+	case "ungroup":
+		m.tabs.Ungroup(c.Group)
+	case "closeGroup":
+		m.Interaction(w, "tab.close", func() { m.tabs.CloseGroup(c.Group) })
 	case "setTabLayout":
 		m.SwitchTabLayout(c.Text)
+	case "setAddressBarPosition":
+		m.prefs.SetAddressBarPosition(c.Text)
+	case "backCloses":
+		m.eng.SetShellBack(w, c.On)
+	case "backKey":
+		// The phone's back key, which the engine reports on this channel while the shell
+		// said it closes something: the shell hears it.
+		m.send(w, map[string]any{"t": "backKey"})
 	case "run":
 		m.run(c.Text)
 	case "relaunch":
@@ -217,7 +265,7 @@ func (m *Manager) TabChanged(t tabs.Tab) {
 // TabsChanged tells each window's shell which tabs it has now and which is active.
 func (m *Manager) TabsChanged() {
 	for _, w := range m.window.Windows() {
-		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w)})
+		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w), "groups": m.tabs.GroupsIn(w)})
 	}
 }
 
@@ -229,6 +277,26 @@ func (m *Manager) ThemeChanged(theme string) {
 // TabLayoutChanged tells the shells where the tabs go now.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+// ContextMenu tells a tab's shell what a long press in its page was on.
+func (m *Manager) ContextMenu(tab engine.TabID, cm engine.ContextMenu) {
+	m.send(m.tabs.WindowOf(tab), map[string]any{"t": "contextMenu", "tab": tab, "x": cm.X, "y": cm.Y, "link": cm.Link,
+		"linkText": cm.LinkText, "src": cm.Src, "media": cm.Media, "selection": cm.Selection})
+}
+
+// ScrollDirectionChanged tells a tab's shell its page began to scroll down, or up.
+func (m *Manager) ScrollDirectionChanged(tab engine.TabID, down bool) {
+	direction := "up"
+	if down {
+		direction = "down"
+	}
+	m.send(m.tabs.WindowOf(tab), map[string]any{"t": "scroll", "tab": tab, "direction": direction})
+}
+
+// AddressBarPositionChanged tells the shells where a phone shell's address bar goes now.
+func (m *Manager) AddressBarPositionChanged(at string) {
+	m.sendAll(map[string]any{"t": "addressBarPosition", "addressBarPosition": at})
 }
 
 // UpdateChanged tells the shells what the updater is doing: nothing, checking,
@@ -308,4 +376,12 @@ func (m *Manager) ForgetData() { clear(m.data) }
 func (m *Manager) WindowClosed(w engine.WindowID) {
 	delete(m.heard, w)
 	delete(m.data, w)
+}
+
+// derefOr is what s points at, or "" for nil.
+func derefOr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

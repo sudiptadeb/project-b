@@ -13,6 +13,7 @@
 #include "net/http/http_response_headers.h"
 #include "components/input/native_web_keyboard_event.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/context_menu_params.h"
 #include "content/public/browser/cookie_access_details.h"
 #include "content/public/browser/focused_node_details.h"
 #include "content/public/browser/global_request_id.h"
@@ -79,6 +80,18 @@ void Pack(Args& args, const content::BrowserContext* const_v) {
   }
   args.Bool(v->IsOffTheRecord());
   args.Str(v->GetPath().value());
+}
+
+void Pack(Args& args, const content::ContextMenuParams& v) {
+  args.Int(v.x);
+  args.Int(v.y);
+  args.Str(v.page_url.spec());
+  args.Str(v.link_url.spec());
+  args.Str(base::UTF16ToUTF8(v.link_text));
+  args.Str(v.src_url.spec());
+  args.Int(static_cast<int>(v.media_type));
+  args.Str(base::UTF16ToUTF8(v.selection_text));
+  args.Bool(v.is_editable);
 }
 
 void Pack(Args& args, const content::CookieAccessDetails& v) {
@@ -1840,6 +1853,20 @@ bool WebContentsDelegateHooks::GuestSaveFrame(content::WebContents* guest_web_co
     }
   }
   return content::WebContentsDelegate::GuestSaveFrame(guest_web_contents);
+}
+
+bool WebContentsDelegateHooks::HandleContextMenu(content::RenderFrameHost& render_frame_host, const content::ContextMenuParams& params) {
+  if (hooks::Subscribed(hooks::kWebContentsDelegate_HandleContextMenu)) {
+    hooks::Args args;
+    hooks::Pack(args, hook_contents());
+    hooks::Pack(args, &render_frame_host);
+    hooks::Pack(args, params);
+    PBValue result;
+    if (hooks::Ask(hooks::kWebContentsDelegate_HandleContextMenu, args, &result)) {
+      return result.i != 0;
+    }
+  }
+  return content::WebContentsDelegate::HandleContextMenu(render_frame_host, params);
 }
 
 void WebContentsDelegateHooks::HandleDragEnded() {

@@ -133,6 +133,9 @@ android_assets("assets") {
     "../../shell/dist/shell/example/index.html",
     "../../shell/dist/shell/example/example.css",
     "../../shell/dist/shell/example/example.js",
+    "../../shell/dist/shell/mobile/index.html",
+    "../../shell/dist/shell/mobile/mobile.css",
+    "../../shell/dist/shell/mobile/mobile.js",
   ]
   renaming_destinations = [
     "shell/settings/index.html",
@@ -144,6 +147,9 @@ android_assets("assets") {
     "shell/shell/example/index.html",
     "shell/shell/example/example.css",
     "shell/shell/example/example.js",
+    "shell/shell/mobile/index.html",
+    "shell/shell/mobile/mobile.css",
+    "shell/shell/mobile/mobile.js",
   ]
   disable_compression = true
   deps = [

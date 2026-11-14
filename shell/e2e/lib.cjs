@@ -99,15 +99,16 @@ lib.watch = (page, errors) => {
 };
 
 // openWindow opens one of Go's windows in a page of browser, the OS window: the shell in a
-// frame, and a mock page for each tab the layout shows (core/cmd/dev/window.html). It has
+// frame, and a mock page for each tab the layout shows (core/cmd/dev/window.html); with
+// hasTouch, a touch screen's, as a phone's is. It has
 //
 //   page          the window, whose mouse, keyboard and screenshots are the window's
 //   ui            a locator into the shell's frame, which survives it loading again
 //   shell()       the shell's frame itself, to evaluate in
 //   mockPage(t)   a locator into the mock page of tab t
 //   errors        every error the window and its frames logged
-lib.openWindow = async (browser, { window = 1, viewport = { width: 1100, height: 700 } } = {}) => {
-  const page = await browser.newPage({ viewport });
+lib.openWindow = async (browser, { window = 1, viewport = { width: 1100, height: 700 }, hasTouch = false } = {}) => {
+  const page = await browser.newPage({ viewport, hasTouch });
   const errors = [];
   lib.watch(page, errors);
   await page.goto(`${lib.base}/?window=${window}`);

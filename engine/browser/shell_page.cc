@@ -225,7 +225,11 @@ class AppDataSource : public content::URLDataSource {
     base::File asset(
         base::android::OpenApkAsset("assets/shell/" + name, &region));
     base::MemoryMappedFile mapped;
-    CHECK(mapped.Initialize(std::move(asset), region));
+    // A file the APK doesn't hold is a page's 404, as a missing one is on the Mac.
+    if (!asset.IsValid() || !mapped.Initialize(std::move(asset), region)) {
+      std::move(callback).Run(nullptr);
+      return;
+    }
     std::string data(base::as_string_view(mapped.bytes()));
     std::move(callback).Run(
         base::MakeRefCounted<base::RefCountedString>(std::move(data)));

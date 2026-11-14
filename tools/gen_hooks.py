@@ -135,6 +135,19 @@ COPIERS = {
         ("HasPostData", "bool", "v->GetHasPostData()"),
         ("Timestamp", "base::Time", "v->GetTimestamp()"),
     ]),
+    # What a long press or a right click in a page was on: a link, an image, a selection.
+    "content::ContextMenuParams": dict(include="content/public/browser/context_menu_params.h", fields=[
+        ("X", "int", "v.x"),
+        ("Y", "int", "v.y"),
+        ("PageURL", "str", "v.page_url.spec()"),
+        ("LinkURL", "str", "v.link_url.spec()"),
+        ("LinkText", "str", "base::UTF16ToUTF8(v.link_text)"),
+        ("SrcURL", "str", "v.src_url.spec()"),
+        # blink::mojom::ContextMenuDataMediaType: 0 none, 1 image, 2 video, 3 audio, ...
+        ("MediaType", "int", "static_cast<int>(v.media_type)"),
+        ("SelectionText", "str", "base::UTF16ToUTF8(v.selection_text)"),
+        ("IsEditable", "bool", "v.is_editable"),
+    ]),
     "content::SiteInstance": dict(ptr=True, include="content/public/browser/site_instance.h", fields=[
         ("ID", "int", "v->GetId().value()"),
     ]),

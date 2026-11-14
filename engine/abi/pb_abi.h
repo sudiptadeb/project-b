@@ -215,6 +215,9 @@ typedef struct PBEngineCalls {
   void (*focus_tab)(int64_t tab);
   void (*focus_shell)(int64_t window);
   void (*send_to_shell)(int64_t window, const char* json, size_t length);
+  // Whether the phone's back key goes to the shell first: while on, the window reports
+  // the key on the shell's channel as {"t":"backKey"}. Only Android has the key.
+  void (*set_shell_back)(int64_t window, int on);
   // A window's settings page, over the whole window in its own page while open.
   void (*open_settings)(int64_t window);
   void (*close_settings)(int64_t window);
@@ -301,6 +304,10 @@ typedef struct PBGoCalls {
                           size_t text_length);
   // The moment one of our pages' own clock started, by its channel's name.
   void (*timeline_page_origin)(const char* page, int64_t t);
+
+  // Frees a string Go returned, with the allocator that made it: Go's C library's. The
+  // content library's own free is Chromium's allocator on Android, which can't.
+  void (*free)(void* p);
 } PBGoCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_ABI_H_

@@ -36,6 +36,7 @@ type DelegateHooks struct {
 	answerGetTopControlsMinHeight                            func(tab WebContents) (int64, bool)
 	answerGetVirtualKeyboardHeight                           func(tab WebContents, webContents WebContents) (int64, bool)
 	answerGuestSaveFrame                                     func(tab WebContents, guestWebContents WebContents) (bool, bool)
+	answerHandleContextMenu                                  func(tab WebContents, renderFrameHost RenderFrameHost, params ContextMenuParams) (bool, bool)
 	onHandleDragEnded                                        []func(tab WebContents)
 	answerHandleKeyboardEvent                                func(tab WebContents, source WebContents, event NativeWebKeyboardEvent) (bool, bool)
 	answerIsBackForwardCacheSupported                        func(tab WebContents, webContents WebContents) (bool, bool)
@@ -310,6 +311,16 @@ func (c *DelegateHooks) AnswerGetVirtualKeyboardHeight(f func(tab WebContents, w
 func (c *DelegateHooks) AnswerGuestSaveFrame(f func(tab WebContents, guestWebContents WebContents) (bool, bool)) {
 	c.hooks.subscribe(DelegateGuestSaveFrame)
 	c.answerGuestSaveFrame = f
+}
+
+// HandleContextMenu: Asks the delegate to open/show the context menu based on `params`. The
+// `render_frame_host` represents the frame that requests the context menu (typically
+// this frame is focused, but this is not necessarily the case - see
+// https://crbug.com/1257907#c14). Returns true if the context menu operation was
+// handled by the delegate.
+func (c *DelegateHooks) AnswerHandleContextMenu(f func(tab WebContents, renderFrameHost RenderFrameHost, params ContextMenuParams) (bool, bool)) {
+	c.hooks.subscribe(DelegateHandleContextMenu)
+	c.answerHandleContextMenu = f
 }
 
 // HandleDragEnded is content::WebContentsDelegate::HandleDragEnded.
@@ -950,6 +961,15 @@ func (c *DelegateHooks) dispatch(id Hook, r *reader) (Value, bool) {
 			return Value{}, false
 		}
 		v, ok := c.answerGuestSaveFrame(tab, guestWebContents)
+		return boolValue(v), ok
+	case DelegateHandleContextMenu:
+		tab := r.webContents()
+		renderFrameHost := r.renderFrameHost()
+		params := r.contextMenuParams()
+		if c.answerHandleContextMenu == nil {
+			return Value{}, false
+		}
+		v, ok := c.answerHandleContextMenu(tab, renderFrameHost, params)
 		return boolValue(v), ok
 	case DelegateHandleDragEnded:
 		tab := r.webContents()

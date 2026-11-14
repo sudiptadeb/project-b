@@ -35,6 +35,8 @@ type Tab struct {
 
 	CanGoBack    bool `json:"canGoBack"`
 	CanGoForward bool `json:"canGoForward"`
+	// Group is the id of the tab group it is in, "" for none (groups.go).
+	Group string `json:"group,omitempty"`
 }
 
 // Gate runs before a navigation. Returning false blocks it, and later gates don't run.
@@ -68,6 +70,8 @@ type Manager struct {
 	onEmpty    []func(engine.WindowID)
 	onFront    []func(engine.WindowID)
 	onMoved    []func(tab engine.TabID, from engine.WindowID, fromIndex int, to engine.WindowID)
+	// groupSeq numbers the groups, for their ids.
+	groupSeq int
 }
 
 // window is one window's tabs: their order, the active one, and recent use.
@@ -79,6 +83,8 @@ type window struct {
 	recent []engine.TabID
 	cycle  []engine.TabID
 	at     int
+	// groups are its tab groups, in the order they were made.
+	groups []*Group
 }
 
 // New returns a manager with no windows. first says which workspace is first in the
@@ -189,10 +195,31 @@ func (m *Manager) FirstWorkspace() string { return m.first() }
 // CreateIn opens a new tab at the end of window w, on the blank page, in a workspace, by
 // its id, and makes it active.
 func (m *Manager) CreateIn(w engine.WindowID, workspace string) engine.TabID {
+	return m.Add(w, workspace, true)
+}
+
+// Add opens a new tab at the end of window w, on the blank page, in a workspace, and
+// makes it active when foreground, or leaves it behind the active one.
+func (m *Manager) Add(w engine.WindowID, workspace string, foreground bool) engine.TabID {
+	id := m.create(w, workspace)
+	m.shown(id, foreground)
+	return id
+}
+
+// shown makes a new tab active, or tells of it behind the active one.
+func (m *Manager) shown(id engine.TabID, foreground bool) {
+	if foreground {
+		m.Activate(id)
+	} else {
+		m.listChanged()
+	}
+}
+
+// create opens a new tab at the end of window w, on the blank page, in a workspace.
+func (m *Manager) create(w engine.WindowID, workspace string) engine.TabID {
 	id := m.eng.CreateTab(workspace)
 	m.add(id, w).Workspace = workspace
 	m.eng.LoadURL(id, BlankURL)
-	m.Activate(id)
 	return id
 }
 
@@ -309,6 +336,7 @@ func (m *Manager) Close(id engine.TabID) {
 		return
 	}
 	w := m.windowOf[id]
+	m.leaveGroup(id)
 	i := m.detach(id)
 	delete(m.tabs, id)
 	m.eng.CloseTab(id)
@@ -323,6 +351,9 @@ func (m *Manager) Move(id engine.TabID, w engine.WindowID, index int) {
 		return
 	}
 	from := m.windowOf[id]
+	if from != w {
+		m.leaveGroup(id)
+	}
 	i := m.detach(id)
 	m.windowOf[id] = w
 	win := m.windows[w]
@@ -557,8 +588,8 @@ func (m *Manager) zoomTo(f float64) {
 }
 
 // HandleTabOpened records a tab a page opened, in the opener's window, or in the window
-// in front when no tab opened it, in the workspace the engine made it in, and shows it if
-// the page asked for the foreground.
+// in front when no tab opened it, in the workspace the engine made it in, and in its
+// opener's group, and shows it if the page asked for the foreground.
 func (m *Manager) HandleTabOpened(opener, id engine.TabID, u, workspace string, foreground bool) {
 	w := m.windowOf[opener]
 	if w == 0 {
@@ -566,6 +597,10 @@ func (m *Manager) HandleTabOpened(opener, id engine.TabID, u, workspace string, 
 	}
 	t := m.add(id, w)
 	t.URL, t.Workspace = address(u), workspace
+	// A tab a page opens joins its opener's group, after it.
+	if o := m.tabs[opener]; o != nil && o.Group != "" {
+		m.join(id, o.Group, opener)
+	}
 	if foreground {
 		m.Activate(id)
 	} else {

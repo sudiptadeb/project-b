@@ -24,9 +24,14 @@ export const state = {
   // This window's tabs in order, and the active one's id.
   tabs: [],
   active: 0,
+  // This window's tab groups, each {id, name, color, collapsed, tabs}, in the order made;
+  // a tab's group is its id (docs/groups.md).
+  groups: [],
   // Where the standard shell puts the tabs: 'vertical' (a sidebar) or 'horizontal' (a
   // strip on top).
   tabLayout: 'vertical',
+  // Where the Mobile shell puts its address bar: 'bottom' or 'top'.
+  addressBarPosition: 'bottom',
   // 'system', 'light' or 'dark', as Go's theme pref says.
   theme: 'system',
   // Where the native window controls are. Zero size when there are none.
@@ -64,7 +69,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'extensions']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions']);
 
 const listeners = [];
 

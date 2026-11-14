@@ -24,6 +24,7 @@ JNIEXPORT jlong JNICALL Java_dev_projectb_browser_GoCore_table(JNIEnv* env, jcla
       .timeline_now = PBTimelineNow,
       .timeline_record = PBTimelineRecord,
       .timeline_page_origin = PBTimelinePageOrigin,
+      .free = PBFree,
   };
   return (jlong)(intptr_t)&go;
 }

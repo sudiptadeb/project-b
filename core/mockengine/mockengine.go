@@ -113,6 +113,7 @@ type window struct {
 	bounds            engine.Rect    // Its frame on screen.
 	minimised, zoomed bool
 	settings          bool
+	shellBack         bool               // The phone's back key goes to the shell.
 	reported          engine.WindowState // The last one reported.
 }
 
@@ -655,6 +656,14 @@ func (e *Engine) FocusShell(engine.WindowID) {}
 
 func (e *Engine) SendToShell(w engine.WindowID, msg []byte) { e.Feeds(w).Shell.Publish(msg) }
 
+func (e *Engine) SetShellBack(w engine.WindowID, on bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if win := e.windows[w]; win != nil {
+		win.shellBack = on
+	}
+}
+
 func (e *Engine) Post(fn func()) { e.queue <- fn }
 
 // Settle returns once the engine has run everything posted to it so far, and everything
@@ -715,6 +724,23 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 			e.navigate(shown, value)
 		case "title":
 			e.listener.TitleChanged(shown, value)
+		case "backKey":
+			// The phone's back key, as Android's window takes it: settings, then the
+			// shell's own, then the page's history.
+			switch {
+			case win.settings:
+				e.listener.SettingsMessage(w, []byte(`{"t":"close"}`))
+			case win.shellBack:
+				e.listener.ShellMessage(w, []byte(`{"t":"backKey"}`))
+			default:
+				e.listener.ShellMessage(w, []byte(`{"t":"back"}`))
+			}
+		case "contextMenu":
+			// A long press on a link to value, as content reports it.
+			e.listener.ContextMenu(shown, engine.ContextMenu{X: 40, Y: 60, Link: value, LinkText: "a link"})
+		case "scroll":
+			// value is down or up, as a page that scrolls makes content say.
+			e.listener.ScrollDirectionChanged(shown, value == "down")
 		case "fail":
 			if t != nil {
 				t.navSeq++

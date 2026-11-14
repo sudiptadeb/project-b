@@ -1475,3 +1475,33 @@ func TestAShellsOwnActionRunsOnlyWhileItsShellIsOn(t *testing.T) {
 		t.Fatalf("Shift+Cmd+D sent %v", m)
 	}
 }
+
+// The tab groups through the shell's messages: a new tab beside one starts a group of the
+// two, which every tabs message carries; a tab a page opens joins its opener's group;
+// editGroup renames it; closeGroup closes its tabs.
+func TestGroupsThroughTheShell(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.visit("https://a.test/")
+	groups := func(m map[string]any) []any { g, _ := m["groups"].([]any); return g }
+
+	r.shell(`{"t":"newTab","groupWith":1}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(groups(m)) == 1 })
+	g := groups(m)[0].(map[string]any)
+	if ids := g["tabs"].([]any); len(ids) != 2 || ids[0].(float64) != 1 || g["color"] != tabs.GroupColors[0] {
+		t.Fatalf("group %v", g)
+	}
+	r.e.Fire(1, 1, "open", "https://c.test/")
+	m = r.waitFor(func(m map[string]any) bool {
+		return m["t"] == "tabs" && len(groups(m)) == 1 && len(groups(m)[0].(map[string]any)["tabs"].([]any)) == 3
+	})
+	r.shell(`{"t":"editGroup","group":"` + g["id"].(string) + `","name":"Release"}`)
+	r.waitFor(func(m map[string]any) bool {
+		return m["t"] == "tabs" && len(groups(m)) == 1 && groups(m)[0].(map[string]any)["name"] == "Release"
+	})
+	r.shell(`{"t":"newTab"}`)
+	r.shell(`{"t":"closeGroup","group":"` + g["id"].(string) + `"}`)
+	r.waitFor(func(m map[string]any) bool {
+		return m["t"] == "tabs" && len(m["tabs"].([]any)) == 1 && len(groups(m)) == 0
+	})
+}

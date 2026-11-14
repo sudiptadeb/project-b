@@ -143,6 +143,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	})
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
+	a.Prefs.OnAddressBarPositionChanged(a.Shell.AddressBarPositionChanged)
+	a.Prefs.OnAddressBarPositionChanged(a.Settings.AddressBarPositionChanged)
 	a.Update.OnAutoChanged(a.Settings.AutoUpdateChanged)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 	a.Update.OnChanged(a.Settings.UpdateChanged)
@@ -267,6 +269,14 @@ func (a *App) TitleChanged(tab engine.TabID, title string) { a.Tabs.HandleTitleC
 
 func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 	a.Tabs.HandleLoadingChanged(tab, loading)
+}
+
+func (a *App) ContextMenu(tab engine.TabID, m engine.ContextMenu) {
+	a.Shell.ContextMenu(tab, m)
+}
+
+func (a *App) ScrollDirectionChanged(tab engine.TabID, down bool) {
+	a.Shell.ScrollDirectionChanged(tab, down)
 }
 
 func (a *App) LoadProgressChanged(tab engine.TabID, progress float64) {

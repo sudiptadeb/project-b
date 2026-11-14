@@ -5,6 +5,8 @@ Take an item off when it lands or is dropped.
 
 ## For discussion with the owner first
 
+- **Dragging tabs** between workspaces (Spaces), onto groups, and in a sidebar: not designed
+  yet. The Mobile shell's switcher drags a card onto another within one workspace only.
 - **URL policy on every request.** Each request is allowed or blocked by policy. The options so
   far: a proxy in the browser process, or rules in content's network layer, before each
   request is sent. Not discussed yet; nothing to build until it is.

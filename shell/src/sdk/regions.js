@@ -133,6 +133,12 @@ export const drag = {
   },
 };
 
+// pageRect is where tab's page shows in the window, or null when it shows nowhere.
+export function pageRect(tab) {
+  for (const [el, t] of pages) if (t === tab) return el.getBoundingClientRect();
+  return null;
+}
+
 // page: tab's page shows in this element; 0 for none. It isn't shell, so a press on it
 // reaches the page. update(el, tab) shows another tab there, and that goes in the layout
 // at once, so the window shows it before anything asks for its keyboard.

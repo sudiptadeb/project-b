@@ -104,10 +104,12 @@ as built so far, and the order of building at the end says which steps are done.
   are erased, with Cancel and Delete, a danger button; with one workspace left Delete… is
   disabled, and Go refuses it too (`deleteWorkspace`, `workspaces.Manager.Delete`). Go
   takes the workspace out of the list, which everyone hears: every shell and settings
-  page, the Tab menu the next time it opens, and the engine, when the first changes. Then
-  it closes its tabs in every window, a window left with none closing as it does when its
-  last tab closes, and then has the engine erase its storage (`erase_workspace`): every
-  kind of site data and the cache in its partition, after its tabs are gone. For Main,
+  page, the Tab menu the next time it opens, and the engine, when the first changes. A
+  window whose every tab is in it then gets a new tab in the first workspace, so a delete
+  never closes a window or quits the app, and a settings page open in it stays. Then Go
+  closes the workspace's tabs in every window, and has the engine erase its storage
+  (`erase_workspace`): every kind of site data and the cache in its partition, after its
+  tabs are gone, in an app still running. For Main,
   the profile's own storage, extensions keep their own data, so they keep working, and
   history stays, as it is the profile's (`App.deleteWorkspace`,
   `Engine::EraseWorkspace`). A Main deleted stays deleted: the list says version 2 by
@@ -281,6 +283,10 @@ Each commit builds, leaves a working app, and carries its tests.
   refusal of the last one is in one place, the list's (`workspaces.Manager.Delete`), and
   nothing closes for a delete refused. Both happen in one call, so the erase still comes
   after the tabs are gone.
+- A delete keeps every window. Closing a window's last tab closes the window, and the last
+  window's closing quits the app, which would end the erase it had just asked for. So a
+  window holding only the workspace's tabs gets a new tab, on the blank page, in the first
+  workspace before they close, as New Tab in a window with none does.
 
 ## Not in this step
 

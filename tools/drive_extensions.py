@@ -379,18 +379,18 @@ def extension_checks():
 def workspace_checks():
     """Deleting Main, the profile's own storage, erases the sites' data there and leaves an
     extension's own: with it gone, the test extension's content script still runs in a page,
-    its service worker answers, and its count in storage goes on."""
+    its service worker answers, and its count in storage goes on. The window, whose only tab
+    is Main's, stays, with a new tab in Work, the first workspace left."""
     profile = new_profile()
     with open(os.path.join(profile, "workspaces.json"), "w") as f:
         json.dump({"version": 2, "workspaces": [{"id": "", "name": "Main", "color": "#3470d0"}, {"id": "0a1b2c3d", "name": "Work", "color": "#d03434"}]}, f)
     app = App(profile, MOCK_STORE)
     install_from_store(app, TEST_ID)
     before = pages_seen(app)
-    # A tab in Work, so the window stays when Main's tabs close.
-    tab = int(app.cmd("opentab", "0a1b2c3d", "about:blank"))
-    app.wait("document.readyState==='complete'", tab=tab)
     drive_first_app.delete_workspace(app, "")
     drive_first_app.erased(app, "")
+    left = drive_first_app.tabs_of(app)["tabs"]
+    check("deleting Main, which the window's only tab is in, keeps the window, with a new tab in Work", [t.get("workspace") for t in left] == ["0a1b2c3d"], left)
     after = pages_seen(app)
     check("with Main deleted and its storage erased, the test extension still runs and keeps its count", after > before, (before, after))
     app.close()

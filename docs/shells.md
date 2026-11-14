@@ -147,7 +147,7 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `renameWorkspace` | `workspace`, `text` | Renames a workspace, by its id |
 | `editWorkspace` | `workspace`, `text`, `color` | Renames and recolours a workspace together; a name refused changes neither |
 | `moveWorkspace` | `workspace`, `by`: -1 or 1 | Moves a workspace one place up or down the list |
-| `deleteWorkspace` | `workspace` | Deletes a workspace: Go takes it out of the list, closes its tabs in every window, and erases its storage. The last one is refused |
+| `deleteWorkspace` | `workspace` | Deletes a workspace: Go takes it out of the list, gives a window whose every tab is in it a new tab in the first workspace, closes its tabs in every window, and erases its storage. The last one is refused |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |

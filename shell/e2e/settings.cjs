@@ -372,6 +372,23 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await page.getByRole('button', { name: 'Actions for Main' }).click();
   check('and Delete… is disabled', await page.getByRole('menuitem', { name: 'Delete…' }).isDisabled());
   await page.keyboard.press('Escape');
+  // A delete never closes the window: deleting Main, which the window's only tab is in,
+  // gives it a new tab in the first workspace left, and the page stays open.
+  await page.getByRole('button', { name: 'New workspace…' }).click();
+  const spareName = page.getByRole('dialog', { name: 'New workspace' }).getByLabel('Name', { exact: true });
+  await spareName.fill('Spare');
+  await spareName.press('Enter');
+  await until(() => workspacesFile().length === 2);
+  const spare = workspacesFile()[1].id;
+  await page.getByRole('button', { name: 'Actions for Main' }).click();
+  await page.getByRole('menuitem', { name: 'Delete…' }).click();
+  const deleteMain = page.getByRole('dialog', { name: 'Delete Main?' });
+  check('Main\'s delete says its one tab closes', (await deleteMain.textContent()).includes('Its 1 open tab closes'), await deleteMain.textContent());
+  await deleteMain.getByRole('button', { name: 'Delete', exact: true }).click();
+  check('deleting the workspace every tab of the window is in keeps the window and the page, with a new tab in the first left', await until(async () => {
+    const r = await regions();
+    return workspacesFile().length === 1 && r.tabs.length === 1 && r.tabs[0].workspace === spare && !r.closed && !r.quit && r.settingsOpen;
+  }), JSON.stringify(await regions()));
 
   // Flags: saved for the next launch, with Relaunch offered until they are what runs.
   const flagsFile = () => {

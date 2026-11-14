@@ -1193,9 +1193,10 @@ func TestTheSettingsPageOpensATabInAWorkspace(t *testing.T) {
 }
 
 // Deleting a workspace from the settings page takes it out of the list everyone has, the Tab
-// menu's too, and tells the engine the new first; closes its tabs in every window, and a
-// window left with none; and only then has the engine erase its storage. The last one
-// can't be deleted, nor can one the list doesn't hold.
+// menu's too, and tells the engine the new first; closes its tabs in every window, a window
+// that held only those getting a new tab in the first workspace; and only then has the
+// engine erase its storage. The last one can't be deleted, nor can one the list doesn't
+// hold.
 func TestTheSettingsPageDeletesAWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	r := start(t, dir)
@@ -1226,18 +1227,18 @@ func TestTheSettingsPageDeletesAWorkspace(t *testing.T) {
 	}
 	r.waitOn(got, func(m map[string]any) bool {
 		c, ok := m["workspaceTabs"].(map[string]any)
-		return m["t"] == "workspaceTabs" && ok && len(c) == 1 && c[""] == float64(1)
+		return m["t"] == "workspaceTabs" && ok && len(c) == 1 && c[""] == float64(2)
 	})
 	r.e.Settle()
-	var left []tabs.Tab
+	var left, inW2 []tabs.Tab
 	var erased []mockengine.Erase
 	var items engine.Menu
 	r.e.Post(func() {
-		left, erased, first, items = r.a.Tabs.All(), r.e.Erased(), r.e.FirstWorkspace(), r.a.MenuList("workspaces")
+		left, inW2, erased, first, items = r.a.Tabs.AllIn(1), r.a.Tabs.AllIn(w2), r.e.Erased(), r.e.FirstWorkspace(), r.a.MenuList("workspaces")
 	})
 	r.e.Settle()
-	if len(left) != 1 || left[0].Workspace != "" || !r.e.Closed(w2) || r.e.Closed(1) {
-		t.Fatalf("left %+v; window 2 closed %v, window 1 %v", left, r.e.Closed(w2), r.e.Closed(1))
+	if len(left) != 1 || left[0].Workspace != "" || len(inW2) != 1 || inW2[0].Workspace != "" || r.e.Closed(w2) || r.e.Closed(1) {
+		t.Fatalf("window 1 has %+v and window 2 %+v; window 2 closed %v, window 1 %v", left, inW2, r.e.Closed(w2), r.e.Closed(1))
 	}
 	if !reflect.DeepEqual(erased, []mockengine.Erase{{Workspace: work}}) || first != "" || len(items) != 1 || items[0].Title != "Main" {
 		t.Fatalf("the engine erased %+v and has %q first; the Tab menu lists %+v", erased, first, items)
@@ -1249,8 +1250,39 @@ func TestTheSettingsPageDeletesAWorkspace(t *testing.T) {
 	r.e.Settle()
 	r.e.Post(func() { left, erased = r.a.Tabs.All(), r.e.Erased() })
 	r.e.Settle()
-	if len(left) != 1 || len(erased) != 1 || len(workspaces.New(dir).List()) != 1 {
+	if len(left) != 2 || len(erased) != 1 || len(workspaces.New(dir).List()) != 1 {
 		t.Fatalf("deleting the last left %+v and erased %+v", left, erased)
+	}
+}
+
+// A delete never closes a window: one whose every tab is in the workspace deleted, with
+// the settings page open in it, stays, with one blank tab in the new first workspace, the
+// page still open, and the engine is asked to erase the workspace.
+func TestDeletingAWorkspaceKeepsAWindowOfOnlyItsTabs(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "workspaces.json"), []byte(`{"version":2,"workspaces":[{"id":"0a1b2c3d","name":"Work","color":"#5b7fd6"},{"id":"","name":"Main","color":"#3470d0"}]}`), 0o600)
+	r := start(t, dir)
+	defer r.stop()
+	r.e.Post(func() { r.a.Tabs.Create(1) })
+	r.openSettings()
+	r.settings(`{"t":"deleteWorkspace","id":"0a1b2c3d"}`)
+	r.e.Settle()
+	var left []tabs.Tab
+	var erased []mockengine.Erase
+	var open bool
+	in := "none"
+	r.e.Post(func() {
+		left, erased, open = r.a.Tabs.AllIn(1), r.e.Erased(), r.a.Settings.IsOpen(1)
+		if len(left) == 1 {
+			in = r.e.Workspace(left[0].ID)
+		}
+	})
+	r.e.Settle()
+	if r.e.Closed(1) || r.e.Quit() || !open || len(left) != 1 || left[0].Workspace != "" || left[0].URL != "" || in != "" {
+		t.Fatalf("window 1 closed %v, the app quit %v, settings open %v; the window has %+v", r.e.Closed(1), r.e.Quit(), open, left)
+	}
+	if !reflect.DeepEqual(erased, []mockengine.Erase{{Workspace: "0a1b2c3d"}}) {
+		t.Fatalf("the engine erased %+v", erased)
 	}
 }
 

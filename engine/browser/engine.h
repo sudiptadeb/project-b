@@ -22,6 +22,7 @@ class WebContents;
 
 namespace project_b {
 
+class NativeShell;
 class PageTab;
 class SettingsPage;
 class ShellPage;
@@ -43,7 +44,9 @@ class Engine {
     ~AppWindow();
     const int64_t id;
     std::unique_ptr<Window> window;
+    // The shell's page, or, for the native shell (spike), native and no page.
     std::unique_ptr<ShellPage> shell;
+    std::unique_ptr<NativeShell> native;
     std::unique_ptr<SettingsPage> settings;
     std::vector<VisibleTab> visible;
     // The visible tab whose page has, or last had, the keyboard here, or 0. The window
@@ -109,6 +112,8 @@ class Engine {
                     const std::string& page,
                     Window::Layout layout,
                     std::vector<VisibleTab> tabs);
+  // Loads another page over the window, or the native shell in place of a page.
+  void SetWindowPage(int64_t window, const std::string& page);
   // Ends the app, every window at once.
   void Quit();
 

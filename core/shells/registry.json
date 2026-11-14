@@ -7,5 +7,6 @@
   { "id": "minimal-js", "name": "Minimal (JS)" },
   { "id": "example", "name": "Example", "example": true },
   { "id": "minimal-vue", "name": "Minimal (Vue)", "example": true },
+  { "id": "native", "name": "Native (spike)" },
   { "id": "mobile", "name": "Mobile", "phone": true }
 ]

@@ -38,6 +38,7 @@
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/browser/mac_app.h"
+#include "project_b/engine/browser/native_shell_mac.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/settings_page.h"
 #include "project_b/engine/browser/shell_page.h"
@@ -134,7 +135,9 @@ std::string Classify(NSView* hit) {
     return "nil";
   }
   NSView* shell =
-      Current()->shell->contents()->GetNativeView().GetNativeNSView();
+      Current()->native
+          ? Current()->native->view().GetNativeNSView()
+          : Current()->shell->contents()->GetNativeView().GetNativeNSView();
   if ([hit isDescendantOf:shell]) {
     return "shell";
   }
@@ -235,8 +238,11 @@ void SendKey(NSString* chars, unsigned short code, NSEventModifierFlags flags) {
     if (type == NSEventTypeKeyDown) {
       timeline::Input("input.key",
                       base::TimeTicks() + base::Seconds(event.timestamp));
+      // As AppKit does: the responder first, then the menu bar, which a native field
+      // such as the native shell's address leaves a shortcut to.
       if ((flags & NSEventModifierFlagCommand) &&
-          [responder performKeyEquivalent:event]) {
+          ([responder performKeyEquivalent:event] ||
+           [NSApp.mainMenu performKeyEquivalent:event])) {
         continue;
       }
       [responder keyDown:event];
@@ -385,6 +391,73 @@ void Stats(const std::string& id) {
                 window.isVisible,
                 (window.occlusionState & NSWindowOcclusionStateVisible) != 0,
                 Current()->window->ignored_stale_bounds()));
+}
+
+// Spike (docs/native-shell.md): the native shell's accessibility tree, as a screen reader
+// reads it: each element with its role, subrole, name, identifier, whether it is
+// selected, its value, and its frame in shell coordinates.
+void AXWalk(id element, NSView* shell, base::ListValue& out) {
+  for (id child in [element accessibilityChildren]) {
+    NSString* role = [child accessibilityRole];
+    if (role && ![role isEqualToString:NSAccessibilityGroupRole]) {
+      base::DictValue e;
+      e.Set("role", base::SysNSStringToUTF8(role));
+      if (NSString* sub = [child accessibilitySubrole]) {
+        e.Set("subrole", base::SysNSStringToUTF8(sub));
+      }
+      NSString* name = [child accessibilityLabel];
+      if (!name.length && [child respondsToSelector:@selector(accessibilityTitle)]) {
+        name = [child accessibilityTitle];
+      }
+      e.Set("name", base::SysNSStringToUTF8(name ?: @""));
+      if (NSString* ident = [child accessibilityIdentifier]; ident.length) {
+        e.Set("id", base::SysNSStringToUTF8(ident));
+      }
+      if ([child isAccessibilitySelected]) {
+        e.Set("selected", true);
+      }
+      id value = [child accessibilityValue];
+      if ([value isKindOfClass:NSString.class]) {
+        e.Set("value", base::SysNSStringToUTF8(value));
+      } else if ([value isKindOfClass:NSNumber.class]) {
+        e.Set("value", [value intValue]);
+      }
+      {
+        // The element's frame on screen, back into the shell's coordinates.
+        NSRect f = [shell convertRect:[shell.window convertRectFromScreen:[child accessibilityFrame]]
+                             fromView:nil];
+        e.Set("frame", base::ListValue()
+                           .Append(f.origin.x)
+                           .Append(f.origin.y)
+                           .Append(f.size.width)
+                           .Append(f.size.height));
+      }
+      out.Append(std::move(e));
+    }
+    AXWalk(child, shell, out);
+  }
+}
+
+// The control of the first element of the native shell's tree with this role and name,
+// as a screen reader finds it, or nil. AppKit's element for a control is its cell.
+NSControl* AXFind(id element, NSString* role, NSString* name) {
+  for (id child in [element accessibilityChildren]) {
+    NSString* label = [child accessibilityLabel];
+    if (!label.length && [child respondsToSelector:@selector(accessibilityTitle)]) {
+      label = [child accessibilityTitle];
+    }
+    if ([label isEqualToString:name] &&
+        [[child accessibilityRole] isEqualToString:role]) {
+      id view = [child isKindOfClass:NSCell.class] ? [child controlView] : child;
+      if ([view isKindOfClass:NSControl.class]) {
+        return view;
+      }
+    }
+    if (NSControl* found = AXFind(child, role, name)) {
+      return found;
+    }
+  }
+  return nil;
 }
 
 void Run(const std::string& line) {
@@ -646,6 +719,53 @@ void Run(const std::string& line) {
     Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
                                  int(c.greenComponent * 255 + 0.5),
                                  int(c.blueComponent * 255 + 0.5)));
+  } else if (cmd == "ax" || cmd == "axpress" || cmd == "axset" ||
+             cmd == "nativeshot") {
+    // Spike: the native shell, by its accessibility tree. "ax" lists it; "axpress <name>"
+    // presses the element with that name; "axset <name> <text>" types text into the field
+    // with that name and presses Enter; "nativeshot <path>" draws the shell's views to a
+    // PNG (AppKit only: the pages under it are another process's layers).
+    if (!Current()->native) {
+      Reply(id, "ERR not the native shell");
+      return;
+    }
+    NSView* shell = Current()->native->view().GetNativeNSView();
+    if (cmd == "ax") {
+      base::ListValue out;
+      AXWalk(shell, shell, out);
+      Reply(id, base::WriteJson(out).value_or("[]"));
+    } else if (cmd == "axpress") {
+      // "axpress <role> <name>"
+      NSControl* e = AXFind(shell, base::SysUTF8ToNSString(parts[2]),
+                            base::SysUTF8ToNSString(rest(3)));
+      if (!e) {
+        Reply(id, "ERR no such element");
+        return;
+      }
+      [e performClick:nil];
+      Reply(id, "ok");
+    } else if (cmd == "axset") {
+      NSControl* e = AXFind(shell, NSAccessibilityTextFieldRole,
+                            base::SysUTF8ToNSString(parts[2]));
+      if (![e isKindOfClass:NSTextField.class]) {
+        Reply(id, "ERR no such field");
+        return;
+      }
+      NSTextField* field = (NSTextField*)e;
+      [field.window makeFirstResponder:field];
+      field.stringValue = base::SysUTF8ToNSString(rest(3));
+      [field sendAction:field.action to:field.target];
+      Reply(id, "ok");
+    } else {
+      NSBitmapImageRep* rep =
+          [shell bitmapImageRepForCachingDisplayInRect:shell.bounds];
+      [shell cacheDisplayInRect:shell.bounds toBitmapImageRep:rep];
+      NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG
+                                      properties:@{}];
+      Reply(id, [png writeToFile:base::SysUTF8ToNSString(parts[2]) atomically:YES]
+                    ? "ok"
+                    : "ERR write");
+    }
   } else if (cmd == "capture") {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {

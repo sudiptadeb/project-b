@@ -123,7 +123,7 @@ void ExtensionPopup::OnWebContentsLostFocus(
 }
 
 void ExtensionPopup::CloseUnlessShellHasFocus() {
-  if (!window() ||
+  if (!window() || !window()->shell ||
       !window()->shell->contents()->GetRenderWidgetHostView()->HasFocus()) {
     AskToClose();
   }

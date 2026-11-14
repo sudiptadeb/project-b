@@ -80,7 +80,7 @@ bool IsShell(content::WebContents* web_contents) {
     return false;
   }
   for (const auto& [id, w] : engine->windows()) {
-    if (web_contents == w->shell->contents()) {
+    if (w->shell && web_contents == w->shell->contents()) {
       return true;
     }
   }

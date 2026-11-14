@@ -51,6 +51,38 @@ action("shell") {
   args += filter_exclude(string_split(project_b_without, ","), [ "" ])
 }
 
+# Spike: the native shell, Swift, built beside GN as Go is (engine/build_swift.py), since
+# Chromium's Mac toolchain has no swift tool. docs/native-shell.md. The action also writes
+# the folders the link finds the Swift libraries in, as a response file, since this build
+# allows no exec_script.
+action("native_shell_swift") {
+  script = "build_swift.py"
+  sources = [ "native/mac/NativeShell.swift" ]
+  outputs = [
+    "$target_gen_dir/libnative_shell.a",
+    "$target_gen_dir/ProjectBNative-Swift.h",
+    "$target_gen_dir/native_shell_link.rsp",
+  ]
+  args = [
+           rebase_path(outputs[0], root_build_dir),
+           rebase_path(outputs[1], root_build_dir),
+           rebase_path(outputs[2], root_build_dir),
+           mac_deployment_target,
+           rebase_path(mac_sdk_path),
+         ] + rebase_path(sources, root_build_dir)
+}
+
+config("native_shell_link") {
+  ldflags = [ "@" + rebase_path("$target_gen_dir/native_shell_link.rsp",
+                                root_build_dir) ]
+}
+
+source_set("native_shell_lib") {
+  public_deps = [ ":native_shell_swift" ]
+  all_dependent_configs = [ ":native_shell_link" ]
+  libs = [ "$target_gen_dir/libnative_shell.a" ]
+}
+
 source_set("go_core_lib") {
   public_deps = [ ":go_core" ]
   libs = [ "$target_gen_dir/libcore.a" ]
@@ -225,12 +257,15 @@ source_set("browser") {
     "browser/timeline.h",
     "browser/window.h",
     "browser/window_mac.mm",
+    "browser/native_shell_mac.h",
+    "browser/native_shell_mac.mm",
     "browser_main_delegate.cc",
     "browser_main_delegate.h",
   ]
   sources += get_target_outputs(":protocol_sources")
   deps = [
     ":common",
+    ":native_shell_lib",
     ":protocol_sources",
     "//base",
     "//components/embedder_support:user_agent",

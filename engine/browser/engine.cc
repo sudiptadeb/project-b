@@ -34,6 +34,9 @@
 #include "project_b/engine/browser/mac_app.h"
 #endif
 #include "project_b/engine/browser/shell_page.h"
+#if !BUILDFLAG(IS_ANDROID)
+#include "project_b/engine/browser/native_shell_mac.h"
+#endif
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
@@ -290,7 +293,7 @@ void CallCreateWindow(int64_t window,
 
 void CallSetWindowPage(int64_t window, const char* page) {
   CheckMainThread();
-  g_engine->window(window)->shell->SetPage(page);
+  g_engine->SetWindowPage(window, page);
 }
 
 void CallSetWindowLayout(int64_t window,
@@ -550,16 +553,27 @@ void Engine::CreateWindow(int64_t id,
   if (AppWindow* other = window(near)) {
     w->window->PlaceNear(other->window.get());
   }
-  w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
-  timeline::Mark("shell.created");
-#if BUILDFLAG(IS_ANDROID)
-  w->window->SetShellContents(w->shell->contents());
-#else
-  w->window->SetShellView(w->shell->contents()->GetNativeView());
+#if !BUILDFLAG(IS_ANDROID)
+  if (NativeShell::Is(page)) {
+    w->native = std::make_unique<NativeShell>(id);
+    timeline::Mark("shell.created");
+    w->window->SetShellView(w->native->view());
+  } else
 #endif
+  {
+    w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
+    timeline::Mark("shell.created");
+#if BUILDFLAG(IS_ANDROID)
+    w->window->SetShellContents(w->shell->contents());
+#else
+    w->window->SetShellView(w->shell->contents()->GetNativeView());
+#endif
+  }
   AppWindow* raw = w.get();
   windows_[id] = std::move(w);
-  raw->shell->Load();
+  if (raw->shell) {
+    raw->shell->Load();
+  }
   // The frame is in the first layout, so even the window's first frame on screen is the
   // frame colour. It still shows before any renderer has drawn.
   if (raw->window->SetLayout(std::move(layout))) {
@@ -629,7 +643,36 @@ void Engine::Quit() {
   quit_.Run();
 }
 
+void Engine::SetWindowPage(int64_t window, const std::string& page) {
+  AppWindow* w = this->window(window);
+#if !BUILDFLAG(IS_ANDROID)
+  const bool native = NativeShell::Is(page);
+  if (native || w->native) {
+    // A page and the native shell are different views: the old one leaves the window.
+    if (w->shell) {
+      NativeShell::Detach(w->shell->contents()->GetNativeView());
+      w->shell.reset();
+    }
+    w->native.reset();
+    if (native) {
+      w->native = std::make_unique<NativeShell>(window);
+      w->window->SetShellView(w->native->view());
+    } else {
+      w->shell = std::make_unique<ShellPage>(pages_context_, window, page);
+      w->window->SetShellView(w->shell->contents()->GetNativeView());
+      w->shell->Load();
+    }
+    return;
+  }
+#endif
+  w->shell->SetPage(page);
+}
+
 void Engine::FocusShellForTraversal(int64_t from_tab, bool reverse) {
+  if (WindowOf(from_tab)->native) {
+    WindowOf(from_tab)->native->Focus();
+    return;
+  }
   content::WebContents* shell = WindowOf(from_tab)->shell->contents();
   shell->Focus();
   shell->FocusThroughTabTraversal(reverse);
@@ -831,7 +874,8 @@ int64_t Engine::DuplicateTab(int64_t tab) {
 content::WebContents* Engine::FocusedContents() const {
   for (const auto& [id, w] : windows_) {
     std::vector<content::WebContents*> pages = {
-        w->settings ? w->settings->contents() : nullptr, w->shell->contents()};
+        w->settings ? w->settings->contents() : nullptr,
+        w->shell ? w->shell->contents() : nullptr};
     for (const VisibleTab& v : w->visible) {
       pages.push_back(tab(v.tab)->contents());
     }
@@ -950,11 +994,20 @@ void Engine::FocusShell(int64_t window) {
   if (w->settings) {
     return;
   }
+  if (w->native) {
+    w->native->Focus();
+    return;
+  }
   w->shell->contents()->Focus();
 }
 
 void Engine::SendToShell(int64_t window, const char* json, size_t length) {
-  this->window(window)->shell->Send(std::string(json, length));
+  AppWindow* w = this->window(window);
+  if (w->native) {
+    w->native->Send(std::string(json, length));
+    return;
+  }
+  w->shell->Send(std::string(json, length));
 }
 
 }  // namespace project_b

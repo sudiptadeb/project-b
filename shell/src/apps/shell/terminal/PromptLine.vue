@@ -115,10 +115,10 @@ watch(
 <template>
   <footer v-shell class="line">
     <button class="tool" type="button" aria-label="Back" :disabled="!activeTab.canGoBack" @click="act('back')">
-      <svg width="12" height="10" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.93.81.81 5.93l5.12 5.13M1.23 5.93H13.2"/></svg>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 1.5 1 6l4.5 4.5M1.5 6H11"/></svg>
     </button>
     <button class="tool" type="button" aria-label="Forward" :disabled="!activeTab.canGoForward" @click="act('forward')">
-      <svg width="12" height="10" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8.07 11.06 5.12-5.13L8.07.81m4.7 5.13H.8"/></svg>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5 11 6l-4.5 4.5M10.5 6H1"/></svg>
     </button>
     <button class="tool" type="button" aria-label="Reload" :disabled="!activeTab.url" @click="act('reload')">
       <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12.35 1.4.24 4.28-3.78.22"/><path d="M11.68 9.55a5.15 5.15 0 1 1 .19-4.39"/></svg>
@@ -159,7 +159,7 @@ watch(
     </form>
     <span v-if="state.update.phase === 'ready'" class="status">
       {{ state.update.version }} ready
-      <button class="relaunch" type="button" @click="send({ t: 'relaunch' })">Relaunch</button>
+      <button class="text-button relaunch" type="button" @click="send({ t: 'relaunch' })">Relaunch</button>
     </span>
   </footer>
 </template>
@@ -199,12 +199,11 @@ watch(
 }
 
 .tool:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: default;
 }
 
-.tool:focus-visible,
-.relaunch:focus-visible {
+.tool:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -223,7 +222,12 @@ watch(
   flex: none;
   width: 16px;
   color: var(--icon);
-  font-weight: 700;
+  font-weight: 500;
+}
+
+/* The field's one focus mark, beside the caret. */
+.field:focus-within .mark {
+  color: var(--accent);
 }
 
 input {
@@ -294,18 +298,11 @@ li.active {
   color: var(--muted);
 }
 
+/* The shared text button, at the line's density. */
 .relaunch {
   height: 20px;
   padding: 0 8px;
-  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
   font: inherit;
-  cursor: pointer;
-}
-
-.relaunch:hover {
-  background: var(--accent-tint);
 }
 </style>

@@ -86,7 +86,7 @@ function end() {
 .divider {
   position: relative;
   flex: none;
-  background: linear-gradient(var(--line), var(--line)), var(--bar);
+  background: var(--line);
 }
 
 .row > .divider {

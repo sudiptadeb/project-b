@@ -447,8 +447,8 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('the keymap follows its template until an edit', keymapFile() === null);
   check('a shell\'s own actions are listed with their keys, hidden from the menu', await until(async () => {
     const row = (name) => page.getByRole('region', { name: 'View › Terminal', exact: true }).locator('button.action', { hasText: name }).textContent();
-    const right = await row('Split Right');
-    const down = await row('Split Down');
+    const right = await row('Split right');
+    const down = await row('Split down');
     return right.includes('⌘D') && right.includes('Hidden') && down.includes('⇧⌘D') && down.includes('Hidden');
   }));
   await openRow('New Tab');

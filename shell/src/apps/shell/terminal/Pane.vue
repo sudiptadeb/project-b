@@ -12,9 +12,9 @@ const active = computed(() => props.id === state.active);
 const host = computed(() => (tab.value.title && tab.value.url ? new URL(tab.value.url).host : ''));
 const status = computed(() => {
   const t = tab.value;
-  if (t.blocked) return 'blocked';
-  if (t.crashed) return 'crashed';
-  if (t.error) return 'failed';
+  if (t.blocked) return 'Blocked';
+  if (t.crashed) return 'Crashed';
+  if (t.error) return 'Failed';
   return '';
 });
 
@@ -43,7 +43,7 @@ function hint(name, action) {
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="10.8" height="10.8"/><path d="M.6 6h10.8"/></svg>
       </button>
       <button class="control" type="button" :aria-label="`Close ${tabLabel(tab)}`" title="Close" @pointerdown.stop @click="close(id)">
-        <svg width="8" height="8" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M9.5 2.5l-7 7M2.5 2.5l7 7"/></svg>
       </button>
       <span class="progress" :class="{ on: tab.loading }" :style="{ width: (tab.progress || 0) * 100 + '%' }"></span>
     </div>
@@ -67,7 +67,7 @@ function hint(name, action) {
   flex: none;
   gap: 8px;
   height: 20px;
-  padding: 0 2px 0 8px;
+  padding: 0 4px 0 8px;
   box-sizing: border-box;
   background: var(--bar);
   color: var(--muted);
@@ -94,14 +94,13 @@ function hint(name, action) {
 .host {
   flex: none;
   max-width: 40%;
-  opacity: 0.75;
 }
 
 .status {
   flex: none;
   padding: 0 4px;
   background: var(--danger);
-  color: var(--surface);
+  color: var(--on-danger);
 }
 
 .gap {
@@ -125,13 +124,24 @@ function hint(name, action) {
 }
 
 .control:hover {
-  background: var(--press);
+  background: var(--hover);
   opacity: 1;
+}
+
+/* On the accent bar the toolbar's hover would wash the icon out, so it darkens instead,
+   and the focus ring, in the accent itself, is drawn in the bar's ink. */
+.title.active .control:hover {
+  background: var(--press);
 }
 
 .control:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 1px currentColor;
+  box-shadow: var(--focus-ring-inset);
+  opacity: 1;
+}
+
+.title.active .control:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--on-accent);
 }
 
 /* The page's load progress, along the foot of the bar. */

@@ -39,13 +39,13 @@ import { chips, shown } from './panes.js';
       :title="state.keys['tab.new'] ? `New Tab (${keyShown(state.keys['tab.new'], state.platform)})` : 'New Tab'"
       @click="send({ t: 'newTab' })"
     >
-      <svg width="10" height="10" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>
     </button>
     <div v-drag class="rest"></div>
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />
     <!-- The Ulaa design's gear, as the standard shell draws it. -->
     <button class="settings" type="button" aria-label="Settings" title="Settings" @click="send({ t: 'run', text: 'app.settings' })">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
     <div v-drag class="space" :style="{ width: controlSpace.right }"></div>
   </div>
@@ -84,11 +84,12 @@ import { chips, shown } from './panes.js';
   scrollbar-width: none;
 }
 
-/* A group: its panes side by side, in a hairline box. The shown one is the surface. */
+/* A group: its panes side by side, in a hairline box. The shown one is the surface, with
+   the accent along its foot. */
 .chip {
   display: flex;
   flex: none;
-  height: 22px;
+  height: 20px;
   border: 1px solid var(--line);
   border-radius: 4px;
   box-sizing: border-box;
@@ -97,13 +98,13 @@ import { chips, shown } from './panes.js';
 
 .chip.shown {
   background: var(--surface);
-  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .segment {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   max-width: 160px;
   padding: 0 8px;
   border: 0;
@@ -123,12 +124,12 @@ import { chips, shown } from './panes.js';
 
 .segment.active {
   color: var(--text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .segment:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: var(--focus-ring-inset);
 }
 
 .label {
@@ -147,8 +148,8 @@ import { chips, shown } from './panes.js';
 /* A workspace's colour, as a small square. */
 .workspace {
   flex: none;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 /* Loading, as a dot in the accent after the label. */
@@ -166,8 +167,8 @@ import { chips, shown } from './panes.js';
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   margin-left: 4px;
   padding: 0;
   border: 0;

@@ -277,7 +277,7 @@ ordinary action in the keymap ([menus-shortcuts.md](menus-shortcuts.md#a-shells-
 
 - **The shell declares them** in its entry in `core/shells/registry.json`, each an id and
   the title its menu item shows: `"actions": [{"id": "terminal.splitRight", "title":
-  "Split Right"}]`. The id starts with the shell's id and a dot, and never changes once
+  "Split right"}]`. The id starts with the shell's id and a dot, and never changes once
   released.
 - Go registers them, and each is enabled only while its shell is the profile's. Their keys
   are in the keymap templates and their place in the menu tree, as any action's.

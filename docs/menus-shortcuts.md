@@ -344,7 +344,7 @@ services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full 
 
 `glide.json` is `project-b.json` with Glide's keys over it ([glide.md](glide.md)): Cmd+T opens
 the Command Bar, Cmd+D pins, and Option+Cmd+Left and Right go to the previous and next
-Space, so New Tab, the terminal's Split Right, and Previous and Next Tab lose those keys
+Space, so New Tab, the terminal's Split right, and Previous and Next Tab lose those keys
 there. Choosing it is the user's, in Keyboard settings; the shell doesn't choose a keymap.
 
 - **Project B** (locked): About Project B; Settings…, Cmd+, (locked); Check for Updates…;
@@ -359,7 +359,7 @@ there. Choosing it is the user's, in Keyboard settings; the shell doesn't choose
   Size, Cmd+0; Zoom In, Cmd+= and Shift+Cmd+=; Zoom Out, Cmd+-; Developer: View Source,
   Option+Cmd+U; Keyboard (hidden): Focus Next Pane, F6 (locked) and Option+Cmd+Down;
   Focus Previous Pane, Shift+F6 (locked) and Option+Cmd+Up; Terminal (hidden), the
-  terminal shell's own: Split Right, Cmd+D, and Split Down, Shift+Cmd+D.
+  terminal shell's own: Split right, Cmd+D, and Split down, Shift+Cmd+D.
 - **History**: Back, Cmd+[ and Cmd+Left; Forward, Cmd+] and Cmd+Right.
 - **Tab**: Select Next Tab, Shift+Cmd+], Option+Cmd+Right and Ctrl+PageDown*; Select
   Previous Tab, the mirror keys*; Select Recent Tab, Ctrl+Tab*; Select Recent Tab
@@ -384,7 +384,7 @@ Cmd+D and Shift+Cmd+D, as iTerm has them.
 
 - **Declared in the registry.** A shell lists its actions in its entry in
   `core/shells/registry.json`, each an id and a title: `"actions": [{"id":
-  "terminal.splitRight", "title": "Split Right"}]`. The id starts with the shell's id and a
+  "terminal.splitRight", "title": "Split right"}]`. The id starts with the shell's id and a
   dot, and never changes once released, like any action's.
 - **Registered by Go** with the rest (`core/app/actions.go`), every shell's in the
   registry, before Load. Each is enabled only while its shell is the profile's: the live one, so View, Shell

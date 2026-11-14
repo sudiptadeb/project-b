@@ -250,6 +250,23 @@ stroke; colour carrying identity, a workspace or a tab group as a coloured pill 
 profile as a pill on the toolbar; room to breathe, sidebar rows 36px; the address field a
 rounded surface with the page's own actions inside its right end.
 
+## Shells with a character of their own
+
+A shell may keep a look of its own where it is the point of the shell. What is listed here
+is deliberate, not drift; everything else on this page still holds for it, colours,
+contrast and focus rings first.
+
+**Terminal** (`shell/src/apps/shell/terminal/`):
+- Monospace, 12px on a 16px line, set on `.app`, for the whole shell.
+- Square corners on what floats (the suggestions) and on its marks (a workspace's square,
+  the loading dot); controls keep radius 4.
+- Dense bars: the strip 32px, a pane's title bar 20px, the prompt line 28px. Its controls
+  are 20px square with 12px icons at a 1.2px stroke, and its suggestion rows 24px.
+- The `>` prompt mark, in `--icon`, `--accent` while the field has focus: the field's only
+  focus mark besides the caret.
+- The active pane's title bar in full accent, its one focus cue, with `--on-accent` on it.
+- Status words on a pane (Blocked, Crashed, Failed) in `--on-danger` on `--danger`.
+
 ## Adding UI
 
 1. Use the classes and variables above. If something is missing, add it to `design.css` (or

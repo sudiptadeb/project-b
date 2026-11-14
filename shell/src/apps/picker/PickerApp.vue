@@ -5,7 +5,7 @@ import { send, state } from './state.js';
 
 // The picker: a copy of the app that hasn't chosen its profile shows this in its one
 // window. Choosing a profile opens it; New Profile makes one from a template and opens it.
-watchEffect(() => paintTheme(state.windowColor, state.theme));
+watchEffect(() => paintTheme(state.tones, state.theme));
 
 const making = ref(false);
 const name = ref('');

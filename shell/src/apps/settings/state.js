@@ -12,6 +12,9 @@ export const { mark, end, firstPaint, inputs } = channel.timeline;
 export const state = reactive({
   ready: false,
   windowColor: '',
+  // Its tones, light and dark, from Go, which the page paints itself with: null until the
+  // snapshot.
+  tones: null,
   controls: { x: 0, y: 0, w: 0, h: 0 },
   tabLayout: 'vertical',
   // Where a phone shell puts its address bar: 'bottom' or 'top'.
@@ -46,6 +49,7 @@ export function connect() {
         case 'snapshot':
           Object.assign(state, {
             windowColor: m.windowColor,
+            tones: m.tones,
             controls: m.controls,
             tabLayout: m.tabLayout,
             addressBarPosition: m.addressBarPosition,
@@ -80,6 +84,7 @@ export function connect() {
           break;
         case 'windowColor':
           state.windowColor = m.windowColor;
+          state.tones = m.tones;
           break;
         case 'controls':
           state.controls = m.controls;

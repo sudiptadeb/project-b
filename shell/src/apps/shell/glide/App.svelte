@@ -19,7 +19,8 @@
   let systemDark = $state(media.matches);
   media.addEventListener('change', () => (systemDark = media.matches));
   const dark = $derived(go.theme === 'dark' || (go.theme !== 'light' && systemDark));
-  const tokens = $derived(styleOf(glideTones(g.space().color, dark)));
+  // The Space's tones, or the frame's for a Space Go hasn't listed yet.
+  const tokens = $derived(styleOf(glideTones(g.space().color, g.space().tones || go.tones, dark)));
 
   let bar = $state();
   // The tab last made active, so each change of it is seen once.

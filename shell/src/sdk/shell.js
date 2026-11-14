@@ -41,6 +41,10 @@ export const state = {
   // The frame colour the window paints natively, and a band of it around its edge when
   // the shell asks for one (setFrame); a shell paints its own strips with the same colour.
   windowColor: '',
+  // Every colour a shell paints with, made by Go from the frame colour, light and dark:
+  // {light, dark}, each the design system's tokens by name ('--accent' and so on). It comes
+  // with windowColor, always together; null before the snapshot, when nothing is painted.
+  tones: null,
   // What the updater is doing: phase '' (nothing), 'downloading', 'ready' or 'failed',
   // with the release's version and, when it failed, why; and how a check the user asked
   // for went.
@@ -50,8 +54,9 @@ export const state = {
   // The platform, as the keymap names it, and the key each action shows, by action id.
   platform: 'mac',
   keys: {},
-  // The profile's workspaces, each with its id, name and colour, in the user's order: one
-  // at least once the snapshot is in. Main, the profile's own storage, has the id ''.
+  // The profile's workspaces, each with its id, name and colour, and the tones of its
+  // colour as state.tones has the frame's, in the user's order: one at least once the
+  // snapshot is in. Main, the profile's own storage, has the id ''.
   workspaces: [],
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
@@ -89,7 +94,7 @@ function change(fields) {
 
 // The root's colours follow the frame colour and the theme.
 onChange((fields) => {
-  if ('windowColor' in fields || 'theme' in fields) paintTheme(state.windowColor, state.theme);
+  if ('tones' in fields || 'theme' in fields) paintTheme(state.tones, state.theme);
 });
 
 // While an extension's popup is open, a press anywhere in the shell closes it. The one

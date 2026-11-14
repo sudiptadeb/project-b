@@ -12,6 +12,8 @@ export const state = reactive({
   ready: false,
   // The app's own frame colour: the picker belongs to no profile.
   windowColor: '',
+  // Its tones, light and dark, from Go: null until Go's state comes.
+  tones: null,
   theme: 'system',
   profiles: [],
   templates: [],
@@ -21,7 +23,7 @@ export function connect() {
   channel.listen(
     (m) => {
       if (m.t === 'state') {
-        Object.assign(state, { windowColor: m.color, profiles: m.profiles, templates: m.templates, ready: true });
+        Object.assign(state, { windowColor: m.color, tones: m.tones, profiles: m.profiles, templates: m.templates, ready: true });
         mark('picker.state');
         // Once the page shows it, Go marks the app ready.
         nextTick(() => send({ t: 'shown' }));

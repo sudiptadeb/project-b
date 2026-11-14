@@ -1,7 +1,7 @@
-// Glide's colours, all from one: the current Space's. The shared tones (tones.js) give the
-// floating things theirs, as on every page; Glide adds its own, prefixed --g-, for the frame
-// and the sidebar on it. Flat: the frame is one tone of the Space's colour, no gradient.
-import { tones } from '@/tones.js';
+// Glide's colours, all from one: the current Space's. The shared tones, which Go makes from
+// the Space's colour and sends with it (core/tones), give the floating things theirs, as on
+// every page; Glide adds its own, prefixed --g-, for the frame and the sidebar on it. Flat:
+// the frame is one tone of the Space's colour, no gradient.
 
 const rgbOf = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
 const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
@@ -20,14 +20,15 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// The near-black dark mode is made on, as tones.js's.
+// The near-black dark mode is made on, as Go's tones'.
 const base = [27, 28, 30];
 
 // glideTones is every colour of the window for a Space of colour color, light or dark: the
-// shared tones and Glide's own, as CSS variables.
-export function glideTones(color, dark) {
+// shared tones, from both, Go's {light, dark} for that colour, and Glide's own, as CSS
+// variables.
+export function glideTones(color, both, dark) {
   const c = rgbOf(color || '#4f9e9e');
-  const shared = tones(hex(c), dark);
+  const shared = (dark ? both?.dark : both?.light) || {};
   if (dark) {
     const frame = mix(c, base, 0.5);
     return {

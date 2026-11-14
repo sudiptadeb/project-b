@@ -169,6 +169,40 @@ From the settings audit of 2026-11-13 (owner approved). Every section follows th
 - **More under a row:** the row is the button, with a chevron on its right that turns
   when it opens. The panel sits under the row on `--accent-tint`. Escape closes it.
 
+### Context menus
+
+The owner, 2026-11-14: a right-click or long-press menu is drawn by the shell, and Go
+supplies what was pressed and the actions it can run. It is the floating menu `RowMenu`
+draws, opened at the pointer, so the shells that want the default look share
+`shell/src/ui/ContextMenu.vue` and its styles, `.ui-menu` and `.ui-menu-item`.
+
+- **The surface:** `--surface`, a `--line` hairline, radius 8, padding 4,
+  `var(--shadow-float)`; 220px wide at least and 320px at most, a long label ending in an
+  ellipsis (selected text is quoted to about 24 characters).
+- **An item:** 32px high (40 on touch), 12px side padding, radius 4, 13px `--text`, in
+  Go's action titles, title case as the Mac's menus are (Open Link in New Tab). Hover `--accent-tint`; keyboard focus `--focus-ring-inset`. An icon is
+  optional, 16px in `--icon`, 10px from the label; when one item has one, the others keep
+  its room so the labels line up. A key shows at the right, 12px `--muted`.
+- **Disabled** items stay, at half opacity, skipped by the arrow keys. A **danger** item is
+  `--danger`, last, after a separator.
+- **Separators** group items: a `--line` rule with 4px above and below; never first, last,
+  or two together.
+- **A submenu** row ends in a chevron and opens to its right, top aligned with the row,
+  after a short hover or at once on click or the right arrow; it flips left without room.
+  A workspace's item carries its colour dot as its icon.
+- **Placement:** at the pointer, flipping left or up to stay 4px inside the window. It is
+  the shell's region while open, as it floats over the page.
+- **Keyboard:** opened by the mouse, nothing is highlighted until a key or the pointer
+  moves; opened from the keyboard, the first item has focus. Up and down wrap, Home and End
+  jump, Enter and Space run, right opens a submenu and left closes it, a letter goes to the
+  next item starting with it. Escape closes the innermost menu (`ui/escape.js`), Tab all
+  of them; so do a press outside, the window losing focus, a scroll, or the tab changing.
+  Running an item closes the menu first, and focus goes back to what had it.
+- **Items** follow one order per context, the most used first: for a link, Open Link in
+  New Tab, in a Tab Group, in a Workspace, in a New Window, then Copy Link and Save Link
+  As; for a tab, New Tab Below, Duplicate, Pin, Add to Tab Group, Open in Workspace, Move
+  to New Window, then the closing ones. A shell lists only what Go can run today.
+
 ### Destructive actions
 
 - **Confirm whatever deletes the user's data or more than one of their changes** in a

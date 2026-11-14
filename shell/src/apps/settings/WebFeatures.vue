@@ -62,14 +62,13 @@ function onFilterEscape(e) {
       </div>
     </section>
     <section v-for="g in groups" :key="g.status" :aria-label="g.title">
-      <h2>{{ g.title }}</h2>
+      <h2 :class="{ quiet: g.status === 'quiet' }">{{ g.title }}</h2>
       <div class="card">
         <div v-for="f in g.rows" :key="f.id" class="row">
           <span class="label">
             <span class="name" :title="f.api">{{ f.name }}</span>
             <span class="secondary why">{{ f.why }}</span>
           </span>
-          <span class="tag" :class="{ quiet: f.status === 'quiet' }">{{ statusText[f.status] }}</span>
         </div>
       </div>
     </section>
@@ -106,9 +105,9 @@ function onFilterEscape(e) {
   overflow-wrap: anywhere;
 }
 
-/* Only a feature that fails without saying so is marked; every other tag stays neutral. */
-.tag.quiet {
-  box-shadow: inset 0 0 0 1px var(--danger);
+/* The group heading carries the status; only the features that fail without saying so
+   are marked. */
+h2.quiet {
   color: var(--danger);
 }
 </style>

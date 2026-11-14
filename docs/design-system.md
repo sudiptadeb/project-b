@@ -96,6 +96,19 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 | Touch | buttons grow to 40px; hover does nothing |
 | A phone | every control a finger presses is at least 48px each way, Android's least (48dp; a CSS pixel is a dp on a phone). What it draws may be smaller inside its target, as a 32px chip in a 48px row. The Mobile shell's tests check every control on each screen (`shell/e2e/shells/mobile.cjs`) |
 
+## Motion
+
+The owner, 2026-11-14: animations are very quick, about 100 ms, and smooth.
+
+- **Every transition** uses `var(--motion) var(--ease)` from `design.css`: 100 ms on
+  `cubic-bezier(0.2, 0, 0, 1)`, which starts fast and settles. No other durations.
+- **Animate only what helps you follow a change:** something opening or folding (the
+  sidebar, a group, a switch's thumb), a cross-fade from the splash to the UI, the load
+  progress. A menu or a dialog appears at once; hover and press colours change at once.
+- **Opacity and transforms** over size where it can be, so nothing reflows while it moves.
+- **Less motion** when the system asks for it (`prefers-reduced-motion`): `--motion` is 0,
+  and things change at once.
+
 ## Surfaces and elevation
 
 - **Flat:** the bar, the settings page. No border, no shadow.

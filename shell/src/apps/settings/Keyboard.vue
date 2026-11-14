@@ -514,7 +514,7 @@ h2 .tag {
 
 .chevron {
   color: var(--icon);
-  transition: transform 120ms;
+  transition: transform var(--motion) var(--ease);
 }
 
 .action[aria-expanded='true'] .chevron {

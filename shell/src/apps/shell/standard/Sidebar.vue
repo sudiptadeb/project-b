@@ -80,7 +80,7 @@ const rows = computed(() =>
   width: 220px;
   overflow: hidden;
   background: var(--frame);
-  transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: width var(--motion) var(--ease);
 }
 
 .sidebar.closed {

@@ -125,7 +125,7 @@ function switchLayout() {
   height: 2px;
   background: var(--accent);
   opacity: 0;
-  transition: width 0.15s ease-out;
+  transition: width var(--motion) var(--ease);
 }
 
 .progress.on {

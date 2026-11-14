@@ -114,7 +114,9 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
   `ready` or `failed`.
 - `keys` is the key each action shows, by action id, written as the keymap writes it
   (`Cmd+T`); `@/keys.js` and `keyLabel` show it as the menus do.
-- `workspaces` is each workspace's `{id, name, color}`; the default one isn't among them.
+- `workspaces` is each workspace's `{id, name, color}`, in the user's order, one at least.
+  Main, the profile's own storage, has the id `""`. A tab's `workspace` is its workspace's
+  id.
 - `suggestions` has the `id` the shell asked with and `items`, each `{url, title}`.
 - `extensions` is `{buttons, popup, prompt}`. A button is `{id, name, title, icon, badge,
   badgeColor, badgeTextColor, enabled, pinned}`, in the order the menu lists them; `popup`
@@ -129,7 +131,7 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH`, `frame` | The regions, the pages shown, and the band. Below. The SDK sends it |
-| `newTab` | `workspace`, optional: a workspace's id, `""` for the default | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's |
+| `newTab` | `workspace`, optional: a workspace's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |

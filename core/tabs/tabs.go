@@ -18,9 +18,10 @@ import (
 // Tab is a copy of one tab's state. Subscribers can keep it.
 type Tab struct {
 	ID engine.TabID `json:"id"`
-	// Workspace is the id of the workspace the tab is in, or "" for the default. It is
-	// given when the tab is made and never changes, whichever window the tab is in.
-	Workspace string `json:"workspace,omitempty"`
+	// Workspace is the id of the workspace the tab is in: "" is the profile's own storage,
+	// Main's. It is given when the tab is made and never changes, whichever window the tab
+	// is in.
+	Workspace string `json:"workspace"`
 	URL       string `json:"url"`
 	Title     string `json:"title"`
 	Loading   bool   `json:"loading"`
@@ -48,7 +49,10 @@ const BlankURL = "about:blank"
 
 // Manager owns the tabs.
 type Manager struct {
-	eng      engine.Engine
+	eng engine.Engine
+	// first is the first workspace in the profile's list, where a tab opens when nothing
+	// picks one.
+	first    func() string
 	tabs     map[engine.TabID]*Tab
 	windowOf map[engine.TabID]engine.WindowID
 	windows  map[engine.WindowID]*window
@@ -77,9 +81,10 @@ type window struct {
 	at     int
 }
 
-// New returns a manager with no windows.
-func New(eng engine.Engine) *Manager {
-	return &Manager{eng: eng, tabs: map[engine.TabID]*Tab{}, windowOf: map[engine.TabID]engine.WindowID{}, windows: map[engine.WindowID]*window{}}
+// New returns a manager with no windows. first says which workspace is first in the
+// profile's list.
+func New(eng engine.Engine, first func() string) *Manager {
+	return &Manager{eng: eng, first: first, tabs: map[engine.TabID]*Tab{}, windowOf: map[engine.TabID]engine.WindowID{}, windows: map[engine.WindowID]*window{}}
 }
 
 // AddGate adds a gate. Gates run in the order they were added.
@@ -169,14 +174,20 @@ func (m *Manager) WindowOf(id engine.TabID) engine.WindowID { return m.windowOf[
 func (m *Manager) front() *window { return m.windows[m.Front()] }
 
 // Create is New Tab: it opens a new tab at the end of window w, on the blank page, in the
-// workspace of w's active tab, or in the default one when w has none, and makes it active.
+// workspace of w's active tab, or in the first one when w has none, and makes it active.
 func (m *Manager) Create(w engine.WindowID) engine.TabID {
-	active, _ := m.Get(m.ActiveIn(w))
-	return m.CreateIn(w, active.Workspace)
+	if active, ok := m.Get(m.ActiveIn(w)); ok {
+		return m.CreateIn(w, active.Workspace)
+	}
+	return m.CreateIn(w, m.first())
 }
 
+// FirstWorkspace is the first workspace in the profile's list, where a tab opens when
+// nothing picks one.
+func (m *Manager) FirstWorkspace() string { return m.first() }
+
 // CreateIn opens a new tab at the end of window w, on the blank page, in a workspace, by
-// its id, or in the default one for "", and makes it active.
+// its id, and makes it active.
 func (m *Manager) CreateIn(w engine.WindowID, workspace string) engine.TabID {
 	id := m.eng.CreateTab(workspace)
 	m.add(id, w).Workspace = workspace
@@ -458,11 +469,12 @@ func (m *Manager) Duplicate() {
 // Open opens a URL in a new last tab of the window in front and shows it.
 func (m *Manager) Open(u string) { m.OpenIn(u, true) }
 
-// OpenIn opens a URL in a new last tab of the window in front, in the default workspace,
+// OpenIn opens a URL in a new last tab of the window in front, in the first workspace,
 // shown or behind the active one.
 func (m *Manager) OpenIn(u string, foreground bool) engine.TabID {
-	id := m.eng.CreateTab("")
-	m.HandleTabOpened(m.ActiveID(), id, u, "", foreground)
+	workspace := m.first()
+	id := m.eng.CreateTab(workspace)
+	m.HandleTabOpened(m.ActiveID(), id, u, workspace, foreground)
 	m.eng.LoadURL(id, u)
 	return id
 }

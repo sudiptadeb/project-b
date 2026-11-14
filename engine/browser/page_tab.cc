@@ -165,7 +165,7 @@ content::WebContents* PageTab::OpenURLFromTab(
 // The new tab is in this tab's workspace. Content makes a tab that keeps its opener in the
 // opener's SiteInstance, so in its workspace. One without, from target=_blank, rel=noopener
 // or a page that COOP cuts off from its opener, it makes in a SiteInstance of its own in
-// the default workspace. That one is dropped before it loads anything, and a tab made in
+// the profile's own storage. That one is dropped before it loads anything, and a tab made in
 // this tab's workspace takes its place: content loads the WebContents returned here when
 // its own is gone (kPwaNavigationCapturing, on by default), with the navigation it had for
 // its own, referrer and form data included. Its sessionStorage starts empty in the

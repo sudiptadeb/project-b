@@ -1,10 +1,11 @@
 // Package workspaces owns the profile's workspaces. A workspace is a set of tabs whose
-// cookies and site storage are their own, apart from the rest of the profile's: each tab is
-// in one for its life, and the engine keeps its storage apart. The default workspace is the
-// profile's own storage; it always exists and isn't in the list. The list is one small
-// file in the profile, workspaces.json beside prefs.json, read when the app starts and
-// written when it changes: each workspace's id, which Go makes and never changes, its name
-// and its colour.
+// cookies and site storage are their own: each tab is in one for its life, and the engine
+// keeps each one's storage apart. A profile always has at least one. A new profile starts
+// with Main, whose storage is the profile's own, the one the engine makes a tab in for "",
+// so Main's id is "". Every workspace made later has storage of its own. None is special
+// to the user. The list is one small file in the profile, workspaces.json beside
+// prefs.json, read when the app starts and written when it changes: each workspace's id,
+// which Go makes and never changes, its name and its colour, in the user's order.
 package workspaces
 
 import (
@@ -30,8 +31,16 @@ type Workspace struct {
 
 // file is workspaces.json.
 type file struct {
+	Version    int         `json:"version"`
 	Workspaces []Workspace `json:"workspaces"`
 }
+
+// version 2 lists Main. A file from before has no version.
+const version = 2
+
+// mainWorkspace is the workspace a new profile starts with, in the first of the colours
+// the settings page offers.
+var mainWorkspace = Workspace{ID: "", Name: "Main", Color: "#3470d0"}
 
 // A colour is "#rrggbb", as a colour input gives it.
 var color = regexp.MustCompile(`^#[0-9a-f]{6}$`)
@@ -43,29 +52,35 @@ type Manager struct {
 	onChanged []func()
 }
 
-// New returns a manager for the list in the profile folder dir, read here: none when there
-// is no file yet.
+// New returns a manager for the list in the profile folder dir, read here.
 func New(dir string) *Manager {
 	m := &Manager{path: filepath.Join(dir, "workspaces.json")}
-	b, err := os.ReadFile(m.path)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			timeline.Errorf("workspaces: %v", err)
-		}
-		return m
-	}
 	var f file
-	if err := json.Unmarshal(b, &f); err != nil {
-		timeline.Errorf("workspaces: %s: %v", m.path, err)
-		return m
+	if b, err := os.ReadFile(m.path); err == nil {
+		if err := json.Unmarshal(b, &f); err != nil {
+			timeline.Errorf("workspaces: %s: %v", m.path, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		timeline.Errorf("workspaces: %v", err)
 	}
 	m.list = f.Workspaces
+	// The one upgrade step. A new profile has no file, and one from before version 2 has
+	// a list without Main: either gets Main at the top, so the tabs and logins in the
+	// profile's own storage are in a listed workspace. The file says version 2 from the
+	// next change on, so a Main deleted after that never comes back.
+	if f.Version < version {
+		m.list = slices.Insert(m.list, 0, mainWorkspace)
+	}
 	return m
 }
 
-// List returns a copy of the workspaces, in the user's order, which starts as the order
-// they were made: none is an empty list, never nil, so it goes to a page as [].
-func (m *Manager) List() []Workspace { return append([]Workspace{}, m.list...) }
+// List returns a copy of the workspaces, in the user's order: Main first in a new profile,
+// then the order they were made.
+func (m *Manager) List() []Workspace { return slices.Clone(m.list) }
+
+// First is the id of the first workspace in the list, where a tab opens when nothing
+// picks a workspace for it.
+func (m *Manager) First() string { return m.list[0].ID }
 
 // OnChanged subscribes to a workspace being made, renamed, recoloured or moved.
 func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }
@@ -74,7 +89,7 @@ func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }
 // Names are unique in the list, whatever their case.
 func (m *Manager) Create(name, c string) (Workspace, error) {
 	name = strings.TrimSpace(name)
-	if err := m.checkName("", name); err != nil {
+	if err := m.checkName(-1, name); err != nil {
 		return Workspace{}, err
 	}
 	if !color.MatchString(c) {
@@ -94,7 +109,7 @@ func (m *Manager) SetName(id, name string) error {
 	if err != nil {
 		return err
 	}
-	if err := m.checkName(id, name); err != nil {
+	if err := m.checkName(i, name); err != nil {
 		return err
 	}
 	if m.list[i].Name == name {
@@ -149,13 +164,16 @@ func (m *Manager) index(id string) (int, error) {
 	return i, nil
 }
 
-// checkName refuses an empty name, and one another workspace than id has, in any case.
-func (m *Manager) checkName(id, name string) error {
+// checkName refuses an empty name, and one a workspace other than the one at index i has,
+// in any case. A new workspace is at none, -1.
+func (m *Manager) checkName(i int, name string) error {
 	if name == "" {
 		return errors.New("a workspace needs a name")
 	}
-	if slices.ContainsFunc(m.list, func(w Workspace) bool { return w.ID != id && strings.EqualFold(w.Name, name) }) {
-		return errors.New("there is already a workspace called " + name)
+	for j, w := range m.list {
+		if j != i && strings.EqualFold(w.Name, name) {
+			return errors.New("there is already a workspace called " + name)
+		}
 	}
 	return nil
 }
@@ -179,7 +197,7 @@ func (m *Manager) changed() {
 }
 
 func (m *Manager) save() {
-	b, _ := json.MarshalIndent(file{Workspaces: m.list}, "", "  ")
+	b, _ := json.MarshalIndent(file{Version: version, Workspaces: m.list}, "", "  ")
 	// A new file renamed over the old, so no reader and no crash sees half of one.
 	tmp := m.path + ".tmp"
 	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {

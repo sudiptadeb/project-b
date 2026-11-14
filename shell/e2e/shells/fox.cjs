@@ -10,7 +10,8 @@ const lib = require('../lib.cjs');
 const { check, fire, out, regions, settle, until } = lib;
 
 (async () => {
-  // A workspace, so a tab can be opened in it as Tab, New Tab in Workspace does.
+  // A workspace, so a tab can be opened in it as Tab, New Tab in Workspace does. The list
+  // is from before Main, so Go puts Main above it.
   fs.writeFileSync(path.join(lib.profile, 'workspaces.json'), JSON.stringify({ workspaces: [{ id: '0a1b2c3d', name: 'Work', color: '#5b7fd6' }] }));
   await lib.start(['-use=fox']);
   const browser = await chromium.launch();
@@ -166,16 +167,17 @@ const { check, fire, out, regions, settle, until } = lib;
   check('Escape restores the address and gives the keyboard to the page',
     await until(async () => (await field.inputValue()) === before && (await go()).focused === (await go()).active), JSON.stringify({ value: await field.inputValue(), focused: (await go()).focused }));
 
-  // A tab in a workspace: its line, and the workspace's name in the field.
+  // A tab in a workspace: its line, and the workspace's name in the field. The tabs before
+  // it are in Main.
   await fire('menu', 'workspaces:0a1b2c3d');
   await tabCount(3);
   const inWork = (await go()).active;
   const line = ui.locator(`[role=tab][data-tab="${inWork}"] .workspace`);
   check('a tab in a workspace has a line in its colour', (await line.count()) === 1 && (await line.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(91, 127, 214)');
-  check('a tab in the default workspace has none', (await tabs.first().locator('.workspace').count()) === 0);
+  check('a tab in Main has Main\'s', (await tabs.first().locator('.workspace').evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(52, 112, 208)');
   check('the field shows the workspace\'s name', (await ui.locator('.field .workspace').innerText()).trim() === 'Work');
   await tabs.first().click();
-  check('and not for a tab outside it', await until(async () => (await ui.locator('.field .workspace').count()) === 0));
+  check('and Main\'s for a tab in Main', await until(async () => (await ui.locator('.field .workspace').innerText()).trim() === 'Main'));
 
   // Many tabs: each at least the minimum width, the strip scrolls with arrows, and the
   // active tab is scrolled into view.

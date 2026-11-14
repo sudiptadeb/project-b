@@ -33,8 +33,8 @@ typedef struct PBValue {
 typedef enum PBEvent {
   PB_EVENT_SHELL_MESSAGE = 1,           // i: window, s: json
   PB_EVENT_TAB_OPENED = 2,              // i: opener, i: tab, s: url, s: its workspace,
-                                        // "" for the default; i: foreground, i: in a new
-                                        // window of its own
+                                        // "" for the profile's own storage; i: foreground,
+                                        // i: in a new window of its own
   PB_EVENT_FAVICON_CHANGED = 3,         // i: tab, s: data url or ""
   PB_EVENT_WINDOW_CHANGED = 4,          // i: window; d: w, d: h, the content area; d: x,
                                         // d: y, d: w, d: h, the window buttons; d: corner
@@ -158,8 +158,8 @@ typedef struct PBEngineCalls {
   // extension runtime with it. Go calls it once, as the copy becomes that profile's, before
   // anything asks for a tab.
   void (*open_profile)(const char* dir);
-  // Makes a hidden tab in a workspace, by Go's id for it, or in the default workspace for
-  // "". A window's layout shows it.
+  // Makes a hidden tab in a workspace, by Go's id for it: "" is the profile's own storage.
+  // A window's layout shows it.
   int64_t (*create_tab)(const char* workspace);
   // The workspace a tab the engine makes on its own goes in, one a client of the debugging
   // port or an extension asks for: the first in the profile's list. Go says which at start,

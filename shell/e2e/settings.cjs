@@ -286,9 +286,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-profile.png') });
 
-  // Workspaces: the list, New Workspace with a name and a colour, and rename. Go keeps them
-  // in the profile's folder, and the shell has them at once: a tab opened in one, as Tab,
-  // New Tab in Workspace does, shows its dot, and a rename reaches it.
+  // Workspaces: the list, Main in a new profile, New Workspace with a name and a colour, and
+  // rename. Go keeps them in the profile's folder, and the shell has them at once: a tab
+  // opened in one, as Tab, New Tab in Workspace does, shows its dot, and a rename reaches it.
   const workspacesFile = () => {
     try {
       return JSON.parse(fs.readFileSync(path.join(profile, 'workspaces.json'), 'utf8')).workspaces;
@@ -298,7 +298,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   };
   await page.getByRole('button', { name: 'Workspaces', exact: true }).click();
   const workspacesSection = page.getByRole('region', { name: 'Workspaces' });
-  check('Workspaces lists none at first, and says so', (await workspacesSection.locator('.row').textContent()).trim() === 'No workspaces yet');
+  const mainRow = workspacesSection.locator('.row', { hasText: 'Main' });
+  check('Workspaces lists Main at first, with the tab open in it',
+    (await workspacesSection.locator('.row').count()) === 1 && (await mainRow.textContent()).includes('1 tab') && workspacesFile().length === 0);
   await page.getByRole('button', { name: 'New workspace…' }).click();
   const wsDialog = page.getByRole('dialog', { name: 'New workspace' });
   const wsName = wsDialog.getByLabel('Name', { exact: true });
@@ -306,18 +308,20 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await wsDialog.getByLabel('Custom colour').fill('#c2410c');
   await wsName.fill('Work');
   await wsName.press('Enter');
-  check('Create makes one with its name and colour, kept in the profile', await until(() => workspacesFile().length === 1 && workspacesFile()[0].name === 'Work' && workspacesFile()[0].color === '#c2410c'), JSON.stringify(workspacesFile()));
+  check('Create makes one with its name and colour, kept in the profile after Main', await until(() => workspacesFile().length === 2 && workspacesFile()[0].name === 'Main' &&
+    workspacesFile()[1].name === 'Work' && workspacesFile()[1].color === '#c2410c'), JSON.stringify(workspacesFile()));
   check('and lists it as a row with its menu', await until(async () => (await page.getByRole('button', { name: 'Actions for Work' }).count()) === 1 && (await wsDialog.count()) === 0));
   await page.getByRole('button', { name: 'New workspace…' }).click();
   await wsName.fill('work');
   await wsName.press('Enter');
-  check('a name the list has is refused under the field', await until(async () => (await wsDialog.getByRole('alert').textContent()).includes('already') && workspacesFile().length === 1));
+  check('a name the list has is refused under the field', await until(async () => (await wsDialog.getByRole('alert').textContent()).includes('already') && workspacesFile().length === 2));
   await page.keyboard.press('Escape');
   check('Escape cancels the dialog and leaves the page open', await until(async () => (await wsDialog.count()) === 0) && (await regions()).settingsOpen === true);
-  const made = workspacesFile()[0].id;
+  const made = workspacesFile()[1].id;
   await fetch(`${base}/mock/fire`, { method: 'POST', body: new URLSearchParams({ kind: 'menu', value: 'workspaces:' + made }) });
-  const dot = ui.locator('[role=tab] .workspace');
-  check('a tab opened in it shows its dot in the shell at once', await until(async () => (await dot.count()) === 1 && (await dot.getAttribute('aria-label')) === 'In Work' &&
+  const dots = ui.locator('[role=tab] .workspace');
+  const dot = dots.nth(1);
+  check('a tab opened in it shows its dot in the shell at once', await until(async () => (await dots.count()) === 2 && (await dot.getAttribute('aria-label')) === 'In Work' &&
     (await dot.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(194, 65, 12)'));
   check('and the row counts it', await until(async () => (await workspacesSection.locator('.row', { hasText: 'Work' }).textContent()).includes('1 tab')));
   await workspacesSection.locator('.row', { hasText: 'Work' }).click({ button: 'right' });
@@ -326,11 +330,11 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   const editDialog = page.getByRole('dialog', { name: 'Edit workspace' });
   await editDialog.getByLabel('Name', { exact: true }).fill('Office');
   await editDialog.getByRole('button', { name: 'Save' }).click();
-  check('Edit renames it, under the same id', await until(() => workspacesFile()[0].name === 'Office' && workspacesFile()[0].id === made), JSON.stringify(workspacesFile()));
+  check('Edit renames it, under the same id', await until(() => workspacesFile()[1].name === 'Office' && workspacesFile()[1].id === made), JSON.stringify(workspacesFile()));
   check('and the dot in the shell says it at once', await until(async () => (await dot.getAttribute('aria-label')) === 'In Office'));
   await page.getByRole('button', { name: 'Actions for Office' }).click();
   await page.getByRole('menuitem', { name: 'New tab in workspace' }).click();
-  check('New tab in workspace opens a tab in it and closes the page', await until(async () => (await dot.count()) === 2 && (await regions()).settingsOpen === false));
+  check('New tab in workspace opens a tab in it and closes the page', await until(async () => (await dots.count()) === 3 && (await regions()).settingsOpen === false));
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await until(async () => (await regions()).settingsOpen === true);
   await page.close();

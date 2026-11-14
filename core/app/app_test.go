@@ -936,7 +936,7 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 	var items engine.Menu
 	r.e.Post(func() { items = r.a.MenuList("workspaces") })
 	r.e.Settle()
-	if len(items) != 0 {
+	if len(items) != 1 || items[0].Title != "Main" || items[0].Action != "workspaces:" || !items[0].Enabled {
 		t.Fatalf("a new profile's list holds %+v", items)
 	}
 	var work workspaces.Workspace
@@ -945,10 +945,10 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 		items = r.a.MenuList("workspaces")
 	})
 	r.e.Settle()
-	if len(items) != 1 || items[0].Title != "Work" || items[0].Action != "workspaces:"+work.ID {
+	if len(items) != 2 || items[1].Title != "Work" || items[1].Action != "workspaces:"+work.ID {
 		t.Fatalf("the list holds %+v", items)
 	}
-	r.e.Post(func() { r.a.MenuChosen(items[0].Action) })
+	r.e.Post(func() { r.a.MenuChosen(items[1].Action) })
 	m := r.waitFor(isTabs(2))
 	tab := m["tabs"].([]any)[1].(map[string]any)
 	id := engine.TabID(tab["id"].(float64))
@@ -974,7 +974,7 @@ func TestNewTabInWorkspaceFromTheMenu(t *testing.T) {
 }
 
 // New Tab, by Cmd+T or the shell's newTab, opens in the workspace of the window's active
-// tab. The shell's newTab can name a workspace instead, "" for the default.
+// tab. The shell's newTab can name a workspace instead, Main by "".
 func TestANewTabOpensInTheActiveTabsWorkspace(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
@@ -1006,9 +1006,50 @@ func TestANewTabOpensInTheActiveTabsWorkspace(t *testing.T) {
 	opens("the shell names a workspace", func() { r.shell(`{"t":"newTab","workspace":"` + work.ID + `"}`) }, work.ID)
 	opens("Cmd+T from a tab in it", cmdT, work.ID)
 	opens("the shell's newTab from a tab in it", shellNewTab, work.ID)
-	opens("the shell names the default", func() { r.shell(`{"t":"newTab","workspace":""}`) }, "")
-	opens("Cmd+T from a tab in the default", cmdT, "")
-	opens("the shell's newTab from a tab in the default", shellNewTab, "")
+	opens("the shell names Main", func() { r.shell(`{"t":"newTab","workspace":""}`) }, "")
+	opens("Cmd+T from a tab in Main", cmdT, "")
+	opens("the shell's newTab from a tab in Main", shellNewTab, "")
+}
+
+// A tab nothing places opens in the first workspace in the user's order: the first window's
+// at start, a new window's and a link's from another app. The engine hears which is first at
+// start and whenever another comes to the top, for the tabs it makes on its own.
+func TestATabNothingPlacesOpensInTheFirstWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "workspaces.json"), []byte(`{"version":2,"workspaces":[{"id":"0a1b2c3d","name":"Work","color":"#5b7fd6"},{"id":"","name":"Main","color":"#3470d0"}]}`), 0o600)
+	r := start(t, dir)
+	defer r.stop()
+	// in says where a tab is, in Go and in the engine.
+	in := func(id engine.TabID) string {
+		tab, _ := r.a.Tabs.Get(id)
+		return tab.Workspace + "/" + r.e.Workspace(id)
+	}
+	var atStart, inWindow, handed, firstThen, firstNow, afterMove string
+	r.e.Post(func() {
+		atStart, firstThen = in(r.a.Tabs.AllIn(1)[0].ID), r.e.FirstWorkspace()
+		r.a.Handover([]string{"https://elsewhere.test/"})
+		handed = in(r.a.Tabs.ActiveID())
+	})
+	// The page loads, and its visit is saved, before anything else.
+	r.waitForTab(func(t map[string]any) bool {
+		return t["url"] == "https://elsewhere.test/" && t["loading"] == false && strings.HasPrefix(t["title"].(string), "Mock")
+	})
+	r.e.Post(func() {
+		_, tab := r.a.NewWindow("")
+		inWindow = in(tab)
+		r.a.Workspaces.Move("", -1)
+		firstNow = r.e.FirstWorkspace()
+		_, tab = r.a.NewWindow("")
+		afterMove = in(tab)
+	})
+	r.e.Settle()
+	work := "0a1b2c3d/0a1b2c3d"
+	if atStart != work || inWindow != work || handed != work || firstThen != "0a1b2c3d" {
+		t.Fatalf("with Work first: the first tab is in %q, a new window's in %q, a handed link's in %q; the engine has %q first", atStart, inWindow, handed, firstThen)
+	}
+	if firstNow != "" || afterMove != "/" {
+		t.Fatalf("with Main moved to the top the engine has %q first, and a new window's tab is in %q", firstNow, afterMove)
+	}
 }
 
 // Every shell has the workspaces from its snapshot on, and hears of one made or renamed at
@@ -1017,18 +1058,21 @@ func TestTheShellHearsTheWorkspaces(t *testing.T) {
 	r := start(t, t.TempDir())
 	defer r.stop()
 	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
-	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 0 {
+	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 1 || l[0].(map[string]any)["name"] != "Main" || l[0].(map[string]any)["id"] != "" {
 		t.Fatalf("the snapshot's workspaces: %v", snap["workspaces"])
+	}
+	if tab := snap["tabs"].([]any)[0].(map[string]any); tab["workspace"] != "" {
+		t.Fatalf("the first tab is %v", tab)
 	}
 	r.e.Post(func() { r.a.Workspaces.Create("Work", "#5b7fd6") })
 	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" })
-	w := m["workspaces"].([]any)[0].(map[string]any)
+	w := m["workspaces"].([]any)[1].(map[string]any)
 	if w["name"] != "Work" || w["color"] != "#5b7fd6" || w["id"] == "" {
 		t.Fatalf("the shell heard %v", m)
 	}
 	r.e.Post(func() { r.a.Workspaces.SetName(w["id"].(string), "Office") })
 	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" })
-	if m["workspaces"].([]any)[0].(map[string]any)["name"] != "Office" {
+	if m["workspaces"].([]any)[1].(map[string]any)["name"] != "Office" {
 		t.Fatalf("after the rename the shell heard %v", m)
 	}
 }
@@ -1041,12 +1085,12 @@ func TestTheSettingsPageMakesAndRenamesWorkspaces(t *testing.T) {
 	r := start(t, dir)
 	defer r.stop()
 	got, snap := r.openSettings()
-	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 0 {
+	if l, ok := snap["workspaces"].([]any); !ok || len(l) != 1 || l[0].(map[string]any)["name"] != "Main" {
 		t.Fatalf("the snapshot's workspaces: %v", snap["workspaces"])
 	}
 	r.settings(`{"t":"createWorkspace","text":"Work","color":"#c2410c"}`)
 	m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaces" })
-	w := m["workspaces"].([]any)[0].(map[string]any)
+	w := m["workspaces"].([]any)[1].(map[string]any)
 	if w["name"] != "Work" || w["color"] != "#c2410c" {
 		t.Fatalf("the page heard %v", m)
 	}
@@ -1056,10 +1100,10 @@ func TestTheSettingsPageMakesAndRenamesWorkspaces(t *testing.T) {
 	var items engine.Menu
 	r.e.Post(func() { items = r.a.MenuList("workspaces") })
 	r.e.Settle()
-	if len(items) != 1 || items[0].Title != "Office" {
+	if len(items) != 2 || items[1].Title != "Office" {
 		t.Fatalf("the Tab menu's list holds %+v", items)
 	}
-	if l := workspaces.New(dir).List(); len(l) != 1 || l[0].ID != w["id"] || l[0].Name != "Office" {
+	if l := workspaces.New(dir).List(); len(l) != 2 || l[1].ID != w["id"] || l[1].Name != "Office" {
 		t.Fatalf("the profile's list holds %+v", l)
 	}
 }
@@ -1080,34 +1124,34 @@ func TestTheSettingsPageEditsMovesAndCountsWorkspaces(t *testing.T) {
 	})
 	r.e.Settle()
 	got, snap := r.openSettings()
-	if c, ok := snap["workspaceTabs"].(map[string]any); !ok || len(c) != 0 {
+	if c, ok := snap["workspaceTabs"].(map[string]any); !ok || len(c) != 1 || c[""] != float64(1) {
 		t.Fatalf("the snapshot's counts: %v", snap["workspaceTabs"])
 	}
 	r.settings(`{"t":"editWorkspace","id":"` + work + `","text":"shopping","color":"#2f9e44"}`)
 	r.settings(`{"t":"editWorkspace","id":"` + work + `","text":"Office","color":"#2f9e44"}`)
 	r.settings(`{"t":"moveWorkspace","id":"` + shop + `","by":-1}`)
 	r.waitOn(got, func(m map[string]any) bool {
-		return m["t"] == "workspaces" && m["workspaces"].([]any)[0].(map[string]any)["id"] == shop
+		return m["t"] == "workspaces" && m["workspaces"].([]any)[1].(map[string]any)["id"] == shop
 	})
 	l := workspaces.New(dir).List()
-	if len(l) != 2 || l[0].ID != shop || l[1].ID != work || l[1].Name != "Office" || l[1].Color != "#2f9e44" {
+	if len(l) != 3 || l[0].ID != "" || l[1].ID != shop || l[2].ID != work || l[2].Name != "Office" || l[2].Color != "#2f9e44" {
 		t.Fatalf("the profile's list holds %+v", l)
 	}
 	var items engine.Menu
 	r.e.Post(func() { items = r.a.MenuList("workspaces") })
 	r.e.Settle()
-	if len(items) != 2 || items[0].Title != "Shopping" || items[1].Title != "Office" {
+	if len(items) != 3 || items[0].Title != "Main" || items[1].Title != "Shopping" || items[2].Title != "Office" {
 		t.Fatalf("the Tab menu's list holds %+v", items)
 	}
 	var tab engine.TabID
 	r.e.Post(func() { tab = r.a.Tabs.CreateIn(r.a.Tabs.Front(), work) })
 	m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaceTabs" })
-	if c := m["workspaceTabs"].(map[string]any); len(c) != 1 || c[work] != float64(1) {
+	if c := m["workspaceTabs"].(map[string]any); len(c) != 2 || c[work] != float64(1) || c[""] != float64(1) {
 		t.Fatalf("after a tab opened in Office the page heard %v", m)
 	}
 	r.e.Post(func() { r.a.Tabs.Close(tab) })
 	m = r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaceTabs" })
-	if c := m["workspaceTabs"].(map[string]any); len(c) != 0 {
+	if c := m["workspaceTabs"].(map[string]any); len(c) != 1 || c[work] != nil {
 		t.Fatalf("after it closed the page heard %v", m)
 	}
 }

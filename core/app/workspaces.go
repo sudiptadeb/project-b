@@ -107,13 +107,11 @@ func (a *App) workspaceSettingsPart() settings.Part {
 }
 
 // workspaceTabs counts the tabs open in each workspace, by its id, in every window. A
-// workspace with none isn't in it, nor is the default.
+// workspace with none isn't in it.
 func (a *App) workspaceTabs() map[string]int {
 	counts := map[string]int{}
 	for _, t := range a.Tabs.All() {
-		if t.Workspace != "" {
-			counts[t.Workspace]++
-		}
+		counts[t.Workspace]++
 	}
 	return counts
 }

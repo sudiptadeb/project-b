@@ -45,8 +45,8 @@ export const state = {
   // The platform, as the keymap names it, and the key each action shows, by action id.
   platform: 'mac',
   keys: {},
-  // The profile's workspaces, each with its id, name and colour; the default workspace
-  // isn't among them.
+  // The profile's workspaces, each with its id, name and colour, in the user's order: one
+  // at least once the snapshot is in. Main, the profile's own storage, has the id ''.
   workspaces: [],
   // The report of the last run's crash, '' when it didn't crash or the notice was closed.
   crashLog: '',
@@ -126,7 +126,7 @@ export function activeTab(s) {
   return s.tabs.find((t) => t.id === s.active) || emptyTab;
 }
 
-// workspaceOf is the workspace a tab is in, or undefined for the default one.
+// workspaceOf is the workspace a tab is in, or undefined for one the list doesn't hold.
 export function workspaceOf(s, tab) {
   return s.workspaces.find((w) => w.id === tab.workspace);
 }

@@ -600,9 +600,9 @@ const stopServer = lib.stop;
   check('the running release keeps working', (await bar.inputValue()) === 'https://example.org/');
   releaseServer.close();
 
-  // A tab in a workspace shows a dot in the workspace's colour, in both layouts; a tab in
-  // the default workspace shows none. The tab is opened as Tab, New Tab in Workspace does,
-  // and New Tab from it opens in it too.
+  // A tab shows a dot in its workspace's colour, in both layouts: one in Work, and the
+  // first, in Main, which Go puts above a list from before it. The tab is opened as Tab, New
+  // Tab in Workspace does, and New Tab from it opens in it too.
   await stopServer();
   fs.writeFileSync(path.join(profile, 'workspaces.json'), JSON.stringify({ workspaces: [{ id: '0a1b2c3d', name: 'Work', color: '#5b7fd6' }] }));
   await startServer();
@@ -616,21 +616,21 @@ const stopServer = lib.stop;
   check('a tab in a workspace shows a dot in its colour, with the tabs on the side',
     (await sideRows.nth(1).locator('.workspace').count()) === 1 && (await dotColor(sideRows.nth(1))) === 'rgb(91, 127, 214)' &&
       (await sideRows.nth(1).locator('.workspace').getAttribute('aria-label')) === 'In Work');
-  check('a tab in the default workspace shows none, with the tabs on the side', (await sideRows.first().locator('.workspace').count()) === 0);
+  check('and a tab in Main shows Main\'s', (await dotColor(sideRows.first())) === 'rgb(52, 112, 208)' && (await sideRows.first().locator('.workspace').getAttribute('aria-label')) === 'In Main');
   await settle(page);
   await page.screenshot({ path: path.join(out, '11-workspace-dot-side.png') });
   await ui.getByRole('button', { name: 'Tabs on top' }).click();
   await ui.locator('.strip').waitFor();
   const topRows = ui.locator('.strip [role=tab]');
   check('and with the tabs on top', (await topRows.nth(1).locator('.workspace').count()) === 1 && (await dotColor(topRows.nth(1))) === 'rgb(91, 127, 214)');
-  check('where the default workspace\'s tab shows none', (await topRows.first().locator('.workspace').count()) === 0);
+  check('where Main\'s tab shows Main\'s', (await dotColor(topRows.first())) === 'rgb(52, 112, 208)');
   await settle(page);
   await page.screenshot({ path: path.join(out, '12-workspace-dot-top.png') });
   await ui.getByRole('button', { name: 'Tabs on the side' }).click();
   await ui.locator('nav').waitFor();
   await ui.getByRole('button', { name: 'New Tab', exact: true }).click();
   check('New Tab from a tab in a workspace opens in it',
-    await until(async () => (await sideRows.count()) === 3 && (await sideRows.nth(2).locator('.workspace').count()) === 1));
+    await until(async () => (await sideRows.count()) === 3 && (await sideRows.nth(2).locator('.workspace').getAttribute('aria-label')) === 'In Work'));
 
   check('no page errors', errors.length === 0, errors.join(' | '));
   await browser.close();

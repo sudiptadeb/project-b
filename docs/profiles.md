@@ -90,8 +90,10 @@ How these are built is in [profiles-build.md](profiles-build.md).
 
 **Decided.**
 
-- A profile has workspaces. A tab opened in another workspace shares no cookies or site
-  storage with the default workspace, as Firefox's containers and Brave's do.
+- A profile has workspaces. A tab in one workspace shares no cookies or site storage with
+  a tab in another, as Firefox's containers and Brave's do.
+- Every tab is in a workspace, and a profile always has at least one. A new profile starts
+  with Main, whose storage is the profile's own. None is special: there is no default.
 - Separate per workspace: cookies, local storage, IndexedDB, caches, service workers. Shared
   across the profile: extensions, permissions, downloads, settings and history. Firefox and
   Brave share the same things.
@@ -105,9 +107,9 @@ How these are built is in [profiles-build.md](profiles-build.md).
   interface gains one value on creating a tab and on a tab opening. A tab a page opens takes
   its opener's workspace.
 - *The holes are closed:* a link that opens a new tab without an opener, which content puts
-  in the default workspace (`content/browser/web_contents/web_contents_impl.cc`), and our own
-  paths for a link opened in a new tab. A tab made over DevTools is in the default
-  workspace, as decided.
+  in the profile's own storage (`content/browser/web_contents/web_contents_impl.cc`), and
+  our own paths for a link opened in a new tab. A tab nothing places, made over DevTools or
+  from another app, is in the first workspace in the user's order.
 - Not in this design: a throwaway workspace, rules that send a site to a workspace, and what
   extensions are told about a tab's workspace.
 

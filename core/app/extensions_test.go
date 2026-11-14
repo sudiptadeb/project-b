@@ -377,6 +377,43 @@ func TestTabsAPI(t *testing.T) {
 
 // Each window is one of Go's: the calls find, open, move, size and close them, and the
 // events say what happened to each.
+// A tab an extension opens is in the first workspace, whichever tab is active: tabs.create
+// in the window in front and in one behind, and each tab of a window windows.create opens.
+func TestATabAnExtensionOpensIsInTheFirstWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "workspaces.json"), []byte(`{"version":2,"workspaces":[{"id":"0a1b2c3d","name":"Work","color":"#5b7fd6"},{"id":"","name":"Main","color":"#3470d0"}]}`), 0o600)
+	r := startExtensions(t, dir)
+	r.install()
+	// Each window's active tab is in Main.
+	var w1 engine.WindowID
+	r.on(func() {
+		w1 = r.a.Tabs.Front()
+		r.a.Tabs.CreateIn(w1, "")
+		w2, _ := r.a.NewWindow("")
+		r.a.Tabs.CreateIn(w2, "")
+	})
+	var made map[string]any
+	var ids []engine.TabID
+	json.Unmarshal(r.call("tabs.create", `[{"url":"https://example.org/"}]`, 0).Result, &made)
+	ids = append(ids, engine.TabID(made["id"].(float64)))
+	json.Unmarshal(r.call("tabs.create", `[{"url":"https://example.net/","windowId":`+itoa(engine.TabID(w1))+`}]`, 0).Result, &made)
+	ids = append(ids, engine.TabID(made["id"].(float64)))
+	json.Unmarshal(r.call("windows.create", `[{"url":["https://a.test/","https://b.test/"],"populate":true}]`, 0).Result, &made)
+	for _, tab := range made["tabs"].([]any) {
+		ids = append(ids, engine.TabID(tab.(map[string]any)["id"].(float64)))
+	}
+	var in []string
+	r.on(func() {
+		for _, id := range ids {
+			tab, _ := r.a.Tabs.Get(id)
+			in = append(in, tab.Workspace+"/"+r.x.Workspace(id))
+		}
+	})
+	if len(in) != 4 || strings.Count(strings.Join(in, " "), "0a1b2c3d/0a1b2c3d") != 4 {
+		t.Fatalf("the tabs are in %q", in)
+	}
+}
+
 func TestWindowsAPI(t *testing.T) {
 	r := startExtensions(t, t.TempDir())
 	r.install()

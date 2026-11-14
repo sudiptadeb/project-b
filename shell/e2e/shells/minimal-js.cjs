@@ -202,7 +202,7 @@ const names = ['Example Domain', 'Mail · Work', 'Project B on GitHub', 'Weather
   await until(async () => (await go()).tabs.every((t, i) => t.title === names[i]));
   const dot = ui.locator(`[role=tab][data-tab="${inWork}"] .dot`);
   check('a tab in a workspace has a small square in its colour', (await dot.count()) === 1 && (await dot.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(217, 119, 6)' && (await dot.getAttribute('aria-label')) === 'In Work');
-  check('a tab in the default workspace has none', (await tabs.first().locator('.dot').count()) === 0);
+  check('a tab in Main, which Go put above Work, has Main\'s', (await tabs.first().locator('.dot').evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(52, 112, 208)');
   const fourWidths = await tabs.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
   check('with few tabs each is 200px wide', fourWidths.every((x) => x === 200), JSON.stringify(fourWidths));
   const first = r.tabs[0].id;

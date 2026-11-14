@@ -634,8 +634,8 @@ void Engine::FocusPageForTraversal(int64_t window, bool reverse) {
   }
 }
 
-// The default workspace is the context's own partition, which content refuses as a fixed
-// one, so its tabs get no SiteInstance and take the default as any page does.
+// The profile's own storage is the context's default partition, which content refuses as
+// a fixed one, so its tabs get no SiteInstance and take the default as any page does.
 PageTab* Engine::CreateTab(const std::string& workspace) {
   content::WebContents::CreateParams params(browser_context_);
   if (!workspace.empty()) {

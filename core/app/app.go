@@ -74,9 +74,9 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Policy = policy.New(cfg.BlockedHosts)
 	a.History = history.New(cfg.ProfileDir, e.Post)
 	a.Suggest = suggest.New(a.History)
-	a.Tabs = tabs.New(e)
-	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Workspaces = workspaces.New(cfg.ProfileDir)
+	a.Tabs = tabs.New(e, a.Workspaces.First)
+	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
 	a.Window = window.New(e, engine.ShellPage(a.Prefs.Shell()), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
@@ -118,12 +118,19 @@ func Start(e engine.Engine, cfg Config) *App {
 		})
 		a.Settings.AddPart(a.profileSettingsPart(cfg.Profiles, cfg.Profile))
 	}
-	// A workspace made or renamed reaches every shell at once, for the dots, and every
-	// settings page; the Tab menu reads the list as it opens.
+	// A change to the workspaces reaches every shell at once, for the dots, and every
+	// settings page; the Tab menu reads the list as it opens. The engine hears which is
+	// first, at start and whenever that changes, for the tabs it makes on its own.
+	firstWorkspace := a.Workspaces.First()
+	e.SetFirstWorkspace(firstWorkspace)
 	a.Workspaces.OnChanged(func() {
 		m := map[string]any{"t": "workspaces", "workspaces": a.Workspaces.List()}
 		a.Shell.Send(m)
 		a.Settings.Send(m)
+		if now := a.Workspaces.First(); now != firstWorkspace {
+			firstWorkspace = now
+			e.SetFirstWorkspace(now)
+		}
 	})
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
@@ -155,7 +162,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	}
 
 	a.History.Load(nil)
-	a.Tabs.CreateIn(first, "")
+	a.Tabs.Create(first)
 	a.Update.Start()
 	return a
 }
@@ -208,12 +215,12 @@ func (a *App) openWindow() engine.WindowID {
 	return w
 }
 
-// NewWindow opens a window with one tab, and returns both: a new tab, or one loading u
-// when it isn't "".
+// NewWindow opens a window with one tab, in the first workspace, and returns both: a new
+// tab, or one loading u when it isn't "".
 func (a *App) NewWindow(u string) (engine.WindowID, engine.TabID) {
 	w := a.openWindow()
 	if u == "" {
-		return w, a.Tabs.CreateIn(w, "")
+		return w, a.Tabs.Create(w)
 	}
 	// The new window is in front, where OpenIn opens.
 	return w, a.Tabs.OpenIn(u, true)

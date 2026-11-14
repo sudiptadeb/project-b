@@ -22,8 +22,8 @@ type command struct {
 	Text string          `json:"text"`
 	ID   int64           `json:"id"`
 	Data json.RawMessage `json:"data"`
-	// Workspace is where newTab opens its tab: a workspace's id, or "" for the default.
-	// Without it the tab opens in the workspace of the window's active tab.
+	// Workspace is where newTab opens its tab, by the workspace's id. Without it the tab
+	// opens in the workspace of the window's active tab, or the first in a window with none.
 	Workspace *string `json:"workspace"`
 }
 

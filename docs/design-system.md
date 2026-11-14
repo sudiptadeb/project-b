@@ -151,7 +151,8 @@ From the settings audit of 2026-11-13 (owner approved). Every section follows th
   "Edit workspace". Enter saves, Escape cancels.
 - **A new item gets the next colour no other item has.** Names are unique in a list; a
   duplicate is refused under the field.
-- **An empty list is one muted row:** "No workspaces yet". The add button stays where it is.
+- **An empty list is one muted row:** "No extensions installed". The add button stays where
+  it is.
 - **A long name is one line with an ellipsis,** the full name in its tooltip.
 
 ### Rows and headings

@@ -5,12 +5,13 @@ import RowMenu from '@/ui/RowMenu.vue';
 import Swatches from '@/ui/Swatches.vue';
 import { send, state } from './state.js';
 
-// The profile's workspaces: a list of rows, each with its colour, its name and the number
-// of tabs open in it, and a menu to edit or move it. New workspace and Edit open one
-// dialog with the name and the colour. Go owns the list and answers with it as it is now;
-// it refuses a duplicate name too, but the dialog says so first.
+// The profile's workspaces, one at least: a list of rows, each with its colour, its name and
+// the number of tabs open in it, and a menu to edit or move it. New workspace and Edit open
+// one dialog with the name and the colour. Go owns the list and answers with it as it is
+// now; it refuses a duplicate name too, but the dialog says so first.
 
-// The colours a workspace starts from; any other is a custom one.
+// The colours a workspace starts from; any other is a custom one. Main, the workspace a
+// profile starts with, has the first (core/workspaces).
 const colors = ['#3470d0', '#d03434', '#4f9e9e', '#e8a317', '#8a4fd0', '#2e9d5b', '#34404f'];
 
 function tabs(w) {
@@ -112,7 +113,6 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
       <button type="button" class="text-button" @click="create">New workspace…</button>
     </div>
     <div class="card">
-      <div v-if="!state.workspaces.length" class="row empty">No workspaces yet</div>
       <div
         v-for="(w, i) in state.workspaces"
         :key="w.id"
@@ -181,10 +181,6 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.empty {
-  color: var(--muted);
 }
 
 .text-field {

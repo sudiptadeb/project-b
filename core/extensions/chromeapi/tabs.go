@@ -178,7 +178,7 @@ func init() {
 		if p.URL != "" {
 			u = resolve(c.Extension, p.URL)
 		}
-		// Into the window named, or the caller's current one.
+		// Into the window named, or the caller's current one, in the first workspace.
 		w := a.current(c)
 		if p.WindowID != nil && *p.WindowID != currentWindow {
 			if _, ok := a.windows.Get(*p.WindowID); !ok {
@@ -190,7 +190,7 @@ func init() {
 		if w == a.tabs.Front() {
 			id = a.tabs.OpenIn(u, p.Active == nil || *p.Active)
 		} else {
-			id = a.tabs.CreateIn(w, "")
+			id = a.tabs.CreateIn(w, a.tabs.FirstWorkspace())
 			a.tabs.Load(id, u)
 		}
 		t, _ := a.tabs.Get(id)

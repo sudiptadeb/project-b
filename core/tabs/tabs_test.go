@@ -12,16 +12,29 @@ type fakeEngine struct {
 	engine.Engine
 	next   engine.TabID
 	closed []engine.TabID
+	// in is the workspace each tab was made in, by its id.
+	in map[engine.TabID]string
 }
 
-func (f *fakeEngine) CreateTab(string) engine.TabID          { f.next++; return f.next }
+func (f *fakeEngine) CreateTab(workspace string) engine.TabID {
+	f.next++
+	if f.in == nil {
+		f.in = map[engine.TabID]string{}
+	}
+	f.in[f.next] = workspace
+	return f.next
+}
+
 func (f *fakeEngine) DuplicateTab(engine.TabID) engine.TabID { f.next++; return f.next }
 func (f *fakeEngine) CloseTab(id engine.TabID)               { f.closed = append(f.closed, id) }
 func (f *fakeEngine) LoadURL(engine.TabID, string)           {}
 
-// oneWindow is a manager with window 1.
+// work is the first workspace in the tests' list.
+const work = "0a1b2c3d"
+
+// oneWindow is a manager with window 1, whose list has work first.
 func oneWindow(e engine.Engine) *Manager {
-	m := New(e)
+	m := New(e, func() string { return work })
 	m.AddWindow(1)
 	return m
 }
@@ -276,18 +289,32 @@ func TestATabKeepsItsWorkspace(t *testing.T) {
 	}
 }
 
-// New Tab opens in the workspace of its window's active tab, and in the default one in a
+// New Tab opens in the workspace of its window's active tab, and in the first one in a
 // window with no tab.
 func TestANewTabTakesTheActiveTabsWorkspace(t *testing.T) {
 	m := oneWindow(&fakeEngine{})
 	workspace := func(id engine.TabID) string { t, _ := m.Get(id); return t.Workspace }
 	first := m.Create(1)
-	work := m.CreateIn(1, "0a1b2c3d")
-	fromWork := m.Create(1)
+	main := m.CreateIn(1, "")
+	fromMain := m.Create(1)
 	m.Activate(first)
-	fromDefault := m.Create(1)
-	got := []string{workspace(first), workspace(work), workspace(fromWork), workspace(fromDefault)}
-	if !slices.Equal(got, []string{"", "0a1b2c3d", "0a1b2c3d", ""}) {
+	fromFirst := m.Create(1)
+	m.AddWindow(2)
+	inNewWindow := m.Create(2)
+	got := []string{workspace(first), workspace(main), workspace(fromMain), workspace(fromFirst), workspace(inNewWindow)}
+	if !slices.Equal(got, []string{work, "", "", work, work}) {
 		t.Fatalf("workspaces %q", got)
+	}
+}
+
+// A URL opened with no tab to take a workspace from, as a link from another app is, opens
+// in the first workspace, whichever tab is active.
+func TestAURLOpensInTheFirstWorkspace(t *testing.T) {
+	e := &fakeEngine{}
+	m := oneWindow(e)
+	m.CreateIn(1, "")
+	id := m.OpenIn("https://p.test/", true)
+	if tab, _ := m.Get(id); tab.Workspace != work || e.in[id] != work || tab.URL != "https://p.test/" {
+		t.Fatalf("the tab is %+v, in %q in the engine", tab, e.in[id])
 	}
 }

@@ -1588,11 +1588,11 @@ def attach(profile, url):
 def workspace_checks():
     """A workspace keeps its own cookies and site storage. What a page in workspace a sets,
     a cookie, a local storage value and an IndexedDB database, a second tab of a sees, and
-    workspace b and the default workspace don't; a restart on the same profile keeps it. A
-    tab a page in a opens is in a too: by window.open, with its opener or without, by a link
-    opened in a new tab, and by a target=_blank or rel=noopener link, which content would
-    put in the default workspace. The driver opens a tab in a workspace by its id, as Go
-    does."""
+    workspace b and Main, the profile's own storage, don't; a restart on the same profile
+    keeps it. A tab a page in a opens is in a too: by window.open, with its opener or
+    without, by a link opened in a new tab, and by a target=_blank or rel=noopener link,
+    which content would put in the profile's own storage. The driver opens a tab in a
+    workspace by its id, as Go does."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile, ["--remote-debugging-port=0"])
     a = open_in(app, "a", STORE)
@@ -1604,8 +1604,8 @@ def workspace_checks():
     check("a tab of another workspace sees neither", stored(app, b) == ["", None], stored(app, b))
     app.js(f"location.href={json.dumps(STORE)}", tab=1)
     app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=1)
-    check("nor does a tab of the default workspace", stored(app, 1) == ["", None], stored(app, 1))
-    check("an IndexedDB database made in a workspace is seen there, and not in another or the default",
+    check("nor does a tab of Main", stored(app, 1) == ["", None], stored(app, 1))
+    check("an IndexedDB database made in a workspace is seen there, and not in another or Main",
           (databases(app, second), databases(app, b), databases(app, 1)) == ("w", "", ""))
     # The blank page in a workspace tab, reached by every way but the one Go loads it by:
     # a reload, history, and DevTools. Content would stop the app on the next navigation
@@ -1667,13 +1667,13 @@ def tabs_of(app):
 
 def workspace_menu_checks():
     """Tab, New Tab in Workspace lists the profile's workspaces, read as the menu opens, and
-    choosing one opens a new tab in that workspace in the window in front. With no
-    workspaces it is disabled. A workspace made in settings is listed the next time the menu
-    opens; it is the profile folder's, here a folder named outright."""
+    choosing one opens a new tab in that workspace in the window in front. A new profile's
+    lists Main. A workspace made in settings is listed the next time the menu opens; it is
+    the profile folder's, here a folder named outright."""
     profile = tempfile.mkdtemp(prefix="pb-profile-")
     app = App(profile)
     item = lambda: next(i for m in json.loads(app.cmd("menu")) if m["title"] == "Tab" for i in m["items"] if i != "-" and i["title"] == "New Tab in Workspace")
-    check("with no workspaces, Tab, New Tab in Workspace is disabled and empty", not item()["enabled"] and item()["items"] == [], item())
+    check("a new profile's Tab, New Tab in Workspace lists Main", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Main"], item())
 
     settings = lambda expr: json.loads(app.cmd("evalsettings", expr))
     app.cmd("key", "cmd+,")
@@ -1697,9 +1697,9 @@ def workspace_menu_checks():
                 raise TimeoutError("the New workspace dialog never closed")
             time.sleep(0.1)
     deadline = time.time() + 10
-    while [i["title"] for i in item()["items"]] != ["Work", "Shopping"] and time.time() < deadline:
+    while [i["title"] for i in item()["items"]] != ["Main", "Work", "Shopping"] and time.time() < deadline:
         time.sleep(0.1)
-    check("workspaces made in settings are listed the next time the menu opens", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Work", "Shopping"], item())
+    check("workspaces made in settings are listed the next time the menu opens", [i["title"] for i in item()["items"]] == ["Main", "Work", "Shopping"], item())
     app.cmd("key", "cmd+w")
     ids = {w["name"]: w["id"] for w in json.load(open(os.path.join(profile, "workspaces.json")))["workspaces"]}
 

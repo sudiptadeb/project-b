@@ -59,7 +59,7 @@ type tab struct {
 	state   string // What the mock page shows: empty, loading, loaded, blocked, crashed.
 	current string
 	zoom    float64
-	// workspace is the app's id for the workspace the tab is in, or "" for the default.
+	// workspace is the app's id for the workspace the tab is in, "" for the profile's own storage.
 	workspace string
 }
 
@@ -234,7 +234,7 @@ func (e *Engine) CreateTab(workspace string) engine.TabID {
 	return e.nextTab
 }
 
-// Workspace is the workspace a tab is in, or "" for the default. Main thread.
+// Workspace is the workspace a tab is in, "" for the profile's own storage. Main thread.
 func (e *Engine) Workspace(id engine.TabID) string {
 	if t := e.tabs[id]; t != nil {
 		return t.workspace

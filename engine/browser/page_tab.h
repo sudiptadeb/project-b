@@ -26,7 +26,8 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
 
   int64_t id() const { return id_; }
   content::WebContents* contents() const { return contents_.get(); }
-  // Go's id for the workspace the tab is in, or "" for the default. It never changes.
+  // Go's id for the workspace the tab is in, "" for the profile's own storage. It never
+  // changes.
   const std::string& workspace() const { return workspace_; }
   // Go's id for the window whose layout last showed this tab, 0 before any has.
   int64_t window() const { return window_; }

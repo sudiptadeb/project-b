@@ -150,7 +150,7 @@ const tell = (msg) => fetch(`${lib.base}/shell/send`, { method: 'POST', body: JS
   await visit('mail.test', 'https://mail.test');
   const dot = ui.locator(`[role=tab][data-tab="${inWork}"] .dot`);
   check('a tab in a workspace shows a square in its colour', (await dot.count()) === 1 && (await dot.evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(217, 119, 6)');
-  check('a tab outside one shows none', (await tabs.first().locator('.dot').count()) === 0);
+  check('a tab in Main, which Go put above Work, shows Main\'s', (await tabs.first().locator('.dot').evaluate((e) => getComputedStyle(e).backgroundColor)) === 'rgb(52, 112, 208)');
   await tabs.first().click();
   await until(async () => (await active()).url === 'https://example.com/news/today');
   await newTab.click();

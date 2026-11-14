@@ -115,15 +115,15 @@ class Engine {
   void FocusShellForTraversal(int64_t from_tab, bool reverse);
   void FocusPageForTraversal(int64_t window, bool reverse);
 
-  // Makes a hidden tab in a workspace: Go's id for one, or "" for the default, the
-  // profile's own storage. A workspace is a storage partition of the profile's context,
-  // which the tab keeps for its life, across every site it visits and every tab it opens.
+  // Makes a hidden tab in a workspace, by Go's id for it: "" is the profile's own storage.
+  // Any other workspace is a storage partition of the profile's context, which the tab
+  // keeps for its life, across every site it visits and every tab it opens.
   PageTab* CreateTab(const std::string& workspace);
   // Takes a WebContents content made for a page's window.open or link, or for an
   // extension's page, and makes it a hidden tab, in the workspace content made it in.
   PageTab* AdoptTab(std::unique_ptr<content::WebContents> contents);
   // The workspace a page is in, by the partition content made it in: Go's id for one, or
-  // "" for the default.
+  // "" for the profile's own storage.
   std::string WorkspaceOf(content::WebContents* contents) const;
   // The workspace a tab the engine makes on its own goes in, one a client of the
   // debugging port or an extension asks for: the first in the profile's list, as Go says.

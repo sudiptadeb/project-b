@@ -11,6 +11,16 @@
   --focus-ring: 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
   /* The same ring drawn inside, for what fills its container: a menu item, a row. */
   --focus-ring-inset: inset 0 0 0 1px var(--accent), inset 0 0 0 3px var(--accent-soft);
+  /* Motion: every transition, quick and smooth (docs/design-system.md, Motion). */
+  --motion: 100ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Asked for less motion, things change at once. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+  }
 }
 
 /* An icon alone: a flat 28px square with a 6px radius. */
@@ -185,7 +195,7 @@ select:disabled {
   height: 12px;
   border-radius: 50%;
   background: var(--muted);
-  transition: transform 120ms;
+  transition: transform var(--motion) var(--ease);
 }
 
 .switch:checked {

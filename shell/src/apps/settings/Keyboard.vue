@@ -483,7 +483,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 
 .chevron {
   color: var(--icon);
-  transition: transform 120ms;
+  transition: transform var(--motion) var(--ease);
 }
 
 .action[aria-expanded='true'] .chevron {

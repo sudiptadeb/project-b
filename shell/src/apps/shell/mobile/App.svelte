@@ -18,6 +18,9 @@
   setFrame(0);
 
   const tab = $derived(activeTab(go));
+  // The address bar on top, as a setting has it, rather than at the foot. The group strip
+  // stays at the foot either way, as Chrome's does.
+  const top = $derived(go.addressBarPosition === 'top');
   // What is open over the page: '', 'switcher', 'menu', 'extensions', 'group' (the active
   // tab's, or the one in sheetGroup) or 'card' (cardTab's menu).
   let sheet = $state('');
@@ -119,6 +122,9 @@
   {#if clear}
     <div class="clear" use:shell use:drag style:height="{clear}px"></div>
   {/if}
+  {#if top}
+    <Toolbar {tab} top count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+  {/if}
   <div class="stage">
     <main use:page={go.active}></main>
     {#if group}
@@ -140,7 +146,9 @@
     />
   </div>
   <CrashBar />
-  <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+  {#if !top}
+    <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+  {/if}
   {#if sheet === 'menu'}
     <MenuSheet {tab} {group} {workspace} onclose={() => (sheet = '')} onnewtab={(inGroup) => newTab(inGroup ? go.active : 0)} {onsheet} onworkspace={(id) => (workspace = id)} />
   {:else if sheet === 'group' && shownGroup}

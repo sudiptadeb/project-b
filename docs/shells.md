@@ -106,6 +106,7 @@ gives the page the same two.
 | `update` | `update`: what the updater is doing | It changed |
 | `crashLog` | `crashLog`, `crashReport` | The notice of the last run's crash was closed |
 | `tabLayout` | `tabLayout` | The standard shell's tab position changed |
+| `addressBarPosition` | `addressBarPosition`: `bottom` or `top` | The Mobile shell's address bar moved, from settings on a phone |
 | `focusAddressBar` | | The user asked for the address bar |
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
@@ -168,6 +169,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `data` | `data`: any JSON | Replaces this window's copy of the shell's own data |
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
+| `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
 | `extensionClick` | `extension`, `rect` | A press on an extension's button at `rect`: Go opens its popup under it, closes it when it is the one open, or tells the extension it was clicked |
 | `extensionPin` | `extension`, `on` | Puts the extension's button on the toolbar, or takes it off |
 | `extensionsManage` | | Opens settings at its Extensions section |
@@ -478,6 +480,9 @@ address field, and a menu button at the far right, in our tones.
   tab is in one; then Workspaces (where new
   tabs open), Extensions while their flag is on, the update when one is ready, and
   Settings.
+- **The address bar on top** is a setting, `addressBarPosition`, in Settings, General on a
+  phone: the bar moves under the status bar, the suggestions grow down from it, and the
+  group strip stays at the foot, as Chrome's does. Sheets stay at the foot.
 - **The band:** none. A desktop window's buttons, as on the mock, get a strip of their
   own above the page, which a phone has no need of.
 

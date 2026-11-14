@@ -27,6 +27,12 @@ const themes = [
   { value: 'dark', label: 'Dark' },
 ];
 
+// A phone's address bar: at the foot, by the thumb, or on top.
+const positions = [
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+];
+
 const layouts = [
   { value: 'vertical', label: 'Vertical' },
   { value: 'horizontal', label: 'Horizontal' },
@@ -62,6 +68,10 @@ const busy = computed(() => state.update.check === 'checking' || state.update.ph
         <div class="row">
           <span class="label">Theme</span>
           <Segmented label="Theme" :options="themes" :model-value="state.theme" @update:model-value="send({ t: 'setTheme', text: $event })" />
+        </div>
+        <div v-if="phone" class="row">
+          <span class="label">Address bar</span>
+          <Segmented label="Address bar" :options="positions" :model-value="state.addressBarPosition" @update:model-value="send({ t: 'setAddressBarPosition', text: $event })" />
         </div>
         <div v-if="!phone" class="row">
           <span class="label">Tab layout</span>

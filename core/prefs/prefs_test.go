@@ -63,7 +63,7 @@ func TestApplySetsWhatTheValuesHoldThroughTheSetters(t *testing.T) {
 	if strings.Join(heard, " ") != "horizontal #5b7fd6" {
 		t.Fatalf("heard %v", heard)
 	}
-	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark, Shell: "standard"}) {
+	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark, Shell: "standard", AddressBarPosition: AddressBottom}) {
 		t.Fatalf("saved %+v", got)
 	}
 }
@@ -92,5 +92,26 @@ func TestTheShellIsAShellsIDAndSurvivesARestart(t *testing.T) {
 	}
 	if New(dir).Shell() != "standard" {
 		t.Fatalf("a shell that isn't one loads as %q", New(dir).Shell())
+	}
+}
+
+// The address bar is at the foot by default, moves to the top and back, and a position
+// that isn't one keeps the default.
+func TestTheAddressBarPosition(t *testing.T) {
+	dir := t.TempDir()
+	m := New(dir)
+	var got []string
+	m.OnAddressBarPositionChanged(func(at string) { got = append(got, at) })
+	m.SetAddressBarPosition("middle")
+	m.SetAddressBarPosition(AddressTop)
+	m.SetAddressBarPosition(AddressTop)
+	if m.AddressBarPosition() != AddressTop || len(got) != 1 || New(dir).AddressBarPosition() != AddressTop {
+		t.Fatalf("changes %v, saved %q", got, New(dir).AddressBarPosition())
+	}
+	if err := os.WriteFile(filepath.Join(dir, "prefs.json"), []byte(`{"addressBarPosition":"side"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if New(dir).AddressBarPosition() != AddressBottom {
+		t.Fatalf("a position that isn't one loads as %q", New(dir).AddressBarPosition())
 	}
 }

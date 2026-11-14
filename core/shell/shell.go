@@ -124,22 +124,23 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "ready":
 		m.heard[w] = true
 		snapshot := map[string]any{
-			"t":            "snapshot",
-			"tabs":         m.tabs.AllIn(w),
-			"active":       m.tabs.ActiveIn(w),
-			"groups":       m.tabs.GroupsIn(w),
-			"windowColor":  m.window.Color(),
-			"controls":     m.window.Controls(w),
-			"cornerRadius": m.window.CornerRadius(w),
-			"tabLayout":    m.prefs.TabLayout(),
-			"theme":        m.prefs.Theme(),
-			"update":       m.update.State(),
-			"running":      m.update.Running(),
-			"crashLog":     m.crash.Last(),
-			"crashReport":  m.crash.Report(),
-			"platform":     m.os,
-			"keys":         m.keys(),
-			"data":         m.data[w],
+			"t":                  "snapshot",
+			"tabs":               m.tabs.AllIn(w),
+			"active":             m.tabs.ActiveIn(w),
+			"groups":             m.tabs.GroupsIn(w),
+			"windowColor":        m.window.Color(),
+			"controls":           m.window.Controls(w),
+			"cornerRadius":       m.window.CornerRadius(w),
+			"tabLayout":          m.prefs.TabLayout(),
+			"theme":              m.prefs.Theme(),
+			"addressBarPosition": m.prefs.AddressBarPosition(),
+			"update":             m.update.State(),
+			"running":            m.update.Running(),
+			"crashLog":           m.crash.Last(),
+			"crashReport":        m.crash.Report(),
+			"platform":           m.os,
+			"keys":               m.keys(),
+			"data":               m.data[w],
 		}
 		for _, p := range m.parts {
 			p.Snapshot(snapshot)
@@ -190,6 +191,8 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.Interaction(w, "tab.close", func() { m.tabs.CloseGroup(c.Group) })
 	case "setTabLayout":
 		m.SwitchTabLayout(c.Text)
+	case "setAddressBarPosition":
+		m.prefs.SetAddressBarPosition(c.Text)
 	case "run":
 		m.run(c.Text)
 	case "relaunch":
@@ -253,6 +256,11 @@ func (m *Manager) ThemeChanged(theme string) {
 // TabLayoutChanged tells the shells where the tabs go now.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+// AddressBarPositionChanged tells the shells where a phone shell's address bar goes now.
+func (m *Manager) AddressBarPositionChanged(at string) {
+	m.sendAll(map[string]any{"t": "addressBarPosition", "addressBarPosition": at})
 }
 
 // UpdateChanged tells the shells what the updater is doing: nothing, checking,

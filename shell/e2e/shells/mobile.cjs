@@ -274,6 +274,56 @@ const H = 915;
   await menu.getByRole('menuitem', { name: 'Settings' }).tap();
   check('Settings in the menu opens the settings page', await until(async () => (await regions()).settingsOpen === true));
 
+  // The address bar on top, from settings on a phone: the toolbar moves under the status
+  // bar, the strip stays at the foot, the suggestions grow down.
+  const settings = page.frameLocator('iframe.mock-settings');
+  await settings.getByRole('radiogroup', { name: 'Address bar' }).getByRole('radio', { name: 'Top' }).tap();
+  await settings.getByRole('button', { name: 'Close settings' }).tap();
+  await until(async () => (await regions()).settingsOpen === false);
+  const clear = (await regions()).window.Controls;
+  const topY = clear.h > 0 ? clear.y + clear.h : 0;
+  check('Top in settings moves the toolbar to the top', await until(async () => {
+    const b = await box('.toolbar');
+    return b && Math.round(b.y) === topY && b.height === 48;
+  }), JSON.stringify(await box('.toolbar')));
+  check('the page lies under it, down to the foot', await until(async () => {
+    const v = (await regions()).visible[0].rect;
+    return v.y === topY + 48 && v.y + v.h === H;
+  }), JSON.stringify((await regions()).visible));
+  await fire('menu', 'tab.new');
+  await until(inField);
+  await page.keyboard.type('example.com/docs');
+  await until(async () => (await suggestions.count()) >= 2);
+  const below = await box('.suggestions');
+  check('the suggestions grow down from the field', below.y >= topY + 48 - 4 && below.y < topY + 60, JSON.stringify(below));
+  await shots('top-suggestions');
+  await page.keyboard.press('Enter');
+  await until(async () => !(await inField()));
+  await tabsButton.tap();
+  check('the switcher opens under the toolbar', await until(async () => {
+    const b = await box('.switcher');
+    return (await switcher.isVisible()) && Math.round(b.y) === topY + 48 && b.bottom === H;
+  }), JSON.stringify(await box('.switcher')));
+  await page.keyboard.press('Escape');
+  await fire('menu', 'tab.select1');
+  const firstTab = (await regions()).tabs[0].id;
+  await until(async () => (await regions()).active === firstTab);
+  await menuButton.tap();
+  await menu.getByRole('button', { name: 'New Tab' }).tap();
+  await until(inField);
+  await page.keyboard.press('Escape');
+  await tabsButton.tap();
+  const lastCard = cards.filter({ visible: true }).first();
+  await lastCard.click({ button: 'right' });
+  await cardMenu.getByRole('menuitem', { name: 'Add to group' }).tap();
+  await cardMenu.getByRole('menuitem', { name: 'New group' }).tap();
+  check('with the toolbar on top, the strip is at the foot', await until(async () => {
+    const b = await box('[role=group][aria-label^="Group "]');
+    return b && Math.round(b.bottom) === H;
+  }), JSON.stringify(await box('[role=group][aria-label^="Group "]')));
+  await page.keyboard.press('Escape');
+  await shots('top-strip');
+
   check('it logged no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();
   await lib.done();

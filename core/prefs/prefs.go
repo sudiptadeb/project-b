@@ -19,6 +19,12 @@ const (
 	TabsHorizontal = "horizontal"
 )
 
+// Where a phone shell puts its address bar: at the foot, by the thumb, or on top.
+const (
+	AddressBottom = "bottom"
+	AddressTop    = "top"
+)
+
 // Themes: the shell and the window follow the system's light or dark, or stay one.
 const (
 	ThemeSystem = "system"
@@ -33,11 +39,13 @@ type Prefs struct {
 	Theme      string `json:"theme"`
 	// Shell is the id of the shell every window loads.
 	Shell string `json:"shell"`
+	// AddressBarPosition is AddressBottom or AddressTop. Only the Mobile shell reads it.
+	AddressBarPosition string `json:"addressBarPosition"`
 }
 
 // Defaults are the settings before the user changes any.
 func Defaults() Prefs {
-	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem, Shell: shells.Default()}
+	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem, Shell: shells.Default(), AddressBarPosition: AddressBottom}
 }
 
 func isTheme(t string) bool { return t == ThemeSystem || t == ThemeLight || t == ThemeDark }
@@ -53,6 +61,7 @@ type Manager struct {
 	onFrameColor []func(string)
 	onTheme      []func(string)
 	onShell      []func(string)
+	onAddress    []func(string)
 }
 
 // New returns a manager with the settings saved under dir, or the defaults. A setting the
@@ -71,6 +80,9 @@ func New(dir string) *Manager {
 			}
 			if !isTheme(s.Theme) {
 				s.Theme = ThemeSystem
+			}
+			if s.AddressBarPosition != AddressBottom && s.AddressBarPosition != AddressTop {
+				s.AddressBarPosition = AddressBottom
 			}
 			if !shells.Fits(s.Shell) {
 				s.Shell = Defaults().Shell
@@ -159,6 +171,27 @@ func (m *Manager) SetShell(id string) {
 	}
 }
 
+// AddressBarPosition is where a phone shell puts its address bar: AddressBottom or
+// AddressTop.
+func (m *Manager) AddressBarPosition() string { return m.prefs.AddressBarPosition }
+
+// OnAddressBarPositionChanged subscribes to the address bar moving.
+func (m *Manager) OnAddressBarPositionChanged(f func(string)) {
+	m.onAddress = append(m.onAddress, f)
+}
+
+// SetAddressBarPosition moves the address bar. Anything but the two positions is ignored.
+func (m *Manager) SetAddressBarPosition(at string) {
+	if at != AddressBottom && at != AddressTop || at == m.prefs.AddressBarPosition {
+		return
+	}
+	m.prefs.AddressBarPosition = at
+	m.save()
+	for _, f := range m.onAddress {
+		f(at)
+	}
+}
+
 // Apply sets each setting values holds, in the form the file has them, through its own
 // setter, so every listener hears of it as of a change by hand. A setting values doesn't
 // hold keeps its value. A profile reset to a template takes the template's values so.
@@ -171,6 +204,7 @@ func (m *Manager) Apply(values json.RawMessage) error {
 	m.SetFrameColor(p.FrameColor)
 	m.SetTheme(p.Theme)
 	m.SetShell(p.Shell)
+	m.SetAddressBarPosition(p.AddressBarPosition)
 	return nil
 }
 

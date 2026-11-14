@@ -143,6 +143,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	})
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)
+	a.Prefs.OnAddressBarPositionChanged(a.Shell.AddressBarPositionChanged)
+	a.Prefs.OnAddressBarPositionChanged(a.Settings.AddressBarPositionChanged)
 	a.Update.OnAutoChanged(a.Settings.AutoUpdateChanged)
 	a.Update.OnChanged(a.Shell.UpdateChanged)
 	a.Update.OnChanged(a.Settings.UpdateChanged)

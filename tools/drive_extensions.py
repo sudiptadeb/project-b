@@ -30,10 +30,6 @@ from drive_first_app import App, check, click, run_parts, visit
 
 ROOT = drive_first_app.ROOT
 STORE_DIR = os.path.join(ROOT, ".tools/extensions")
-STORE = "http://127.0.0.1:8767"
-# What makes the mock store the browser's store: its page gets the store's API, and
-# packages are fetched from it.
-MOCK_STORE = [f"--apps-gallery-url={STORE}", f"--apps-gallery-download-url={STORE}/download/%s"]
 WEB_STORE = "https://chromewebstore.google.com/"
 TEST_ID = "oepjjojhhaclfhmopocgmdfbeiffpheh"
 TEST_NAME = "Project B test extension"
@@ -554,7 +550,17 @@ if __name__ == "__main__":
     # Built first, so the process started is the store itself and stops when told to.
     store_bin = os.path.join(ROOT, "build/e2e/extstore")
     subprocess.check_call(["go", "build", "-o", store_bin, "./cmd/extstore"], cwd=os.path.join(ROOT, "core"))
-    store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", STORE.split("//")[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # The store listens on a port of its own and says where once it does. On a fixed port, a
+    # second run at once, in this checkout or another, found the first's store there and used
+    # it, until the first ended and took its store with it.
+    store = subprocess.Popen([store_bin, "-dir", STORE_DIR, "-addr", "127.0.0.1:0"], stdout=subprocess.PIPE, text=True)
+    listening = store.stdout.readline()
+    if " at http://" not in listening:
+        sys.exit("the mock store didn't start")
+    STORE = listening.split(" at ")[1].strip().rstrip("/")
+    # What makes the mock store the browser's store: its page gets the store's API, and
+    # packages are fetched from it.
+    MOCK_STORE = [f"--apps-gallery-url={STORE}", f"--apps-gallery-download-url={STORE}/download/%s"]
     try:
         # One part by name, such as "fonts_ninja", or all of them.
         parts = [extension_checks, workspace_checks, flag_off_checks, fonts_ninja_checks, web_store_checks]

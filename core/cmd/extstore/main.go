@@ -25,8 +25,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -103,7 +105,7 @@ func manifest(path string) ([]byte, error) {
 
 func main() {
 	dir := flag.String("dir", ".tools/extensions", "the folder to serve")
-	addr := flag.String("addr", "127.0.0.1:8766", "where to listen")
+	addr := flag.String("addr", "127.0.0.1:8766", "where to listen; port 0 for any free one")
 	flag.Parse()
 
 	mux := http.NewServeMux()
@@ -153,8 +155,14 @@ func main() {
 		xml.NewEncoder(w).Encode(answer)
 	})
 
-	log.Printf("the mock extension store serves %s at http://%s/", *dir, *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	listener, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Said once it listens, with the port it got, on its own line, the only one it prints: a
+	// caller that asked for port 0 reads where it is from here.
+	fmt.Printf("the mock extension store serves %s at http://%s/\n", *dir, listener.Addr())
+	log.Fatal(http.Serve(listener, mux))
 }
 
 func check(catalogue []entry, id, have, base string) app {

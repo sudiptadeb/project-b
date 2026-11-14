@@ -322,8 +322,9 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
 - `tools/test.sh app`: `tools/drive_extensions.py`, 54 checks on the real app
   (`PB_BIN`, or `build/pb/project_b`), in profiles with the Extensions flag on, and
   one with it off, where no button shows, the store's page has no store API, and the Flags
-  section's switch and Relaunch turn it on. Started with the mock store as
-  its store, it installs the test extension and uBlock Origin Lite from the mock store's page,
+  section's switch and Relaunch turn it on. Started with the mock store as its store, on a
+  port of its own so that two runs at once never share one, it installs the test extension
+  and uBlock Origin Lite from the mock store's page,
   sees the content script run and an ad host blocked, pins and unpins, opens the popup and
   clicks in it, has its service worker message the tab, restarts, turns one off and removes it. The popup's opening has the worker draw
   its icon on a canvas, and the button shows it; and it takes a picture of the tab.

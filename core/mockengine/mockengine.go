@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -750,8 +751,14 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 				e.listener.ShellMessage(w, []byte(`{"t":"back"}`))
 			}
 		case "contextMenu":
-			// A long press on a link to value, as content reports it.
-			e.listener.ContextMenu(shown, engine.ContextMenu{X: 40, Y: 60, Link: value, LinkText: "a link"})
+			// A right-click or a long press, as content reports it: on a link to value, or
+			// on what value says as JSON, {"link", "src", "media", "selection", "editable", ...}.
+			m := engine.ContextMenu{X: 40, Y: 60, Link: value, LinkText: "a link"}
+			if strings.HasPrefix(value, "{") {
+				m = engine.ContextMenu{X: 40, Y: 60}
+				json.Unmarshal([]byte(value), &m)
+			}
+			e.listener.ContextMenu(shown, m)
 		case "scroll":
 			// value is down or up, as a page that scrolls makes content say.
 			e.listener.ScrollDirectionChanged(shown, value == "down")

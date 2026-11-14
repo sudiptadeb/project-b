@@ -417,4 +417,6 @@ type ContextMenu struct {
 	Src       string  `json:"src"`
 	Media     string  `json:"media"`
 	Selection string  `json:"selection"`
+	// Editable says the press was in a field.
+	Editable bool `json:"editable"`
 }

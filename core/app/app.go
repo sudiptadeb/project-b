@@ -57,6 +57,8 @@ type App struct {
 	ShellData *shelldata.Manager
 
 	actions []*commands.Action
+	// menus are the windows' open right-click menus.
+	menus *contextMenus
 	// keyIn is which page had the keyboard at the last key press.
 	keyIn engine.Surface
 	// lastWindow is the id of the window made last; Go numbers them from 1.
@@ -95,6 +97,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Shell.AddPart(a.workspaceShellPart(e))
 	a.Shell.AddPart(a.shellDataPart())
+	a.menus = newContextMenus(a, e)
+	a.Shell.AddPart(a.menus.shellPart())
 	// Every action a shell can run by name, for a shell that lists them, as Glide's
 	// Command Bar does.
 	a.Shell.AddPart(shell.Part{
@@ -283,7 +287,7 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 }
 
 func (a *App) ContextMenu(tab engine.TabID, m engine.ContextMenu) {
-	a.Shell.ContextMenu(tab, m)
+	a.menus.show(tab, m)
 }
 
 func (a *App) ScrollDirectionChanged(tab engine.TabID, down bool) {

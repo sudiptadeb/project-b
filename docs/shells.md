@@ -125,7 +125,7 @@ gives the page the same two.
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
-| `contextMenu` | `tab`, `x`, `y`, `link`, `linkText`, `src`, `media`, `selection` | A long press or a right click in a tab's page was on a link or an image (content's `HandleContextMenu`, which Go answers as handled, so the shell draws the menu); `media` is `image`, `video` and so on |
+| `contextMenu` | `contextMenu`: the open right-click menu, or `null` | A right click in a tab's page, or a long press on a link or an image on a phone: what it was on and the actions that can run there ([daily-driver.md](daily-driver.md#right-click)); `null` once it is answered, or its tab closes, navigates or is no longer shown |
 | `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
@@ -193,6 +193,8 @@ none. The snapshot also has `running` (the version), `platform`
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
+| `contextMenuChoose` | `id`, `item` | Runs action `item` of right-click menu `id`; Go closes the menu |
+| `contextMenuClose` | `id` | The menu went without running anything |
 | `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
 | `extensionClick` | `extension`, `rect` | A press on an extension's button at `rect`: Go opens its popup under it, closes it when it is the one open, or tells the extension it was clicked |
 | `extensionPin` | `extension`, `on` | Puts the extension's button on the toolbar, or takes it off |

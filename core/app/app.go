@@ -145,6 +145,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	})
 	a.Prefs.OnThemeChanged(func(t string) { a.Window.SetTheme(themeOf(t)) })
 	a.Prefs.OnThemeChanged(a.Shell.ThemeChanged)
+	a.Prefs.OnChanged(a.Shell.PrefsChanged)
 	a.Prefs.OnThemeChanged(a.Settings.ThemeChanged)
 	// Another shell loads in every window at once. The old one's regions go, as after a
 	// crash, and the tabs stay where they were until the new one reports.

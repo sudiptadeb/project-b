@@ -32,6 +32,8 @@ export const state = {
   tabLayout: 'vertical',
   // Where the Mobile shell puts its address bar: 'bottom' or 'top'.
   addressBarPosition: 'bottom',
+  // Go's prefs, all of them, by their names in the file: what setPref sets.
+  prefs: {},
   // 'system', 'light' or 'dark', as Go's theme pref says.
   theme: 'system',
   // Where the native window controls are. Zero size when there are none.
@@ -72,7 +74,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'prefs']);
 
 const listeners = [];
 
@@ -105,6 +107,14 @@ onChange((fields) => {
   if (state.extensions?.popup) addEventListener('pointerdown', closePopup, true);
   else removeEventListener('pointerdown', closePopup, true);
 });
+
+// setPref sets one of Go's prefs, by its name in prefs (frameColor, theme, tabLayout,
+// shell, addressBarPosition), with the checks the settings page's writes get: a value Go
+// refuses changes nothing. Every window hears the change, as prefs and as the field it
+// has of its own (windowColor, theme, ...).
+export function setPref(name, value) {
+  send({ t: 'setPref', name, value });
+}
 
 // saveData keeps value, any JSON, as this window's copy of the shell's own data, in place
 // of what it was. Go keeps it and never reads it.

@@ -77,7 +77,7 @@ of it.
 
 | From | What |
 |---|---|
-| `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `saveProfileData(value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
+| `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `saveProfileData(value)`. `setPref(name, value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
@@ -130,6 +130,7 @@ gives the page the same two.
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
 | `profileData` | `profileData`: what this shell saved for the profile | A shell in any window of the profile saved it |
+| `prefs` | `prefs`: every one of Go's prefs by its name in the file (`frameColor`, `theme`, `tabLayout`, `shell`, `addressBarPosition`); the snapshot carries it too | Any pref changed, after the message of its own (`windowColor`, `theme`, ...) |
 
 The snapshot's `profileData` is what this shell last saved for the profile, `null` when
 nothing. Its `actions` is every action in the menus that can run then, `{id, title}`, in
@@ -191,6 +192,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `data` | `data`: any JSON | Replaces this window's copy of the shell's own data |
 | `profileData` | `data`: any JSON | Replaces what this shell keeps for the whole profile, on disk |
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
+| `setPref` | `name`: a pref's name in `prefs`; `value` | Sets one of Go's prefs through its own setter, so with the same checks as the settings page's writes: a value it refuses, or a name that isn't a pref, changes nothing. Every window hears it |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
 | `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
@@ -235,6 +237,15 @@ The SDK does these for a shell on it. A shell that talks to Go itself does them 
    `@/tones.js`, as the SDK does.
 7. For the timeline only: it answers `paint` with a `timeline` entry of kind `end` and that
    span once it has drawn. Without it the span stays open.
+
+## Go's prefs
+
+The owner, 2026-11-14: "shells and internal pages all are privileged so the shells get to
+control everything... we can start with a simple api interface for the shell to the prefs".
+A shell reads Go's prefs from `state.prefs` and sets any of them with `setPref(name,
+value)`, with the checks the settings page's writes get; every window hears the change.
+The profile's frame colour and theme are among them, so a shell with a page of its own for
+colours changes Go's, which the window, the Dock and the profile list follow.
 
 ## A shell's own data
 

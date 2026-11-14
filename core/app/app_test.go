@@ -1574,3 +1574,34 @@ func TestTheGlideKeymap(t *testing.T) {
 	press("Cmd+D", "glide.pin")
 	press("Option+Cmd+Right", "glide.spaceNext")
 }
+
+// A shell may set any of Go's prefs by name, with the setters' own checks: the frame colour
+// changes the window and reaches every window as windowColor and in prefs; a value Go
+// refuses, or a name that isn't a pref, changes nothing. The snapshot carries the prefs.
+func TestAShellSetsGoPrefsByName(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	snap := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if p, _ := snap["prefs"].(map[string]any); p == nil || p["frameColor"] != "#4f9e9e" || p["theme"] != "system" {
+		t.Fatalf("the snapshot's prefs are %v", snap["prefs"])
+	}
+	r.shell(`{"t":"setPref","name":"frameColor","value":"#d03434"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#d03434" })
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "prefs" })
+	if p := m["prefs"].(map[string]any); p["frameColor"] != "#d03434" {
+		t.Fatalf("prefs after setPref: %v", p)
+	}
+	if prefs.New(dir).FrameColor() != "#d03434" || r.e.Layout(1).FrameColor != "#d03434" {
+		t.Fatal("the frame colour wasn't kept, or the window isn't painted with it")
+	}
+	r.shell(`{"t":"setPref","name":"theme","value":"dark"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "theme" && m["theme"] == "dark" })
+	for _, bad := range []string{`{"t":"setPref","name":"frameColor","value":"red"}`, `{"t":"setPref","name":"theme","value":"sepia"}`, `{"t":"setPref","name":"nope","value":"x"}`, `{"t":"setPref","value":"x"}`} {
+		r.shell(bad)
+	}
+	r.e.Settle()
+	if got := prefs.New(dir).All(); got.FrameColor != "#d03434" || got.Theme != "dark" {
+		t.Fatalf("a refused setPref changed the prefs to %+v", got)
+	}
+}

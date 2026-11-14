@@ -62,6 +62,7 @@ type Manager struct {
 	onTheme      []func(string)
 	onShell      []func(string)
 	onAddress    []func(string)
+	onChanged    []func(Prefs)
 }
 
 // New returns a manager with the settings saved under dir, or the defaults. A setting the
@@ -112,6 +113,7 @@ func (m *Manager) SetTabLayout(layout string) {
 	for _, f := range m.onLayout {
 		f(layout)
 	}
+	m.changed()
 }
 
 // FrameColor is the colour the window's frame is painted, "#rrggbb". The shell's other
@@ -133,6 +135,7 @@ func (m *Manager) SetFrameColor(color string) {
 	for _, f := range m.onFrameColor {
 		f(color)
 	}
+	m.changed()
 }
 
 // Theme is ThemeSystem, ThemeLight or ThemeDark.
@@ -151,6 +154,7 @@ func (m *Manager) SetTheme(theme string) {
 	for _, f := range m.onTheme {
 		f(theme)
 	}
+	m.changed()
 }
 
 // Shell is the id of the shell every window loads.
@@ -169,6 +173,7 @@ func (m *Manager) SetShell(id string) {
 	for _, f := range m.onShell {
 		f(id)
 	}
+	m.changed()
 }
 
 // AddressBarPosition is where a phone shell puts its address bar: AddressBottom or
@@ -190,6 +195,37 @@ func (m *Manager) SetAddressBarPosition(at string) {
 	for _, f := range m.onAddress {
 		f(at)
 	}
+	m.changed()
+}
+
+// OnChanged subscribes to any setting changing, with them all as they are now.
+func (m *Manager) OnChanged(f func(Prefs)) { m.onChanged = append(m.onChanged, f) }
+
+// changed tells OnChanged's subscribers, after a setting's own have heard.
+func (m *Manager) changed() {
+	for _, f := range m.onChanged {
+		f(m.prefs)
+	}
+}
+
+// Set sets one setting by its name in the file, through its own setter, so a value that
+// setter refuses changes nothing. It says whether name is a setting.
+func (m *Manager) Set(name, value string) bool {
+	switch name {
+	case "tabLayout":
+		m.SetTabLayout(value)
+	case "frameColor":
+		m.SetFrameColor(value)
+	case "theme":
+		m.SetTheme(value)
+	case "shell":
+		m.SetShell(value)
+	case "addressBarPosition":
+		m.SetAddressBarPosition(value)
+	default:
+		return false
+	}
+	return true
 }
 
 // Apply sets each setting values holds, in the form the file has them, through its own

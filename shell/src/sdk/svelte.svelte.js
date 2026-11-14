@@ -8,7 +8,7 @@ import { tick } from 'svelte';
 import * as sdk from './shell.js';
 import * as regions from './regions.js';
 
-export { activeTab, controlSpace, focusPage, keyLabel, saveData, saveProfileData, send, setFrame, tabLabel, workspaceOf } from './shell.js';
+export { activeTab, controlSpace, focusPage, keyLabel, saveData, saveProfileData, send, setFrame, setPref, tabLabel, workspaceOf } from './shell.js';
 
 export const state = $state({ ...sdk.state });
 sdk.onChange((fields) => Object.assign(state, fields));

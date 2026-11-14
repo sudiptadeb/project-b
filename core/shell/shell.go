@@ -38,6 +38,8 @@ type command struct {
 	// Background opens newTab's tab behind the active one, as a link opened in a new
 	// tab is.
 	Background bool `json:"background"`
+	// Value is what setPref sets the pref Name to.
+	Value string `json:"value"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -138,6 +140,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"tabLayout":          m.prefs.TabLayout(),
 			"theme":              m.prefs.Theme(),
 			"addressBarPosition": m.prefs.AddressBarPosition(),
+			"prefs":              m.prefs.All(),
 			"update":             m.update.State(),
 			"running":            m.update.Running(),
 			"crashLog":           m.crash.Last(),
@@ -204,6 +207,12 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.tabs.Ungroup(c.Group)
 	case "closeGroup":
 		m.Interaction(w, "tab.close", func() { m.tabs.CloseGroup(c.Group) })
+	// A shell is privileged: it may set any of Go's prefs, by name, as the settings page
+	// does, through the same setters and so with the same checks.
+	case "setPref":
+		if c.Name == nil || !m.prefs.Set(*c.Name, c.Value) {
+			timeline.Warnf("shell: setPref: no pref %v", c.Name)
+		}
 	case "setTabLayout":
 		m.SwitchTabLayout(c.Text)
 	case "setAddressBarPosition":
@@ -267,6 +276,11 @@ func (m *Manager) TabsChanged() {
 	for _, w := range m.window.Windows() {
 		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w), "groups": m.tabs.GroupsIn(w)})
 	}
+}
+
+// PrefsChanged sends the shells Go's prefs, all of them, after any changed.
+func (m *Manager) PrefsChanged(p prefs.Prefs) {
+	m.sendAll(map[string]any{"t": "prefs", "prefs": p})
 }
 
 // ThemeChanged tells the shells to be light, dark or as the system is.

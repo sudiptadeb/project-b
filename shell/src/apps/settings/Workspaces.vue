@@ -6,16 +6,19 @@ import Swatches from '@/ui/Swatches.vue';
 import { send, state } from './state.js';
 
 // The profile's workspaces, one at least: a list of rows, each with its colour, its name and
-// the number of tabs open in it, and a menu to edit or move it. New workspace and Edit open
-// one dialog with the name and the colour. Go owns the list and answers with it as it is
-// now; it refuses a duplicate name too, but the dialog says so first.
+// the number of tabs open in it, and a menu to edit, move or delete it. New workspace and
+// Edit open one dialog with the name and the colour; Delete asks first, saying what goes.
+// Go owns the list and answers with it as it is now; it refuses a duplicate name and
+// deleting the last one too, but the page says so first.
 
 // The colours a workspace starts from; any other is a custom one. Main, the workspace a
 // profile starts with, has the first (core/workspaces).
 const colors = ['#3470d0', '#d03434', '#4f9e9e', '#e8a317', '#8a4fd0', '#2e9d5b', '#34404f'];
 
+const openTabs = (w) => state.workspaceTabs?.[w.id] || 0;
+
 function tabs(w) {
-  const n = state.workspaceTabs?.[w.id] || 0;
+  const n = openTabs(w);
   return n === 0 ? 'No tabs' : n === 1 ? '1 tab' : `${n} tabs`;
 }
 
@@ -28,7 +31,39 @@ function items(w, i) {
     { label: 'Edit…', run: () => edit(w) },
     { label: 'Move up', run: () => move(w, -1), disabled: i === 0 },
     { label: 'Move down', run: () => move(w, 1), disabled: i === state.workspaces.length - 1 },
+    { separator: true },
+    { label: 'Delete…', danger: true, run: () => (deleting.value = w), disabled: state.workspaces.length === 1 },
   ];
+}
+
+// The workspace being asked about before it is deleted.
+const deleting = ref(null);
+const list = ref(null);
+
+// What deleting a workspace takes, in the confirm.
+function lost(w) {
+  const n = openTabs(w);
+  if (n === 0) return 'Its cookies and site data are erased.';
+  return `Its ${n} open ${n === 1 ? 'tab closes' : 'tabs close'}, and its cookies and site data are erased.`;
+}
+
+// The row goes once Go says so; focus then goes to the row that took its place, or the one
+// above it at the end of the list.
+function remove() {
+  const w = deleting.value;
+  const at = state.workspaces.findIndex((x) => x.id === w.id);
+  deleting.value = null;
+  send({ t: 'deleteWorkspace', id: w.id });
+  const stop = watch(
+    () => state.workspaces,
+    async (now) => {
+      if (now.some((x) => x.id === w.id)) return;
+      stop();
+      await nextTick();
+      const buttons = list.value.querySelectorAll('.ui-row-menu > button');
+      buttons[Math.min(at, buttons.length - 1)].focus();
+    },
+  );
 }
 
 // The row moves when Go answers, and the browser drops focus from a button that moves, so
@@ -112,7 +147,7 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
       <h2 id="workspaces">Workspaces</h2>
       <button type="button" class="text-button" @click="create">New workspace…</button>
     </div>
-    <div class="card">
+    <div ref="list" class="card">
       <div
         v-for="(w, i) in state.workspaces"
         :key="w.id"
@@ -153,6 +188,13 @@ const title = computed(() => (editing.value ? 'Edit workspace' : 'New workspace'
       <template #buttons>
         <button type="button" class="text-button" @click="open = false">Cancel</button>
         <button type="submit" form="workspace-form" class="text-button primary">{{ editing ? 'Save' : 'Create' }}</button>
+      </template>
+    </Dialog>
+    <Dialog v-if="deleting" :title="`Delete ${deleting.name}?`" @close="deleting = null">
+      <p>{{ lost(deleting) }}</p>
+      <template #buttons>
+        <button type="button" class="text-button" @click="deleting = null">Cancel</button>
+        <button type="button" class="text-button danger" @click="remove">Delete</button>
       </template>
     </Dialog>
   </section>

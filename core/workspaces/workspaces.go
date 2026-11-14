@@ -3,7 +3,8 @@
 // keeps each one's storage apart. A profile always has at least one. A new profile starts
 // with Main, whose storage is the profile's own, the one the engine makes a tab in for "",
 // so Main's id is "". Every workspace made later has storage of its own. None is special
-// to the user. The list is one small file in the profile, workspaces.json beside
+// to the user: each can be renamed, recoloured, moved and deleted, but the last one can't
+// be deleted. The list is one small file in the profile, workspaces.json beside
 // prefs.json, read when the app starts and written when it changes: each workspace's id,
 // which Go makes and never changes, its name and its colour, in the user's order.
 package workspaces
@@ -82,7 +83,7 @@ func (m *Manager) List() []Workspace { return slices.Clone(m.list) }
 // picks a workspace for it.
 func (m *Manager) First() string { return m.list[0].ID }
 
-// OnChanged subscribes to a workspace being made, renamed, recoloured or moved.
+// OnChanged subscribes to a workspace being made, renamed, recoloured, moved or deleted.
 func (m *Manager) OnChanged(f func()) { m.onChanged = append(m.onChanged, f) }
 
 // Create makes a workspace called name, in color, with an id Go makes: eight hex digits.
@@ -152,6 +153,21 @@ func (m *Manager) Move(id string, by int) error {
 		return errors.New("the workspace is already at that end")
 	}
 	m.list[i], m.list[j] = m.list[j], m.list[i]
+	m.changed()
+	return nil
+}
+
+// Delete takes a workspace out of the list. The last one stays, as a profile always has
+// one. Closing its tabs and erasing its storage are the caller's.
+func (m *Manager) Delete(id string) error {
+	i, err := m.index(id)
+	if err != nil {
+		return err
+	}
+	if len(m.list) == 1 {
+		return errors.New("a profile keeps one workspace at least")
+	}
+	m.list = slices.Delete(m.list, i, i+1)
 	m.changed()
 	return nil
 }

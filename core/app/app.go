@@ -92,7 +92,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell.AddPart(a.workspaceShellPart())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
-	a.Settings.AddPart(a.workspaceSettingsPart())
+	a.Settings.AddPart(a.workspaceSettingsPart(e))
 	a.registerActions(e)
 
 	a.Tabs.AddGate(a.Policy.IsAllowedURL)

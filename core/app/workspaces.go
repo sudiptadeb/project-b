@@ -51,11 +51,11 @@ type workspaceCommand struct {
 
 // workspaceSettingsPart is the settings page's Workspaces section: the list, each with the
 // number of tabs open in it, New workspace with a name and a colour, editing one's name and
-// colour, and moving one up or down the list. Every copy has it, a copy on a folder named
-// outright too, since the list is the profile folder's. The pages hear the list again
-// through its OnChanged, as the shells do, and the counts again when a tab opens or closes
-// and they differ.
-func (a *App) workspaceSettingsPart() settings.Part {
+// colour, moving one up or down the list, and deleting one. Every copy has it, a copy on a
+// folder named outright too, since the list is the profile folder's. The pages hear the
+// list again through its OnChanged, as the shells do, and the counts again when a tab opens
+// or closes and they differ.
+func (a *App) workspaceSettingsPart(e engine.Engine) settings.Part {
 	counts := a.workspaceTabs()
 	a.Tabs.OnListChanged(func() {
 		if now := a.workspaceTabs(); !maps.Equal(now, counts) {
@@ -85,6 +85,8 @@ func (a *App) workspaceSettingsPart() settings.Part {
 				}
 			case "moveWorkspace":
 				err = a.Workspaces.Move(c.ID, c.By)
+			case "deleteWorkspace":
+				err = a.deleteWorkspace(e, c.ID)
 			// New tab in workspace: a tab in it at the end of the page's own window, and the
 			// page closes so the tab is what the user sees, as choosing it in the Tab menu
 			// does.
@@ -104,6 +106,23 @@ func (a *App) workspaceSettingsPart() settings.Part {
 			return true
 		},
 	}
+}
+
+// deleteWorkspace deletes a workspace. It leaves the list first, which refuses the last one
+// and tells everyone the list as it is now; then its tabs close in every window, a window
+// left with none closing as when its last tab closes; then the engine erases its storage,
+// once those tabs are gone.
+func (a *App) deleteWorkspace(e engine.Engine, id string) error {
+	if err := a.Workspaces.Delete(id); err != nil {
+		return err
+	}
+	for _, t := range a.Tabs.All() {
+		if t.Workspace == id {
+			a.Tabs.Close(t.ID)
+		}
+	}
+	e.EraseWorkspace(id)
+	return nil
 }
 
 // workspaceTabs counts the tabs open in each workspace, by its id, in every window. A

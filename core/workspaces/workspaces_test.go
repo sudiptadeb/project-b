@@ -168,3 +168,24 @@ func TestAWorkspaceMovesUpAndDown(t *testing.T) {
 		t.Fatalf("order %s, first %q", got, m.First())
 	}
 }
+
+// A workspace leaves the list and stays out of it; Main is deleted as any other, and a list
+// that had it doesn't get it back. The last one can't be deleted, nor one the list doesn't
+// hold.
+func TestAWorkspaceIsDeletedButNotTheLast(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "workspaces.json"), []byte(`{"workspaces":[{"id":"0a1b2c3d","name":"Work","color":"#5b7fd6"}]}`), 0o600)
+	m := New(dir)
+	changes := 0
+	m.OnChanged(func() { changes++ })
+	if err := m.Delete(""); err != nil {
+		t.Fatal(err)
+	}
+	if m.Delete("") == nil || m.Delete("0a1b2c3d") == nil {
+		t.Fatal("deleted one the list doesn't hold, or the last")
+	}
+	again := New(dir)
+	if l := again.List(); len(l) != 1 || l[0].ID != "0a1b2c3d" || again.First() != "0a1b2c3d" || changes != 1 {
+		t.Fatalf("read back %+v, first %q, after %d changes", l, again.First(), changes)
+	}
+}

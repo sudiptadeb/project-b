@@ -1192,6 +1192,68 @@ func TestTheSettingsPageOpensATabInAWorkspace(t *testing.T) {
 	}
 }
 
+// Deleting a workspace from the settings page takes it out of the list everyone has, the Tab
+// menu's too, and tells the engine the new first; closes its tabs in every window, and a
+// window left with none; and only then has the engine erase its storage. The last one
+// can't be deleted, nor can one the list doesn't hold.
+func TestTheSettingsPageDeletesAWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	var work string
+	var w2 engine.WindowID
+	r.e.Post(func() {
+		w, _ := r.a.Workspaces.Create("Work", "#5b7fd6")
+		work = w.ID
+		r.a.Workspaces.Move(work, -1)
+		r.a.Tabs.CreateIn(1, work)
+		w2, _ = r.a.NewWindow("")
+		r.a.WindowFocused(1)
+	})
+	r.e.Settle()
+	got, _ := r.openSettings()
+	var first string
+	r.e.Post(func() { first = r.e.FirstWorkspace() })
+	r.e.Settle()
+	if first != work {
+		t.Fatalf("with Work first the engine has %q", first)
+	}
+	r.settings(`{"t":"deleteWorkspace","id":"nothere"}`)
+	r.settings(`{"t":"deleteWorkspace","id":"` + work + `"}`)
+	m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "workspaces" })
+	if l := m["workspaces"].([]any); len(l) != 1 || l[0].(map[string]any)["id"] != "" {
+		t.Fatalf("the page heard %v", m)
+	}
+	r.waitOn(got, func(m map[string]any) bool {
+		c, ok := m["workspaceTabs"].(map[string]any)
+		return m["t"] == "workspaceTabs" && ok && len(c) == 1 && c[""] == float64(1)
+	})
+	r.e.Settle()
+	var left []tabs.Tab
+	var erased []mockengine.Erase
+	var items engine.Menu
+	r.e.Post(func() {
+		left, erased, first, items = r.a.Tabs.All(), r.e.Erased(), r.e.FirstWorkspace(), r.a.MenuList("workspaces")
+	})
+	r.e.Settle()
+	if len(left) != 1 || left[0].Workspace != "" || !r.e.Closed(w2) || r.e.Closed(1) {
+		t.Fatalf("left %+v; window 2 closed %v, window 1 %v", left, r.e.Closed(w2), r.e.Closed(1))
+	}
+	if !reflect.DeepEqual(erased, []mockengine.Erase{{Workspace: work}}) || first != "" || len(items) != 1 || items[0].Title != "Main" {
+		t.Fatalf("the engine erased %+v and has %q first; the Tab menu lists %+v", erased, first, items)
+	}
+	if l := workspaces.New(dir).List(); len(l) != 1 || l[0].ID != "" {
+		t.Fatalf("the profile's list holds %+v", l)
+	}
+	r.settings(`{"t":"deleteWorkspace","id":""}`)
+	r.e.Settle()
+	r.e.Post(func() { left, erased = r.a.Tabs.All(), r.e.Erased() })
+	r.e.Settle()
+	if len(left) != 1 || len(erased) != 1 || len(workspaces.New(dir).List()) != 1 {
+		t.Fatalf("deleting the last left %+v and erased %+v", left, erased)
+	}
+}
+
 // View, Shell lists the shells the user can choose, with a tick on the one in use. Choosing
 // another makes it the profile's and loads it in the window, which hears nothing until it
 // says it's ready; what the old shell claimed of the window goes, and the tab stays shown.

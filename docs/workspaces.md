@@ -83,8 +83,8 @@ as built so far, and the order of building at the end says which steps are done.
   a menu item by its action, as the menu bar does (`/mock/fire`, kind `menu`).
 - Settings has a Workspaces section, after Profile: a list of rows, each with the
   workspace's colour, its name and the number of tabs open in it, and a menu (the ⋯
-  button, or a right-click on the row) with New tab in workspace, Edit…, Move up and Move
-  down. Main is a row like any other. New tab in workspace opens a tab in it in the page's
+  button, or a right-click on the row) with New tab in workspace, Edit…, Move up, Move
+  down and, after a separator, Delete… in the danger colour. Main is a row like any other. New tab in workspace opens a tab in it in the page's
   window and closes the page (`openInWorkspace`). New workspace…
   on the heading's right and Edit… open one dialog with the name and the colour (the
   presets, or any other). A new one starts on the first preset no workspace has. Names are
@@ -94,11 +94,24 @@ as built so far, and the order of building at the end says which steps are done.
   `moveWorkspace` by -1 or +1, and `renameWorkspace`; the page and every shell hear
   `{"t": "workspaces", ...}`), so the dots change at once and the Tab menu has the change
   the next time it opens. The page has the counts in its snapshot and hears them again,
-  `{"t": "workspaceTabs", ...}`, when a tab opening or closing changes them. No workspace
-  can be deleted. Every copy has the section, a copy on a folder named outright
+  `{"t": "workspaceTabs", ...}`, when a tab opening or closing changes them. Every copy has
+  the section, a copy on a folder named outright
   (`--user-data-dir`) too: the list is the folder's, as its prefs are, and nothing about
   it needs the profile list (`core/app/workspaces.go`,
   `shell/src/apps/settings/Workspaces.vue`).
+- A workspace can be deleted, but not the last one. Delete… asks first, in a dialog,
+  "Delete Work?", that says how many of its tabs close and that its cookies and site data
+  are erased, with Cancel and Delete, a danger button; with one workspace left Delete… is
+  disabled, and Go refuses it too (`deleteWorkspace`, `workspaces.Manager.Delete`). Go
+  takes the workspace out of the list, which everyone hears: every shell and settings
+  page, the Tab menu the next time it opens, and the engine, when the first changes. Then
+  it closes its tabs in every window, a window left with none closing as it does when its
+  last tab closes, and then has the engine erase its storage (`erase_workspace`): every
+  kind of site data and the cache in its partition, after its tabs are gone. For Main,
+  the profile's own storage, extensions keep their own data, so they keep working, and
+  history stays, as it is the profile's (`App.deleteWorkspace`,
+  `Engine::EraseWorkspace`). A Main deleted stays deleted: the list says version 2 by
+  then.
 
 ## Decided
 
@@ -148,8 +161,8 @@ app, a tab made over DevTools, a tab an extension opens, a new window's first ta
 **Using it, first version.**
 - Tab menu: "New Tab in Workspace", a list of the workspaces read when the menu opens, as
   the Profiles menu is.
-- Settings: a Workspaces section, with the list, New workspace (a name and a colour), and
-  edit and reorder.
+- Settings: a Workspaces section, with the list, New workspace (a name and a colour),
+  edit, reorder and delete.
 - The shell shows a tab's workspace as a dot in the workspace's colour on the tab, while
   there are two or more.
 
@@ -182,6 +195,7 @@ Each commit builds, leaves a working app, and carries its tests.
 7. Done. No default: Main in every profile, the profile's own storage, and a tab nothing
    places in the first workspace, in Go and in the engine.
 8. Done. The dot only while there are two or more workspaces.
+9. Done. Deleting a workspace: its tabs close, then its storage is erased.
 
 ## Decided while building
 
@@ -256,8 +270,13 @@ Each commit builds, leaves a working app, and carries its tests.
   so they are gone first, and `workspace.erased` on the timeline says when it is done.
   The partition's folder stays, as the remover leaves it.
 
+- Deleting a workspace takes it out of the list first and then closes its tabs, so the
+  refusal of the last one is in one place, the list's (`workspaces.Manager.Delete`), and
+  nothing closes for a delete refused. Both happen in one call, so the erase still comes
+  after the tabs are gone.
+
 ## Not in this step
 
-Deleting a workspace (its partition has to be emptied), a throwaway workspace, rules that
-send a site to a workspace, telling extensions a tab's workspace, DevTools' storage
-commands for a workspace, a workspace per window.
+A throwaway workspace, rules that send a site to a workspace, telling extensions a tab's
+workspace, DevTools' storage commands for a workspace, a workspace per window, removing an
+erased partition's folder from disk.

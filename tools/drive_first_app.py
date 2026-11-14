@@ -18,7 +18,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py profiles   # only the start choosing a profile from the list
     python3 tools/drive_first_app.py copies     # only two profiles' copies, the Profiles menu and the Dock
     python3 tools/drive_first_app.py picker     # only the picker
-    python3 tools/drive_first_app.py workspaces # only workspaces: their storage, and New Tab in Workspace
+    python3 tools/drive_first_app.py workspaces # only workspaces: their storage, New Tab in Workspace, and deleting one
     python3 tools/drive_first_app.py shells     # only every shell: starting on it, and switching to it live
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
@@ -1716,6 +1716,95 @@ def workspace_menu_checks():
     app.close()
 
 
+def in_settings(app, expr, timeout=10):
+    """Waits for expr to be truthy in the settings page, and returns it."""
+    deadline = time.time() + timeout
+    while True:
+        r = app.cmd("evalsettings", expr.replace("\n", " "))
+        if r and not r.startswith("ERR") and json.loads(r):
+            return json.loads(r)
+        if time.time() > deadline:
+            raise TimeoutError(f"settings: {expr} last={r}")
+        time.sleep(0.1)
+
+
+def delete_workspace(app, workspace):
+    """Deletes a workspace, by its id, as a person does in Settings, Workspaces: its row's
+    menu, Delete…, then Delete in the dialog that asks first. The page opens on Cmd+, and
+    closes on Escape."""
+    row = json.dumps(f'[data-workspace="{workspace}"]')
+    click = "(b=>b&&(b.click(),1))"
+    app.cmd("key", "cmd+,")
+    in_settings(app, click + "([...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Workspaces'))")
+    in_settings(app, click + f"(document.querySelector({row}+' .ui-row-menu > button'))")
+    in_settings(app, click + "([...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.trim()==='Delete…'))")
+    in_settings(app, click + "([...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='Delete'))")
+    in_settings(app, f"!document.querySelector({row})")
+    app.cmd("key", "escape")
+    deadline = time.time() + 10
+    while not app.cmd("evalsettings", "1").startswith("ERR"):
+        if time.time() > deadline:
+            raise TimeoutError("the settings page stayed open")
+        time.sleep(0.1)
+
+
+def erased(app, workspace):
+    """Waits for the engine to have erased a workspace's storage, as it marks on the
+    timeline."""
+    deadline = time.time() + 30
+    while not any(e.get("name") == "workspace.erased" and e.get("text") == f"workspace={workspace}" for e in json.loads(app.cmd("timeline"))["result"]["entries"]):
+        if time.time() > deadline:
+            raise TimeoutError(f"workspace {workspace!r} was never erased")
+        time.sleep(0.1)
+
+
+def workspace_delete_checks():
+    """Deleting a workspace in settings closes its tabs and then erases its storage: a tab
+    opened in its partition again finds no cookie and no local storage, and the other
+    workspaces keep theirs. Deleting Main erases the profile's own site data. With Main
+    deleted, a tab made over DevTools is in the first workspace. That an extension still
+    works with Main deleted is checked in tools/drive_extensions.py."""
+    work, shop = "0a1b2c3d", "4e5f6a7b"
+    profile = tempfile.mkdtemp(prefix="pb-profile-")
+    with open(os.path.join(profile, "workspaces.json"), "w") as f:
+        json.dump({"version": 2, "workspaces": [{"id": "", "name": "Main", "color": "#3470d0"}, {"id": work, "name": "Work", "color": "#d03434"},
+                                                {"id": shop, "name": "Shop", "color": "#4f9e9e"}]}, f)
+    app = App(profile, ["--remote-debugging-port=0"])
+
+    def keep(tab, value):
+        app.js(f"document.cookie='w={value}; max-age=3600';localStorage.setItem('w','{value}')", tab=tab)
+
+    app.js(f"location.href={json.dumps(STORE)}", tab=1)
+    app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=1)
+    keep(1, "main")
+    in_work = [open_in(app, work, STORE), open_in(app, work, STORE)]
+    keep(in_work[0], "work")
+    in_shop = open_in(app, shop, STORE)
+    keep(in_shop, "shop")
+    check("each workspace has its own cookie and local storage", [stored(app, t) for t in (1, in_work[1], in_shop)] == [["w=main", "main"], ["w=work", "work"], ["w=shop", "shop"]])
+
+    delete_workspace(app, work)
+    left = sorted(t["id"] for t in tabs_of(app)["tabs"])
+    check("deleting a workspace in settings closes its tabs", left == [1, in_shop] and app.js(ROWS) == 2, left)
+    erased(app, work)
+    check("and erases its storage: a tab opened in it again has no cookie and no local storage", stored(app, open_in(app, work, STORE)) == ["", None])
+    check("while the others keep theirs", stored(app, 1) == ["w=main", "main"] and stored(app, in_shop) == ["w=shop", "shop"])
+
+    delete_workspace(app, "")
+    check("deleting Main closes its tabs", 1 not in [t["id"] for t in tabs_of(app)["tabs"]], tabs_of(app))
+    erased(app, "")
+    check("and erases the profile's own site data", stored(app, open_in(app, "", STORE)) == ["", None])
+    check("while Shop keeps its own", stored(app, in_shop) == ["w=shop", "shop"])
+
+    port = open(os.path.join(profile, "DevToolsActivePort")).read().split()[0]
+    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/json/new?{STORE}", method="PUT")).read()
+    app.wait(f"{ROWS}===4")
+    made = max(tabs_of(app)["tabs"], key=lambda t: t["id"])
+    app.wait("document.readyState==='complete'&&location.pathname==='/store'", tab=made["id"])
+    check("with Main deleted, a tab made over DevTools is in the first workspace", made.get("workspace") == shop and stored(app, made["id"]) == ["w=shop", "shop"], made)
+    app.close()
+
+
 def shell_checks():
     """What the real app adds to a shell's contract, for every shell in the registry
     (docs/shells.md): a profile whose pref names it starts on it and marks app.ready, and
@@ -1803,5 +1892,5 @@ def quit_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks], "shells": [shell_checks], "quit": [quit_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, shell_checks, quit_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "quit": [quit_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, quit_checks]))

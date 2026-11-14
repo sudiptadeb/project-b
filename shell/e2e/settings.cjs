@@ -343,6 +343,36 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await settle(page);
   await page.screenshot({ path: path.join(out, 'settings-workspaces.png') });
 
+  // Delete…, last in a row's menu in the danger colour, asks first: the dialog says how many
+  // of its tabs close and that its cookies and site data go, and Delete is the danger
+  // button. Delete closes its tabs and takes it out of the list; with one workspace left,
+  // Delete… is disabled and the shell shows no dot.
+  await page.getByRole('button', { name: 'Actions for Office' }).click();
+  const deleteItem = page.getByRole('menuitem', { name: 'Delete…' });
+  check('a row\'s menu ends with Delete…, in the danger colour', await deleteItem.isEnabled() && await deleteItem.evaluate((e) => e.classList.contains('danger') && !e.nextElementSibling));
+  await deleteItem.click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Delete Office?' });
+  check('Delete… asks first, saying its open tabs close and its site data go',
+    (await deleteDialog.textContent()).includes('Its 2 open tabs close, and its cookies and site data are erased.'), await deleteDialog.textContent());
+  const deleteButton = deleteDialog.getByRole('button', { name: 'Delete', exact: true });
+  check('and Delete is the danger button', await deleteButton.evaluate((b) => b.matches('.text-button.danger')));
+  await settle(page);
+  await page.screenshot({ path: path.join(out, 'settings-workspace-delete.png') });
+  await page.keyboard.press('Escape');
+  check('Escape cancels it, and nothing is deleted', await until(async () => (await deleteDialog.count()) === 0) && workspacesFile().length === 2 && (await dots.count()) === 3);
+  await page.getByRole('button', { name: 'Actions for Office' }).click();
+  await page.getByRole('menuitem', { name: 'Delete…' }).click();
+  await deleteButton.click();
+  check('Delete closes its tabs and takes it out of the list', await until(async () => {
+    const tabs = (await regions()).tabs;
+    return workspacesFile().length === 1 && workspacesFile()[0].name === 'Main' && tabs.length === 1 && tabs[0].workspace === '';
+  }), JSON.stringify(workspacesFile()));
+  check('and focus goes to the row left', await until(async () => page.getByRole('button', { name: 'Actions for Main' }).evaluate((e) => e === document.activeElement)));
+  check('with one workspace left the shell shows no dot', await until(async () => (await dots.count()) === 0));
+  await page.getByRole('button', { name: 'Actions for Main' }).click();
+  check('and Delete… is disabled', await page.getByRole('menuitem', { name: 'Delete…' }).isDisabled());
+  await page.keyboard.press('Escape');
+
   // Flags: saved for the next launch, with Relaunch offered until they are what runs.
   const flagsFile = () => {
     try {

@@ -1877,6 +1877,42 @@ def cookie_checks():
 TERMINATE = 'ObjC.import("AppKit"); $.NSRunningApplication.runningApplicationWithProcessIdentifier(Number(%d)).terminate'
 
 
+def glide_checks():
+    """Glide, the default shell, on a profile a first start makes: it comes up, keeps a
+    Favorite and a pinned tab, draws a folder for a tab group, and its Command Bar finds the
+    open tabs. Leaves glide.png and glide-command-bar.png, which the README shows."""
+    root = tempfile.mkdtemp(prefix="pb-root-")
+    app = App(None, [f"--root={root}"])
+    send = lambda msg: app.js(f"chrome.send('shell', [{json.dumps(json.dumps(msg))}]), 1")
+    app.wait("location.href==='chrome://shell/glide/'&&!!document.querySelector('.glide')", 30)
+    check("a first start comes up on Glide", True)
+    app.cmd("resize", 1280, 800)
+    send({"t": "navigate", "text": URL_A})
+    app.wait(f"{ROWS}===1&&document.querySelector('[role=tab][aria-selected=true]').title!=='New Tab'", 30)
+    send({"t": "run", "text": "glide.favorite"})
+    check("Add to Favorites puts a tile at the top", bool(app.wait("document.querySelectorAll('.fav').length===1", 10)))
+    for url in (URL_B, PAGES + "store", PAGES):
+        send({"t": "newTab", "text": url})
+    app.wait(f"{ROWS}===4", 30)
+    tabs = json.loads(app.js("JSON.stringify([...document.querySelectorAll('[role=tab]')].map(e => +e.dataset.tab))"))
+    send({"t": "activateTab", "id": tabs[1]})
+    app.wait(f"document.querySelector('[role=tab][aria-selected=true]').dataset.tab==='{tabs[1]}'", 10)
+    send({"t": "run", "text": "glide.pin"})
+    check("Pin Tab keeps it at the top", bool(app.wait(f"document.querySelector('.pinned [role=tab]')?.dataset.tab==='{tabs[1]}'", 10)))
+    send({"t": "createGroup", "ids": tabs[2:], "name": "Reading"})
+    check("a tab group is a folder", bool(app.wait("document.querySelector('.folder')?.textContent.includes('Reading')", 10)))
+    send({"t": "activateTab", "id": tabs[0]})
+    time.sleep(2)
+    print(app.cmd("capture", os.path.join(OUT, "glide.png")), flush=True)
+    send({"t": "run", "text": "glide.commandBar"})
+    app.wait("!!document.querySelector('[aria-label=Address]')", 10)
+    app.js("(i => { i.value = 'example'; i.dispatchEvent(new Event('input', {bubbles: true})); })(document.querySelector('[aria-label=Address]')), 1")
+    check("the Command Bar finds the open tabs", bool(app.wait("[...document.querySelectorAll('[role=option]')].some(o => o.textContent.includes('Example'))", 10)))
+    time.sleep(0.5)
+    print(app.cmd("capture", os.path.join(OUT, "glide-command-bar.png")), flush=True)
+    app.close()
+
+
 def quit_checks():
     """Quitting from the Dock is a clean stop: crash.log, which says the app is running, is
     gone, and the next start has no crash to report."""
@@ -1903,5 +1939,5 @@ def quit_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "quit": [quit_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, quit_checks]))
+    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "glide": [glide_checks], "quit": [quit_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, glide_checks, quit_checks]))

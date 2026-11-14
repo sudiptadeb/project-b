@@ -37,7 +37,7 @@
   <button class="count" aria-label="Tabs" aria-haspopup="dialog" aria-expanded={sheet === 'switcher'} onclick={() => onsheet(sheet === 'switcher' ? '' : 'switcher')}>
     <span>{count > 99 ? ':D' : count}</span>
   </button>
-  <button class="more" aria-label="Menu" aria-haspopup="menu" aria-expanded={sheet === 'menu'} onclick={() => onsheet(sheet === 'menu' ? '' : 'menu')}>
+  <button class="more" aria-label="Menu" aria-haspopup="dialog" aria-expanded={sheet === 'menu'} onclick={() => onsheet(sheet === 'menu' ? '' : 'menu')}>
     <Icon name="more" />
   </button>
 </div>

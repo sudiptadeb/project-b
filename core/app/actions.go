@@ -53,6 +53,7 @@ func (a *App) registerActions(e engine.Engine) {
 		for _, sa := range s.Actions {
 			act := add(sa.ID, sa.Title, func() { a.Shell.Action(a.Tabs.Front(), sa.ID) })
 			act.Enabled = func() bool { return a.Prefs.Shell() == s.ID }
+			act.Shell = s.Name
 		}
 	}
 

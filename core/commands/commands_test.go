@@ -286,3 +286,36 @@ func TestTitlesListWhatCanRun(t *testing.T) {
 		t.Fatalf("titles %v", got)
 	}
 }
+
+// A shell's own actions show in the view only while their shell is on, in a group that
+// names the shell, so Keyboard settings can list them apart.
+func TestTheViewHasOnlyTheShellInUsesOwnActions(t *testing.T) {
+	full := false
+	m, _ := manager(t, t.TempDir(), &full)
+	on := false
+	m.Register(Action{ID: "glide.sidebar", Title: "Show or Hide Sidebar", Shell: "Glide", Enabled: func() bool { return on }})
+	m.Load()
+	find := func() *Group {
+		v := m.View()
+		for i, g := range v.Groups {
+			for _, a := range g.Actions {
+				if a.ID == "glide.sidebar" {
+					return &v.Groups[i]
+				}
+			}
+		}
+		return nil
+	}
+	if g := find(); g != nil {
+		t.Fatalf("with Glide off its action shows, in %+v", g)
+	}
+	for _, id := range m.View().Gone {
+		if id == "glide.sidebar" {
+			t.Fatal("with Glide off its action counts as gone")
+		}
+	}
+	on = true
+	if g := find(); g == nil || g.Shell != "Glide" {
+		t.Fatalf("with Glide on its group is %+v", g)
+	}
+}

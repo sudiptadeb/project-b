@@ -9,6 +9,10 @@ Update this list when a check's result changes or a plan is decided.
 **Status:** works, partly or missing. **Plan:** who builds it, or "needs discussion" when nobody
 has a plan yet. "Proposed" means the plan is written down but waits on the owner's approval.
 
+The web APIs a page calls whose browser side is Chrome's (badges, the clipboard, permissions,
+devices, payments and the rest) are kept one per row, with what a page gets of each on Mac
+and Android, in the web-features registry: [web-features.md](web-features.md).
+
 ## What stops daily use, worst first
 
 | # | Feature | Status | Plan |

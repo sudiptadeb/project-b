@@ -211,6 +211,22 @@ const { check, fire, regions, settle, until } = lib;
   check('and, empty, it wants an address', await until(() => prompt.evaluate((el) => el === document.activeElement)));
   check('and the other group never showed', !(await w.shell().evaluate(() => window.shownGroups)).some((ids) => ids.includes(t4)), JSON.stringify(await w.shell().evaluate(() => window.shownGroups)));
 
+  // A split's new pane lands at the end of Go's list; the shell moves it beside its pane, so
+  // Go's order is the strip's, and Cmd+1 to 9 and Shift+Cmd+] go where the strip says.
+  await ui.locator(`[role=tab][data-tab="${t4}"]`).click();
+  await until(async () => (await regions()).active === t4);
+  await fire('key', 'splitRight');
+  check('a split of the first group opens a pane in it', await until(async () => (await regions()).tabs.length === 4 && (await ui.locator('.chip', { has: ui.locator(`[data-tab="${t4}"]`) }).locator('[role=tab]').count()) === 2));
+  const t8 = (await regions()).active;
+  const strip = () => ui.locator('[role=tab]').evaluateAll((els) => els.map((el) => Number(el.dataset.tab)));
+  check('Go\'s order becomes the strip\'s', await until(async () => JSON.stringify((await regions()).tabs.map((t) => t.id)) === JSON.stringify(await strip())) && JSON.stringify(await strip()) === JSON.stringify([t6, t7, t4, t8]), JSON.stringify({ go: (await regions()).tabs.map((t) => t.id), strip: await strip() }));
+  await fire('key', 'tab2');
+  check('Cmd+2 is the second on the strip', await until(async () => (await regions()).active === t7 && (await showsOnly([t6, t7]))));
+  await fire('key', 'nextTab');
+  check('Shift+Cmd+] is the next on the strip', await until(async () => (await regions()).active === t4 && (await showsOnly([t4, t8]))));
+  await fire('key', 'tab9');
+  check('Cmd+9 is the last on the strip, the split\'s new pane', await until(async () => (await regions()).active === t8));
+
   // The gear at the strip's far end opens the settings page.
   check('settings starts closed', (await regions()).settingsOpen === false);
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();

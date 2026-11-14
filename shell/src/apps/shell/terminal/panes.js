@@ -23,16 +23,19 @@ export function tabsOf(node) {
   return node.parts ? node.parts.flatMap(tabsOf) : [node.tab];
 }
 
-// The groups in the order of Go's list, each by its first tab there, with its tabs in that
-// order too: the strip follows Go's order.
+// The groups in the order of Go's list, each by its first tab there, with its tabs in the
+// order they lie on screen, left to right and top to bottom. The shell moves Go's tabs to
+// that order (order, below), so the strip, Cmd+1 to 9 and the next and previous tab keys
+// all agree.
 export const chips = computed(() => {
   const index = new Map(state.tabs.map((t, i) => [t.id, i]));
+  const byId = new Map(state.tabs.map((t) => [t.id, t]));
+  const first = (ids) => Math.min(...ids.map((id) => index.get(id)));
   return groups
-    .map((root) => {
-      const ids = new Set(tabsOf(root));
-      return { root, tabs: state.tabs.filter((t) => ids.has(t.id)) };
-    })
-    .sort((a, b) => index.get(a.tabs[0].id) - index.get(b.tabs[0].id));
+    .map((root) => ({ root, ids: tabsOf(root).filter((id) => byId.has(id)) }))
+    .filter((c) => c.ids.length)
+    .sort((a, b) => first(a.ids) - first(b.ids))
+    .map(({ root, ids }) => ({ root, tabs: ids.map((id) => byId.get(id)) }));
 });
 
 // The pane the body shows the group of: the active one, or its heir while Go makes it so.
@@ -73,6 +76,7 @@ export function follow() {
     placed.add(t.id);
   }
   save();
+  order();
   if (next && next !== state.active) {
     heirAsked.value = next;
     send({ t: 'activateTab', id: next });
@@ -166,6 +170,23 @@ function heir(tab, live) {
 export function split(tab, dir) {
   asked = { beside: tab, dir };
   send({ t: 'newTab' });
+}
+
+// The move last asked of Go, with its list as it was, so one Go doesn't make isn't asked
+// again for the same list.
+let moved = '';
+
+// order asks Go to move the first tab that is out of the strip's order to its place. Go
+// answers with its list, which comes back here, until the two agree.
+function order() {
+  const want = chips.value.flatMap((c) => c.tabs.map((t) => t.id));
+  const have = state.tabs.map((t) => t.id);
+  const i = want.findIndex((id, k) => have[k] !== id);
+  if (i < 0) return;
+  const ask = JSON.stringify([have, want[i], i]);
+  if (ask === moved) return;
+  moved = ask;
+  send({ t: 'moveTab', id: want[i], index: i });
 }
 
 // close closes the pane of tab; follow makes its heir active when it was the active one.

@@ -68,6 +68,10 @@ export const state = {
   // editable), and actions, what can run there, each {id, title, group, enabled}, a
   // submenu with actions of its own. contextmenu.js answers it.
   contextMenu: null,
+  // The profile's downloads, newest first, each {id, name, url, path, state, received,
+  // total, paused}: state is progress, done, cancelled or failed, and total -1 when
+  // unknown. downloads.js acts on one (docs/daily-driver.md).
+  downloads: [],
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
@@ -77,7 +81,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads']);
 
 const listeners = [];
 

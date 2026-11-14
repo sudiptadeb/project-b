@@ -118,6 +118,27 @@ const { check, fire, regions, settle, until } = lib;
   check('near the corner it stays inside the window', b.x + b.width <= vp.width - 4 && b.y + b.height <= vp.height - 4, JSON.stringify({ b, vp }));
   await page.keyboard.press('Escape');
 
+  // Downloads: the control shows once there is one, and its list acts on each.
+  const control = ui.getByRole('button', { name: 'Downloads' });
+  check('no Downloads control before any download', (await control.count()) === 0);
+  await fire('download', 'https://a.test/files/report.pdf');
+  check('a download brings the Downloads control', await until(() => control.isVisible()));
+  await control.click();
+  const list = ui.getByRole('dialog', { name: 'Downloads' });
+  const entry = list.getByRole('listitem', { name: 'report.pdf' });
+  check('its list shows the download by its file name', await until(() => entry.isVisible()));
+  check('done, it offers Open and Show in Finder', await until(async () => (await entry.getByRole('button', { name: 'Open' }).count()) === 1 && (await entry.getByRole('button', { name: 'Show in Finder' }).count()) === 1));
+  await shoot('downloads');
+  await entry.getByRole('button', { name: 'Show in Finder' }).click();
+  check('Show in Finder asks Go to show the file', await until(async () => (await regions()).shown?.length === 1));
+  await entry.getByRole('button', { name: 'Open' }).click();
+  check('Open asks Go to open it', await until(async () => (await regions()).openedFiles?.length === 1));
+  await page.keyboard.press('Escape');
+  check('Escape closes the list', await until(async () => (await list.count()) === 0));
+  await control.click();
+  await list.getByRole('button', { name: 'Clear' }).click();
+  check('Clear empties the list, and the control goes', await until(async () => (await control.count()) === 0));
+
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();
   await lib.done();

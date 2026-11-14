@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import AddressBar from './AddressBar.vue';
+import Downloads from './Downloads.vue';
 import NavButtons from './NavButtons.vue';
 import { ExtensionsToolbar } from '@extensions';
 import { activeTab, controlSpace as controls, send, state } from '@/sdk/vue.js';
@@ -40,6 +41,7 @@ function switchLayout() {
     <NavButtons />
     <AddressBar />
     <component :is="ExtensionsToolbar" v-if="ExtensionsToolbar" :extensions="state.extensions" />
+    <Downloads />
     <button
       class="icon-button layout"
       type="button"

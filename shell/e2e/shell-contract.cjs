@@ -30,11 +30,24 @@ const rules = {
   12: 'The basic controls are somewhere in the shell, found by role and name, and each does its job',
   13: 'It logs no errors',
   16: 'On a desktop, a right click in a page opens a menu of Go\'s actions there; choosing one makes Go do it; Escape, or a press outside, closes it',
+  17: 'On a desktop, a control named Downloads shows once there is a download, and opens a list of them by file name, a finished one with Open and Show in Finder',
 };
 
 // The desktop shells that don't draw the right-click menu yet, and who brings it to each
 // (docs/daily-driver.md). Rule 16 holds every other desktop shell to it.
 const noMenuYet = {
+  glide: 'r6 brings it',
+  terminal: 'r4 brings it',
+  fox: 'r4 brings it',
+  'minimal-svelte': 'r4 brings it',
+  'minimal-js': 'r4 brings it',
+  'minimal-vue': 'r4 brings it',
+  example: 'r4 brings it',
+};
+
+// The desktop shells that don't draw the downloads list yet, and who brings it to each.
+// Rule 17 holds every other desktop shell to it.
+const noDownloadsYet = {
   glide: 'r6 brings it',
   terminal: 'r4 brings it',
   fox: 'r4 brings it',
@@ -404,6 +417,28 @@ const noMenuYet = {
         rule(16, 'a press outside closes it, and nothing ran', (await closed()) && (await regions()).clipboard === 'https://contract.test/menu');
       } catch (e) {
         rule(16, 'its checks ran to their end', false, e.message.split('\n')[0]);
+      }
+    }
+
+    // 17. Downloads, on a desktop shell.
+    if (shell.phone) {
+      rule(17, 'not for a phone yet: a phone\'s downloads come later', true);
+    } else if (noDownloadsYet[id]) {
+      rule(17, `not checked yet: ${noDownloadsYet[id]}`, true);
+    } else {
+      try {
+        const control = ui.getByRole('button', { name: 'Downloads' });
+        await fire('download', 'https://contract.test/files/contract.pdf');
+        rule(17, 'a download brings a control named Downloads', await until(() => control.first().isVisible()));
+        await control.first().click();
+        const entry = ui.getByRole('listitem', { name: 'contract.pdf' });
+        rule(17, 'which opens a list with the download by its file name', await until(() => entry.isVisible()));
+        rule(17, 'finished, it has Open and Show in Finder', await until(async () => (await entry.getByRole('button', { name: 'Open' }).count()) === 1 && (await entry.getByRole('button', { name: 'Show in Finder' }).count()) === 1));
+        await entry.getByRole('button', { name: 'Show in Finder' }).click();
+        rule(17, 'Show in Finder makes Go show the file', await until(async () => (await regions()).shown?.length > 0));
+        await page.keyboard.press('Escape');
+      } catch (e) {
+        rule(17, 'its checks ran to their end', false, e.message.split('\n')[0]);
       }
     }
 

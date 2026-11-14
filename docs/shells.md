@@ -80,6 +80,7 @@ of it.
 | `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `saveProfileData(value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/contextmenu.js` | What a shell sends about the right-click menu, `state.contextMenu`: `chooseContextItem(menu, id)`, `closeContextMenu(menu)`, and `contextMenuPoint(menu)`, where in the window the press was. |
+| `@/sdk/downloads.js` | What a shell sends about `state.downloads`: `downloadAction(id, action)` and `clearDownloads()`. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
 | `@/sdk/vue.js` | The Vue adapter: `state`, a reactive copy that follows the SDK's; `activeTab` and `controlSpace` as computeds; `workspaceOf(tab)` and `keyLabel(action)`; `connect(handlers)`, which waits for Vue's `nextTick`; the directives `v-shell`, `v-drag` and `v-page="tab.id"`; and `send`, `saveData`, `focusPage`, `setFrame`, `tabLabel`. |
@@ -126,6 +127,7 @@ gives the page the same two.
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
+| `downloads` | `downloads`: the profile's downloads, newest first | One started, moved on, ended or left the list ([daily-driver.md](daily-driver.md#downloads)) |
 | `contextMenu` | `contextMenu`: the open right-click menu, or `null` | A right click in a tab's page, or a long press on a link or an image on a phone: what it was on and the actions that can run there ([daily-driver.md](daily-driver.md#right-click)); `null` once it is answered, or its tab closes, navigates or is no longer shown |
 | `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
@@ -196,6 +198,8 @@ none. The snapshot also has `running` (the version), `platform`
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
 | `contextMenuChoose` | `id`, `item` | Runs action `item` of right-click menu `id`; Go closes the menu |
 | `contextMenuClose` | `id` | The menu went without running anything |
+| `downloadAction` | `id`, `action`: `open`, `reveal`, `cancel`, `pause`, `resume` or `remove` | Acts on one download; `remove` takes it off the list and leaves the file |
+| `clearDownloads` | | Takes every finished download off the list |
 | `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
 | `extensionClick` | `extension`, `rect` | A press on an extension's button at `rect`: Go opens its popup under it, closes it when it is the one open, or tells the extension it was clicked |
 | `extensionPin` | `extension`, `on` | Puts the extension's button on the toolbar, or takes it off |
@@ -311,6 +315,11 @@ The check holds every shell to these, knowing nothing else about it.
     actions it shows, and in what order, is the shell's ([daily-driver.md](daily-driver.md#right-click)).
     A shell that draws nothing shows no menu, which this catches. The shells that don't have
     it yet are listed in the check, with who brings each.
+17. **On a desktop, a control named Downloads shows once the profile has a download,** and
+    opens a list where each download is a `listitem` by its file name, a finished one with
+    Open and Show in Finder, which make Go open the file or show it
+    ([daily-driver.md](daily-driver.md#downloads)). The shells that don't have it yet are
+    listed in the check, with who brings each.
 
 **The names a shell gives its basic controls.** Each is a button, or a menu item in a menu
 one of the shell's controls opens; a menu item's name may end with its key.

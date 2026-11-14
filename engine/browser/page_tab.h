@@ -78,9 +78,9 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
   void EnterFullscreenModeForTab(content::RenderFrameHost* requesting_frame,
                                  const blink::mojom::FullscreenOptions& options) override;
   void ExitFullscreenModeForTab(content::WebContents* web_contents) override;
-#if BUILDFLAG(IS_MAC)
   content::JavaScriptDialogManager* GetJavaScriptDialogManager(
       content::WebContents* source) override;
+#if BUILDFLAG(IS_MAC)
   void RunFileChooser(content::RenderFrameHost* render_frame_host,
                       scoped_refptr<content::FileSelectListener> listener,
                       const blink::mojom::FileChooserParams& params) override;

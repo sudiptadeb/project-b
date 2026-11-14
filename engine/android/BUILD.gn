@@ -35,6 +35,8 @@ source_set("browser") {
     "../browser/child_processes.h",
     "../browser/content_browser_client.cc",
     "../browser/content_browser_client.h",
+    "../browser/dialogs.cc",
+    "../browser/dialogs.h",
     "../browser/engine.cc",
     "../browser/engine.h",
     "../browser/go.cc",

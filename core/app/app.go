@@ -82,7 +82,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs = tabs.New(e, a.Workspaces.First)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
-	a.Window = window.New(e, engine.ShellPage(a.Prefs.Shell()), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
+	a.Window = window.New(e, shells.Page(a.Prefs.Shell()), a.Prefs.FrameColor(), themeOf(a.Prefs.Theme()), a.Tabs.Front)
 	a.Tabs.OnFrontChanged(a.Window.HandleFrontChanged)
 	a.Tabs.OnMoved(a.Window.HandleTabMoved)
 	first := a.openWindow()
@@ -150,7 +150,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	// crash, and the tabs stay where they were until the new one reports.
 	a.Prefs.OnShellChanged(func(id string) {
 		a.Shell.ShellChanged()
-		a.Window.SetPage(engine.ShellPage(id))
+		a.Window.SetPage(shells.Page(id))
 	})
 	a.Prefs.OnTabLayoutChanged(a.Shell.TabLayoutChanged)
 	a.Prefs.OnTabLayoutChanged(a.Settings.TabLayoutChanged)

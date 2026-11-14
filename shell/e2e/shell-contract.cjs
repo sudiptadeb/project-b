@@ -13,7 +13,8 @@ const lib = require('./lib.cjs');
 const { regions, fire, settle, until } = lib;
 
 const registry = JSON.parse(fs.readFileSync(path.join(lib.root, 'core/shells/registry.json'), 'utf8'));
-const ids = process.argv[2] ? [process.argv[2]] : registry.map((s) => s.id);
+// A native shell is no page, so the mock can't load it: tools/drive_android.py checks it.
+const ids = process.argv[2] ? [process.argv[2]] : registry.filter((s) => !s.native).map((s) => s.id);
 
 const rules = [
   'It says ready, draws the snapshot, and says shown',

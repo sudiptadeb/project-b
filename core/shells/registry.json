@@ -6,5 +6,6 @@
   { "id": "minimal", "name": "Minimal" },
   { "id": "minimal-js", "name": "Minimal (JS)" },
   { "id": "example", "name": "Example", "example": true },
-  { "id": "mobile", "name": "Mobile", "phone": true }
+  { "id": "mobile", "name": "Mobile", "phone": true },
+  { "id": "mobile-native", "name": "Mobile (native)", "phone": true, "native": true }
 ]

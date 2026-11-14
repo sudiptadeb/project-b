@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"projectb/engine"
 )
 
 // Shell is one shell of the registry.
@@ -23,6 +25,10 @@ type Shell struct {
 	// offers none of them, though it loads one named outright, as the mock does for a
 	// phone-sized test.
 	Phone bool `json:"phone,omitempty"`
+	// Native is a shell drawn by the platform's own views, not a web page: it has no folder
+	// in shell/src/apps/shell, and its page is native/<id>, which the engine makes as that
+	// platform's view (docs/native-shell.md).
+	Native bool `json:"native,omitempty"`
 	// Actions are the shell's own, such as the terminal's splits. Go registers each with
 	// the others, enabled only while this shell is the profile's; running one sends the
 	// shell action with its id. An id starts with the shell's and a dot.
@@ -94,6 +100,17 @@ func Fits(id string) bool {
 		}
 	}
 	return false
+}
+
+// Page is the page a window loads for the shell called id: native/<id> for a native
+// shell, shell/<id> for the rest.
+func Page(id string) engine.Page {
+	for _, s := range all {
+		if s.ID == id && s.Native {
+			return engine.NativeShellPage(id)
+		}
+	}
+	return engine.ShellPage(id)
 }
 
 // Has says whether id is a shell's.

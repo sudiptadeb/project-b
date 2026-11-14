@@ -69,7 +69,9 @@ const (
 
 // Page is which of our pages covers a window: a shell, or the picker in a copy that
 // hasn't chosen its profile. Each is an app of its own, chrome://<page>/: a shell's page
-// is "shell/<id>", at chrome://shell/<id>/.
+// is "shell/<id>", at chrome://shell/<id>/. A native shell, drawn by the platform's own
+// views and not a page, is "native/<id>": the engine makes that shell's view where it
+// would load a page (docs/native-shell.md).
 type Page string
 
 // PagePicker is the picker's page.
@@ -78,13 +80,18 @@ const PagePicker Page = "picker"
 // ShellPage is the page of the shell called id.
 func ShellPage(id string) Page { return Page("shell/" + id) }
 
-// Shell is the id of the shell the page is, or "" for a page that isn't a shell.
+// NativeShellPage is the native shell called id.
+func NativeShellPage(id string) Page { return Page("native/" + id) }
+
+// Shell is the id of the shell the page is, web or native, or "" for a page that isn't a
+// shell.
 func (p Page) Shell() string {
-	id, ok := strings.CutPrefix(string(p), "shell/")
-	if !ok {
-		return ""
+	for _, prefix := range []string{"shell/", "native/"} {
+		if id, ok := strings.CutPrefix(string(p), prefix); ok {
+			return id
+		}
 	}
-	return id
+	return ""
 }
 
 // MenuItem is one entry of the native menu bar. A submenu has Items; a separator has

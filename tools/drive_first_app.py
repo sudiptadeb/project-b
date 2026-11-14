@@ -1845,7 +1845,8 @@ def shell_checks():
     (docs/shells.md): a profile whose pref names it starts on it and marks app.ready, and
     switching to it live, as View, Shell does, leaves the tabs loaded and shows the active
     tab. The checks speak to each shell only as Go does, on the shell channel."""
-    registry = json.load(open(os.path.join(ROOT, "core/shells/registry.json")))
+    # A native shell is drawn on its platform only: tools/drive_android.py checks it.
+    registry = [s for s in json.load(open(os.path.join(ROOT, "core/shells/registry.json"))) if not s.get("native")]
 
     def on(shell):
         profile = tempfile.mkdtemp(prefix="pb-profile-")

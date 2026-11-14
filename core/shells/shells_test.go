@@ -21,8 +21,8 @@ func TestTheListedShellsAreAllButTheExample(t *testing.T) {
 	}
 }
 
-// Every folder of shell/src/apps/shell is a shell the registry has, and every shell the
-// registry has is a folder there.
+// Every folder of shell/src/apps/shell is a shell the registry has, and every web shell
+// the registry has is a folder there. A native shell has none.
 func TestTheRegistryAndTheFoldersNameTheSameShells(t *testing.T) {
 	entries, err := os.ReadDir("../../shell/src/apps/shell")
 	if err != nil {
@@ -35,7 +35,9 @@ func TestTheRegistryAndTheFoldersNameTheSameShells(t *testing.T) {
 		}
 	}
 	for _, s := range All() {
-		registered = append(registered, s.ID)
+		if !s.Native {
+			registered = append(registered, s.ID)
+		}
 	}
 	slices.Sort(registered)
 	if !slices.Equal(folders, registered) {

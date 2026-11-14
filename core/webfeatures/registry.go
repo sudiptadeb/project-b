@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 )
@@ -213,4 +214,31 @@ func (f *Feature) hasProbe(name string) bool {
 		}
 	}
 	return false
+}
+
+// Platform is the platform this runs on, as the rows name it.
+func Platform() string {
+	if runtime.GOOS == "android" {
+		return "android"
+	}
+	return "mac"
+}
+
+// Row is what the settings page shows of a feature: what a page gets of it on this
+// platform, and why.
+type Row struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	API    string `json:"api"`
+	Status string `json:"status"`
+	Why    string `json:"why"`
+}
+
+// View is every row for this platform, in the registry's order.
+func View() []Row {
+	rows := make([]Row, 0, len(All))
+	for _, f := range All {
+		rows = append(rows, Row{ID: f.ID, Name: f.Name, API: f.API, Status: f.Status[Platform()], Why: f.Why})
+	}
+	return rows
 }

@@ -28,6 +28,9 @@ export const state = reactive({
   // Every flag with its saved value, whether its build has it, and whether it waits for a
   // relaunch.
   flags: [],
+  // The web-features registry for this platform: each feature, what a page gets of it here,
+  // and why. Read only.
+  webFeatures: [],
   // This profile in the list: its name, the template it was made from or last reset to,
   // the templates, the id of the shell it loads, and the shells to choose from, each with
   // its id and name. null in a copy on a folder named outright, which isn't listed.
@@ -55,6 +58,7 @@ export function connect() {
             running: m.running,
             keyboard: m.keyboard,
             flags: m.flags,
+            webFeatures: m.webFeatures,
             section: m.section,
             profile: m.profile || null,
             workspaces: m.workspaces,

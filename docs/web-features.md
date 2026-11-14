@@ -12,7 +12,7 @@ record of what a page gets of it. Everything that needs to know reads it:
 | GN (`engine/web_features.gni`) | The features the engine turns off, which `engine/buildflags` hands to `DisableChromeOnlyBlinkFeatures` in `engine/common/main_delegate.cc` |
 | The probes (`tools/web_features.py`) | The calls to make in a page, and what each row's status lets a call give |
 | `tools/web_features_bump.py` | The interfaces, delegates, features and permissions the rows name |
-| Go (`core/webfeatures`) | The whole file, embedded; it refuses a row that doesn't hold together |
+| Go (`core/webfeatures`) | The whole file, embedded; it refuses a row that doesn't hold together, and sends the rows to the settings page |
 
 It lives in `core/` because Go embeds it, and `go:embed` can't reach outside the module; GN
 and the tools read it from there, as they read `core/flags/registry.json`.
@@ -60,7 +60,17 @@ The inventory is a reading of Chromium 155 and Project B 0.2.61; the registry is
 
 A key Go doesn't know, a status that isn't one of the list, a probe name used twice, or a
 `test` that names a probe the row doesn't have fails `TestTheRegistry` (`go test ./...` in
-`core`).
+`core`), and stops the app at its start.
+
+## In settings
+
+Settings, Web features lists every row, read only, with a filter by name, API, status or
+reason. Each row shows the feature's name (its API in the tooltip), what a page gets on the
+platform the app runs on (Works, Turned off, Fails quietly, Absent, Partly, Crashes the
+page, Not checked), and the `why` line. Go sends the rows in the settings snapshot
+(`webfeatures.View()`, for `runtime.GOOS`); the page never reads the file. The section is
+`shell/src/apps/settings/WebFeatures.vue`, and `shell/e2e/settings.cjs` checks it on the mock
+engine: every row there, the Mac's status and the reason, nothing to change, and the filter.
 
 ## The statuses
 

@@ -16,6 +16,8 @@ const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
 // The names of the shells the user can choose, as the registry lists them.
 const listedShells = JSON.parse(fs.readFileSync(path.join(root, 'core/shells/registry.json'), 'utf8')).filter((s) => !s.example && !s.phone).map((s) => s.name);
+// The web features, as their registry lists them.
+const webFeatures = JSON.parse(fs.readFileSync(path.join(root, 'core/webfeatures/registry.json'), 'utf8'));
 const port = 8797;
 const base = `http://127.0.0.1:${port}`;
 
@@ -440,6 +442,25 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await sizes.fill('');
   await sizes.press('Enter');
   await until(() => JSON.stringify(flagsFile()) === '{}');
+
+  // Web features: the registry, as Go sends it for this platform, only shown.
+  await page.getByRole('button', { name: 'Web features' }).click();
+  const featureList = page.getByRole('region', { name: 'Web features' });
+  const featureRows = featureList.locator('.row');
+  check('Web features lists every row of the registry', await until(async () => (await featureRows.count()) === webFeatures.length), `${await featureRows.count()} of ${webFeatures.length}`);
+  const badgeRow = featureList.locator('.row', { hasText: 'App badge' }).first();
+  check('each says what a page gets on the Mac, and why', (await badgeRow.locator('.tag').textContent()) === 'Fails quietly' && (await badgeRow.textContent()).includes(webFeatures.find((f) => f.id === 'badge').why));
+  check('a feature the engine turns off says so', (await featureList.locator('.row', { hasText: 'Installed related apps' }).locator('.tag').textContent()) === 'Turned off');
+  check('and nothing on it can be changed', (await featureList.locator('input, select, button').count()) === 0);
+  const featureFilter = page.getByLabel('Filter web features');
+  await featureFilter.fill('turned off');
+  const off = webFeatures.filter((f) => f.status.mac === 'off').length;
+  check('the filter keeps the rows that match, by status too', await until(async () => (await featureRows.count()) === off), `${await featureRows.count()} of ${off}`);
+  await featureFilter.fill('no such feature');
+  check('and says when none does', await until(async () => (await featureList.getByText('No features match').isVisible()) && (await featureRows.count()) === 1));
+  await featureFilter.press('Escape');
+  check('Escape empties the filter, and leaves the page', await until(async () => (await featureRows.count()) === webFeatures.length) && (await regions()).settingsOpen === true);
+  await page.screenshot({ path: path.join(out, 'settings-web-features.png') });
 
   // Keyboard.
   await page.getByRole('button', { name: 'Keyboard' }).click();

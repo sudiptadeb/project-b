@@ -7,6 +7,7 @@ import Flags from './Flags.vue';
 import General from './General.vue';
 import Keyboard from './Keyboard.vue';
 import Profile from './Profile.vue';
+import WebFeatures from './WebFeatures.vue';
 import Workspaces from './Workspaces.vue';
 import { send, state } from './state.js';
 
@@ -24,6 +25,7 @@ const sections = computed(() =>
     { id: 'keyboard', label: 'Keyboard', component: Keyboard },
     extensionsSection?.shown() && extensionsSection,
     { id: 'flags', label: 'Flags', component: Flags },
+    { id: 'webFeatures', label: 'Web features', component: WebFeatures },
   ].filter((s) => s),
 );
 const section = computed(() => sections.value.find((s) => s.id === state.section) || sections.value[0]);

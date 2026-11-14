@@ -14,6 +14,7 @@ import (
 	"projectb/prefs"
 	"projectb/timeline"
 	"projectb/update"
+	"projectb/webfeatures"
 	"projectb/window"
 )
 
@@ -147,6 +148,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"running":            m.update.Running(),
 			"keyboard":           m.commands.View(),
 			"flags":              m.flags.View(),
+			"webFeatures":        webfeatures.View(),
 		}
 		snapshot["section"] = section
 		for _, p := range m.parts {

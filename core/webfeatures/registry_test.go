@@ -41,3 +41,17 @@ func TestTheRegistry(t *testing.T) {
 		t.Errorf("refused %s: %v", good, err)
 	}
 }
+
+// The settings page gets every row, with what a page gets of it on this platform.
+func TestTheView(t *testing.T) {
+	v := View()
+	if len(v) != len(All) {
+		t.Fatalf("%d rows for %d features", len(v), len(All))
+	}
+	for i, r := range v {
+		f := All[i]
+		if r.ID != f.ID || r.Name != f.Name || r.API != f.API || r.Why != f.Why || r.Status != f.Status[Platform()] {
+			t.Errorf("%s: %+v", f.ID, r)
+		}
+	}
+}

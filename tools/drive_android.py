@@ -73,6 +73,10 @@ WEB_APIS = {
                       " {total: {label: 't', amount: {currency: 'USD', value: '1'}}}).canMakePayment()",
     "digitalGoods": "getDigitalGoodsService('https://play.google.com/billing')",
     "subApps": "navigator.subApps.list()",
+    "speechOnDevice": "SpeechRecognition.available({langs: ['en-US'], processLocally: true})",
+    "speechInstall": "SpeechRecognition.install({langs: ['en-US'], processLocally: true})",
+    # Blink asks for the payment link's handler as soon as the link is in a main frame's document.
+    "paymentLink": "document.head.append(Object.assign(document.createElement('link'), {rel: 'facilitated-payment', href: 'https://example.com/pay'}))",
     "contacts": "navigator.contacts.select(['name'])",
     "idle": "IdleDetector.requestPermission()",
     "wakeLock": "navigator.wakeLock.request('screen')",

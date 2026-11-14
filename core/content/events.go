@@ -37,7 +37,7 @@ const (
 )
 
 // dialogKinds name PBDialogKind's values.
-var dialogKinds = []string{"alert", "confirm", "prompt", "beforeunload"}
+var dialogKinds = []string{"alert", "confirm", "prompt", "beforeunload", "signin"}
 
 var eventNames = map[Hook]string{
 	eventShellMessage:   "engine.ShellMessage",

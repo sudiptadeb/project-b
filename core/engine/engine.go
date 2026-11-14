@@ -178,6 +178,9 @@ type Engine interface {
 	RevealFile(path string)
 	// AnswerDialog answers a page's dialog: OK or not, and a prompt's text.
 	AnswerDialog(id DialogID, ok bool, text string)
+	// AnswerSignIn answers a site's or a proxy's sign-in: the username and password, or
+	// no to cancel it.
+	AnswerSignIn(id DialogID, ok bool, username, password string)
 	// Find searches a tab's page for text: a new search, or the next match forward or
 	// back. FindReply answers with request. StopFinding ends it, keeping the match
 	// selected.
@@ -355,9 +358,11 @@ type Listener interface {
 // DialogID is the engine's number for a page's dialog.
 type DialogID int64
 
-// Dialog is what a page asks: its kind, alert, confirm, prompt or beforeunload (leave the
-// page), its words, a prompt's text to start from, the origin of the frame asking, and
-// whether a leave-page question is for a reload.
+// Dialog is what a page asks: its kind, alert, confirm, prompt, beforeunload (leave the
+// page) or signin (a site's or a proxy's request for a username and password), its words
+// (a sign-in's realm), a prompt's text to start from, the origin of the frame asking (or
+// of the site or proxy), and whether a leave-page question is for a reload, or a sign-in
+// is a proxy's.
 type Dialog struct {
 	ID          DialogID
 	Tab         TabID

@@ -775,7 +775,7 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 		case "pageFullscreen":
 			// The page asks to fill the screen, as a video's button does.
 			e.listener.PageFullScreen(shown, true)
-		case "alert", "confirm", "prompt", "beforeunload":
+		case "alert", "confirm", "prompt", "beforeunload", "signin":
 			// The page asks; value is its words.
 			e.openDialog(shown, kind, value)
 		case "chooseFile":

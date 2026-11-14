@@ -3,11 +3,17 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "content/public/browser/javascript_dialog_manager.h"
+#include "content/public/browser/login_delegate.h"
+
+namespace net {
+class AuthChallengeInfo;
+}  // namespace net
 
 namespace project_b {
 
@@ -28,6 +34,15 @@ class Dialogs : public content::JavaScriptDialogManager {
   // Go's answer to dialog id: OK or not, and a prompt's text.
   void Answer(int64_t id, bool ok, const std::string& text);
 
+  // A site's or a proxy's request for a username and password, as content asks for one:
+  // Go hears of it as a dialog, and the request lives while the returned delegate does.
+  std::unique_ptr<content::LoginDelegate> SignIn(
+      content::WebContents* contents,
+      const net::AuthChallengeInfo& auth_info,
+      content::LoginDelegate::LoginAuthRequiredCallback callback);
+  // Go's answer to sign-in id: the username and password, or no.
+  void AnswerSignIn(int64_t id, bool ok, const std::string& username, const std::string& password);
+
   // content::JavaScriptDialogManager:
   void RunJavaScriptDialog(content::WebContents* web_contents,
                            content::RenderFrameHost* render_frame_host,
@@ -46,6 +61,8 @@ class Dialogs : public content::JavaScriptDialogManager {
   void CancelDialogs(content::WebContents* web_contents, bool reset_state) override;
 
  private:
+  class SignInRequest;
+
   struct Pending {
     raw_ptr<content::WebContents> contents;
     DialogClosedCallback callback;
@@ -61,6 +78,8 @@ class Dialogs : public content::JavaScriptDialogManager {
 
   int64_t next_id_ = 1;
   std::map<int64_t, Pending> pending_;
+  // The sign-ins waiting, which remove themselves when content drops them.
+  std::map<int64_t, raw_ptr<SignInRequest>> sign_ins_;
 };
 
 }  // namespace project_b

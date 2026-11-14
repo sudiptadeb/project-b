@@ -238,6 +238,11 @@ void CallStopFinding(int64_t tab) {
   }
 }
 
+void CallAnswerSignIn(int64_t dialog, int ok, const char* username, const char* password) {
+  CheckMainThread();
+  Dialogs::Get()->AnswerSignIn(dialog, ok, username, password);
+}
+
 void CallExitPageFullScreen(int64_t tab) {
   CheckMainThread();
   if (PageTab* page = g_engine->tab(tab)) {
@@ -497,6 +502,7 @@ const PBEngineCalls* Engine::Calls() {
       .open_file = CallOpenFile,
       .reveal_file = CallRevealFile,
       .answer_dialog = CallAnswerDialog,
+      .answer_sign_in = CallAnswerSignIn,
       .find = CallFind,
       .stop_finding = CallStopFinding,
       .exit_page_full_screen = CallExitPageFullScreen,

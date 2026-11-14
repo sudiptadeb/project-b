@@ -88,6 +88,8 @@ typedef enum PBDialogKind {
   PB_DIALOG_CONFIRM = 1,
   PB_DIALOG_PROMPT = 2,
   PB_DIALOG_BEFOREUNLOAD = 3,
+  PB_DIALOG_SIGN_IN = 4,  // A site's or a proxy's request for a username and password,
+                          // answered with answer_sign_in; its origin is the one asking
 } PBDialogKind;
 
 // Where a download is.
@@ -237,6 +239,8 @@ typedef struct PBEngineCalls {
   void (*reveal_file)(const char* path);
   // Answers a page's dialog: OK or not, and a prompt's text.
   void (*answer_dialog)(int64_t dialog, int ok, const char* text);
+  // Answers a sign-in dialog: the username and password, or no to cancel.
+  void (*answer_sign_in)(int64_t dialog, int ok, const char* username, const char* password);
   // Finds text in a tab's page, a new search or the next match forward or back; the
   // counts come back through the FindReply hook with request.
   void (*find)(int64_t tab, int32_t request, const char* text, int forward, int find_next);

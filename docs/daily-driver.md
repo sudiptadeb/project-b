@@ -151,3 +151,16 @@ pressed (Go takes it before the page, and asks the engine's `exit_page_full_scre
 another tab shows or the tab closes, and when the window leaves full screen through its own
 button. The window then goes back to how it was. Contract rule 21 holds every desktop shell to
 it.
+
+## Sign-in to a site
+
+A site or a proxy that answers 401 or 407 asks for a username and password. Content asks the
+embedder (`CreateLoginDelegate`), and the engine makes it one of the page's dialogs: Go hears
+it as `PB_EVENT_DIALOG_OPENED` with the kind `signin`, the site's realm as its words, and the
+origin asking; `state.dialogs` carries it titled "Sign in", with "example.com asks for a
+username and password." (or "The proxy …"), the realm as `realm`, and the Sign in and Cancel
+buttons. The shell asks for the username and the password and answers with `answerDialog {id,
+ok, text, password}`, the username as `text`; Go hands them to the engine's `answer_sign_in`,
+which answers content outside its own call, as content asks. When content drops the request,
+as when its tab navigates, the dialog goes. Contract rule 22 holds every shell that draws
+dialogs to it. Nothing is remembered yet: saved passwords are a later step.

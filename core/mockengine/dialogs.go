@@ -1,6 +1,10 @@
 package mockengine
 
-import "projectb/engine"
+import (
+	"strings"
+
+	"projectb/engine"
+)
 
 // dialogs is what the mock keeps of pages' dialogs: those waiting, by tab, and the app's
 // answers, in order.
@@ -28,6 +32,13 @@ func (e *Engine) openDialog(tab engine.TabID, kind, message string) {
 	e.dialogs.waiting[id] = tab
 	e.mu.Unlock()
 	d := engine.Dialog{ID: id, Tab: tab, Kind: kind, Message: message, Origin: "https://mock.test"}
+	if kind == "signin" {
+		d.Origin = "https://secure.mock.test"
+		// "http:" before the words asks over a connection that isn't secure.
+		if rest, ok := strings.CutPrefix(message, "http:"); ok {
+			d.Origin, d.Message = "http://plain.mock.test", rest
+		}
+	}
 	if kind == "prompt" {
 		d.DefaultText = "mock"
 	}
@@ -58,6 +69,10 @@ func (e *Engine) AnswerDialog(id engine.DialogID, ok bool, text string) {
 	}
 	delete(e.dialogs.waiting, id)
 	e.dialogs.answers = append(e.dialogs.answers, DialogAnswer{ID: id, OK: ok, Text: text})
+}
+
+func (e *Engine) AnswerSignIn(id engine.DialogID, ok bool, username, password string) {
+	e.AnswerDialog(id, ok, username+":"+password)
 }
 
 // DialogAnswers are the app's answers to pages' dialogs, in order.

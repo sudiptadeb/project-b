@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "build/build_config.h"
+#include "content/public/browser/login_delegate.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "project_b/engine/buildflags/buildflags.h"
 
@@ -36,6 +37,21 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
   void CreateThrottlesForNavigation(
       content::NavigationThrottleRegistry& registry) override;
   std::string GetProduct() override;
+#if BUILDFLAG(IS_MAC)
+  // A site's or a proxy's request for a username and password goes to Go as a dialog.
+  std::unique_ptr<content::LoginDelegate> CreateLoginDelegate(
+      const net::AuthChallengeInfo& auth_info,
+      content::WebContents* web_contents,
+      content::BrowserContext* browser_context,
+      const content::GlobalRequestID& request_id,
+      bool is_request_for_primary_main_frame_navigation,
+      bool is_request_for_navigation,
+      const GURL& url,
+      scoped_refptr<net::HttpResponseHeaders> response_headers,
+      bool first_auth_attempt,
+      content::GuestPageHolder* guest_page_holder,
+      content::LoginDelegate::LoginAuthRequiredCallback auth_required_callback) override;
+#endif
   std::string GetUserAgent() override;
   void ConfigureNetworkContextParams(
       content::BrowserContext* context,

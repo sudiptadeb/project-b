@@ -3,7 +3,11 @@
 #include <utility>
 #include <vector>
 
+#include "base/functional/bind.h"
+#include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
+#include "base/task/single_thread_task_runner.h"
+#include "net/base/auth.h"
 #include "base/strings/utf_string_conversions.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -81,6 +85,78 @@ void Dialogs::Open(content::WebContents* contents,
   args.Str(frame ? frame->GetLastCommittedOrigin().Serialize() : std::string());
   args.Bool(is_reload);
   hooks::Fire(PB_EVENT_DIALOG_OPENED, args);
+}
+
+// One sign-in while content waits for it. Content drops it when the request ends another
+// way, as when its tab navigates; Go then hears the dialog went.
+class Dialogs::SignInRequest : public content::LoginDelegate {
+ public:
+  SignInRequest(Dialogs* dialogs, int64_t id, LoginAuthRequiredCallback callback)
+      : dialogs_(dialogs), id_(id), callback_(std::move(callback)) {}
+  ~SignInRequest() override {
+    if (dialogs_->sign_ins_.erase(id_)) {
+      hooks::Args args;
+      args.Int(id_);
+      hooks::Fire(PB_EVENT_DIALOG_CLOSED, args);
+    }
+  }
+
+  // Answers content, not from inside its own call, as it asks.
+  void Answer(std::optional<net::AuthCredentials> credentials) {
+    dialogs_->sign_ins_.erase(id_);
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&SignInRequest::Run, weak_factory_.GetWeakPtr(),
+                                  std::move(credentials)));
+  }
+
+ private:
+  void Run(std::optional<net::AuthCredentials> credentials) {
+    std::move(callback_).Run(credentials);
+  }
+
+  raw_ptr<Dialogs> dialogs_;
+  const int64_t id_;
+  LoginAuthRequiredCallback callback_;
+  base::WeakPtrFactory<SignInRequest> weak_factory_{this};
+};
+
+std::unique_ptr<content::LoginDelegate> Dialogs::SignIn(
+    content::WebContents* contents,
+    const net::AuthChallengeInfo& auth_info,
+    content::LoginDelegate::LoginAuthRequiredCallback callback) {
+  int64_t tab = contents ? hooks::TabOf(contents) : 0;
+  if (tab <= 0) {
+    return nullptr;
+  }
+  int64_t id = next_id_++;
+  auto request = std::make_unique<SignInRequest>(this, id, std::move(callback));
+  sign_ins_[id] = request.get();
+  hooks::Args args;
+  args.Int(id);
+  args.Int(tab);
+  args.Int(PB_DIALOG_SIGN_IN);
+  args.Str(auth_info.realm);
+  args.Str(std::string());
+  args.Str(auth_info.challenger.Serialize());
+  args.Bool(auth_info.is_proxy);
+  hooks::Fire(PB_EVENT_DIALOG_OPENED, args);
+  return request;
+}
+
+void Dialogs::AnswerSignIn(int64_t id,
+                           bool ok,
+                           const std::string& username,
+                           const std::string& password) {
+  auto it = sign_ins_.find(id);
+  if (it == sign_ins_.end()) {
+    return;
+  }
+  SignInRequest* request = it->second;
+  if (ok) {
+    request->Answer(net::AuthCredentials(base::UTF8ToUTF16(username), base::UTF8ToUTF16(password)));
+  } else {
+    request->Answer(std::nullopt);
+  }
 }
 
 void Dialogs::Answer(int64_t id, bool ok, const std::string& text) {

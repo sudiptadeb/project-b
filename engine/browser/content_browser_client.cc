@@ -18,6 +18,12 @@
 #else
 #include "project_b/engine/browser/devtools.h"
 #endif
+#if BUILDFLAG(IS_MAC)
+#include "content/public/browser/login_delegate.h"
+#include "net/base/auth.h"
+#include "net/http/http_response_headers.h"
+#include "project_b/engine/browser/dialogs.h"
+#endif
 
 namespace project_b {
 
@@ -63,6 +69,23 @@ void ContentBrowserClient::CreateThrottlesForNavigation(
 // What Chrome reports, "Chrome/155.0.8059.41": DevTools' /json/version and
 // Browser.getVersion show it, and ChromeDriver reads the browser's version from it. The
 // user agent pages see comes from GetUserAgent, not from this.
+#if BUILDFLAG(IS_MAC)
+std::unique_ptr<content::LoginDelegate> ContentBrowserClient::CreateLoginDelegate(
+    const net::AuthChallengeInfo& auth_info,
+    content::WebContents* web_contents,
+    content::BrowserContext* browser_context,
+    const content::GlobalRequestID& request_id,
+    bool is_request_for_primary_main_frame_navigation,
+    bool is_request_for_navigation,
+    const GURL& url,
+    scoped_refptr<net::HttpResponseHeaders> response_headers,
+    bool first_auth_attempt,
+    content::GuestPageHolder* guest_page_holder,
+    content::LoginDelegate::LoginAuthRequiredCallback auth_required_callback) {
+  return Dialogs::Get()->SignIn(web_contents, auth_info, std::move(auth_required_callback));
+}
+#endif
+
 std::string ContentBrowserClient::GetProduct() {
   return std::string(version_info::GetProductNameAndVersionForUserAgent());
 }

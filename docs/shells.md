@@ -96,7 +96,7 @@ gives the page the same two.
 | `t` | Carries | When |
 |---|---|---|
 | `snapshot` | Everything below at once, and `data` | In answer to `ready` |
-| `tabs` | `tabs`, `active`: this window's tabs in order, and the active one's id | Tabs open, close, move, or another becomes active |
+| `tabs` | `tabs`, `active`, `groups`: this window's tabs in order, the active one's id, and its tab groups | Tabs open, close, move, another becomes active, or a group changes |
 | `tab` | `tab`: one tab's new state | Its title, address, loading, favicon or history changed |
 | `theme` | `theme`: `system`, `light` or `dark` | The pref changed |
 | `windowColor` | `windowColor`: `#rrggbb` | The frame colour changed |
@@ -113,7 +113,8 @@ gives the page the same two.
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
 
 A tab is `{id, url, title, loading, progress, blocked, crashed, error, favicon, canGoBack,
-canGoForward, workspace}`. The snapshot also has `running` (the version), `platform`
+canGoForward, workspace, group}`, `group` the id of its tab group, absent when it is in
+none. The snapshot also has `running` (the version), `platform`
 (`mac`, as the keymap names it) and `data`, and `extensions` only while their flag is on.
 
 - `controls` is `{x, y, w, h}`, where the native window buttons are, zero size when there
@@ -128,6 +129,9 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
   changed it. The workspace messages are the settings page's, and keep its rules: a name
   no other workspace has, whatever its case, and never deleting the last. A shell names
   the workspace by `workspace`, as `newTab` does, where the settings page says `id`.
+- `groups` is each of the window's tab groups, `{id, name, color, collapsed, tabs}`, in the
+  order they were made, `tabs` its tabs' ids in the group's own order
+  ([groups.md](groups.md)).
 - `suggestions` has the `id` the shell asked with and `items`, each `{url, title}`.
 - `extensions` is `{buttons, popup, prompt}`. A button is `{id, name, title, icon, badge,
   badgeColor, badgeTextColor, enabled, pinned}`, in the order the menu lists them; `popup`
@@ -142,12 +146,16 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH`, `frame` | The regions, the pages shown, and the band. Below. The SDK sends it |
-| `newTab` | `workspace`, optional: a workspace's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab |
+| `newTab` | `workspace`, optional: a workspace's id; or `groupWith`, a tab's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab. With `groupWith`, in that tab's workspace and group, starting a group of the two when it has none |
 | `createWorkspace` | `text`, `color` | Makes a workspace with that name and `#rrggbb` colour, at the end of the list |
 | `renameWorkspace` | `workspace`, `text` | Renames a workspace, by its id |
 | `editWorkspace` | `workspace`, `text`, `color` | Renames and recolours a workspace together; a name refused changes neither |
 | `moveWorkspace` | `workspace`, `by`: -1 or 1 | Moves a workspace one place up or down the list |
 | `deleteWorkspace` | `workspace` | Deletes a workspace: Go takes it out of the list, gives a window whose every tab is in it a new tab in the first workspace, closes its tabs in every window, and erases its storage. The last one is refused |
+| `createGroup` | `ids`, optional `name` and `color` | Makes a group of the tabs: the first's window and workspace, and the rest that share them |
+| `addToGroup`, `removeFromGroup` | `id`, and `group` to add to | Puts a tab in a group, or takes it out |
+| `editGroup` | `group`, and any of `name`, `color`, `collapsed` | Changes what is sent |
+| `ungroup`, `closeGroup` | `group` | Ends a group, its tabs staying; or closes its tabs |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |

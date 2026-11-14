@@ -25,6 +25,15 @@ type command struct {
 	// Workspace is where newTab opens its tab, by the workspace's id. Without it the tab
 	// opens in the workspace of the window's active tab, or the first in a window with none.
 	Workspace *string `json:"workspace"`
+	// The tab groups' (tabs/groups.go): GroupWith is the tab newTab opens beside in its
+	// group; Group a group's id; IDs the tabs createGroup groups; and what editGroup
+	// changes, each only when sent.
+	GroupWith engine.TabID   `json:"groupWith"`
+	Group     string         `json:"group"`
+	IDs       []engine.TabID `json:"ids"`
+	Name      *string        `json:"name"`
+	Color     *string        `json:"color"`
+	Collapsed *bool          `json:"collapsed"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -118,6 +127,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"t":            "snapshot",
 			"tabs":         m.tabs.AllIn(w),
 			"active":       m.tabs.ActiveIn(w),
+			"groups":       m.tabs.GroupsIn(w),
 			"windowColor":  m.window.Color(),
 			"controls":     m.window.Controls(w),
 			"cornerRadius": m.window.CornerRadius(w),
@@ -154,7 +164,9 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.tabs.Reload()
 	case "newTab":
 		m.Interaction(w, "tab.new", func() {
-			if c.Workspace == nil {
+			if c.GroupWith != 0 {
+				m.tabs.CreateWith(c.GroupWith)
+			} else if c.Workspace == nil {
 				m.tabs.Create(w)
 			} else {
 				m.tabs.CreateIn(w, *c.Workspace)
@@ -164,6 +176,18 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":
 		m.Interaction(w, "tab.activate", func() { m.tabs.Activate(engine.TabID(c.ID)) })
+	case "createGroup":
+		m.tabs.CreateGroup(c.IDs, derefOr(c.Name), derefOr(c.Color))
+	case "addToGroup":
+		m.tabs.AddToGroup(engine.TabID(c.ID), c.Group)
+	case "removeFromGroup":
+		m.tabs.RemoveFromGroup(engine.TabID(c.ID))
+	case "editGroup":
+		m.tabs.EditGroup(c.Group, c.Name, c.Color, c.Collapsed)
+	case "ungroup":
+		m.tabs.Ungroup(c.Group)
+	case "closeGroup":
+		m.Interaction(w, "tab.close", func() { m.tabs.CloseGroup(c.Group) })
 	case "setTabLayout":
 		m.SwitchTabLayout(c.Text)
 	case "run":
@@ -217,7 +241,7 @@ func (m *Manager) TabChanged(t tabs.Tab) {
 // TabsChanged tells each window's shell which tabs it has now and which is active.
 func (m *Manager) TabsChanged() {
 	for _, w := range m.window.Windows() {
-		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w)})
+		m.send(w, map[string]any{"t": "tabs", "tabs": m.tabs.AllIn(w), "active": m.tabs.ActiveIn(w), "groups": m.tabs.GroupsIn(w)})
 	}
 }
 
@@ -308,4 +332,12 @@ func (m *Manager) ForgetData() { clear(m.data) }
 func (m *Manager) WindowClosed(w engine.WindowID) {
 	delete(m.heard, w)
 	delete(m.data, w)
+}
+
+// derefOr is what s points at, or "" for nil.
+func derefOr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

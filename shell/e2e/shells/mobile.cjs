@@ -307,6 +307,28 @@ const H = 915;
     (await switcher.locator('[data-group] [role=tab]').evaluateAll((els) => els.map((e) => Number(e.dataset.tab)).sort().join())) === [x, y2].sort().join()));
   await page.keyboard.press('Escape');
 
+  // Slice 6: the bars slide away while the page scrolls down, and give the page their room;
+  // they come back when it scrolls up, or for another tab.
+  const pageRect = async () => (await regions()).visible[0].rect;
+  const act = (await regions()).active;
+  // With the bars: down to the toolbar, or to the strip while the tab is in a group.
+  const foot = async () => H - 48 - ((await strip.isVisible()) ? 44 : 0);
+  await until(async () => (await pageRect()).y + (await pageRect()).h === await foot());
+  const withBars = await pageRect();
+  await fire('scroll', 'down', { tab: act });
+  check('scrolling down, the bars go and the page takes the window to its foot', await until(async () => {
+    const v = await pageRect();
+    return v.y === withBars.y && v.y + v.h === H;
+  }), JSON.stringify(await pageRect()));
+  await shots('scrolled');
+  await fire('scroll', 'up', { tab: act });
+  check('scrolling up, they come back', await until(async () => JSON.stringify(await pageRect()) === JSON.stringify(withBars) && (await box('.toolbar')).bottom === H), JSON.stringify({ now: await pageRect(), withBars, bar: await box('.toolbar') }));
+  await fire('scroll', 'down', { tab: act });
+  await until(async () => (await pageRect()).h > withBars.h);
+  await fire('key', 'focusAddressBar', { tab: act });
+  check('the address bar called for brings them back', await until(async () => (await box('.toolbar')).bottom === H && await inField()));
+  await page.keyboard.press('Escape');
+
   // Settings, from the menu.
   await menuButton.tap();
   await menu.getByRole('menuitem', { name: 'Settings' }).tap();

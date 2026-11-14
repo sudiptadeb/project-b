@@ -258,6 +258,15 @@ func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
+// ScrollDirectionChanged tells a tab's shell its page began to scroll down, or up.
+func (m *Manager) ScrollDirectionChanged(tab engine.TabID, down bool) {
+	direction := "up"
+	if down {
+		direction = "down"
+	}
+	m.send(m.tabs.WindowOf(tab), map[string]any{"t": "scroll", "tab": tab, "direction": direction})
+}
+
 // AddressBarPositionChanged tells the shells where a phone shell's address bar goes now.
 func (m *Manager) AddressBarPositionChanged(at string) {
 	m.sendAll(map[string]any{"t": "addressBarPosition", "addressBarPosition": at})

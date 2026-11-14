@@ -715,6 +715,9 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 			e.navigate(shown, value)
 		case "title":
 			e.listener.TitleChanged(shown, value)
+		case "scroll":
+			// value is down or up, as a page that scrolls makes content say.
+			e.listener.ScrollDirectionChanged(shown, value == "down")
 		case "fail":
 			if t != nil {
 				t.navSeq++

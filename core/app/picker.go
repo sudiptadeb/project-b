@@ -183,6 +183,7 @@ func (p *Picker) HistoryChanged(engine.TabID, bool, bool)                       
 func (p *Picker) TitleChanged(engine.TabID, string)                                {}
 func (p *Picker) LoadingChanged(engine.TabID, bool)                                {}
 func (p *Picker) LoadProgressChanged(engine.TabID, float64)                        {}
+func (p *Picker) ScrollDirectionChanged(engine.TabID, bool)                        {}
 func (p *Picker) PageCrashed(engine.TabID)                                         {}
 func (p *Picker) FaviconChanged(engine.TabID, string)                              {}
 func (p *Picker) TabOpened(engine.TabID, engine.TabID, string, string, bool, bool) {}

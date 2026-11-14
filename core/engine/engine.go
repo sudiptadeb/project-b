@@ -233,6 +233,9 @@ type Listener interface {
 	LoadingChanged(tab TabID, loading bool)
 	// LoadProgressChanged says how far the page's load has got, 0 to 1.
 	LoadProgressChanged(tab TabID, progress float64)
+	// ScrollDirectionChanged says the page began to scroll down, or back up: a phone
+	// shell hides its bars while the page scrolls down.
+	ScrollDirectionChanged(tab TabID, down bool)
 	PageCrashed(tab TabID)
 	// FaviconChanged carries the page's icon as a data: URL, or "" when the page has
 	// none the engine could fetch.

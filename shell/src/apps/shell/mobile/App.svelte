@@ -33,6 +33,35 @@
   let address = $state();
   // The tab last made active, so each change of it is seen once.
   let active = 0;
+  // The bars while the page scrolls down: away, sliding off the screen, then gone, their
+  // room given to the page in one step, so the page is resized once and not every frame.
+  // Back with the page scrolling up, another tab, the address or a sheet.
+  let away = $state(false);
+  let gone = $state(false);
+  let sliding = 0;
+  const slide = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 150;
+
+  function bars(show) {
+    if (show !== away) return;
+    clearTimeout(sliding);
+    if (show) {
+      gone = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => (away = false)));
+    } else {
+      away = true;
+      sliding = setTimeout(() => (gone = true), slide);
+    }
+  }
+
+  function scrolled(m) {
+    const editing = document.activeElement?.getAttribute('aria-label') === 'Address';
+    if (m.tab === go.active && !sheet && !editing) bars(m.direction !== 'down');
+  }
+
+  $effect(() => {
+    if (sheet) bars(true);
+  });
+
   // Space for the native window buttons, which a phone hasn't: a desktop window, as on
   // the mock, keeps the page from under them.
   const clear = $derived(go.controls?.h > 0 ? go.controls.y + go.controls.h : 0);
@@ -47,6 +76,7 @@
   function activated() {
     if (go.active === active) return;
     active = go.active;
+    bars(true);
     workspace = tab.workspace || '';
     address.blur();
     if (tab.url === '') {
@@ -110,8 +140,10 @@
     tabs: activated,
     focusAddressBar: () => {
       sheet = '';
+      bars(true);
       address.focus();
     },
+    scroll: scrolled,
     suggestions: (m) => address.suggestions(m),
   });
 </script>
@@ -123,12 +155,16 @@
     <div class="clear" use:shell use:drag style:height="{clear}px"></div>
   {/if}
   {#if top}
-    <Toolbar {tab} top count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+    <div class="bars head" class:away class:gone>
+      <Toolbar {tab} top count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+    </div>
   {/if}
   <div class="stage">
     <main use:page={go.active}></main>
     {#if group}
-      <Strip {group} tabs={tabsOf(group)} active={go.active} onsheet={() => onsheet('group')} onpick={pick} onclosetab={(id) => closeTabs([id])} onnewtab={() => newTab(go.active)} />
+      <div class="bars" class:away class:gone>
+        <Strip {group} tabs={tabsOf(group)} active={go.active} onsheet={() => onsheet('group')} onpick={pick} onclosetab={(id) => closeTabs([id])} onnewtab={() => newTab(go.active)} />
+      </div>
     {/if}
     <Switcher
       open={sheet === 'switcher'}
@@ -146,10 +182,12 @@
       onclosegroup={(id) => openGroup(id, true)}
     />
   </div>
-  <CrashBar />
-  {#if !top}
-    <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
-  {/if}
+  <div class="bars" class:away class:gone>
+    <CrashBar />
+    {#if !top}
+      <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+    {/if}
+  </div>
   {#if sheet === 'menu'}
     <MenuSheet {tab} {group} {workspace} onclose={() => (sheet = '')} onnewtab={(inGroup) => newTab(inGroup ? go.active : 0)} {onsheet} onworkspace={(id) => (workspace = id)} />
   {:else if sheet === 'group' && shownGroup}
@@ -230,6 +268,32 @@
   main {
     flex: 1;
     min-height: 0;
+  }
+
+  .bars {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    transition: transform 150ms ease-out;
+  }
+
+  .bars.away {
+    transform: translateY(100%);
+  }
+
+  .head.away {
+    transform: translateY(-100%);
+  }
+
+  .bars.gone {
+    height: 0;
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bars {
+      transition: none;
+    }
   }
 
   :global(button) {

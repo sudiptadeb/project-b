@@ -102,6 +102,11 @@ func Wire(h *Hooks, l engine.Listener) {
 			l.LoadProgressChanged(engine.TabID(c.ID), progress)
 		}
 	})
+	h.Observer.OnDidChangeVerticalScrollDirection(func(c WebContents, d VerticalScrollDirection) {
+		if c.ID > 0 && d != VerticalScrollDirectionNull {
+			l.ScrollDirectionChanged(engine.TabID(c.ID), d == VerticalScrollDirectionDown)
+		}
+	})
 	h.Observer.OnTitleWasSet(func(c WebContents, entry NavigationEntry) {
 		if c.ID > 0 {
 			l.TitleChanged(engine.TabID(c.ID), c.Title)

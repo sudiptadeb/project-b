@@ -271,6 +271,10 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 	a.Tabs.HandleLoadingChanged(tab, loading)
 }
 
+func (a *App) ScrollDirectionChanged(tab engine.TabID, down bool) {
+	a.Shell.ScrollDirectionChanged(tab, down)
+}
+
 func (a *App) LoadProgressChanged(tab engine.TabID, progress float64) {
 	a.Tabs.HandleLoadProgressChanged(tab, progress)
 }

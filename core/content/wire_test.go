@@ -77,6 +77,10 @@ func (r *recorder) LoadingChanged(tab engine.TabID, loading bool) {
 		r.note("loaded")
 	}
 }
+func (r *recorder) ScrollDirectionChanged(tab engine.TabID, down bool) {
+	r.note(fmt.Sprintf("scroll %d %v", tab, down))
+}
+
 func (r *recorder) LoadProgressChanged(tab engine.TabID, progress float64) {
 	r.note(fmt.Sprintf("progress %.2f", progress))
 }
@@ -240,6 +244,19 @@ func TestLoadProgressReachesTheListener(t *testing.T) {
 	h.Dispatch(ObserverLoadProgressChanged, pack(WebContents{ID: 2}, 0.4))
 	h.Dispatch(ObserverLoadProgressChanged, pack(WebContents{ID: 0}, 0.9))
 	if !reflect.DeepEqual(r.got, []string{"progress 0.40"}) {
+		t.Fatalf("got %v", r.got)
+	}
+}
+
+// A page's scroll direction reaches the listener as down or not; no direction, and the
+// shell's own page, don't.
+func TestScrollDirectionReachesTheListener(t *testing.T) {
+	h, r, _ := wired(t)
+	h.Dispatch(ObserverDidChangeVerticalScrollDirection, pack(WebContents{ID: 2}, int64(VerticalScrollDirectionDown)))
+	h.Dispatch(ObserverDidChangeVerticalScrollDirection, pack(WebContents{ID: 2}, int64(VerticalScrollDirectionUp)))
+	h.Dispatch(ObserverDidChangeVerticalScrollDirection, pack(WebContents{ID: 2}, int64(VerticalScrollDirectionNull)))
+	h.Dispatch(ObserverDidChangeVerticalScrollDirection, pack(WebContents{ID: 0}, int64(VerticalScrollDirectionDown)))
+	if !reflect.DeepEqual(r.got, []string{"scroll 2 true", "scroll 2 false"}) {
 		t.Fatalf("got %v", r.got)
 	}
 }

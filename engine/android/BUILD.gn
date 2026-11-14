@@ -213,8 +213,13 @@ android_resources("resources") {
 action("native_shells_kotlin") {
   script = "build_kotlin.py"
   sources = [
+    "java/dev/projectb/browser/Bars.kt",
+    "java/dev/projectb/browser/Icons.kt",
     "java/dev/projectb/browser/MobileNativeShell.kt",
     "java/dev/projectb/browser/NativeShell.kt",
+    "java/dev/projectb/browser/Sheets.kt",
+    "java/dev/projectb/browser/Switcher.kt",
+    "java/dev/projectb/browser/Ui.kt",
   ]
   _android_jar = android_sdk_jar
   inputs = [ _android_jar ]

@@ -9,6 +9,10 @@ const text = ref('');
 const typed = ref('');
 const items = ref([]);
 const highlight = ref(-1);
+// Whether the bar holds what the user typed rather than the page's address. Typed text
+// stays through a blur, the window losing focus or the page loading, as browsers keep it,
+// until Enter, Escape or another tab takes it away.
+const edited = ref(false);
 
 let latestQuery = 0;
 
@@ -28,6 +32,7 @@ function close() {
 }
 
 function onInput() {
+  edited.value = true;
   typed.value = text.value;
   highlight.value = -1;
   if (text.value.trim() === '') {
@@ -71,6 +76,7 @@ function onKeydown(e) {
         text.value = typed.value;
         close();
       } else {
+        edited.value = false;
         text.value = activeTab.value.url;
         input.value.blur();
         focusPage();
@@ -83,6 +89,7 @@ function go(target) {
   const value = (target ?? text.value).trim();
   if (value === '') return;
   text.value = value;
+  edited.value = false;
   close();
   send({ t: 'navigate', text: value });
   input.value.blur();
@@ -112,7 +119,7 @@ function onMouseUp(e) {
 function onBlur() {
   focused.value = false;
   close();
-  text.value = activeTab.value.url;
+  if (!edited.value) text.value = activeTab.value.url;
 }
 
 // The shell page has to hold the keyboard before the input can.
@@ -134,7 +141,7 @@ onMounted(() => {
 watch(
   () => activeTab.value.url,
   (url) => {
-    if (!focused.value) text.value = url;
+    if (!focused.value && !edited.value) text.value = url;
   },
 );
 
@@ -145,6 +152,7 @@ watch(
   () => {
     if (state.active === 0) return;
     close();
+    edited.value = false;
     text.value = activeTab.value.url;
     if (activeTab.value.url === '') {
       focusBar();

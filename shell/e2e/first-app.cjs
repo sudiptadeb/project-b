@@ -158,13 +158,17 @@ const stopServer = lib.stop;
   await shellFrame().waitForFunction(() => document.querySelector('input').value === 'https://go.dev/learn');
   check('clicking a suggestion navigates', (await list.count()) === 0);
 
-  // Clicking the page closes the box.
+  // Clicking the page closes the box, and keeps what was typed until Escape.
   await bar.click();
   await page.keyboard.type('exam');
   await options.first().waitFor();
   await page.mouse.click(1050, 650);
   await settle(page);
-  check('clicking the page closes the box', (await list.count()) === 0 && (await bar.inputValue()) === 'https://go.dev/learn');
+  check('clicking the page closes the box and keeps what was typed', (await list.count()) === 0 && (await bar.inputValue()) === 'exam', await bar.inputValue());
+  await bar.click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  check('Escape then puts the page\'s address back', (await bar.inputValue()) === 'https://go.dev/learn', await bar.inputValue());
 
   // The window sends each press where its regions say, with the mouse moved there first,
   // as a person's is: beside the suggestions the page takes it, on them the shell.
@@ -212,6 +216,19 @@ const stopServer = lib.stop;
   check('the blank page a new tab holds stays out of history', (await options.count()) === 0);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
+
+  // What was typed stays when the bar loses focus, as when the window does, until Escape.
+  const address = await bar.inputValue();
+  await bar.click();
+  await bar.fill('');
+  await page.keyboard.type('half typed');
+  await bar.evaluate((e) => e.blur());
+  await settle(page);
+  check('typed text stays when the address bar loses focus', (await bar.inputValue()) === 'half typed', await bar.inputValue());
+  await bar.click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  check('and Escape puts the page\'s address back', (await bar.inputValue()) === address, await bar.inputValue());
 
   // The shell's own page never loads in a tab: a copy there would talk to Go as the
   // shell. Content's own internal pages still load when typed.

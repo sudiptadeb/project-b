@@ -228,6 +228,10 @@ android_library("java") {
     "//build/android:build_java",
     "//components/embedder_support/android:content_view_java",
     "//components/embedder_support/android:web_contents_delegate_java",
+
+    # The GPU process's begin-frame source below Android 13, which has no AChoreographer
+    # vsync: without it the GPU process aborts at start. content_shell_java lists it too.
+    "//components/viz/service:service_java",
     "//content/public/android:content_java",
     "//media/capture/video/android:capture_java",
     "//net/android:net_java",

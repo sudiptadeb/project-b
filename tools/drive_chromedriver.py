@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "chromium/src/out/pb/project_b")
+BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "build/pb/project_b")
 CHROMEDRIVER = os.environ.get("CHROMEDRIVER") or os.path.join(
     ROOT, ".tools/chromedriver/chromedriver-mac-arm64/chromedriver")
 OUT = os.path.join(ROOT, "build/cdp")

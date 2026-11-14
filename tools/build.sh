@@ -213,4 +213,17 @@ if [ "$RC" -ne 0 ]; then
 fi
 
 ls -la "$OUT/project_b" "$OUT/project_b_helper" "$OUT/libproject_b_content.dylib" 2>/dev/null
+
+# $OUT is shared by every checkout, and the next build from any of them replaces what is in
+# it. So, still under the lock, the app this checkout built is copied to build/<out dir's
+# name>/ in the checkout, as APFS clones, which cost no time or space. Run and test that copy:
+# the test tools default to build/pb/project_b.
+APP_COPY=$ROOT/build/$(basename "$OUT")
+rm -rf "$APP_COPY" && mkdir -p "$APP_COPY"
+cp -c "$OUT/project_b" "$OUT/project_b_helper" "$OUT/libproject_b_content.dylib" \
+      "$OUT/project_b.pak" "$OUT/icudtl.dat" "$OUT/snapshot_blob.bin" "$OUT"/v8_context_snapshot.*.bin \
+      "$OUT/libEGL.dylib" "$OUT/libGLESv2.dylib" "$OUT/libvk_swiftshader.dylib" "$OUT/libvulkan.dylib" \
+      "$OUT/vk_swiftshader_icd.json" "$APP_COPY/" || { echo "RESULT=failed copy to $APP_COPY"; exit 1; }
+cp -cR "$OUT/shell" "$APP_COPY/shell" || { echo "RESULT=failed copy to $APP_COPY"; exit 1; }
+echo "=== the app is $APP_COPY/project_b"
 echo "RESULT=ok $(date '+%F %T')"

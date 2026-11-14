@@ -42,7 +42,7 @@ BUILT=$(python3 -c 'import json, os, sys
 out = set(filter(None, os.environ["WITHOUT"].split(",")))
 print(",".join(f["id"] for f in json.load(open("core/flags/registry.json")) if f.get("build") and f["id"] not in out))')
 built() { case ",$BUILT," in *",$1,"*) return 0 ;; esac; return 1; }
-BIN=${PB_BIN:-chromium/src/out/pb/project_b}
+BIN=${PB_BIN:-build/pb/project_b}
 APK=${PB_APK:-build/android/project-b-content.apk}
 ADB="$HOME/Library/Android/sdk/platform-tools/adb -s ${ADB_SERIAL:-emulator-5600}"
 VM_PYTHON=$HOME/PW_TOOLS/macos-vm/venv/bin/python

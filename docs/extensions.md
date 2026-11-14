@@ -9,12 +9,12 @@ This is the design as built. The research behind it is in
     tools/pack-test-extension.py                  # ours, packed into the same folder
     (cd core && go run ./cmd/extstore -dir ../.tools/extensions)    # the mock store, on 127.0.0.1:8766
     tools/build.sh                                # extensions are in the build by default
-    chromium/src/out/pb/project_b                 # then Settings, Flags, Extensions, and Relaunch
+    build/pb/project_b                 # then Settings, Flags, Extensions, and Relaunch
 
 The store is a website. Started like that, the store is the Chrome Web Store: visit
 `chromewebstore.google.com` and press "Add to Chrome". To make the mock store the store:
 
-    chromium/src/out/pb/project_b --apps-gallery-url=http://127.0.0.1:8766 \
+    build/pb/project_b --apps-gallery-url=http://127.0.0.1:8766 \
         --apps-gallery-download-url=http://127.0.0.1:8766/download/%s
 
 and visit `http://127.0.0.1:8766/`.
@@ -320,7 +320,7 @@ The extension checks are part of two of the existing groups, unless `WITHOUT=ext
   through the real UI in a browser. Its last check builds the shell without the flag and finds
   no extension UI in it.
 - `tools/test.sh app`: `tools/drive_extensions.py`, 54 checks on the real app
-  (`PB_BIN`, or `chromium/src/out/pb/project_b`), in profiles with the Extensions flag on, and
+  (`PB_BIN`, or `build/pb/project_b`), in profiles with the Extensions flag on, and
   one with it off, where no button shows, the store's page has no store API, and the Flags
   section's switch and Relaunch turn it on. Started with the mock store as
   its store, it installs the test extension and uBlock Origin Lite from the mock store's page,

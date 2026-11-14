@@ -10,7 +10,7 @@ runs, and the Flags section's switch and Relaunch turn it on. Last, in an app st
 installs uBlock Origin Lite from the real chromewebstore.google.com. It needs the network,
 for that and for the ad host uBlock Origin Lite is seen blocking. Run it from the repo root:
 
-    PB_BIN=chromium/src/out/pb/project_b python3 tools/drive_extensions.py
+    PB_BIN=build/pb/project_b python3 tools/drive_extensions.py
 
 Results go to build/real/, as tools/drive_first_app.py's do.
 """

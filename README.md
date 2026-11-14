@@ -57,7 +57,8 @@ several hours on a laptop. Later builds take under a minute.
 
     tools/build.sh
 
-The app is `chromium/src/out/pb/project_b`. Run it directly.
+The app is `build/pb/project_b`, a copy of what the build made in `chromium/src/out/pb`, which
+every checkout on the machine shares and the next build replaces. Run the copy directly.
 
 **No Chromium yet?** The shell runs on a mock engine in a minute:
 

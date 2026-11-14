@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-BIN = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "chromium/src/out/pb/project_b")
+BIN = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "build/pb/project_b")
 LIB = os.path.join(os.path.dirname(BIN), "libproject_b_content.dylib")
 if not os.path.exists(LIB):
     # In an app bundle the library is in Contents/Frameworks.

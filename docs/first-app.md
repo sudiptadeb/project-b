@@ -383,4 +383,4 @@ for Chrome for Testing.
 
 Run the real app:
 
-    chromium/src/out/pb/project_b --block=blocked.test
+    build/pb/project_b --block=blocked.test

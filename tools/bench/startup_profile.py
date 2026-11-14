@@ -15,7 +15,7 @@ navigation start is printed so it lines up with the timeline's shell.navigation_
 cpu records each start with Instruments' Time Profiler (xcrun xctrace) and prints the main
 thread in 20 ms buckets from the process's first sample, each with what it was doing, then
 the engine calls Go made during Go's start. The package is stripped, so this one runs the
-build tree's binary, which keeps its symbols: chromium/src/out/pb/project_b, or PB_BIN.
+build tree's binary, which keeps its symbols: build/pb/project_b, the copy tools/build.sh makes, or PB_BIN.
 Samples are of a running thread only, so a bucket's busy count below 20 is time the main
 thread waited.
 
@@ -37,7 +37,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PACKAGE = os.path.join(ROOT, "build/package/Project B.app/Contents/MacOS/project_b")
-SYMBOLS = os.path.join(ROOT, "chromium/src/out/pb/project_b")
+SYMBOLS = os.path.join(ROOT, "build/pb/project_b")
 
 
 # --- trace -------------------------------------------------------------------------

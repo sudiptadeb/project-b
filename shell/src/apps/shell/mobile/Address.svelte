@@ -24,6 +24,8 @@
       return tab.url;
     }
   });
+  // What went wrong with the page, said at the pill's end.
+  const status = $derived(tab.blocked ? 'Blocked' : tab.crashed ? 'Crashed' : tab.error ? 'Failed' : '');
   const secure = $derived(tab.url.startsWith('https:') ? 'lock' : tab.url.startsWith('http:') ? 'warn' : '');
   // The list from the field outwards: under a field on top, over one at the bottom with
   // the first suggestion nearest it.
@@ -116,6 +118,9 @@
       else if (e.key === 'Escape') leave();
     }}
   />
+  {#if !editing && status}
+    <span class="status">{status}</span>
+  {/if}
   {#if editing && text}
     <!-- A press here mustn't take the keyboard from the field. -->
     <button class="clear" aria-label="Clear" onmousedown={(e) => e.preventDefault()} onclick={() => fill('')}><Icon name="close" size={18} /></button>
@@ -189,6 +194,15 @@
   input::placeholder {
     color: var(--muted);
     font-weight: 400;
+  }
+
+  .status {
+    flex: none;
+    padding: 2px 8px;
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    color: var(--danger);
+    font-size: 12px;
   }
 
   .clear {

@@ -203,6 +203,8 @@ source_set("browser") {
     "browser/devtools.h",
     "browser/devtools_session.cc",
     "browser/devtools_session.h",
+    "browser/dialogs.cc",
+    "browser/dialogs.h",
     "browser/downloads.cc",
     "browser/downloads.h",
     "browser/downloads_mac.mm",

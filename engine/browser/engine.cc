@@ -26,6 +26,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents.h"
+#include "project_b/engine/browser/dialogs.h"
 #include "project_b/engine/browser/downloads.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
@@ -208,6 +209,11 @@ void CallOpenFile(const char* path) {
 void CallRevealFile(const char* path) {
   CheckMainThread();
   RevealFile(base::FilePath::FromUTF8Unsafe(path));
+}
+
+void CallAnswerDialog(int64_t dialog, int ok, const char* text) {
+  CheckMainThread();
+  Dialogs::Get()->Answer(dialog, ok, text);
 }
 
 void CallOpenSettings(int64_t window) {
@@ -461,6 +467,7 @@ const PBEngineCalls* Engine::Calls() {
       .download_command = CallDownloadCommand,
       .open_file = CallOpenFile,
       .reveal_file = CallRevealFile,
+      .answer_dialog = CallAnswerDialog,
       .create_window = CallCreateWindow,
       .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,

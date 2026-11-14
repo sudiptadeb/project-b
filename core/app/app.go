@@ -69,6 +69,8 @@ type App struct {
 	menus *contextMenus
 	// lastFolder is where files were last chosen from for a page.
 	lastFolder string
+	// dialogs are the pages' dialogs waiting for an answer.
+	dialogs *pageDialogs
 	// keyIn is which page had the keyboard at the last key press.
 	keyIn engine.Surface
 	// lastWindow is the id of the window made last; Go numbers them from 1.
@@ -114,6 +116,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell.AddPart(a.shellDataPart())
 	a.menus = newContextMenus(a, e)
 	a.Shell.AddPart(a.downloadsShellPart())
+	a.dialogs = &pageDialogs{a: a, e: e, list: []pageDialog{}}
+	a.Shell.AddPart(a.dialogs.shellPart())
 	a.Shell.AddPart(a.menus.shellPart())
 	// Every action a shell can run by name, for a shell that lists them, as Glide's
 	// Command Bar does.

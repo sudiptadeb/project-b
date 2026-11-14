@@ -34,6 +34,7 @@ static inline void call_download_url(const PBEngineCalls* c, int64_t tab, const 
 static inline void call_download_command(const PBEngineCalls* c, uint32_t download, int32_t command) { c->download_command(download, command); }
 static inline void call_open_file(const PBEngineCalls* c, const char* path) { c->open_file(path); }
 static inline void call_reveal_file(const PBEngineCalls* c, const char* path) { c->reveal_file(path); }
+static inline void call_answer_dialog(const PBEngineCalls* c, int64_t dialog, int ok, const char* text) { c->answer_dialog(dialog, ok, text); }
 static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
 static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
 static inline void call_send_to_settings(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_settings(window, json, length); }
@@ -175,6 +176,16 @@ func (e *nativeEngine) RevealFile(path string) {
 	cs := C.CString(path)
 	defer C.free(unsafe.Pointer(cs))
 	C.call_reveal_file(e.calls, cs)
+}
+
+func (e *nativeEngine) AnswerDialog(id engine.DialogID, ok bool, text string) {
+	cs := C.CString(text)
+	defer C.free(unsafe.Pointer(cs))
+	yes := C.int(0)
+	if ok {
+		yes = 1
+	}
+	C.call_answer_dialog(e.calls, C.int64_t(id), yes, cs)
 }
 
 func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }

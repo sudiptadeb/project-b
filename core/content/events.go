@@ -32,7 +32,12 @@ const (
 	eventDownloadUpdate Hook = 18
 	eventFileChooser    Hook = 19
 	eventFilesChosen    Hook = 20
+	eventDialogOpened   Hook = 21
+	eventDialogClosed   Hook = 22
 )
+
+// dialogKinds name PBDialogKind's values.
+var dialogKinds = []string{"alert", "confirm", "prompt", "beforeunload"}
 
 var eventNames = map[Hook]string{
 	eventShellMessage:   "engine.ShellMessage",
@@ -55,6 +60,8 @@ var eventNames = map[Hook]string{
 	eventDownloadUpdate: "engine.DownloadUpdated",
 	eventFileChooser:    "engine.FileChooser",
 	eventFilesChosen:    "engine.FilesChosen",
+	eventDialogOpened:   "engine.DialogOpened",
+	eventDialogClosed:   "engine.DialogClosed",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -89,6 +96,8 @@ type Events struct {
 	OnDownloadUpdated func(d engine.Download)
 	OnFileChooser     func(r engine.FileChooserRequest) engine.FileChooserAnswer
 	OnFilesChosen     func(tab engine.TabID, count int, folder string)
+	OnDialogOpened    func(d engine.Dialog)
+	OnDialogClosed    func(id engine.DialogID)
 
 	// more are the events a build tag adds, by number.
 	more map[Hook]func(r *reader) (Value, bool)
@@ -195,6 +204,19 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		}
 		b, _ := json.Marshal(e.OnFileChooser(req))
 		return Value{S: string(b)}, true
+	case eventDialogOpened:
+		if e.OnDialogOpened != nil {
+			d := engine.Dialog{ID: engine.DialogID(r.int()), Tab: engine.TabID(r.int())}
+			if k := int(r.int()); k >= 0 && k < len(dialogKinds) {
+				d.Kind = dialogKinds[k]
+			}
+			d.Message, d.DefaultText, d.Origin, d.Reload = r.str(), r.str(), r.str(), r.bool()
+			e.OnDialogOpened(d)
+		}
+	case eventDialogClosed:
+		if e.OnDialogClosed != nil {
+			e.OnDialogClosed(engine.DialogID(r.int()))
+		}
 	case eventFilesChosen:
 		if e.OnFilesChosen != nil {
 			e.OnFilesChosen(engine.TabID(r.int()), int(r.int()), r.str())

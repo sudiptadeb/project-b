@@ -132,6 +132,11 @@ func (r *recorder) FilesChosen(tab engine.TabID, count int, folder string) {
 	r.note(fmt.Sprintf("files chosen %d %d %s", tab, count, folder))
 }
 
+func (r *recorder) DialogOpened(d engine.Dialog) {
+	r.note(fmt.Sprintf("dialog %d %s %s", d.ID, d.Kind, d.Message))
+}
+func (r *recorder) DialogClosed(id engine.DialogID) { r.note(fmt.Sprintf("dialog closed %d", id)) }
+
 func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 	r.note("devtools " + method + " " + string(params))
 	switch method {

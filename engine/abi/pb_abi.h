@@ -74,7 +74,21 @@ typedef enum PBEvent {
                                         // where the panel opens; none refuses
   PB_EVENT_FILES_CHOSEN = 20,           // i: tab, i: how many files, s: the folder they
                                         // came from
+  PB_EVENT_DIALOG_OPENED = 21,          // i: dialog, i: tab, i: PBDialogKind, s: message,
+                                        // s: a prompt's default text, s: the asking
+                                        // frame's origin, i: a leave-page question asked
+                                        // for a reload. The page waits for answer_dialog
+  PB_EVENT_DIALOG_CLOSED = 22,          // i: dialog; content gave up on it, as when its
+                                        // tab navigated or closed
 } PBEvent;
+
+// What a page's dialog asks.
+typedef enum PBDialogKind {
+  PB_DIALOG_ALERT = 0,
+  PB_DIALOG_CONFIRM = 1,
+  PB_DIALOG_PROMPT = 2,
+  PB_DIALOG_BEFOREUNLOAD = 3,
+} PBDialogKind;
 
 // Where a download is.
 typedef enum PBDownloadState {
@@ -221,6 +235,8 @@ typedef struct PBEngineCalls {
   // Opens a file as the OS would, or shows it in the file manager.
   void (*open_file)(const char* path);
   void (*reveal_file)(const char* path);
+  // Answers a page's dialog: OK or not, and a prompt's text.
+  void (*answer_dialog)(int64_t dialog, int ok, const char* text);
   // Makes a window and the page covering it, chrome://<page>/: a shell, "shell/<id>", or
   // "picker" in a copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.

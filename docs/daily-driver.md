@@ -106,3 +106,21 @@ Cancelling, or a refusal, answers the page with nothing, as a cancelled panel do
 
 **Android.** The phone's own picker already opens through content, without Go. Bringing it
 through Go's policy comes with the Android pass.
+
+## JavaScript dialogs
+
+`alert`, `confirm`, `prompt` and the leave-page question. The engine's
+`JavaScriptDialogManager` tells Go of each (`PB_EVENT_DIALOG_OPENED`: its id, tab, kind,
+words, a prompt's text, the asking frame's origin, and whether a leave-page question is for a
+reload) and holds the page until Go answers (`answer_dialog`). Go keeps them in
+`state.dialogs`, oldest first, each with the title and the buttons' words every shell shows:
+"example.com says" with OK and Cancel (OK alone for an alert), or "Leave site?" with Leave and
+Cancel ("Reload site?" with Reload). When content gives up on one, as when its tab navigates or
+closes, the engine says so (`PB_EVENT_DIALOG_CLOSED`) and it leaves the list unanswered.
+
+A shell shows its active tab's, over that page only, so the tabs and the toolbar still work;
+another tab shown hides it and the page keeps waiting. It answers with `answerDialog {id, ok,
+text}`; Escape answers no. In Standard it is the design system's dialog over the page. The
+contract's rule 15 holds every shell to it.
+
+**Android.** The engine keeps content's way on a phone until the Mobile shell draws them.

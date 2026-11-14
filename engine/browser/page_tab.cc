@@ -15,6 +15,7 @@
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #if BUILDFLAG(IS_MAC)
+#include "project_b/engine/browser/dialogs.h"
 #include "project_b/engine/browser/file_chooser.h"
 #endif
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
@@ -205,6 +206,13 @@ bool PageTab::HandleKeyboardEvent(content::WebContents* source,
 }
 
 #if BUILDFLAG(IS_MAC)
+// A page's dialogs are Go's, drawn by the shell. A phone keeps content's way until the
+// Mobile shell draws them.
+content::JavaScriptDialogManager* PageTab::GetJavaScriptDialogManager(
+    content::WebContents* source) {
+  return Dialogs::Get();
+}
+
 // The phone's own picker already opens; the Mac's goes through Go first.
 void PageTab::RunFileChooser(content::RenderFrameHost* render_frame_host,
                              scoped_refptr<content::FileSelectListener> listener,

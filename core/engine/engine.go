@@ -176,6 +176,8 @@ type Engine interface {
 	// OpenFile opens a file as the OS would; RevealFile shows it in the file manager.
 	OpenFile(path string)
 	RevealFile(path string)
+	// AnswerDialog answers a page's dialog: OK or not, and a prompt's text.
+	AnswerDialog(id DialogID, ok bool, text string)
 
 	// CreateWindow makes window w, with its page, and puts it on screen with its first
 	// layout, a little down and right of window near, or where a first window goes when
@@ -326,6 +328,27 @@ type Listener interface {
 	FileChooser(r FileChooserRequest) FileChooserAnswer
 	// FilesChosen says the user chose count files in the panel, from folder.
 	FilesChosen(tab TabID, count int, folder string)
+
+	// DialogOpened says a page asks the user something and waits for AnswerDialog.
+	// DialogClosed says the engine gave up on one, as when its tab navigated or closed.
+	DialogOpened(d Dialog)
+	DialogClosed(id DialogID)
+}
+
+// DialogID is the engine's number for a page's dialog.
+type DialogID int64
+
+// Dialog is what a page asks: its kind, alert, confirm, prompt or beforeunload (leave the
+// page), its words, a prompt's text to start from, the origin of the frame asking, and
+// whether a leave-page question is for a reload.
+type Dialog struct {
+	ID          DialogID
+	Tab         TabID
+	Kind        string
+	Message     string
+	DefaultText string
+	Origin      string
+	Reload      bool
 }
 
 // FileChooserMode is what a page's file panel picks.

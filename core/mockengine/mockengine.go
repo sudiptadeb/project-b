@@ -92,6 +92,7 @@ type Engine struct {
 	clipboard  string
 	downloads  downloads
 	chooser    []engine.FileChooserAnswer
+	dialogs    dialogs
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
@@ -273,6 +274,7 @@ func (e *Engine) EraseWorkspace(workspace string) {
 func (e *Engine) Erased() []Erase { return slices.Clone(e.erased) }
 
 func (e *Engine) CloseTab(id engine.TabID) {
+	e.dropDialogs(id)
 	delete(e.tabs, id)
 	for w, win := range e.windows {
 		for slot, v := range win.visible {
@@ -768,6 +770,9 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 				json.Unmarshal([]byte(value), &m)
 			}
 			e.listener.ContextMenu(shown, m)
+		case "alert", "confirm", "prompt", "beforeunload":
+			// The page asks; value is its words.
+			e.openDialog(shown, kind, value)
 		case "chooseFile":
 			// The page asks for a file; the user picks one in folder value, or cancels
 			// with "".
@@ -860,6 +865,9 @@ func (e *Engine) load(id engine.TabID, u string, commit func(*tab)) {
 	t := e.tabs[id]
 	if t == nil {
 		return
+	}
+	if e.listener != nil {
+		e.dropDialogs(id)
 	}
 	// A load asked for while the app is still starting begins once it listens.
 	if e.listener == nil {

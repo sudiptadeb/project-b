@@ -68,6 +68,8 @@ func Wire(h *Hooks, l engine.Listener) {
 	h.Events.OnDownloadUpdated = l.DownloadUpdated
 	h.Events.OnFileChooser = l.FileChooser
 	h.Events.OnFilesChosen = l.FilesChosen
+	h.Events.OnDialogOpened = l.DialogOpened
+	h.Events.OnDialogClosed = l.DialogClosed
 
 	// The gate: every top-level navigation in a tab asks Go before it starts and on
 	// each redirect. The shell's and the settings page's own navigations (ids 0 and -1) have no gate.

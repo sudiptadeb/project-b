@@ -489,7 +489,8 @@ def layout_click_works(win, on_top):
     Returns how many seconds the tabs took to move, or None if they didn't within 5 s.
     """
     def strip():
-        return float(np.mean(near(crop(desk.image(), win[0] + win[2] - 200, win[1] + 6, 150, 20), FRAME)))
+        # The sidebar's place: the bar colour with the tabs on the side, the page with them on top.
+        return float(np.mean(near(crop(desk.image(), win[0] + 8, win[1] + 300, 180, 200), BAR)))
 
     first, then = (T, V) if on_top else (V, T)
     before = strip()
@@ -1753,8 +1754,9 @@ until(address, lambda a: changed(a, example_at) < 0.01)
 
 
 def tabs_on_top(img):
-    """Whether the tabs are on top: the strip along the window's top right is the frame colour."""
-    return float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME))) > 0.9
+    """Whether the tabs are on top: the sidebar's place shows the page, not the bar colour. The
+    strip along the top is the bar colour in both layouts, so it can't tell them apart."""
+    return float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR))) < 0.2
 
 
 def switch_layout(rect, to_top, name):
@@ -1779,7 +1781,7 @@ took = time.time() - start
 check("after the tabs move to the top, the sidebar is gone within 1 s", took <= 1, f"gone after {took:.1f} s")
 shot("horizontal")
 img = desk.image()
-strip = float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), FRAME)))
+strip = float(np.mean(near(crop(img, PX + W - 200, PY + 6, 150, 20), BAR)))
 gone = float(np.mean(near(crop(img, PX + 8, PY + 300, 180, 200), BAR)))
 check("the layout button puts the tabs on top", strip > 0.9 and gone < 0.2, f"strip {strip:.2f}, shell colour where the sidebar was {gone:.2f}")
 PX0, PY0, PW, PH = T["bounds"]["reported"]

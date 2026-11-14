@@ -899,6 +899,121 @@
           "reserve": "windowed"
         }
       ]
+    },
+    "glide.sidebar": {
+      "mac": [
+        {
+          "keys": "Cmd+S",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.copyAddress": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+C",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.splitAdd": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+=",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.splitRemove": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+Shift+-",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space1": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+1",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space2": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+2",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space3": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+3",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space4": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+4",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space5": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+5",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space6": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+6",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space7": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+7",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space8": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+8",
+          "reserve": "page"
+        }
+      ]
+    },
+    "glide.space9": {
+      "hidden": true,
+      "mac": [
+        {
+          "keys": "Ctrl+9",
+          "reserve": "page"
+        }
+      ]
     }
   }
 }

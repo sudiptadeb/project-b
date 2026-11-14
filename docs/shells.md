@@ -40,8 +40,9 @@ the real app; "What the real app adds" lists the little the mock can't show.
   engine names a shell: it serves `chrome://shell/<id>/` from that folder.
 - Every shell speaks on the one channel, `shell`. Go doesn't know which shell is on the
   other end.
-- The shells: `standard`, the one there has always been; `terminal`, panes that split, as
-  a terminal's do; `fox`, laid out as Firefox is.
+- The shells: `glide`, a sidebar of Spaces with the page as a card ([glide.md](glide.md));
+  `standard`, the one there has always been; `terminal`, panes that split, as a
+  terminal's do; `fox`, laid out as Firefox is.
 
 ## Choosing a shell
 

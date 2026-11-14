@@ -1,0 +1,98 @@
+/* What Glide's parts share: the window, its rows and its icon buttons. The colours are
+   Glide's tokens (tokens.js) on .glide, made from the Space's colour. Only this shell's
+   page loads this file, so its class names reach no other app. */
+
+.glide {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.3 'Zoho Puvi', 'Zoho_Puvi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  color: var(--g-ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.glide .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* An icon alone on the frame: 28px, radius 6, the frame's icon colour. */
+.glide .g-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--g-icon);
+  cursor: default;
+}
+
+.glide .g-icon:hover:not(:disabled),
+.glide .g-icon[aria-expanded='true'] {
+  background: var(--g-row-hover);
+}
+
+.glide .g-icon:disabled {
+  opacity: 0.4;
+}
+
+.glide .g-icon:focus-visible,
+.glide .g-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* A row of the sidebar: 32px, radius 8, transparent until pointed at; the active one
+   raised in --g-row-active. */
+.glide .g-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--g-ink);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.glide .g-row:hover {
+  background: var(--g-row-hover);
+}
+
+.glide .g-row.active {
+  background: var(--g-row-active);
+  color: var(--g-active-ink);
+}
+
+.glide .g-row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.glide .toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--g-float-shadow);
+  font-size: 12px;
+  pointer-events: none;
+}

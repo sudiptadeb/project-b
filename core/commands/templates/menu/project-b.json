@@ -137,6 +137,68 @@
           ]
         },
         {
+          "title": "Glide",
+          "items": [
+            {
+              "action": "glide.commandBar"
+            },
+            {
+              "action": "glide.sidebar"
+            },
+            {
+              "action": "glide.pin"
+            },
+            {
+              "action": "glide.favorite"
+            },
+            {
+              "action": "glide.copyAddress"
+            },
+            {
+              "action": "glide.splitAdd"
+            },
+            {
+              "action": "glide.splitRemove"
+            },
+            {
+              "action": "glide.spacePrevious"
+            },
+            {
+              "action": "glide.spaceNext"
+            },
+            {
+              "action": "glide.newSpace"
+            },
+            {
+              "action": "glide.space1"
+            },
+            {
+              "action": "glide.space2"
+            },
+            {
+              "action": "glide.space3"
+            },
+            {
+              "action": "glide.space4"
+            },
+            {
+              "action": "glide.space5"
+            },
+            {
+              "action": "glide.space6"
+            },
+            {
+              "action": "glide.space7"
+            },
+            {
+              "action": "glide.space8"
+            },
+            {
+              "action": "glide.space9"
+            }
+          ]
+        },
+        {
           "separator": true
         },
         {

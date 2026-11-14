@@ -1,7 +1,9 @@
 # Tab groups
 
 Tabs of one window kept together under a name and a colour, which every shell draws its
-own way: the Mobile shell's strip and switcher cards, Glide's sidebar folders. Owner's
+own way: the Mobile shell's strip and switcher cards, Glide's sidebar folders, the standard
+shell's headers in its sidebar and chips in its strip, each with a menu that names and
+colours the group (a right-click, or Shift+F10). Owner's
 decision, 2026-11-14: a group is Go's, since every shell is expected to have it
 ([shells.md](shells.md): a concept moves into Go when every shell is).
 

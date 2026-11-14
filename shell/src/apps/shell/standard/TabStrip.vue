@@ -1,6 +1,14 @@
 <script setup>
 import { shown } from '@/keys.js';
+import { computed } from 'vue';
 import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
+import { entries, groupLabel } from './groups.js';
+import { openMenu } from './menu.js';
+
+// The strip, flat: a group's chip, then its tabs, which carry the group for their rule.
+const items = computed(() =>
+  entries(state).flatMap((e) => (e.group ? [{ chip: e.group }, ...e.tabs.map((tab) => ({ tab, group: e.group }))] : [e])),
+);
 
 // The strip is the title bar when the tabs are on top: it sits on the bar, leaves the
 // native window controls their space, and moves the window wherever it has no tab or
@@ -11,26 +19,45 @@ import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/
 <template>
   <div v-shell v-drag class="strip" role="tablist" aria-label="Open tabs">
     <div class="space" :style="{ width: controls.left }"></div>
-    <div
-      v-for="tab in state.tabs"
-      :key="tab.id"
-      class="tab"
-      :class="{ active: tab.id === state.active }"
-      role="tab"
-      :data-tab="tab.id"
-      tabindex="0"
-      :aria-selected="tab.id === state.active"
-      @click="send({ t: 'activateTab', id: tab.id })"
-      @keydown.enter="send({ t: 'activateTab', id: tab.id })"
-      @auxclick.middle="send({ t: 'closeTab', id: tab.id })"
+    <template v-for="it in items" :key="it.chip ? 'g' + it.chip.id : it.tab.id">
+    <button
+      v-if="it.chip"
+      type="button"
+      class="chip"
+      :data-group="it.chip.id"
+      :style="{ '--group': it.chip.color }"
+      :aria-expanded="!it.chip.collapsed"
+      :title="groupLabel(it.chip)"
+      @click="send({ t: 'editGroup', group: it.chip.id, collapsed: !it.chip.collapsed })"
+      @contextmenu="openMenu('group', it.chip.id, $event)"
+      @keydown.shift.f10="openMenu('group', it.chip.id, $event)"
     >
-      <img v-if="tab.favicon" class="icon" :src="tab.favicon" alt="" width="16" height="16" />
-      <span class="title">{{ tabLabel(tab) }}</span>
-      <span v-if="workspaceOf(tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(tab).name}`" :title="workspaceOf(tab).name" :style="{ background: workspaceOf(tab).color }"></span>
-      <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
+      <span class="swatch"></span>
+      <span class="chip-name" :class="{ muted: !it.chip.name }">{{ groupLabel(it.chip) }}</span>
+    </button>
+    <div
+      v-else
+      class="tab"
+      :class="{ active: it.tab.id === state.active, grouped: it.group }"
+      :style="it.group ? { '--group': it.group.color } : null"
+      role="tab"
+      :data-tab="it.tab.id"
+      tabindex="0"
+      :aria-selected="it.tab.id === state.active"
+      @click="send({ t: 'activateTab', id: it.tab.id })"
+      @keydown.enter="send({ t: 'activateTab', id: it.tab.id })"
+      @keydown.shift.f10="openMenu('tab', it.tab.id, $event)"
+      @auxclick.middle="send({ t: 'closeTab', id: it.tab.id })"
+      @contextmenu="openMenu('tab', it.tab.id, $event)"
+    >
+      <img v-if="it.tab.favicon" class="icon" :src="it.tab.favicon" alt="" width="16" height="16" />
+      <span class="title">{{ tabLabel(it.tab) }}</span>
+      <span v-if="workspaceOf(it.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(it.tab).name}`" :title="workspaceOf(it.tab).name" :style="{ background: workspaceOf(it.tab).color }"></span>
+      <button class="close" type="button" :aria-label="`Close ${tabLabel(it.tab)}`" @click.stop="send({ t: 'closeTab', id: it.tab.id })">
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
       </button>
     </div>
+    </template>
     <button class="new-tab" type="button" aria-label="New Tab" :title="state.keys['tab.new'] ? `New Tab (${shown(state.keys['tab.new'], state.platform)})` : 'New Tab'" @click="send({ t: 'newTab' })">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
     </button>
@@ -79,6 +106,65 @@ import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/
 
 .tab + .tab {
   margin-left: 2px;
+}
+
+/* A group's chip: its colour and name; a press folds or opens it. */
+.chip {
+  display: flex;
+  align-items: center;
+  flex: none;
+  max-width: 140px;
+  height: 24px;
+  margin: 0 2px 0 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--group) 18%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--group) 28%, transparent);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.chip .swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--group);
+}
+
+.chip-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chip-name.muted {
+  color: var(--muted);
+}
+
+/* A grouped tab has a rule in its group's colour along its foot. */
+.tab.grouped::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--group);
 }
 
 .tab:hover:not(.active) {

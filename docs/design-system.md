@@ -96,6 +96,9 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 
 - **Flat:** the bar, the settings page. No border, no shadow.
 - **Card:** `--surface`, a `--line` hairline, radius 8, rows divided by hairlines.
+- **The page as a card in the frame** (Glide): its corners are concentric with the window's,
+  the window's radius less the inset (26 − 8 = 18 on macOS 26), and 8 when the window's
+  corners are square, as in full screen. Radius 8 everywhere else.
 - **Floating:** a menu, the address bar's suggestions, a dialog. `--surface`, a `--line`
   hairline, radius 8, and `var(--shadow-float)`. A modal dialog's backdrop is `--bar` at 70%.
 - **Focus:** `var(--focus-ring)` on `:focus-visible`, never the browser's outline. On a menu

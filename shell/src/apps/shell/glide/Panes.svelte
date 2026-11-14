@@ -7,8 +7,12 @@
   // it the active one, as Go does by itself. The frame round them is
   // painted in strips, so nothing is painted where a page shows; four corner pieces round
   // each card. The band over the cards drags the window. hidden: the sidebar is hidden,
-  // so the cards keep the frame's 8px on every side.
+  // so the cards keep the frame's 8px on every side. The cards' corners are concentric
+  // with the window's: its radius less the 8px inset (18 on macOS 26), and the design
+  // system's 8 where the window has square corners, as in full screen.
   let { hidden } = $props();
+
+  const radius = $derived(Math.max(go.cornerRadius - 8, 8));
 
   const ids = $derived(g.shown());
   const split = $derived(g.splitOf(go.active));
@@ -42,7 +46,7 @@
   }
 </script>
 
-<section class="panes" class:full={hidden}>
+<section class="panes" class:full={hidden} style:--card-radius="{radius}px">
   <div class="band top" use:drag></div>
   <div class="row" bind:this={row}>
     {#if hidden}<div class="band side"></div>{/if}
@@ -107,40 +111,40 @@
   /* The corners, in the frame's colour, cut round on the page's side. */
   .corner {
     position: absolute;
-    width: 8px;
-    height: 8px;
+    width: var(--card-radius);
+    height: var(--card-radius);
     pointer-events: none;
   }
 
   .tl {
     top: 0;
     left: 0;
-    background: radial-gradient(circle at 100% 100%, transparent 7.5px, var(--g-frame) 8px);
+    background: radial-gradient(circle at 100% 100%, transparent calc(var(--card-radius) - 0.5px), var(--g-frame) var(--card-radius));
   }
 
   .tr {
     top: 0;
     right: 0;
-    background: radial-gradient(circle at 0 100%, transparent 7.5px, var(--g-frame) 8px);
+    background: radial-gradient(circle at 0 100%, transparent calc(var(--card-radius) - 0.5px), var(--g-frame) var(--card-radius));
   }
 
   .bl {
     bottom: 0;
     left: 0;
-    background: radial-gradient(circle at 100% 0, transparent 7.5px, var(--g-frame) 8px);
+    background: radial-gradient(circle at 100% 0, transparent calc(var(--card-radius) - 0.5px), var(--g-frame) var(--card-radius));
   }
 
   .br {
     bottom: 0;
     right: 0;
-    background: radial-gradient(circle at 0 0, transparent 7.5px, var(--g-frame) 8px);
+    background: radial-gradient(circle at 0 0, transparent calc(var(--card-radius) - 0.5px), var(--g-frame) var(--card-radius));
   }
 
   /* A hairline round the card, drawn outside the page, on the frame. */
   .ring {
     position: absolute;
     inset: 0;
-    border-radius: 8px;
+    border-radius: var(--card-radius);
     box-shadow: 0 0 0 1px var(--g-line);
     pointer-events: none;
   }

@@ -50,6 +50,7 @@ PAGE = {
     "/keys": "<title>Keys</title><body style='height:100vh' onkeydown='event.preventDefault()'>keys",
     "/steal": "<title>Steal</title><input id=i><script>setTimeout(()=>i.focus(),1500)</script>",
     "/download": "<title>Download</title><a id=a style='font-size:40px' href=/dl>file</a>",
+    "/find": "<title>Find</title><p style='font-size:40px'>apple pear apple plum apple",
     "/cookie": "<title>Cookie</title><script>document.cookie='basics=kept; Max-Age=3600'</script>",
     "/pip": """<title>ready</title><canvas id=c width=64 height=64></canvas><video id=v muted></video>
 <button id=b style='font-size:40px' onclick="go()">pip</button><script>
@@ -513,6 +514,27 @@ def a39(app):
     return not ports and not file, (ports, file)
 
 
+def a40(app):
+    go(app, P + "/find")
+    app.cmd("key", "cmd+f")
+    bar = "document.querySelector('[role=search][aria-label=\\'Find in page\\']')"
+    app.wait(f"document.activeElement && document.activeElement.getAttribute('aria-label') === 'Find in page'", 5)
+    app.cmd("type", "apple")
+    count = lambda: app.js(f"({bar} || {{}}).textContent || ''")
+    try:
+        app.wait(f"({bar} || {{}}).textContent.includes('1 of 3')", 5)
+    except TimeoutError:
+        return False, f"typing apple didn't show 1 of 3: the bar says {count()!r}"
+    app.cmd("key", "enter")
+    try:
+        app.wait(f"({bar} || {{}}).textContent.includes('2 of 3')", 5)
+    except TimeoutError:
+        return False, f"Enter didn't move to 2 of 3: the bar says {count()!r}"
+    app.cmd("key", "escape")
+    time.sleep(0.5)
+    return not app.js(f"!!{bar}"), "Escape left the find bar open"
+
+
 AREAS = [
     (1, "window lifecycle: a page's beforeunload asks before its tab closes", a01, ()),
     (2, "tab lifecycle: a tab closes while it is still loading", a02, ()),
@@ -553,6 +575,7 @@ AREAS = [
     (37, "window bounds: a resize reaches the shell", a37, ()),
     (38, "captive portals", a38, ()),
     (39, "DevTools: off unless the switch is given", a39, ()),
+    (40, "find in page: Cmd+F counts the matches and Enter moves to the next", a40, ()),
 ]
 
 

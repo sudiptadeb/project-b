@@ -1505,3 +1505,22 @@ func TestGroupsThroughTheShell(t *testing.T) {
 		return m["t"] == "tabs" && len(m["tabs"].([]any)) == 1 && len(groups(m)) == 0
 	})
 }
+
+// What a shell saves for the profile reaches every window's shell, and comes back in the
+// snapshot after a restart.
+func TestProfileDataOutlivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	r.shell(`{"t":"profileData","data":{"pinned":["https://a.test/"]}}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "profileData" })
+	if p := m["profileData"].(map[string]any)["pinned"].([]any); len(p) != 1 {
+		t.Fatalf("profileData %v", m)
+	}
+	r.stop()
+	r = start(t, dir)
+	defer r.stop()
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if p, _ := m["profileData"].(map[string]any); p == nil || len(p["pinned"].([]any)) != 1 {
+		t.Fatalf("snapshot profileData %v", m["profileData"])
+	}
+}

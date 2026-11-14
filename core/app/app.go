@@ -14,6 +14,7 @@ import (
 	"projectb/relaunch"
 	"projectb/settings"
 	"projectb/shell"
+	"projectb/shelldata"
 	"projectb/shells"
 	"projectb/suggest"
 	"projectb/tabs"
@@ -52,6 +53,8 @@ type App struct {
 	Settings *settings.Manager
 	// Workspaces is the profile's list of workspaces, beside its prefs.
 	Workspaces *workspaces.Manager
+	// ShellData is what each shell saves for the whole profile, beside its prefs.
+	ShellData *shelldata.Manager
 
 	actions []*commands.Action
 	// keyIn is which page had the keyboard at the last key press.
@@ -75,6 +78,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.History = history.New(cfg.ProfileDir, e.Post)
 	a.Suggest = suggest.New(a.History)
 	a.Workspaces = workspaces.New(cfg.ProfileDir)
+	a.ShellData = shelldata.New(cfg.ProfileDir)
 	a.Tabs = tabs.New(e, a.Workspaces.First)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
@@ -90,6 +94,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Commands.RegisterList(a.shellList())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Shell.AddPart(a.workspaceShellPart(e))
+	a.Shell.AddPart(a.shellDataPart())
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
 	a.Settings.AddPart(a.workspaceSettingsPart(e))

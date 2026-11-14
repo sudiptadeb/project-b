@@ -66,10 +66,13 @@ export const state = {
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
+  // What the shell saved for the whole profile with saveProfileData, or null: kept on disk,
+  // the same in every window, and there again after a restart.
+  profileData: null,
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData']);
 
 const listeners = [];
 
@@ -108,6 +111,14 @@ onChange((fields) => {
 export function saveData(value) {
   change({ data: value });
   send({ t: 'data', data: value });
+}
+
+// saveProfileData keeps value, any JSON, as what this shell saves for the whole profile,
+// in place of what it was. Go writes it to the profile and sends it to the shell in every
+// window, this one too, as profileData; it never reads it.
+export function saveProfileData(value) {
+  change({ profileData: value });
+  send({ t: 'profileData', data: value });
 }
 
 // How the shell's view waits until it has drawn what just changed: what connect was given.

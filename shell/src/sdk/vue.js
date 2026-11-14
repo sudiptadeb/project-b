@@ -8,7 +8,7 @@ import { computed, nextTick, reactive } from 'vue';
 import * as sdk from './shell.js';
 import { drag, page, shell } from './regions.js';
 
-export { focusPage, saveData, send, setFrame, tabLabel } from './shell.js';
+export { focusPage, saveData, saveProfileData, send, setFrame, tabLabel } from './shell.js';
 
 export const state = reactive({ ...sdk.state });
 sdk.onChange((fields) => Object.assign(state, fields));

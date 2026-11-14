@@ -63,7 +63,7 @@ of it.
 
 | From | What |
 |---|---|
-| `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
+| `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `saveProfileData(value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
@@ -115,6 +115,10 @@ gives the page the same two.
 | `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
+| `profileData` | `profileData`: what this shell saved for the profile | A shell in any window of the profile saved it |
+
+The snapshot's `profileData` is what this shell last saved for the profile, `null` when
+nothing.
 
 A tab is `{id, url, title, loading, progress, blocked, crashed, error, favicon, canGoBack,
 canGoForward, workspace, group}`, `group` the id of its tab group, absent when it is in
@@ -170,6 +174,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `run` | `text`: an action's id | Runs an action, as its menu item would |
 | `window` | `text`: `close`, `minimise`, `zoom` or `fullScreen` | Asks the window |
 | `data` | `data`: any JSON | Replaces this window's copy of the shell's own data |
+| `profileData` | `data`: any JSON | Replaces what this shell keeps for the whole profile, on disk |
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
@@ -223,6 +228,13 @@ reads it. It comes back as `state.data` in the snapshot, so a shell that was rel
 itself out as it was. A new window's shell gets none. It is dropped when the shell
 changes, the profile is reset to a template, or the window closes. It is in memory for
 now, and will be saved with the windows and tabs when sessions are.
+
+**What a shell keeps for the profile.** `saveProfileData(value)` sends the whole value as
+`profileData`; Go writes it to `shells/<id>.json` in the profile folder and sends it to the
+shell in every window, and it comes back as `state.profileData` in every snapshot. Go never
+reads it. It survives a restart, a closed window and a switch to another shell and back; a
+reset to a template keeps it, as it keeps the workspaces. It names no tabs, since a tab's id
+lasts only as long as the tab: Glide keeps its Favorites and pinned addresses here.
 
 A shell's data names tabs by id. A tab in the data that Go no longer lists is gone, and a
 tab Go lists that the data doesn't have is new: Go's list is the truth.

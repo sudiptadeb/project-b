@@ -93,6 +93,7 @@ type Engine struct {
 	downloads  downloads
 	chooser    []engine.FileChooserAnswer
 	dialogs    dialogs
+	finds      finds
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.

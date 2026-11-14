@@ -137,6 +137,10 @@ func (r *recorder) DialogOpened(d engine.Dialog) {
 }
 func (r *recorder) DialogClosed(id engine.DialogID) { r.note(fmt.Sprintf("dialog closed %d", id)) }
 
+func (r *recorder) FindReply(tab engine.TabID, request, matches, active int, final bool) {
+	r.note(fmt.Sprintf("find %d %d %d/%d %v", tab, request, active, matches, final))
+}
+
 func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 	r.note("devtools " + method + " " + string(params))
 	switch method {

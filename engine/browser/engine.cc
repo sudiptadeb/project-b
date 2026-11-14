@@ -26,6 +26,8 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/stop_find_action.h"
+#include "third_party/blink/public/mojom/frame/find_in_page.mojom.h"
 #include "project_b/engine/browser/dialogs.h"
 #include "project_b/engine/browser/downloads.h"
 #include "project_b/engine/browser/go.h"
@@ -214,6 +216,26 @@ void CallRevealFile(const char* path) {
 void CallAnswerDialog(int64_t dialog, int ok, const char* text) {
   CheckMainThread();
   Dialogs::Get()->Answer(dialog, ok, text);
+}
+
+void CallFind(int64_t tab, int32_t request, const char* text, int forward, int find_next) {
+  CheckMainThread();
+  PageTab* page = g_engine->tab(tab);
+  if (!page) {
+    return;
+  }
+  auto options = blink::mojom::FindOptions::New();
+  options->forward = forward;
+  options->new_session = !find_next;
+  page->contents()->Find(request, base::UTF8ToUTF16(text), std::move(options),
+                         /*skip_delay=*/false);
+}
+
+void CallStopFinding(int64_t tab) {
+  CheckMainThread();
+  if (PageTab* page = g_engine->tab(tab)) {
+    page->contents()->StopFinding(content::STOP_FIND_ACTION_KEEP_SELECTION);
+  }
 }
 
 void CallOpenSettings(int64_t window) {
@@ -468,6 +490,8 @@ const PBEngineCalls* Engine::Calls() {
       .open_file = CallOpenFile,
       .reveal_file = CallRevealFile,
       .answer_dialog = CallAnswerDialog,
+      .find = CallFind,
+      .stop_finding = CallStopFinding,
       .create_window = CallCreateWindow,
       .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,

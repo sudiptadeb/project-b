@@ -105,6 +105,23 @@
         },
         {
           "action": "edit.selectAll"
+        },
+        {
+          "separator": true
+        },
+        {
+          "title": "Find",
+          "items": [
+            {
+              "action": "find.open"
+            },
+            {
+              "action": "find.next"
+            },
+            {
+              "action": "find.previous"
+            }
+          ]
         }
       ]
     },

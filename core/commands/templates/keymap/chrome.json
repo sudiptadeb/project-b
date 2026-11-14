@@ -294,6 +294,63 @@
         }
       ]
     },
+    "find.open": {
+      "mac": [
+        {
+          "keys": "Cmd+F"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+F"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+F"
+        }
+      ]
+    },
+    "find.next": {
+      "mac": [
+        {
+          "keys": "Cmd+G"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+G"
+        },
+        {
+          "keys": "F3"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+G"
+        }
+      ]
+    },
+    "find.previous": {
+      "mac": [
+        {
+          "keys": "Shift+Cmd+G"
+        }
+      ],
+      "windows": [
+        {
+          "keys": "Ctrl+Shift+G"
+        },
+        {
+          "keys": "Shift+F3"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+G"
+        }
+      ]
+    },
     "view.tabsSide": {},
     "view.tabsTop": {},
     "nav.stop": {

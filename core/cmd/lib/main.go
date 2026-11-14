@@ -34,6 +34,8 @@ static inline void call_download_url(const PBEngineCalls* c, int64_t tab, const 
 static inline void call_download_command(const PBEngineCalls* c, uint32_t download, int32_t command) { c->download_command(download, command); }
 static inline void call_open_file(const PBEngineCalls* c, const char* path) { c->open_file(path); }
 static inline void call_reveal_file(const PBEngineCalls* c, const char* path) { c->reveal_file(path); }
+static inline void call_find(const PBEngineCalls* c, int64_t tab, int32_t request, const char* text, int forward, int find_next) { c->find(tab, request, text, forward, find_next); }
+static inline void call_stop_finding(const PBEngineCalls* c, int64_t tab) { c->stop_finding(tab); }
 static inline void call_answer_dialog(const PBEngineCalls* c, int64_t dialog, int ok, const char* text) { c->answer_dialog(dialog, ok, text); }
 static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
 static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
@@ -187,6 +189,20 @@ func (e *nativeEngine) AnswerDialog(id engine.DialogID, ok bool, text string) {
 	}
 	C.call_answer_dialog(e.calls, C.int64_t(id), yes, cs)
 }
+
+func (e *nativeEngine) Find(tab engine.TabID, request int, text string, forward, next bool) {
+	cs := C.CString(text)
+	defer C.free(unsafe.Pointer(cs))
+	b := func(v bool) C.int {
+		if v {
+			return 1
+		}
+		return 0
+	}
+	C.call_find(e.calls, C.int64_t(tab), C.int32_t(request), cs, b(forward), b(next))
+}
+
+func (e *nativeEngine) StopFinding(tab engine.TabID) { C.call_stop_finding(e.calls, C.int64_t(tab)) }
 
 func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }
 

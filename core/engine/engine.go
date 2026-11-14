@@ -178,6 +178,11 @@ type Engine interface {
 	RevealFile(path string)
 	// AnswerDialog answers a page's dialog: OK or not, and a prompt's text.
 	AnswerDialog(id DialogID, ok bool, text string)
+	// Find searches a tab's page for text: a new search, or the next match forward or
+	// back. FindReply answers with request. StopFinding ends it, keeping the match
+	// selected.
+	Find(tab TabID, request int, text string, forward, next bool)
+	StopFinding(tab TabID)
 
 	// CreateWindow makes window w, with its page, and puts it on screen with its first
 	// layout, a little down and right of window near, or where a first window goes when
@@ -333,6 +338,10 @@ type Listener interface {
 	// DialogClosed says the engine gave up on one, as when its tab navigated or closed.
 	DialogOpened(d Dialog)
 	DialogClosed(id DialogID)
+
+	// FindReply says how a search in a tab's page went: the matches so far, which one is
+	// active, from 1, and whether the count is final.
+	FindReply(tab TabID, request, matches, active int, final bool)
 }
 
 // DialogID is the engine's number for a page's dialog.

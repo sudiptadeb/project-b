@@ -237,6 +237,11 @@ typedef struct PBEngineCalls {
   void (*reveal_file)(const char* path);
   // Answers a page's dialog: OK or not, and a prompt's text.
   void (*answer_dialog)(int64_t dialog, int ok, const char* text);
+  // Finds text in a tab's page, a new search or the next match forward or back; the
+  // counts come back through the FindReply hook with request.
+  void (*find)(int64_t tab, int32_t request, const char* text, int forward, int find_next);
+  // Ends a tab's search, keeping the active match selected.
+  void (*stop_finding)(int64_t tab);
   // Makes a window and the page covering it, chrome://<page>/: a shell, "shell/<id>", or
   // "picker" in a copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.

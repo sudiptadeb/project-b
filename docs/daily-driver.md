@@ -124,3 +124,17 @@ text}`; Escape answers no. In Standard it is the design system's dialog over the
 contract's rule 15 holds every shell to it.
 
 **Android.** The engine keeps content's way on a phone until the Mobile shell draws them.
+
+## Find in page
+
+Find…, Find Next and Find Previous are Go's actions, `find.open`, `find.next` and
+`find.previous` (Cmd+F, Cmd+G and Shift+Cmd+G on the Mac), in the Edit menu's Find submenu.
+Each tab keeps its own search while its bar is open. Go runs it through the engine's `find`
+(content's `WebContents::Find`) and hears the count from content's `FindReply`; it sends the
+window's shell the active tab's search as `state.find`, `{tab, text, matches, active}`, or
+`null`, and `focusFind` when the find key is pressed. The shell draws the bar and sends
+`findText` as the text changes, `findNext` for Enter and Shift+Enter, and `findClose`, each
+naming the tab whose bar it is, so a key typed as another tab comes forward goes nowhere; closing
+keeps the match shown selected. A bar opened afresh starts with the last text searched for,
+and a page that loads again is searched again. Contract rule 20 holds every desktop shell to
+it. In Standard the bar hangs from the page's top right.

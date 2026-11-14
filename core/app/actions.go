@@ -30,6 +30,12 @@ func (a *App) registerActions(e engine.Engine) {
 
 	add("tab.new", "New Tab", func() { a.Shell.Interaction(a.Tabs.Front(), "tab.new", func() { a.Tabs.Create(a.Tabs.Front()) }) })
 	add("address.focus", "Open Location…", func() { a.Shell.FocusAddressBar(a.Tabs.Front()) })
+	find := add("find.open", "Find…", func() { a.finds.open(a.Tabs.Front()) })
+	find.Enabled = active
+	next := add("find.next", "Find Next", func() { a.finds.step(a.Tabs.Front(), true) })
+	next.Enabled = active
+	previous := add("find.previous", "Find Previous", func() { a.finds.step(a.Tabs.Front(), false) })
+	previous.Enabled = active
 	add("window.new", "New Window", func() { a.NewWindow("") })
 	add("window.close", "Close Window", func() { a.Window.Request(a.Tabs.Front(), engine.WindowClose) })
 	// The settings page sits over the tabs like a tab of its own, so closing the tab

@@ -129,6 +129,11 @@ func Wire(h *Hooks, l engine.Listener) {
 			Src: p.SrcURL, Media: mediaTypes[p.MediaType], Selection: p.SelectionText, Editable: p.IsEditable})
 		return true, true
 	})
+	h.Delegate.OnFindReply(func(c WebContents, _ WebContents, request, matches int64, _ GfxRect, active int64, final bool) {
+		if c.ID > 0 {
+			l.FindReply(engine.TabID(c.ID), int(request), int(matches), int(active), final)
+		}
+	})
 	h.Observer.OnDidChangeVerticalScrollDirection(func(c WebContents, d VerticalScrollDirection) {
 		if c.ID > 0 && d != VerticalScrollDirectionNull {
 			l.ScrollDirectionChanged(engine.TabID(c.ID), d == VerticalScrollDirectionDown)

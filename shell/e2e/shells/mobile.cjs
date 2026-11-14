@@ -24,7 +24,7 @@ const H = 915;
   page.setDefaultTimeout(5000);
 
   const field = ui.getByRole('textbox', { name: 'Address' });
-  const tabsButton = ui.getByRole('button', { name: 'Tabs' });
+  const tabsButton = ui.getByRole('button', { name: 'Tabs', exact: true });
   const menuButton = ui.getByRole('button', { name: 'Menu' });
   const switcher = ui.getByRole('dialog', { name: 'Tabs' });
   const menu = ui.getByRole('dialog', { name: 'Menu' });
@@ -174,6 +174,100 @@ const H = 915;
   await tabsButton.tap();
   check('the switcher opens on the active tab\'s workspace', await until(async () => (await chips.nth(1).getAttribute('aria-checked')) === 'true' && (await cards.filter({ visible: true }).count()) === 1));
   await page.keyboard.press('Escape');
+
+  // Groups. A long press on a card opens its menu; New group makes a group of its tab and a
+  // new one, which starts in edit mode.
+  const strip = ui.getByRole('group', { name: /^Group / });
+  const stripTabs = strip.locator('button[data-tab]');
+  const groupSheet = ui.getByRole('dialog', { name: 'Group' });
+  const cardMenu = ui.getByRole('dialog', { name: 'Tab' });
+  await tabsButton.tap();
+  await chips.first().tap();
+  await until(async () => (await cards.filter({ visible: true }).count()) === 2);
+  const [g1] = (await regions()).tabs.map((t) => t.id);
+  await cards.filter({ visible: true }).first().click({ button: 'right' });
+  check('a long press on a card opens its menu', await until(() => cardMenu.isVisible()));
+  await cardMenu.getByRole('menuitem', { name: 'Add to group' }).tap();
+  await cardMenu.getByRole('menuitem', { name: 'New group' }).tap();
+  check('New group opens a new tab in edit mode', await until(async () => (await regions()).tabs.length === 4 && (await active()).url === '' && await inField()));
+  check('and the strip shows the group, the tab and the new one', await until(async () => (await strip.isVisible()) && (await stripTabs.count()) === 2));
+  const stripBox = await box('[role=group][aria-label^="Group "]');
+  check('the strip is 44px, just over the toolbar', Math.round(stripBox.height) === 44 && Math.round(stripBox.bottom) === H - 48, JSON.stringify(stripBox));
+  check('the page ends over the strip', await until(async () => {
+    const v = (await regions()).visible[0].rect;
+    return v.y + v.h === H - 48 - 44;
+  }), JSON.stringify((await regions()).visible));
+  await visit('example.com/group/two', 'https://example.com/group/two');
+  const g2 = (await regions()).active;
+  await strip.getByRole('button', { name: 'New tab in group' }).tap();
+  check('+ in the strip opens a third tab in the group', await until(async () => (await stripTabs.count()) === 3 && (await active()).url === ''));
+  await visit('example.com/group/three', 'https://example.com/group/three');
+  const g3 = (await regions()).active;
+  check('the strip lists the group\'s tabs in order', JSON.stringify(await stripTabs.evaluateAll((els) => els.map((e) => Number(e.dataset.tab)))) === JSON.stringify([g1, g2, g3]));
+  await shots('strip');
+  await stripTabs.first().tap();
+  check('a tap on a favicon in the strip goes to its tab', await until(async () => (await regions()).active === g1));
+  await swipe(330, 150);
+  check('a swipe along the bar stays in the group', await until(async () => (await regions()).active === g2));
+
+  // The group sheet: rename, colour.
+  await strip.getByRole('button', { name: /^Group / }).tap();
+  check('the group\'s dot opens its sheet', await until(() => groupSheet.isVisible()));
+  const nameField = groupSheet.getByRole('textbox', { name: 'Group name' });
+  await nameField.tap();
+  await page.keyboard.type('Release');
+  await page.keyboard.press('Enter');
+  check('a name and Enter rename the group', await until(async () => (await strip.getAttribute('aria-label')) === 'Group Release'));
+  await groupSheet.getByRole('radio', { name: '#8a4fd0' }).tap();
+  check('a swatch gives it that colour', await until(async () => (await groupSheet.getByRole('radio', { name: '#8a4fd0' }).getAttribute('aria-checked')) === 'true'));
+  await shots('group');
+  await page.keyboard.press('Escape');
+
+  // The switcher shows the group as one card.
+  await tabsButton.tap();
+  const groupCard = switcher.locator('[data-group]');
+  check('the switcher shows the group as one card, its tabs\' favicons in it', await until(async () => (await groupCard.count()) === 1 && (await groupCard.getByRole('tab').count()) === 3));
+  check('named, and the ungrouped tab beside it', (await groupCard.locator('.title').innerText()) === 'Release' && (await switcher.locator('.card:not([data-group]):visible').count()) === 1);
+  await shots('switcher-group');
+  await groupCard.locator('.title').tap();
+  check('a tap on the group card opens its sheet', await until(() => groupSheet.isVisible()));
+  await page.keyboard.press('Escape');
+
+  // Reloaded, the shell draws the groups Go keeps.
+  await w.shell().evaluate(() => location.reload());
+  check('reloaded, the group comes back from Go', await until(async () => (await strip.getAttribute('aria-label').catch(() => '')) === 'Group Release' && (await stripTabs.count()) === 3, 10000));
+
+  // The strip's × closes the active tab and goes to its neighbour in the group.
+  await until(async () => (await regions()).active === g2);
+  await strip.getByRole('button', { name: /^Close / }).tap();
+  check('the strip\'s × closes the active tab and goes to the next in the group', await until(async () => (await regions()).active === g3 && (await stripTabs.count()) === 2));
+  await stripTabs.last().click({ button: 'right' });
+  check('a long press on a favicon closes its tab, and a group of one ends', await until(async () => (await regions()).tabs.length === 3 && !(await strip.isVisible())));
+
+  // Add to group, Remove from group, and Close group with its confirm.
+  await tabsButton.tap();
+  await until(async () => (await cards.filter({ visible: true }).count()) === 2);
+  await cards.filter({ visible: true }).nth(1).click({ button: 'right' });
+  await cardMenu.getByRole('menuitem', { name: 'Add to group' }).tap();
+  await cardMenu.getByRole('menuitem', { name: 'New group' }).tap();
+  await until(async () => (await regions()).tabs.length === 3);
+  await visit('example.com/again', 'https://example.com/again');
+  await tabsButton.tap();
+  const loose = switcher.locator('.card:not([data-group])').filter({ visible: true });
+  await until(async () => (await loose.count()) === 1);
+  await loose.first().click({ button: 'right' });
+  await cardMenu.getByRole('menuitem', { name: 'Add to group' }).tap();
+  await cardMenu.getByRole('menuitem', { name: '2 tabs' }).tap();
+  check('Add to group puts a card\'s tab in that group', await until(async () => (await groupCard.getByRole('tab').count()) === 3 && (await loose.count()) === 0));
+  await groupCard.getByRole('tab').first().click({ button: 'right' });
+  await cardMenu.getByRole('menuitem', { name: 'Remove from group' }).tap();
+  check('Remove from group takes it out', await until(async () => (await groupCard.getByRole('tab').count()) === 2 && (await loose.count()) === 1));
+  await groupCard.getByRole('button', { name: /^Close group/ }).tap();
+  const confirm = ui.getByRole('dialog', { name: 'Close group' });
+  check('Close group asks first: Close 2 tabs?', await until(async () => (await confirm.isVisible()) && (await confirm.locator('h2').innerText()) === 'Close 2 tabs?'));
+  const before = (await regions()).tabs.length;
+  await confirm.getByRole('button', { name: 'Close', exact: true }).tap();
+  check('and Close closes them', await until(async () => (await regions()).tabs.length === before - 2), String((await regions()).tabs.length));
 
   // Settings, from the menu.
   await menuButton.tap();

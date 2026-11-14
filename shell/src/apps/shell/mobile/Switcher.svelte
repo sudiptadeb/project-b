@@ -2,12 +2,36 @@
   import { shell, state, tabLabel } from '@/sdk/svelte.svelte.js';
   import Favicon from './Favicon.svelte';
   import Icon from './Icon.svelte';
+  import { groupLabel, groupOf } from './groups.js';
 
   // The tab switcher, over the page: the workspaces as chips while there are any, which
-  // choose the cards shown, and New tab; then two columns of cards, a tab each, the active
-  // one ringed. A tap on a card shows its tab, its × closes it. It stays in the document
-  // while closed, so every tab is always an element (docs/shells.md, rule 4).
-  let { open, workspace = $bindable(), onpick, onclosetab, onnewtab } = $props();
+  // choose the cards shown, and New tab; then two columns of cards, the active one ringed.
+  // A tab's card: a tap shows it, its × closes it, a long press opens its menu (oncard). A
+  // group is one card where its first tab is, with its colour along the top and its tabs'
+  // favicons, a tap on which goes to that tab; a tap elsewhere on it opens the group's
+  // sheet. It stays in the document while closed, so every tab is always an element
+  // (docs/shells.md, rule 4).
+  let { open, groups, workspace = $bindable(), onpick, onclosetab, onnewtab, oncard, ongroup, onclosegroup } = $props();
+
+  // What the grid shows, in Go's order: a tab, or a group at its first tab.
+  const items = $derived.by(() => {
+    const out = [];
+    const done = new Set();
+    for (const tab of state.tabs) {
+      const g = groupOf(groups, tab.id);
+      if (!g) out.push({ key: `t${tab.id}`, tab });
+      else if (!done.has(g.id)) {
+        done.add(g.id);
+        out.push({ key: `g${g.id}`, group: g, tabs: g.tabs.map((id) => state.tabs.find((t) => t.id === id)).filter(Boolean) });
+      }
+    }
+    return out;
+  });
+
+  function menu(e, tab) {
+    e.preventDefault();
+    oncard(tab.id);
+  }
 
   const workspaces = $derived(state.workspaces || []);
   const host = (url) => {
@@ -35,26 +59,67 @@
     <button class="new" aria-label="New Tab" onclick={onnewtab}><Icon name="plus" /></button>
   </div>
   <div class="grid">
-    {#each state.tabs as tab (tab.id)}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div
-        class="card"
-        class:active={tab.id === state.active}
-        hidden={(tab.workspace || '') !== workspace}
-        role="tab"
-        tabindex="0"
-        data-tab={tab.id}
-        aria-selected={tab.id === state.active}
-        onclick={() => onpick(tab.id)}
-        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onpick(tab.id)}
-      >
-        <div class="top">
-          <span class="title">{tabLabel(tab)}</span>
-          <button class="close" aria-label="Close {tabLabel(tab)}" onclick={(e) => { e.stopPropagation(); onclosetab(tab.id); }}><Icon name="close" size={16} /></button>
+    {#each items as item (item.key)}
+      {#if item.tab}
+        {@const tab = item.tab}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
+          class="card"
+          class:active={tab.id === state.active}
+          hidden={(tab.workspace || '') !== workspace}
+          role="tab"
+          tabindex="0"
+          data-tab={tab.id}
+          aria-selected={tab.id === state.active}
+          onclick={() => onpick(tab.id)}
+          oncontextmenu={(e) => menu(e, tab)}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onpick(tab.id)}
+        >
+          <div class="top">
+            <span class="title">{tabLabel(tab)}</span>
+            <button class="close" aria-label="Close {tabLabel(tab)}" onclick={(e) => { e.stopPropagation(); onclosetab(tab.id); }}><Icon name="close" size={16} /></button>
+          </div>
+          <div class="body"><Favicon {tab} size={32} /></div>
+          <span class="host">{tab.url ? host(tab.url) : 'New tab'}</span>
         </div>
-        <div class="body"><Favicon {tab} size={32} /></div>
-        <span class="host">{tab.url ? host(tab.url) : 'New tab'}</span>
-      </div>
+      {:else}
+        {@const g = item.group}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div
+          class="card group"
+          class:active={g.tabs.includes(state.active)}
+          hidden={(item.tabs[0]?.workspace || '') !== workspace}
+          style:--group={g.color}
+          role="button"
+          tabindex="0"
+          aria-label="Group {groupLabel(g)}"
+          data-group={g.id}
+          onclick={() => ongroup(g.id)}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && ongroup(g.id)}
+        >
+          <div class="top">
+            <span class="title">{groupLabel(g)}</span>
+            <button class="close" aria-label="Close group {groupLabel(g)}" onclick={(e) => { e.stopPropagation(); onclosegroup(g.id); }}><Icon name="close" size={16} /></button>
+          </div>
+          <div class="body cluster">
+            {#each item.tabs as tab, i (tab.id)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <span
+                class="member"
+                hidden={i > 3}
+                role="tab"
+                tabindex="-1"
+                data-tab={tab.id}
+                aria-label={tabLabel(tab)}
+                aria-selected={tab.id === state.active}
+                onclick={(e) => { e.stopPropagation(); onpick(tab.id); }}
+                oncontextmenu={(e) => { e.stopPropagation(); menu(e, tab); }}
+              ><Favicon {tab} size={28} /></span>
+            {/each}
+          </div>
+          <span class="host">{g.name ? `${g.tabs.length} tabs` : ''}</span>
+        </div>
+      {/if}
     {/each}
   </div>
 </div>
@@ -170,6 +235,10 @@
     box-shadow: 0 0 0 1px var(--accent);
   }
 
+  .card.group.active {
+    border-top-color: var(--group);
+  }
+
   .card:focus-visible {
     box-shadow: var(--focus-ring);
   }
@@ -206,6 +275,27 @@
   }
 
   /* With the title and the host about it, the card is 1:1.1. */
+  .card.group {
+    border-top: 4px solid var(--group);
+  }
+
+  .cluster {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .member {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  .member[hidden] {
+    display: none;
+  }
+
   .body {
     aspect-ratio: 5 / 4;
     display: grid;

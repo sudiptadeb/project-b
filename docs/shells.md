@@ -466,7 +466,16 @@ address field, and a menu button at the far right, in our tones.
   columns, the workspaces as chips that choose which cards show and where + opens a tab.
   Its cards are the tabs' `role="tab"` elements, kept in the document while it is closed.
   Closing the last tab leaves a new one: the window never has none.
-- **The menu sheet:** Back, Forward, Reload or Stop, New tab; then Workspaces (where new
+- **Tab groups** are Go's ([groups.md](groups.md)). While the active tab is in one, a strip
+  of 44px over the bar shows the group: its dot, which opens the group's sheet (name,
+  colour, its tabs, New tab, Ungroup, Close group with a confirm), its tabs' favicons, the
+  active one with an ×, and + for a new tab in it. A long press on a favicon closes its tab.
+  In the switcher a group is one card, its colour along the top and its tabs' favicons in
+  it, which are their `role="tab"` elements. A long press on a card opens its menu: Add to
+  group (the groups of its workspace, or a new one with a new tab), Remove from group,
+  Close. A swipe along the bar stays in the group.
+- **The menu sheet:** Back, Forward, Reload or Stop, New tab, New tab in group while the
+  tab is in one; then Workspaces (where new
   tabs open), Extensions while their flag is on, the update when one is ready, and
   Settings.
 - **The band:** none. A desktop window's buttons, as on the mock, get a strip of their

@@ -29,7 +29,7 @@
   }
 </script>
 
-<div class="toolbar" role="toolbar" aria-label="Toolbar" class:top use:shell use:drag onpointerdown={down} onpointerup={up} onpointercancel={() => (start = null)}>
+<div class="toolbar" role="group" aria-label="Toolbar" class:top use:shell use:drag onpointerdown={down} onpointerup={up} onpointercancel={() => (start = null)}>
   <Address bind:this={address} {tab} {top} onedit={(on) => (editing = on)} />
   <button class="count" aria-label="Tabs" aria-haspopup="dialog" aria-expanded={sheet === 'switcher'} onclick={() => onsheet(sheet === 'switcher' ? '' : 'switcher')}>
     <span>{count > 99 ? ':D' : count}</span>

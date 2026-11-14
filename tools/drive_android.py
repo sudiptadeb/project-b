@@ -54,6 +54,77 @@ PAGES = {
     "/to-blocked": None,
 }
 
+# Web APIs whose browser side is a frame interface: Chrome binds them, content doesn't. When the
+# browser has no binder, content kills the asking renderer for a bad message, as DuckDuckGo's
+# search did on Android with getInstalledRelatedApps. The ones that open a system picker over
+# the app are left out, since the picker would take the touches meant for the next part.
+WEB_APIS = {
+    "installedApps": "navigator.getInstalledRelatedApps()",
+    "share": "navigator.share({url: location.href})",
+    "passwordCredential": "navigator.credentials.store(new PasswordCredential({id: 'a', password: 'b'}))",
+    "credentialsGet": "navigator.credentials.get({password: true, mediation: 'silent'})",
+    "otp": "navigator.credentials.get({otp: {transport: ['sms']}, signal: AbortSignal.timeout(1500)})",
+    "webauthn": "navigator.credentials.create({publicKey: {challenge: new Uint8Array(16), rp: {name: 'x'},"
+                " user: {id: new Uint8Array(4), name: 'u', displayName: 'u'}, pubKeyCredParams: [{type: 'public-key', alg: -7}], timeout: 1500}})",
+    "fedcm": "navigator.credentials.get({identity: {providers: [{configURL: 'https://example.com/c', clientId: 'x'}]},"
+             " signal: AbortSignal.timeout(1500)})",
+    "setAppBadge": "navigator.setAppBadge(3)",
+    "paymentRequest": "new PaymentRequest([{supportedMethods: 'https://example.com/pay'}],"
+                      " {total: {label: 't', amount: {currency: 'USD', value: '1'}}}).canMakePayment()",
+    "digitalGoods": "getDigitalGoodsService('https://play.google.com/billing')",
+    "subApps": "navigator.subApps.list()",
+    "contacts": "navigator.contacts.select(['name'])",
+    "idle": "IdleDetector.requestPermission()",
+    "wakeLock": "navigator.wakeLock.request('screen')",
+    "nfc": "new NDEFReader().scan()",
+    "battery": "navigator.getBattery()",
+    "geolocation": "new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no, {timeout: 1500}))",
+    "notification": "Notification.requestPermission()",
+    "persist": "navigator.storage.persist()",
+    "clipboard": "navigator.clipboard.writeText('x')",
+    "enumerateDevices": "navigator.mediaDevices.enumerateDevices()",
+    "orientationLock": "screen.orientation.lock('landscape')",
+    "bluetooth": "navigator.bluetooth.getAvailability()",
+    "usb": "navigator.usb.getDevices()",
+    "serial": "navigator.serial.getPorts()",
+    "hid": "navigator.hid.getDevices()",
+    "presentation": "new PresentationRequest(['https://example.com']).getAvailability()",
+    "keyboardLock": "navigator.keyboard.lock()",
+    "speechSynthesis": "speechSynthesis.getVoices()",
+    "eyeDropper": "new EyeDropper().open()",
+    "windowManagement": "getScreenDetails()",
+    "localFonts": "queryLocalFonts()",
+    "storageAccess": "document.requestStorageAccess()",
+    "topics": "document.browsingTopics()",
+    "sharedStorage": "sharedStorage.set('a', 'b')",
+    "adAuction": "navigator.runAdAuction({})",
+    "interestGroup": "navigator.joinAdInterestGroup({})",
+    "privateToken": "document.hasPrivateToken('https://example.com')",
+    "launchQueue": "launchQueue.setConsumer(() => {})",
+    "xr": "navigator.xr.isSessionSupported('immersive-vr')",
+    "midi": "navigator.requestMIDIAccess()",
+    "webgpu": "navigator.gpu.requestAdapter()",
+    "translator": "Translator.availability({sourceLanguage: 'en', targetLanguage: 'fr'})",
+    "summarizer": "Summarizer.availability()",
+    "languageModel": "LanguageModel.availability()",
+    "pressure": "new PressureObserver(() => {}).observe('cpu')",
+    "handwriting": "navigator.createHandwritingRecognizer({languages: ['en']})",
+    "barcode": "new BarcodeDetector().detect(new ImageData(1, 1))",
+    "face": "new FaceDetector().detect(new ImageData(1, 1))",
+    "text": "new TextDetector().detect(new ImageData(1, 1))",
+}
+
+# Calls every one of them when the page loads and again on a tap, which some need, waiting at most
+# 2 s for each, then says so; and says again a moment later, so a renderer killed after it
+# answered still shows.
+PAGES["/apis"] = ("<title>APIs</title><button style='position:fixed;inset:0;width:100%;height:100%'>apis</button><script>"
+                  "const calls = {" + ",".join("%s: () => %s" % kv for kv in WEB_APIS.items()) + "};"
+                  "function run(when) {"
+                  " Promise.all(Object.values(calls).map(call => { try { return Promise.race([Promise.resolve(call()).catch(() => 0),"
+                  " new Promise(done => setTimeout(done, 2000))]) } catch (e) { return 0 } }))"
+                  " .then(() => fetch('/apis-ran?' + when)).then(() => setTimeout(() => fetch('/apis-alive?' + when), 3000)) }"
+                  "run('load'); document.querySelector('button').onclick = () => run('tap')</script>")
+
 served = []
 results = []
 
@@ -637,6 +708,25 @@ def a_page_spins():
     shot("18-page-spinning")
 
 
+def web_apis():
+    """A page that calls each web API whose browser side is Chrome's keeps its renderer."""
+    launch()
+    adb("logcat", "-c")
+    go(BASE + "/apis")
+    for when in ("load", "tap"):
+        if when == "tap":
+            tap(middle(see("page")))
+        lived = asked("/apis-alive?" + when, 30)
+        # Content says which interface it found no binder for.
+        killed = [line.split("Received bad user message: ", 1)[-1] for line in adb("logcat", "-d").splitlines()
+                  if "bad Mojo message" in line]
+        check("a page that calls %d web APIs on %s keeps its renderer" % (len(WEB_APIS), "a tap" if when == "tap" else "load"),
+              lived and not killed, "; ".join(killed) or ("" if lived else "no word from the page after the calls"))
+        if not lived:
+            return
+    shot("18b-web-apis")
+
+
 def the_real_web():
     """Over the office's 443-only egress."""
     launch()
@@ -658,7 +748,7 @@ def main():
 
     # Each part starts the app again, so one that the app doesn't survive costs only itself.
     for part in (browsing, mobile_shell, history_after_a_restart, where_go_runs, the_page_renderer_dies, the_shell_renderer_dies,
-                 the_gpu_process_dies, a_page_spins, the_real_web):
+                 the_gpu_process_dies, a_page_spins, web_apis, the_real_web):
         try:
             part()
         except TimeoutError as e:

@@ -13,6 +13,7 @@ import (
 	"projectb/flags"
 	"projectb/prefs"
 	"projectb/timeline"
+	"projectb/tones"
 	"projectb/update"
 	"projectb/window"
 )
@@ -137,6 +138,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		snapshot := map[string]any{
 			"t":                  "snapshot",
 			"windowColor":        m.window.Color(),
+			"tones":              tones.Of(m.window.Color()),
 			"controls":           m.window.Controls(w),
 			"cornerRadius":       m.window.CornerRadius(w),
 			"tabLayout":          m.prefs.TabLayout(),
@@ -233,7 +235,7 @@ func (m *Manager) UpdateChanged(s update.State) {
 }
 
 func (m *Manager) WindowColorChanged(color string) {
-	m.sendAll(map[string]any{"t": "windowColor", "windowColor": color})
+	m.sendAll(map[string]any{"t": "windowColor", "windowColor": color, "tones": tones.Of(color)})
 }
 
 func (m *Manager) WindowControlsChanged(w engine.WindowID, r engine.Rect, cornerRadius float64) {

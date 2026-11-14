@@ -135,7 +135,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	firstWorkspace := a.Workspaces.First()
 	e.SetFirstWorkspace(firstWorkspace)
 	a.Workspaces.OnChanged(func() {
-		m := map[string]any{"t": "workspaces", "workspaces": a.Workspaces.List()}
+		m := map[string]any{"t": "workspaces", "workspaces": a.workspacesShown()}
 		a.Shell.Send(m)
 		a.Settings.Send(m)
 		if now := a.Workspaces.First(); now != firstWorkspace {

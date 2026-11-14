@@ -11,6 +11,7 @@ import (
 	"projectb/shell"
 	"projectb/tabs"
 	"projectb/timeline"
+	"projectb/tones"
 	"projectb/workspaces"
 )
 
@@ -38,7 +39,7 @@ func (a *App) workspaceList() commands.List {
 // does, since "id" is a number in a shell's messages.
 func (a *App) workspaceShellPart(e engine.Engine) shell.Part {
 	return shell.Part{
-		Snapshot: func(into map[string]any) { into["workspaces"] = a.Workspaces.List() },
+		Snapshot: func(into map[string]any) { into["workspaces"] = a.workspacesShown() },
 		Handle: func(_ engine.WindowID, t string, msg []byte) bool {
 			var c struct {
 				Workspace string `json:"workspace"`
@@ -105,7 +106,7 @@ func (a *App) workspaceSettingsPart(e engine.Engine) settings.Part {
 	})
 	return settings.Part{
 		Snapshot: func(into map[string]any) {
-			into["workspaces"] = a.Workspaces.List()
+			into["workspaces"] = a.workspacesShown()
 			into["workspaceTabs"] = counts
 		},
 		Handle: func(w engine.WindowID, t string, msg []byte) bool {
@@ -159,4 +160,20 @@ func (a *App) workspaceTabs() map[string]int {
 		counts[t.Workspace]++
 	}
 	return counts
+}
+
+// shownWorkspace is a workspace as the shells and settings hear of it: with the tones of
+// its colour, light and dark, for a shell that paints with a workspace's colour, as Glide
+// paints a Space. The tones are made as it is sent, never saved.
+type shownWorkspace struct {
+	workspaces.Workspace
+	Tones *tones.Both `json:"tones"`
+}
+
+func (a *App) workspacesShown() []shownWorkspace {
+	var out []shownWorkspace
+	for _, w := range a.Workspaces.List() {
+		out = append(out, shownWorkspace{w, tones.Of(w.Color)})
+	}
+	return out
 }

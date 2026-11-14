@@ -12,6 +12,7 @@ import (
 	"projectb/suggest"
 	"projectb/tabs"
 	"projectb/timeline"
+	"projectb/tones"
 	"projectb/update"
 	"projectb/window"
 )
@@ -133,6 +134,7 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 			"active":             m.tabs.ActiveIn(w),
 			"groups":             m.tabs.GroupsIn(w),
 			"windowColor":        m.window.Color(),
+			"tones":              tones.Of(m.window.Color()),
 			"controls":           m.window.Controls(w),
 			"cornerRadius":       m.window.CornerRadius(w),
 			"tabLayout":          m.prefs.TabLayout(),
@@ -311,9 +313,10 @@ func (m *Manager) WindowControlsChanged(w engine.WindowID, r engine.Rect, corner
 	m.send(w, map[string]any{"t": "controls", "controls": r, "cornerRadius": cornerRadius})
 }
 
-// WindowColorChanged tells the shells the frame's new colour, which the windows now paint.
+// WindowColorChanged tells the shells the frame's new colour, which the windows now paint,
+// with the tones made from it, light and dark, which a shell paints itself with.
 func (m *Manager) WindowColorChanged(color string) {
-	m.sendAll(map[string]any{"t": "windowColor", "windowColor": color})
+	m.sendAll(map[string]any{"t": "windowColor", "windowColor": color, "tones": tones.Of(color)})
 }
 
 // KeysChanged tells the shells the keys their hints show, after the keymap changed.

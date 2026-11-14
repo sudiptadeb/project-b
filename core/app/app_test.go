@@ -25,6 +25,7 @@ import (
 	"projectb/shells"
 	"projectb/tabs"
 	"projectb/timeline"
+	"projectb/tones"
 	"projectb/update"
 	"projectb/window"
 	"projectb/workspaces"
@@ -1623,5 +1624,34 @@ func TestTheSettingsPageInstallsAReadyUpdate(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the settings page's Install update never reached the installer")
+	}
+}
+
+// The shells paint with Go's tones (docs/native-shell.md): both palettes of the frame
+// colour come in the snapshot and again with each new colour, and each workspace has its
+// colour's, for a shell that paints with it.
+func TestTheTonesComeWithTheFrameColour(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	accent := func(m map[string]any, theme string) any {
+		both, _ := m["tones"].(map[string]any)
+		palette, _ := both[theme].(map[string]any)
+		return palette["--accent"]
+	}
+	r.shell(`{"t":"ready"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	if accent(m, "light") != tones.For("#4f9e9e", false)["--accent"] || accent(m, "dark") != tones.For("#4f9e9e", true)["--accent"] {
+		t.Fatalf("snapshot tones = %v", m["tones"])
+	}
+	ws := m["workspaces"].([]any)[0].(map[string]any)
+	if accent(ws, "dark") != tones.For(ws["color"].(string), true)["--accent"] {
+		t.Fatalf("workspace tones = %v", ws)
+	}
+
+	r.openSettings()
+	r.settings(`{"t":"setFrameColor","text":"#d82b1f"}`)
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#d82b1f" })
+	if accent(m, "dark") != tones.For("#d82b1f", true)["--accent"] {
+		t.Fatalf("windowColor tones = %v", m["tones"])
 	}
 }

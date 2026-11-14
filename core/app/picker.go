@@ -9,6 +9,7 @@ import (
 	"projectb/prefs"
 	"projectb/profiles"
 	"projectb/timeline"
+	"projectb/tones"
 	"projectb/window"
 )
 
@@ -129,7 +130,7 @@ func (p *Picker) sendState() {
 	for _, t := range profiles.Templates() {
 		templates = append(templates, t.Name)
 	}
-	b, _ := json.Marshal(map[string]any{"t": "state", "profiles": list, "templates": templates, "color": p.window.Color()})
+	b, _ := json.Marshal(map[string]any{"t": "state", "profiles": list, "templates": templates, "color": p.window.Color(), "tones": tones.Of(p.window.Color())})
 	p.e.SendToShell(pickerWindow, b)
 }
 

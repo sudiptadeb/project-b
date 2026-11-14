@@ -255,7 +255,102 @@ notices, colours from the frame colour; the mock harness; Android.
 The registry test that every shell has a folder fails on the branch, by design: it is
 the rule this doc proposes to change.
 
-## Open questions for the owner
+## Decided, 2026-11-14
+
+The owner: "we can make the mobile shell native... swift shell doesnot have to be built
+now", then "mobile now has two shells... native and web both same design... this way i
+can test the feel of both". So:
+
+- **The Mac's Swift shell stops at the spike** (branch `native-shell`, kept, not built on).
+- **The phone gets a second shell, `mobile-native`, "Mobile (native)":** the Mobile shell's
+  design (the same spec, `project-b-research/mobile-shell/spec.md`, and
+  [shells.md](shells.md#the-mobile-shell)), drawn with Android views in Kotlin. Both are
+  phone shells, both in Settings' list, and nothing replaces the other: the comparison is
+  of feel, not design. Where native views can't match the web shell, it says so here.
+- **The tones move into Go** (question 4), for every shell and our pages.
+
+## Building the native Mobile shell
+
+### The path, made concrete
+
+```
+  Go  --send_to_shell(1, json)-->  Engine::SendToShell
+                                     | the window's shell is native
+                                     v
+                                   Window::SendToNativeShell (window_android.cc)
+                                     | JNI, the UI thread (Android's main thread is the browser's)
+                                     v
+                                   BrowserWindow.java  receiveShell(json)
+                                     v
+                                   MobileNativeShell.kt  receive(json)  -> draws
+  MobileNativeShell.kt  send(json)
+                                     v
+                                   BrowserWindow.java  BrowserWindowJni.shellMessage(json)
+                                     | posts a task
+                                     v
+                                   hooks::Fire(PB_EVENT_SHELL_MESSAGE, 1, json)  -->  Go
+```
+
+- **The engine** makes no shell `WebContents` for the page `shell/mobile-native`: it tells
+  the window to make the native shell by its id (`Window::SetNativeShell`), and
+  `SendToShell`, `FocusShell` and the live switch go to the window instead of a page. Go
+  and every other shell don't change.
+- **Java holds the bridge, Kotlin the shell.** The JNI stays in `BrowserWindow.java`, as it
+  is (jni_zero's annotations on Java), and the shell is a plain Kotlin `FrameLayout` given
+  a `send` function. So a second native shell later is another Kotlin class, and no JNI.
+- **Over the page, not in the compositor.** A web shell is a layer in the one compositor
+  over the page's. The native shell is an ordinary view in `ShellHolder` above the
+  `SurfaceView`, which Android draws over the surface; the touch rule is the same, the
+  layout's regions, so a touch on the page goes through to it.
+- **Units:** dp, which are the web shell's CSS pixels on the phone.
+- **The keyboard:** the address is an `EditText`; the window already resizes for the
+  keyboard, so the shell lays out again and reports its layout, as the web shell does.
+- **Messages:** `org.json`, which Android has. The shell keeps Go's state as the SDK's
+  rule 1 says, and does the seven things of "A shell without the SDK" itself.
+
+### Packaging
+
+- `engine/android/BUILD.gn`'s `android_library("java")` takes the `.kt` files beside the
+  `.java` ones; Chromium's rules compile them with `//third_party/kotlinc` and add the
+  Kotlin standard library, which R8 shrinks with the rest.
+- No new dependency: views, `org.json`, and the `androidx.core` already in the APK.
+- Built in the container as a release is, from this worktree copied to its own folder
+  (`/work/native-mobile`), so it never touches another session's tree.
+
+### What the check reads on Android
+
+`tools/drive_android.py` already finds the shell's controls by their labels in Android's
+accessibility tree (`uiautomator dump`), and tells the shell from the page by the `WebView`
+it is in. The native shell's root view reports its own class,
+`dev.projectb.browser.NativeShell`, which the driver takes as the shell; inside it every
+control has the label the web Mobile shell gives it (Menu, Address as an `EditText`, the
+tab count, New Tab, Close <tab>, Settings, ...). Tabs carry `tab-<id>` as their unique id
+and are selected while active. The same `mobile_shell()` checks then run on both shells.
+
+### The order
+
+Each step builds, runs on the emulator, and is committed with its test and a picture.
+
+1. **The tones in Go** (`core/tones`, the JS's output exactly, light and dark for every
+   frame colour), then sent with `windowColor`, and every page painting from them; the JS
+   copy goes last. Reviewed by the shell core session.
+2. **The path:** the registry entry, the engine and window changes, and a first Kotlin
+   shell: the 48dp bar with the address pill, the tab count and ⋯, driven by Go, the page
+   above it. The first picture.
+3. **Address editing:** the field over the keyboard, suggestions growing upward, Enter, back
+   to cancel, a new tab opening in edit.
+4. **The menu sheet** and **the switcher** (cards, the workspace chips, close by × and by
+   swipe, + for a new tab), the back key closing each.
+5. **Groups:** the strip, + in group, the group sheet, group cards, Add to group.
+6. **The long-press link menu**, **the page notices**, **the bars hiding on scroll**, the
+   address bar on top.
+7. **The Android session's changes of 2026-11-14,** kept in step with the web shell: a tap
+   on the active tab in the strip closes it, 48dp targets, the back key going back then
+   closing to the last-used tab, a crash report with Share, the system theme.
+8. **The driver's checks on both shells**, on both emulators, and pictures of each screen
+   in light and dark, side by side with the web shell's.
+
+## Open questions for the owner (asked before the decision above)
 
 1. **One shell, two implementations, or two shells?** Recommendation: one registry id,
    `native`, drawn the platform's way on each (a Safari-like toolbar on the Mac, the

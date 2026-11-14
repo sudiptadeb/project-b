@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/scoped_observation.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
@@ -37,6 +38,7 @@
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
+#include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size_f.h"
@@ -170,6 +172,11 @@ int64_t CallDuplicateTab(int64_t tab) {
 void CallEdit(int32_t command) {
   CheckMainThread();
   g_engine->Edit(command);
+}
+
+void CallWriteClipboard(const char* text, size_t length) {
+  CheckMainThread();
+  g_engine->WriteClipboard(std::string(text, length));
 }
 
 void CallOpenSettings(int64_t window) {
@@ -418,6 +425,7 @@ const PBEngineCalls* Engine::Calls() {
       .get_zoom = CallGetZoom,
       .duplicate_tab = CallDuplicateTab,
       .edit = CallEdit,
+      .write_clipboard = CallWriteClipboard,
       .create_window = CallCreateWindow,
       .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,
@@ -843,6 +851,10 @@ content::WebContents* Engine::FocusedContents() const {
     }
   }
   return nullptr;
+}
+
+void Engine::WriteClipboard(const std::string& text) {
+  ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste).WriteText(base::UTF8ToUTF16(text));
 }
 
 void Engine::Edit(int32_t command) {

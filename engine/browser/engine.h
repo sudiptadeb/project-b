@@ -146,6 +146,7 @@ class Engine {
   double GetZoom(int64_t tab);
   int64_t DuplicateTab(int64_t tab);
   void Edit(int32_t command);
+  void WriteClipboard(const std::string& text);
   void OpenSettings(int64_t window);
   void CloseSettings(int64_t window);
   void SendToSettings(int64_t window, const char* json, size_t length);

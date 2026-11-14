@@ -167,6 +167,8 @@ type Engine interface {
 	DuplicateTab(tab TabID) TabID
 	// Edit runs a text-editing command in whichever page has the keyboard.
 	Edit(c EditCommand)
+	// WriteClipboard puts plain text on the system clipboard.
+	WriteClipboard(text string)
 
 	// CreateWindow makes window w, with its page, and puts it on screen with its first
 	// layout, a little down and right of window near, or where a first window goes when

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"projectb/app"
+	"projectb/commands"
 	"projectb/engine"
 	"projectb/mockengine"
 	"projectb/prefs"
@@ -1537,4 +1538,39 @@ func TestTheShellHearsTheActionsByTitle(t *testing.T) {
 	if !found {
 		t.Fatalf("no app.settings in the snapshot's actions: %v", m["actions"])
 	}
+}
+
+// The glide keymap gives Cmd+T to the Command Bar, Cmd+D to pinning and Option+Cmd+Right to
+// the next Space; Ctrl+1 is Space 1 in every keymap. Each reaches Glide as its action.
+func TestTheGlideKeymap(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	r.e.Post(func() { r.a.MenuChosen("shells:glide") })
+	r.shell(`{"t":"ready"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	press := func(keys, want string) {
+		t.Helper()
+		k, err := commands.ParseKeys(keys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var took bool
+		r.e.Post(func() {
+			took = r.a.Key(k, engine.KeyBeforePage, engine.SurfacePage) || r.a.Key(k, engine.KeyUnhandled, engine.SurfacePage)
+		})
+		r.e.Settle()
+		if !took {
+			t.Fatalf("%v wasn't taken", k)
+		}
+		if m := r.waitFor(func(m map[string]any) bool { return m["t"] == "action" }); m["id"] != want {
+			t.Fatalf("%v sent %v, want %s", k, m, want)
+		}
+	}
+	press("Ctrl+1", "glide.space1")
+	r.e.Post(func() { r.a.Commands.UseTemplate("glide") })
+	r.e.Settle()
+	press("Cmd+T", "glide.commandBar")
+	press("Cmd+D", "glide.pin")
+	press("Option+Cmd+Right", "glide.spaceNext")
 }

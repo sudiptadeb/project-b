@@ -59,7 +59,7 @@ template folder in the app:
 
 | | Current file | Templates |
 |---|---|---|
-| Key bindings | `keymap.json` | `templates/keymap/`: `project-b.json`, `chrome.json`, `firefox.json`, `safari.json`, `edge.json` |
+| Key bindings | `keymap.json` | `templates/keymap/`: `project-b.json`, `chrome.json`, `glide.json`, `firefox.json`, `safari.json`, `edge.json` |
 | Menu tree | `menu.json` | `templates/menu/`: `project-b.json` |
 
 - **The default template for both is `project-b`.**
@@ -341,6 +341,11 @@ work today; Chrome actions for features we don't have are added with their featu
 (private windows, split view, tab groups, printing, bookmarks, the history and downloads
 pages, profiles, extensions, spelling, the task manager, Cast, Translate, the Google
 services). Keys are Chrome's Mac keys; `*` marks the ones reserved outside full screen.
+
+`glide.json` is `project-b.json` with Glide's keys over it ([glide.md](glide.md)): Cmd+T opens
+the Command Bar, Cmd+D pins, and Option+Cmd+Left and Right go to the previous and next
+Space, so New Tab, the terminal's Split Right, and Previous and Next Tab lose those keys
+there. Choosing it is the user's, in Keyboard settings; the shell doesn't choose a keymap.
 
 - **Project B** (locked): About Project B; Settings…, Cmd+, (locked); Check for Updates…;
   Services; Hide Project B, Cmd+H; Hide Others, Option+Cmd+H; Show All; Quit Project B,

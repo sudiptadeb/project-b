@@ -64,6 +64,10 @@ It uses what Go already gives every shell: the workspace messages (`createWorksp
 - Glide's own actions in the registry, under View, Glide in the menu, with keys in every
   keymap where they are free: Show or Hide Sidebar Cmd+S, Copy Address Shift+Cmd+C, Space
   1 to 9 Ctrl+1..9, Add to Split View Ctrl+Shift+=, Separate Split View Ctrl+Shift+-.
+- **A `glide` keymap template,** chosen in Settings, Keyboard like any other; the keymap
+  and the shell stay separate prefs. Over Project B's keys it gives Cmd+T to Open Command
+  Bar, Cmd+D to Pin or Unpin Tab, and Option+Cmd+Left and Right to the previous and next
+  Space. With another keymap, Cmd+T opens a new empty tab, which opens the Command Bar.
 
 ## Left out, on purpose
 

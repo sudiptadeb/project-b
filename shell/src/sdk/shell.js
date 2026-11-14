@@ -81,6 +81,10 @@ export const state = {
   // active}, active counting from 1 and 0 for none. find.js acts on it; focusFind asks the
   // shell to put the keyboard in its bar.
   find: null,
+  // The tab whose page fills the screen in this window, as a video's full screen does, or
+  // 0. While it does, the shell lays that page across the whole window and draws nothing
+  // else; Go ends it on Escape (docs/daily-driver.md).
+  pageFullScreen: 0,
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
@@ -90,7 +94,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads', 'dialogs', 'find']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads', 'dialogs', 'find', 'pageFullScreen']);
 
 const listeners = [];
 

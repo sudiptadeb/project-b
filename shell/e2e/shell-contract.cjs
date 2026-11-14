@@ -33,6 +33,7 @@ const rules = {
   16: 'On a desktop, a right click in a page opens a menu of Go\'s actions there; choosing one makes Go do it; Escape, or a press outside, closes it',
   17: 'On a desktop, a control named Downloads shows once there is a download, and opens a list of them by file name, a finished one with Open and Show in Finder',
   20: 'On a desktop, the find key opens a text box named Find in page with the keyboard in it; typing searches and shows the count; Enter shows the next match; Escape closes it',
+  21: 'On a desktop, a page in full screen covers the whole window with nothing of the shell on it, and when it ends the window is as it was',
 };
 
 // The desktop shells that don't draw the right-click menu yet, and who brings it to each
@@ -58,6 +59,18 @@ const noDialogsYet = {
   'minimal-vue': 'r4 brings it',
   example: 'r4 brings it',
   mobile: 'r3 brings it, with the dialogs on Android',
+};
+
+// The desktop shells that don't lay a page in full screen across the window yet, and who
+// brings each. Rule 21 holds every other desktop shell to it.
+const noPageFullYet = {
+  glide: 'r6 brings it',
+  terminal: 'r4 brings it',
+  fox: 'r4 brings it',
+  'minimal-svelte': 'r4 brings it',
+  'minimal-js': 'r4 brings it',
+  'minimal-vue': 'r4 brings it',
+  example: 'r4 brings it',
 };
 
 // The desktop shells that don't draw a find bar yet, and who brings each. Rule 20 holds
@@ -518,6 +531,29 @@ const noDownloadsYet = {
         rule(20, 'Escape closes it, and Go ends the search', await until(async () => (await field.count()) === 0 && (await regions()).findsStopped?.length > 0));
       } catch (e) {
         rule(20, 'its checks ran to their end', false, e.message.split('\n')[0]);
+      }
+    }
+
+    // 21. A page in full screen, on a desktop shell.
+    if (shell.phone) {
+      rule(21, 'not for a phone yet', true);
+    } else if (noPageFullYet[id]) {
+      rule(21, `not checked yet: ${noPageFullYet[id]}`, true);
+    } else {
+      try {
+        const before = (await regions()).visible.map((v) => v.rect);
+        const screen = page.viewportSize();
+        await fire('pageFullscreen', '');
+        rule(21, 'a page in full screen covers the whole window', await until(async () => {
+          const r = await regions();
+          return r.visible.length === 1 && r.visible[0].rect.x === 0 && r.visible[0].rect.y === 0 && Math.round(r.visible[0].rect.w) === screen.width && Math.round(r.visible[0].rect.h) === screen.height;
+        }), JSON.stringify((await regions()).visible));
+        const controls = await ui.locator(control).evaluateAll((els) => els.filter((el) => el.getClientRects().length > 0).length);
+        rule(21, 'with nothing of the shell on it', controls === 0, `${controls} controls show`);
+        await fire('key', 'escape');
+        rule(21, 'Escape ends it, and the window is as it was', await until(async () => JSON.stringify((await regions()).visible.map((v) => v.rect)) === JSON.stringify(before)));
+      } catch (e) {
+        rule(21, 'its checks ran to their end', false, e.message.split('\n')[0]);
       }
     }
 

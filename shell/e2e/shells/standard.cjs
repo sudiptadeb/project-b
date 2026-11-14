@@ -190,6 +190,21 @@ const { check, fire, regions, settle, until } = lib;
   await finder.press('Escape');
   check('Escape closes it, and Go ends the search', await until(async () => (await finder.count()) === 0 && (await regions()).findsStopped?.length > 0));
 
+  // A page filling the screen has the whole window, and Escape gives it back.
+  const before = (await regions()).visible[0].rect;
+  await fire('pageFullscreen', '');
+  const screen = page.viewportSize();
+  const covers = async () => {
+    const r = (await regions()).visible;
+    return r.length === 1 && r[0].rect.x === 0 && r[0].rect.y === 0 && Math.round(r[0].rect.w) === screen.width && Math.round(r[0].rect.h) === screen.height;
+  };
+  check('a page in full screen covers the whole window', await until(covers), JSON.stringify((await regions()).visible));
+  check('with no control of the shell on it', (await ui.getByRole('button', { name: 'New Tab' }).count()) === 0);
+  await shoot('page-full-screen');
+  await fire('key', 'escape');
+  check('Escape gives the window back as it was', await until(async () => JSON.stringify((await regions()).visible[0].rect) === JSON.stringify(before)), JSON.stringify({ before, now: (await regions()).visible[0].rect }));
+  check('and the address bar still shows the page\'s address', await until(async () => (await ui.getByRole('combobox', { name: 'Address' }).inputValue()).includes('a.test')), await ui.getByRole('combobox', { name: 'Address' }).inputValue().catch((e) => e.message));
+
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();
   await lib.done();

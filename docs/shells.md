@@ -130,6 +130,7 @@ gives the page the same two.
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
 | `find` | `find`: the active tab's search while its find bar is open, `{tab, text, matches, active}`, or `null` | A search ran, its count changed, the bar opened or closed, or another tab shows ([daily-driver.md](daily-driver.md#find-in-page)) |
+| `pageFullScreen` | `pageFullScreen`: the tab whose page fills the screen in this window, or 0 | A page asked to fill the screen, as a video's button does, or it ended ([daily-driver.md](daily-driver.md#video-full-screen)). While it is the active tab, the shell lays that page across the whole window and drops its band too (`setFrame(0)`), and puts both back after |
 | `focusFind` | | The find key was pressed: the keyboard goes to the find bar |
 | `dialogs` | `dialogs`: the dialogs pages wait on, oldest first | A page asked, or one was answered or dropped ([daily-driver.md](daily-driver.md#javascript-dialogs)) |
 | `downloads` | `downloads`: the profile's downloads, newest first | One started, moved on, ended or left the list ([daily-driver.md](daily-driver.md#downloads)) |
@@ -340,6 +341,11 @@ The check holds every shell to these, knowing nothing else about it.
     Enter shows the next match, and Escape closes it and ends the search
     ([daily-driver.md](daily-driver.md#find-in-page)). The shells that don't have it yet are
     listed in the check, with who brings each.
+21. **On a desktop, a page in full screen (`state.pageFullScreen`, the active tab) covers
+    the whole window with nothing of the shell on it,** no band and no controls; when it
+    ends, on Escape, which Go takes, the window is as it was
+    ([daily-driver.md](daily-driver.md#video-full-screen)). The shells that don't have it yet
+    are listed in the check, with who brings each.
 
 **The names a shell gives its basic controls.** Each is a button, or a menu item in a menu
 one of the shell's controls opens; a menu item's name may end with its key.

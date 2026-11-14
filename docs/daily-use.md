@@ -20,7 +20,7 @@ has a plan yet. "Proposed" means the plan is written down but waits on the owner
 | 5 | Find in page | works in Standard: Cmd+F, Cmd+G and Shift+Cmd+G, with the match count | done, r6 ([daily-driver.md](daily-driver.md#find-in-page)); the other shells to come, rule 20 |
 | 6 | Passwords to sites that ask (HTTP auth) | missing: the 401 page shows without asking (basics 12) | r6, after video full screen |
 | 7 | Camera and microphone, for Meet and Zoom on the web | missing: NotSupportedError, no prompt (basics 17) | the permissions and restore session |
-| 8 | Video full screen | missing: requestFullscreen stays pending (basics 18) | r6, after find in page |
+| 8 | Video full screen | works in Standard: the window goes full screen with only the page, and Escape gives it back | done, r6 ([daily-driver.md](daily-driver.md#video-full-screen)); the other shells to come, rule 21 |
 | 9 | Tabs come back after a crash | missing: the app comes back with 1 tab (basics 32) | the permissions and restore session |
 | 10 | Bookmarks | missing in Standard. Glide, an optional style, has favorites and pins | needs discussion |
 | 11 | A history page | partly: history is kept and feeds the address bar's suggestions; the History menu has only Back and Forward | needs discussion |

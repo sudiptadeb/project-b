@@ -9,20 +9,23 @@ against a baseline; these are the deeper looks, run by hand when a question need
 | `python3 tools/measure.py --shell <id>` | The timeline's start-up milestones for any shell |
 | `python3 tools/bench/startup_profile.py trace` | Chromium's startup trace: main-thread tasks, launches, the shell's navigation, stretches with no task |
 | `python3 tools/bench/startup_profile.py cpu` | Instruments' CPU samples of the main thread in 20 ms buckets, and Go's calls into the engine |
+| `python3 tools/bench/first_paint.py` | The start-up marks for a reused profile (every day) and a new one (first start), side by side |
 | `python3 tools/bench/memory.py <shell>...` | Footprint per process kind, the shell's JS heap and element count |
 | `python3 tools/bench/native.py` | The same marks and footprint for a bare AppKit app, plain and with a WKWebView |
 
 Point `PB_BIN` at the package (`build/package/Project B.app/Contents/MacOS/project_b`)
 for what a user gets. The CPU view needs symbols, so it runs `chromium/src/out/pb/project_b`.
-Run from a person's desktop session where you can: an agent's session has no screen, and
-AppKit can be slower there.
+Run from a person's desktop session where you can (`deskrig run -- ...`): an agent's session
+has no screen, and AppKit can be slower there. Measure on a quiet machine: with emulators, the
+VM or a build running, `uptime`'s load runs past 20 and every mark moves later, Go's start
+among them, so compare only numbers taken under the same load.
 
 ## Results, 0.2.50, 2026-11-13
 
 `minimal-svelte` here is the shell now called Minimal (`minimal`).
 
-On a Mac Studio (M3 Ultra), from an agent's session; ms from process start, medians of warm
-starts.
+On a Mac Studio (M3 Ultra), from an agent's session; ms from process start, medians of starts
+after a warm-up, each on a new profile with only the shell set in its prefs.
 
 ### Start-up per shell
 

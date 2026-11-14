@@ -135,10 +135,12 @@ if [ "$PROBLEMS" -gt 0 ]; then
 fi
 
 echo "=== $(date '+%F %T') expose the repo to GN, with no upstream edits"
+# Absolute links to this checkout: a worktree reaches chromium through a link to the main
+# checkout's, so a relative link would resolve to the main checkout's files instead.
 mkdir -p "$SRC/project_b"
-ln -sfn ../../../engine "$SRC/project_b/engine"
-ln -sfn ../../../core "$SRC/project_b/core"
-ln -sfn ../../../shell "$SRC/project_b/shell"
+ln -sfn "$ROOT/engine" "$SRC/project_b/engine"
+ln -sfn "$ROOT/core" "$SRC/project_b/core"
+ln -sfn "$ROOT/shell" "$SRC/project_b/shell"
 
 cd "$SRC" || exit 1
 mkdir -p "$OUT"

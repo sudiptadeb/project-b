@@ -373,6 +373,10 @@ def click_on(r, win=None, right=False):
     distance from the window's right edge instead of its left, for controls that sit there."""
     win = win or home
     x, y = middle(r)
+    if right:
+        # macOS posts banners at the top right at any time (Tips, background activity), over
+        # the controls there; a click would land on the banner.
+        desk.dismiss_notifications()
     desk.click(win[0] + (win[2] - (V["w"] - x) if right else x), win[1] + y)
 
 

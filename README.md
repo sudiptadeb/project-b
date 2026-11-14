@@ -25,9 +25,9 @@ Glide, a style to choose: Favorites, pinned tabs and folders down the side, and 
 <img src="docs/screenshots/glide.png" width="49%"> <img src="docs/screenshots/glide-command-bar.png" width="49%">
 
 Each shell is a web page you can swap. The terminal shell with two panes, the fox shell with its
-menu, and minimal-svelte:
+menu, and Minimal:
 
-<img src="docs/screenshots/terminal.png" width="32%"> <img src="docs/screenshots/fox.png" width="32%"> <img src="docs/screenshots/minimal-svelte.png" width="32%">
+<img src="docs/screenshots/terminal.png" width="32%"> <img src="docs/screenshots/fox.png" width="32%"> <img src="docs/screenshots/minimal.png" width="32%">
 
 These come from the last release's test runs: `tools/readme-shots.py` refreshes them.
 

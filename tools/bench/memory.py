@@ -6,7 +6,7 @@ number Activity Monitor shows, of the browser and each child process by its kind
 shell page's JS heap and element count. The first start of each shell is a warm-up; the
 rest give the median.
 
-    python3 tools/bench/memory.py standard minimal-svelte minimal-js terminal fox
+    python3 tools/bench/memory.py standard minimal minimal-js terminal fox
     python3 tools/bench/memory.py -n 5 --out build/bench/memory.json standard
 
 PB_BIN picks the binary, as for tools/drive_first_app.py; point it at the package

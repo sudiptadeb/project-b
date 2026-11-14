@@ -206,7 +206,11 @@ def screen_parts():
     root = ET.fromstring(out[:out.rindex("</hierarchy>") + len("</hierarchy>")])
     parts = {}
     for view in root.iter("node"):
-        if view.get("class") == "android.webkit.WebView":
+        # A native shell's root view says so by its class (docs/native-shell.md); its
+        # controls carry the same labels a shell page's do.
+        if view.get("class") == "dev.projectb.browser.NativeShell":
+            parts["shell"] = view
+        elif view.get("class") == "android.webkit.WebView":
             labels = {n.get("content-desc") for n in view.iter("node")}
             parts[next(name for name, test in PARTS.items() if test(labels))] = view
     return parts

@@ -3,9 +3,10 @@
 
 import { send } from './channel.js';
 
-// answerDialog answers dialog id: ok or not, and a prompt's text.
-export function answerDialog(id, ok, text = '') {
-  send({ t: 'answerDialog', id, ok, text });
+// answerDialog answers dialog id: ok or not, and a prompt's text, or a sign-in's username
+// and password.
+export function answerDialog(id, ok, text = '', password = '') {
+  send({ t: 'answerDialog', id, ok, text, password });
 }
 
 // dialogFor is the dialog the page of tab waits on, or null: the oldest, as the page asks

@@ -18,7 +18,7 @@ has a plan yet. "Proposed" means the plan is written down but waits on the owner
 | 3 | JavaScript dialogs: alert, confirm, prompt, and "leave this page?" on close | works in Standard, over the page | done, r6 ([daily-driver.md](daily-driver.md#javascript-dialogs)); the other shells to come, rule 15; Android with the Mobile shell |
 | 4 | Right-click menu on a page: open link in a new tab, copy link, copy and save images | works in Standard: drawn by the shell from Go's actions | done, r6 ([daily-driver.md](daily-driver.md#right-click)); the other shells to come, rule 16 |
 | 5 | Find in page | works in Standard: Cmd+F, Cmd+G and Shift+Cmd+G, with the match count | done, r6 ([daily-driver.md](daily-driver.md#find-in-page)); the other shells to come, rule 20 |
-| 6 | Passwords to sites that ask (HTTP auth) | missing: the 401 page shows without asking (basics 12) | r6, after video full screen |
+| 6 | Passwords to sites that ask (HTTP auth) | works in Standard: a Sign in dialog over the page, for a site or a proxy | done, r6 ([daily-driver.md](daily-driver.md#sign-in-to-a-site)); the other shells to come, rule 22; nothing is saved yet |
 | 7 | Camera and microphone, for Meet and Zoom on the web | missing: NotSupportedError, no prompt (basics 17) | the permissions and restore session |
 | 8 | Video full screen | works in Standard: the window goes full screen with only the page, and Escape gives it back | done, r6 ([daily-driver.md](daily-driver.md#video-full-screen)); the other shells to come, rule 21 |
 | 9 | Tabs come back after a crash | missing: the app comes back with 1 tab (basics 32) | the permissions and restore session |

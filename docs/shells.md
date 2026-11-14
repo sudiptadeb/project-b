@@ -81,7 +81,7 @@ of it.
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/contextmenu.js` | What a shell sends about the right-click menu, `state.contextMenu`: `chooseContextItem(menu, id)`, `closeContextMenu(menu)`, and `contextMenuPoint(menu)`, where in the window the press was. |
 | `@/sdk/find.js` | `findText(tab, text)`, `findNext(tab, forward)` and `closeFind(tab)`, for `state.find`, each naming the tab whose bar it is. |
-| `@/sdk/dialogs.js` | `answerDialog(id, ok, text)`, and `dialogFor(state, tab)`, the dialog a tab's page waits on. |
+| `@/sdk/dialogs.js` | `answerDialog(id, ok, text, password)`, and `dialogFor(state, tab)`, the dialog a tab's page waits on. |
 | `@/sdk/downloads.js` | What a shell sends about `state.downloads`: `downloadAction(id, action)` and `clearDownloads()`. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
@@ -207,7 +207,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `findText` | `tab`, `text` | Searches the tab's page afresh; nothing once its bar has closed |
 | `findNext` | `tab`, `forward` | Shows the next match in the tab's page, or the one before |
 | `findClose` | `tab` | Closes the tab's bar, keeping the match shown selected |
-| `answerDialog` | `id`, `ok`, `text` | Answers a page's dialog; `text` is a prompt's |
+| `answerDialog` | `id`, `ok`, `text`, `password` | Answers a page's dialog; `text` is a prompt's, or a sign-in's username with its `password` |
 | `downloadAction` | `id`, `action`: `open`, `reveal`, `cancel`, `pause`, `resume` or `remove` | Acts on one download; `remove` takes it off the list and leaves the file |
 | `clearDownloads` | | Takes every finished download off the list |
 | `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
@@ -346,6 +346,10 @@ The check holds every shell to these, knowing nothing else about it.
     ends, on Escape, which Go takes, the window is as it was
     ([daily-driver.md](daily-driver.md#video-full-screen)). The shells that don't have it yet
     are listed in the check, with who brings each.
+22. **A site's sign-in (`kind` `signin` in `state.dialogs`) shows as a `role=alertdialog`
+    with text boxes named Username and Password,** and Go's Sign in button answers with both
+    ([daily-driver.md](daily-driver.md#sign-in-to-a-site)). Every shell that draws dialogs;
+    the check skips the shells rule 15 lists as not yet.
 
 **The names a shell gives its basic controls.** Each is a button, or a menu item in a menu
 one of the shell's controls opens; a menu item's name may end with its key.

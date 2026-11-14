@@ -190,6 +190,21 @@ const { check, fire, regions, settle, until } = lib;
   await finder.press('Escape');
   check('Escape closes it, and Go ends the search', await until(async () => (await finder.count()) === 0 && (await regions()).findsStopped?.length > 0));
 
+  // A site's sign-in: the dialog with a username and a password.
+  await fire('signin', 'Staff only');
+  check('a sign-in shows as an alertdialog with Username and Password', await until(async () => (await ask.isVisible()) && (await ask.getByRole('textbox', { name: 'Username' }).count()) === 1 && (await ask.getByLabel('Password').count()) === 1));
+  check('with the site\'s words quoted as the site\'s', (await ask.innerText()).includes('The site says: “Staff only”'));
+  check('and the host in bold', (await ask.locator('b').innerText()) === 'secure.mock.test');
+  await ask.getByRole('textbox', { name: 'Username' }).fill('ada');
+  await ask.getByLabel('Password').fill('secret');
+  await shoot('sign-in');
+  await ask.getByLabel('Password').press('Enter');
+  check('Enter signs in with both', await until(async () => (await regions()).dialogAnswers?.at(-1)?.text === 'ada:secret'), JSON.stringify((await regions()).dialogAnswers));
+  await fire('signin', 'http:Staff only');
+  check('over http, it warns the password goes as plain text', await until(async () => (await ask.isVisible()) && (await ask.innerText()).includes('plain text')));
+  await page.keyboard.press('Escape');
+  await until(async () => (await ask.count()) === 0);
+
   // A page filling the screen has the whole window, and Escape gives it back.
   const before = (await regions()).visible[0].rect;
   await fire('pageFullscreen', '');

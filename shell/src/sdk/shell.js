@@ -73,7 +73,8 @@ export const state = {
   // unknown. downloads.js acts on one (docs/daily-driver.md).
   downloads: [],
   // The dialogs pages wait on, oldest first, each {id, tab, kind, title, message,
-  // defaultText, ok, cancel}: kind is alert, confirm, prompt or beforeunload; ok and cancel
+  // defaultText, ok, cancel, realm}: kind is alert, confirm, prompt, beforeunload or
+  // signin, a site's request for a username and password, realm being its own words; ok and cancel
   // are the buttons' words, cancel "" for an alert. A shell shows its active tab's and
   // answers with answerDialog (dialogs.js).
   dialogs: [],

@@ -34,6 +34,7 @@ const rules = {
   17: 'On a desktop, a control named Downloads shows once there is a download, and opens a list of them by file name, a finished one with Open and Show in Finder',
   20: 'On a desktop, the find key opens a text box named Find in page with the keyboard in it; typing searches and shows the count; Enter shows the next match; Escape closes it',
   21: 'On a desktop, a page in full screen covers the whole window with nothing of the shell on it, and when it ends the window is as it was',
+  22: 'A site\'s sign-in shows as an alertdialog with text boxes named Username and Password, and Go\'s Sign in answers with both',
 };
 
 // The desktop shells that don't draw the right-click menu yet, and who brings it to each
@@ -456,6 +457,23 @@ const noDownloadsYet = {
         rule(15, "and OK answers with the field's text", await until(async () => (await answers()).at(-1)?.text === 'Ada'));
       } catch (e) {
         rule(15, 'its checks ran to their end', false, e.message.split('\n')[0]);
+      }
+    }
+
+    // 22. A site's sign-in, on every shell that draws dialogs.
+    if (noDialogsYet[id]) {
+      rule(22, `not checked yet: ${noDialogsYet[id]}`, true);
+    } else {
+      try {
+        const ask = ui.getByRole('alertdialog');
+        await fire('signin', 'Staff only');
+        rule(22, 'a sign-in shows as an alertdialog with Username and Password', await until(async () => (await ask.isVisible()) && (await ask.getByRole('textbox', { name: 'Username' }).count()) === 1 && (await ask.getByLabel('Password').count()) === 1));
+        await ask.getByRole('textbox', { name: 'Username' }).fill('ada');
+        await ask.getByLabel('Password').fill('secret');
+        await ask.getByRole('button', { name: 'Sign in' }).click();
+        rule(22, "Go's Sign in answers with both", await until(async () => ((await regions()).dialogAnswers || []).at(-1)?.text === 'ada:secret'));
+      } catch (e) {
+        rule(22, 'its checks ran to their end', false, e.message.split('\n')[0]);
       }
     }
 

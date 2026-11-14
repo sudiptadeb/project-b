@@ -40,9 +40,22 @@ the real app; "What the real app adds" lists the little the mock can't show.
   engine names a shell: it serves `chrome://shell/<id>/` from that folder.
 - Every shell speaks on the one channel, `shell`. Go doesn't know which shell is on the
   other end.
-- The shells: `glide`, a sidebar of Spaces with the page as a card ([glide.md](glide.md));
-  `standard`, the one there has always been; `terminal`, panes that split, as a
-  terminal's do; `fox`, laid out as Firefox is.
+- The shells: `standard`, the default and the reference shell (below); `glide`, a sidebar
+  of Spaces with the page as a card ([glide.md](glide.md)); `terminal`, panes that split,
+  as a terminal's do; `fox`, laid out as Firefox is.
+
+## The reference shell
+
+The owner, 2026-11-14: `standard` is the neutral, feature-complete reference shell, and
+the default for new profiles and both profile templates.
+
+- **Every Go feature shows there first.** A feature that a shell can show is drawn by
+  Standard when it lands; the other shells follow when they choose to.
+- **Tests run against it.** The checks on the mock engine and in the real app are written
+  for Standard, and other shells have their own on top.
+- **The internal pages share its look:** settings and the rest are drawn from the same
+  design system ([design-system.md](design-system.md)), so they and Standard read as one.
+- Glide and fox are styles to choose, Minimal the stripped-down one, and Mobile the phone's.
 
 ## Choosing a shell
 

@@ -11,11 +11,10 @@ const { chromium } = require('playwright');
 const lib = require('./lib.cjs');
 const { check, out, profile, regions, settle, until } = lib;
 
-// Each start has a port of its own, so the address follows the server. The app's checks
-// are written against the standard shell, which every start chooses: Glide is the default.
+// Each start has a port of its own, so the address follows the server.
 let base = '';
 const startServer = async (extra = []) => {
-  await lib.start(['-block=blocked.test', '-use=standard', ...extra]);
+  await lib.start(['-block=blocked.test', ...extra]);
   base = lib.base;
 };
 const stopServer = lib.stop;
@@ -71,7 +70,7 @@ const stopServer = lib.stop;
 
   let r = await regions();
   check('opens empty with the top bar and the sidebar as shell', r.regions.some((g) => g.x === 0 && g.y === 0 && g.w === 1100) && (await regions({ x: 100, y: 600 })).hit === 'shell' && (await bar.inputValue()) === '', JSON.stringify(r));
-  check('the window loads the shell chosen, standard', r.shell === 'standard', r.shell);
+  check('the window loads the standard shell', r.shell === 'standard', r.shell);
   check('page sits right of the sidebar, below the bar, inside the frame', r.bounds.x === 224 && r.bounds.y === 48 && r.bounds.w === 1100 - 224 - 4 && r.bounds.y + r.bounds.h === 700 - 4, JSON.stringify(r));
   // The dev window places the mock page where the layout puts it, as the real window does.
   const placed = async () => {

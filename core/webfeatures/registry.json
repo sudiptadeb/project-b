@@ -1,0 +1,792 @@
+[
+  {
+    "id": "installed-apps",
+    "name": "Installed related apps",
+    "api": "navigator.getInstalledRelatedApps()",
+    "interface": {"name": "blink.mojom.InstalledAppProvider", "scope": ["frame"]},
+    "status": {"mac": "off", "android": "off"},
+    "why": "On Android only Chrome binds it, and a page that asked was killed, as DuckDuckGo's search was",
+    "owner": "engine/common/main_delegate.cc:DisableChromeOnlyBlinkFeatures",
+    "disable_blink_features": ["InstalledApp"],
+    "probe": [{"name": "installedApps", "call": "navigator.getInstalledRelatedApps()"}],
+    "test": ["probe:installedApps"]
+  },
+  {
+    "id": "digital-goods",
+    "name": "Digital goods",
+    "api": "getDigitalGoodsService()",
+    "interface": {"name": "payments.mojom.DigitalGoodsFactory", "scope": ["frame"]},
+    "status": {"mac": "off", "android": "off"},
+    "why": "Chrome hands it to Play Billing, and a page that asked was killed",
+    "owner": "engine/common/main_delegate.cc:DisableChromeOnlyBlinkFeatures",
+    "disable_blink_features": ["DigitalGoods"],
+    "probe": [{"name": "digitalGoods", "call": "getDigitalGoodsService('https://play.google.com/billing')"}],
+    "test": ["probe:digitalGoods"]
+  },
+  {
+    "id": "speech-on-device",
+    "name": "On-device speech recognition",
+    "api": "SpeechRecognition.available({processLocally: true}), SpeechRecognition.install()",
+    "interface": {"name": "media.mojom.OnDeviceSpeechRecognition", "scope": ["frame"]},
+    "status": {"mac": "off", "android": "off"},
+    "why": "Only Chrome binds its interface, and a page that asked was killed",
+    "owner": "engine/common/main_delegate.cc:DisableChromeOnlyBlinkFeatures",
+    "disable_blink_features": ["OnDeviceWebSpeechAvailable", "InstallOnDeviceSpeechRecognition"],
+    "probe": [
+      {"name": "speechOnDevice", "call": "SpeechRecognition.available({langs: ['en-US'], processLocally: true})"},
+      {"name": "speechInstall", "call": "SpeechRecognition.install({langs: ['en-US'], processLocally: true})"}
+    ],
+    "test": ["probe:speechOnDevice", "probe:speechInstall"]
+  },
+  {
+    "id": "payment-link",
+    "name": "Facilitated payment links",
+    "api": "<link rel=\"facilitated-payment\">",
+    "interface": {"name": "payments.facilitated.mojom.PaymentLinkHandler", "scope": ["frame"]},
+    "status": {"mac": "off", "android": "off"},
+    "why": "Blink asked for Chrome's handler as soon as the link was in a page, and Android killed the page",
+    "owner": "engine/common/main_delegate.cc:DisableChromeOnlyBlinkFeatures",
+    "disable_blink_features": ["PaymentLinkDetection"],
+    "probe": [{"name": "paymentLink", "sees_nothing": true,
+               "call": "document.head.append(Object.assign(document.createElement('link'), {rel: 'facilitated-payment', href: 'https://example.com/pay'}))"}],
+    "test": ["probe:paymentLink"]
+  },
+  {
+    "id": "payment-request",
+    "name": "Payment Request",
+    "api": "new PaymentRequest()",
+    "interface": {"name": "payments.mojom.PaymentRequest", "scope": ["frame"]},
+    "status": {"mac": "off", "android": "off"},
+    "why": "No payment app is behind it; turned off by its base feature, as its Blink switch alone didn't hold",
+    "owner": "engine/common/main_delegate.cc:DisableChromeOnlyBlinkFeatures",
+    "disable_features": ["WebPayments"],
+    "probe": [{"name": "paymentRequest",
+               "call": "new PaymentRequest([{supportedMethods: 'https://example.com/pay'}], {total: {label: 't', amount: {currency: 'USD', value: '1'}}}).canMakePayment()"}],
+    "test": ["probe:paymentRequest"]
+  },
+  {
+    "id": "badge",
+    "name": "App badge",
+    "api": "navigator.setAppBadge(), navigator.clearAppBadge()",
+    "interface": {"name": "blink.mojom.BadgeService", "scope": ["frame"]},
+    "status": {"mac": "quiet", "android": "works"},
+    "why": "On Mac the call goes to an empty binder, so no badge shows; Android doesn't ask the browser",
+    "needs": ["go-manager"],
+    "owner": "engine/browser/content_browser_client.cc:ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame",
+    "probe": [
+      {"name": "setAppBadge", "call": "navigator.setAppBadge(3)"},
+      {"name": "clearAppBadge", "call": "navigator.clearAppBadge()"}
+    ],
+    "test": ["probe:setAppBadge", "probe:clearAppBadge"]
+  },
+  {
+    "id": "badge-sw",
+    "name": "App badge from a service worker",
+    "api": "navigator.setAppBadge() in a service worker",
+    "interface": {"name": "blink.mojom.BadgeService", "scope": ["service_worker"]},
+    "status": {"mac": "quiet", "android": "works"},
+    "why": "On Mac the call goes to an empty binder, so no badge shows; Android doesn't ask the browser",
+    "needs": ["go-manager"],
+    "owner": "engine/browser/content_browser_client.cc:ContentBrowserClient::RegisterBrowserInterfaceBindersForServiceWorker",
+    "test": ["check:a service worker that calls setAppBadge keeps its process"]
+  },
+  {
+    "id": "view-source-wrap",
+    "name": "Line wrap on view-source pages",
+    "api": "The Line wrap box on a view-source: page",
+    "interface": {"name": "blink.mojom.PersistentRendererPrefsService", "scope": ["frame"]},
+    "status": {"mac": "quiet", "android": "works"},
+    "why": "On Mac the box wraps lines but the choice goes to an empty binder and isn't kept; Android doesn't ask",
+    "owner": "engine/browser/content_browser_client.cc:ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame"
+  },
+  {
+    "id": "sub-apps",
+    "name": "Sub apps",
+    "api": "navigator.subApps",
+    "interface": {"name": "blink.mojom.SubAppsService", "scope": ["frame"]},
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "For Isolated Web Apps only; never on here",
+    "probe": [{"name": "subApps", "call": "navigator.subApps.list()"}],
+    "test": ["probe:subApps"]
+  },
+  {
+    "id": "web-share",
+    "name": "Web Share",
+    "api": "navigator.share(), navigator.canShare()",
+    "interface": {"name": "blink.mojom.ShareService", "scope": ["frame"]},
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "Only Chrome's renderer turns it on, and there is no share sheet behind it",
+    "needs": ["binder", "prompt"],
+    "probe": [{"name": "share", "call": "navigator.share({url: location.href})"}],
+    "test": ["probe:share"]
+  },
+  {
+    "id": "web-printing",
+    "name": "Web Printing",
+    "api": "navigator.printing",
+    "interface": {"name": "blink.mojom.WebPrintingService", "scope": ["frame"]},
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "ChromeOS only; never on here"
+  },
+  {
+    "id": "credentials-password",
+    "name": "Password and federated credentials",
+    "api": "navigator.credentials.get(), navigator.credentials.store() with passwords",
+    "interface": {"name": "blink.mojom.CredentialManager", "scope": ["frame"]},
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Content's empty binder answers, so the call rejects with NotSupportedError; there is no password manager",
+    "needs": ["go-manager", "prompt"],
+    "probe": [
+      {"name": "passwordCredential", "call": "navigator.credentials.store(new PasswordCredential({id: 'a', password: 'b'}))"},
+      {"name": "credentialsGet", "call": "navigator.credentials.get({password: true, mediation: 'silent'})"}
+    ],
+    "test": ["probe:passwordCredential", "probe:credentialsGet"]
+  },
+  {
+    "id": "web-install",
+    "name": "Web install",
+    "api": "navigator.install(), <install>",
+    "interface": {"name": "blink.mojom.WebInstallService", "scope": ["frame"]},
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "Content's empty binder takes the call, so it likely never answers; not run",
+    "needs": ["go-manager"]
+  },
+  {
+    "id": "nostate-prefetch",
+    "name": "Link prerender",
+    "api": "<link rel=prerender>",
+    "interface": {"name": "blink.mojom.NoStatePrefetchProcessor", "scope": ["frame"]},
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Content's empty binder does nothing with it; speculation rules prerender still works"
+  },
+  {
+    "id": "ai-prompt",
+    "name": "Built-in AI: prompt, summarise, write",
+    "api": "LanguageModel, Summarizer, Writer, Rewriter, Proofreader",
+    "delegate": "ContentBrowserClient::BindAIManager",
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac content's test echo answers and says a model can be downloaded; off on Android",
+    "needs": ["stay-off"],
+    "probe": [
+      {"name": "languageModel", "call": "LanguageModel.availability()"},
+      {"name": "summarizer", "call": "Summarizer.availability()"}
+    ],
+    "test": ["probe:languageModel", "probe:summarizer"]
+  },
+  {
+    "id": "ai-translator",
+    "name": "Built-in AI: translate and detect language",
+    "api": "Translator, LanguageDetector",
+    "delegate": "ContentBrowserClient::BindTranslationManager",
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac content drops the request, so availability() never answers; off on Android",
+    "needs": ["stay-off"],
+    "probe": [{"name": "translator", "call": "Translator.availability({sourceLanguage: 'en', targetLanguage: 'fr'})"}],
+    "test": ["probe:translator"]
+  },
+  {
+    "id": "js-dialogs",
+    "name": "Alert, confirm and prompt",
+    "api": "alert(), confirm(), prompt()",
+    "delegate": "WebContentsDelegate::GetJavaScriptDialogManager",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No dialog manager: each returns at once without showing anything",
+    "needs": ["delegate", "prompt"],
+    "test": ["basics:13"]
+  },
+  {
+    "id": "beforeunload",
+    "name": "Leave this page?",
+    "api": "beforeunload",
+    "delegate": "JavaScriptDialogManager::RunBeforeUnloadDialog",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No dialog manager: a tab closes without asking",
+    "needs": ["delegate", "prompt"],
+    "test": ["basics:1"]
+  },
+  {
+    "id": "file-input",
+    "name": "File upload",
+    "api": "<input type=file>",
+    "interface": {"name": "blink.mojom.FileChooser", "scope": ["frame"]},
+    "delegate": "WebContentsDelegate::RunFileChooser",
+    "status": {"mac": "quiet", "android": "unknown"},
+    "why": "The default file chooser cancels at once, so no file can be picked",
+    "needs": ["delegate", "prompt"],
+    "test": ["basics:14"]
+  },
+  {
+    "id": "fs-access",
+    "name": "File System Access pickers",
+    "api": "showOpenFilePicker(), showSaveFilePicker(), showDirectoryPicker()",
+    "delegate": "BrowserContext::GetFileSystemAccessPermissionContext",
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "No permission context for file access; needs a click to try, and not run",
+    "needs": ["delegate", "prompt"]
+  },
+  {
+    "id": "downloads",
+    "name": "Downloads",
+    "api": "<a download>, Content-Disposition: attachment",
+    "delegate": "BrowserContext::GetDownloadManagerDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No download manager delegate: no file arrives",
+    "needs": ["delegate", "go-manager"],
+    "test": ["basics:15"]
+  },
+  {
+    "id": "http-auth",
+    "name": "Sign-in for HTTP and proxy auth",
+    "api": "A 401 or 407 answer",
+    "delegate": "ContentBrowserClient::CreateLoginDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No login prompt: the 401 page shows instead",
+    "needs": ["delegate", "prompt"],
+    "test": ["basics:12"]
+  },
+  {
+    "id": "cert-error",
+    "name": "Certificate errors",
+    "api": "A site with a bad certificate",
+    "delegate": "ContentBrowserClient::AllowCertificateError",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The load is refused with an empty page; no warning page and no way to go on",
+    "needs": ["delegate"],
+    "test": ["basics:10"]
+  },
+  {
+    "id": "client-cert",
+    "name": "Client certificates",
+    "api": "A site asking for a TLS client certificate",
+    "delegate": "ContentBrowserClient::SelectClientCertificate",
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "The default goes on without a certificate; not run",
+    "needs": ["delegate", "prompt"]
+  },
+  {
+    "id": "popup-block",
+    "name": "Pop-up blocking",
+    "api": "window.open() without a click",
+    "delegate": "ContentBrowserClient::CanCreateWindow",
+    "status": {"mac": "partly", "android": "partly"},
+    "why": "Pop-ups open, but nothing blocks one without a click as Chrome does",
+    "needs": ["delegate"],
+    "test": ["basics:6"]
+  },
+  {
+    "id": "fullscreen",
+    "name": "Full screen for a page",
+    "api": "element.requestFullscreen()",
+    "delegate": "WebContentsDelegate::EnterFullscreenModeForTab",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The hook reaches Go but nothing answers it, so the request stays pending",
+    "needs": ["go-manager"],
+    "test": ["basics:18"]
+  },
+  {
+    "id": "orientation-lock",
+    "name": "Screen orientation lock",
+    "api": "screen.orientation.lock()",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Rejects: it needs a page in full screen, which there isn't",
+    "needs": ["go-manager"],
+    "probe": [{"name": "orientationLock", "call": "screen.orientation.lock('landscape')"}],
+    "test": ["probe:orientationLock"]
+  },
+  {
+    "id": "pip-video",
+    "name": "Picture in picture for video",
+    "api": "video.requestPictureInPicture()",
+    "delegate": "WebContentsDelegate::EnterPictureInPicture",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Rejects with NotSupportedError: there is no floating window",
+    "needs": ["delegate"],
+    "test": ["basics:36"]
+  },
+  {
+    "id": "pip-document",
+    "name": "Document picture in picture",
+    "api": "documentPictureInPicture.requestWindow()",
+    "status": {"mac": "unknown", "android": "absent"},
+    "why": "Chrome opens a browser window for it; on Mac it's on but not run, off on Android",
+    "needs": ["stay-off"]
+  },
+  {
+    "id": "camera-mic",
+    "name": "Camera and microphone",
+    "api": "navigator.mediaDevices.getUserMedia()",
+    "delegate": "WebContentsDelegate::RequestMediaAccessPermission",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Rejects with NotSupportedError, with no prompt",
+    "needs": ["delegate", "prompt"],
+    "test": ["basics:17"]
+  },
+  {
+    "id": "screen-capture",
+    "name": "Screen sharing",
+    "api": "navigator.mediaDevices.getDisplayMedia()",
+    "delegate": "WebContentsDelegate::RequestMediaAccessPermission",
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac it rejects with NotSupportedError and no picker; off on Android",
+    "needs": ["delegate", "prompt"]
+  },
+  {
+    "id": "media-labels",
+    "name": "Camera and microphone list",
+    "api": "navigator.mediaDevices.enumerateDevices()",
+    "status": {"mac": "works", "android": "works"},
+    "why": "Lists the devices, without their names until a page is allowed the camera",
+    "probe": [{"name": "enumerateDevices", "call": "navigator.mediaDevices.enumerateDevices()"}],
+    "test": ["probe:enumerateDevices"]
+  },
+  {
+    "id": "context-menu",
+    "name": "Context menu",
+    "api": "Right-click or long press on a page",
+    "delegate": "WebContentsDelegate::HandleContextMenu",
+    "status": {"mac": "partly", "android": "works"},
+    "why": "Go answers for links and images; on Mac a right-click on plain text gets no menu",
+    "owner": "core/content/wire.go:HandleContextMenu",
+    "test": ["basics:22"]
+  },
+  {
+    "id": "color-input",
+    "name": "Colour picker",
+    "api": "<input type=color>",
+    "delegate": "WebContentsDelegate::OpenColorChooser",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No colour chooser: nothing opens",
+    "needs": ["delegate"]
+  },
+  {
+    "id": "eye-dropper",
+    "name": "Eye dropper",
+    "api": "new EyeDropper().open()",
+    "delegate": "WebContentsDelegate::OpenEyeDropper",
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac it's there, but no dropper opens; not on Android",
+    "needs": ["stay-off"],
+    "probe": [{"name": "eyeDropper", "call": "new EyeDropper().open()"}],
+    "test": ["probe:eyeDropper"]
+  },
+  {
+    "id": "pointer-lock",
+    "name": "Pointer lock",
+    "api": "element.requestPointerLock()",
+    "delegate": "WebContentsDelegate::RequestPointerLock",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The hook reaches Go but nothing answers it, so the request rejects",
+    "needs": ["go-manager"]
+  },
+  {
+    "id": "keyboard-lock",
+    "name": "Keyboard lock",
+    "api": "navigator.keyboard.lock()",
+    "delegate": "WebContentsDelegate::RequestKeyboardLock",
+    "status": {"mac": "works", "android": "works"},
+    "why": "Content's default accepts it; the browser's own keys stay reserved",
+    "probe": [{"name": "keyboardLock", "call": "navigator.keyboard.lock()"}],
+    "test": ["probe:keyboardLock"]
+  },
+  {
+    "id": "protocol-handler",
+    "name": "Protocol handlers",
+    "api": "navigator.registerProtocolHandler()",
+    "delegate": "WebContentsDelegate::RegisterProtocolHandler",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The hook reaches Go but nothing answers it, so nothing is registered",
+    "needs": ["go-manager", "prompt"]
+  },
+  {
+    "id": "external-protocol",
+    "name": "Links to other apps",
+    "api": "Links to mailto:, tel: and other apps",
+    "delegate": "ContentBrowserClient::HandleExternalProtocol",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The default says it handled the link and does nothing",
+    "needs": ["delegate", "prompt"]
+  },
+  {
+    "id": "print",
+    "name": "Printing",
+    "api": "window.print()",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Printing is Chrome's: the call returns at once and nothing prints",
+    "needs": ["build"]
+  },
+  {
+    "id": "webauthn",
+    "name": "Passkeys and security keys",
+    "api": "navigator.credentials.create({publicKey}), navigator.credentials.get({publicKey})",
+    "delegate": "ContentBrowserClient::GetWebAuthenticationDelegate",
+    "status": {"mac": "unknown", "android": "quiet"},
+    "why": "No authenticator UI; Android rejects at once, and the Mac was not run on a real site",
+    "needs": ["delegate", "prompt"],
+    "probe": [{"name": "webauthn",
+               "call": "navigator.credentials.create({publicKey: {challenge: new Uint8Array(16), rp: {name: 'x'}, user: {id: new Uint8Array(4), name: 'u', displayName: 'u'}, pubKeyCredParams: [{type: 'public-key', alg: -7}], timeout: 1500}})"}],
+    "test": ["probe:webauthn"]
+  },
+  {
+    "id": "fedcm",
+    "name": "Federated sign-in (FedCM)",
+    "api": "navigator.credentials.get({identity})",
+    "delegate": "ContentBrowserClient::CreateIdentityRequestDialogController",
+    "status": {"mac": "unknown", "android": "quiet"},
+    "why": "No account picker: the call fails or times out",
+    "needs": ["stay-off"],
+    "probe": [{"name": "fedcm",
+               "call": "navigator.credentials.get({identity: {providers: [{configURL: 'https://example.com/c', clientId: 'x'}]}, signal: AbortSignal.timeout(1500)})"}],
+    "test": ["probe:fedcm"]
+  },
+  {
+    "id": "web-otp",
+    "name": "One-time codes from SMS",
+    "api": "navigator.credentials.get({otp})",
+    "delegate": "WebContentsDelegate::CreateSmsPrompt",
+    "status": {"mac": "unknown", "android": "quiet"},
+    "why": "No SMS prompt and no SMS retriever: the call times out",
+    "needs": ["stay-off"],
+    "probe": [{"name": "otp", "call": "navigator.credentials.get({otp: {transport: ['sms']}, signal: AbortSignal.timeout(1500)})"}],
+    "test": ["probe:otp"]
+  },
+  {
+    "id": "contacts",
+    "name": "Contact picker",
+    "api": "navigator.contacts.select()",
+    "status": {"mac": "absent", "android": "quiet"},
+    "why": "Android only, and there is no contact picker behind it: it rejects",
+    "needs": ["stay-off"],
+    "probe": [{"name": "contacts", "call": "navigator.contacts.select(['name'])"}],
+    "test": ["probe:contacts"]
+  },
+  {
+    "id": "bluetooth",
+    "name": "Web Bluetooth",
+    "api": "navigator.bluetooth",
+    "delegate": "ContentBrowserClient::GetBluetoothDelegate",
+    "status": {"mac": "unknown", "android": "quiet"},
+    "why": "No Bluetooth delegate and no device chooser",
+    "needs": ["stay-off"],
+    "probe": [{"name": "bluetooth", "call": "navigator.bluetooth.getAvailability()"}],
+    "test": ["probe:bluetooth"]
+  },
+  {
+    "id": "usb",
+    "name": "WebUSB",
+    "api": "navigator.usb",
+    "delegate": "ContentBrowserClient::GetUsbDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No USB delegate and no device chooser: no device is ever listed",
+    "needs": ["stay-off"],
+    "probe": [{"name": "usb", "call": "navigator.usb.getDevices()"}],
+    "test": ["probe:usb"]
+  },
+  {
+    "id": "serial",
+    "name": "Web Serial",
+    "api": "navigator.serial",
+    "delegate": "ContentBrowserClient::GetSerialDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No serial delegate and no port chooser: no port is ever listed",
+    "needs": ["stay-off"],
+    "probe": [{"name": "serial", "call": "navigator.serial.getPorts()"}],
+    "test": ["probe:serial"]
+  },
+  {
+    "id": "hid",
+    "name": "WebHID",
+    "api": "navigator.hid",
+    "delegate": "ContentBrowserClient::GetHidDelegate",
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac there is no HID delegate, so no device is listed; not on Android",
+    "needs": ["stay-off"],
+    "probe": [{"name": "hid", "call": "navigator.hid.getDevices()"}],
+    "test": ["probe:hid"]
+  },
+  {
+    "id": "local-fonts",
+    "name": "Local fonts",
+    "api": "queryLocalFonts()",
+    "delegate": "ContentBrowserClient::GetFontAccessDelegate",
+    "permissions": ["LOCAL_FONTS"],
+    "status": {"mac": "quiet", "android": "absent"},
+    "why": "On Mac it answers with no fonts, the permission being denied; not on Android",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "localFonts", "call": "queryLocalFonts()"}],
+    "test": ["probe:localFonts"]
+  },
+  {
+    "id": "presentation",
+    "name": "Presentation (cast)",
+    "api": "new PresentationRequest()",
+    "delegate": "ContentBrowserClient::GetControllerPresentationServiceDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Casting is Chrome's: no screen is ever found",
+    "needs": ["stay-off"],
+    "probe": [{"name": "presentation", "call": "new PresentationRequest(['https://example.com']).getAvailability()"}],
+    "test": ["probe:presentation"]
+  },
+  {
+    "id": "speech-cloud",
+    "name": "Speech recognition",
+    "api": "new SpeechRecognition().start()",
+    "delegate": "ContentBrowserClient::CreateSpeechRecognitionManagerDelegate",
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "Chrome's recognizer is a Google server with its keys; there is no delegate here; not run",
+    "needs": ["stay-off"]
+  },
+  {
+    "id": "speech-synthesis",
+    "name": "Speech synthesis",
+    "api": "speechSynthesis",
+    "status": {"mac": "unknown", "android": "works"},
+    "why": "Content's own text to speech; on Android the voices are listed, the Mac was not run",
+    "probe": [{"name": "speechSynthesis", "call": "speechSynthesis.getVoices()"}],
+    "test": ["probe:speechSynthesis"]
+  },
+  {
+    "id": "notifications",
+    "name": "Notifications",
+    "api": "Notification, ServiceWorkerRegistration.showNotification()",
+    "delegate": "BrowserContext::GetPlatformNotificationService",
+    "permissions": ["NOTIFICATIONS"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Asking for permission answers denied, with no prompt and no notification service",
+    "needs": ["delegate", "go-manager", "prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "notification", "call": "Notification.requestPermission()"}],
+    "test": ["probe:notification", "basics:16"]
+  },
+  {
+    "id": "push",
+    "name": "Push messages",
+    "api": "PushManager.subscribe()",
+    "delegate": "BrowserContext::GetPushMessagingService",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No push service: Chrome's rides Google's",
+    "needs": ["delegate", "go-manager"]
+  },
+  {
+    "id": "background-sync",
+    "name": "Background sync",
+    "api": "SyncManager, periodicSync",
+    "delegate": "BrowserContext::GetBackgroundSyncController",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No background sync controller: registering rejects",
+    "needs": ["stay-off"]
+  },
+  {
+    "id": "background-fetch",
+    "name": "Background fetch",
+    "api": "BackgroundFetchManager",
+    "delegate": "BrowserContext::GetBackgroundFetchDelegate",
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "No background fetch delegate; not run",
+    "needs": ["stay-off"]
+  },
+  {
+    "id": "client-hints",
+    "name": "Client hints kept across loads",
+    "api": "Accept-CH",
+    "delegate": "BrowserContext::GetClientHintsControllerDelegate",
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "No client hints delegate: a site's request for more hints isn't remembered",
+    "needs": ["delegate"]
+  },
+  {
+    "id": "local-network",
+    "name": "Local network access",
+    "api": "A public page fetching localhost or a LAN address",
+    "permissions": ["LOCAL_NETWORK_ACCESS", "LOCAL_NETWORK", "LOOPBACK_NETWORK"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied with no prompt, so the fetch is blocked",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions"
+  },
+  {
+    "id": "sensors",
+    "name": "Motion and orientation sensors",
+    "api": "deviceorientation, devicemotion, Accelerometer",
+    "permissions": ["SENSORS"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied, so the events never fire; Chrome grants it",
+    "owner": "engine/browser/permissions.cc:Permissions"
+  },
+  {
+    "id": "clipboard-async",
+    "name": "Clipboard",
+    "api": "navigator.clipboard.writeText(), navigator.clipboard.readText()",
+    "permissions": ["CLIPBOARD_SANITIZED_WRITE", "CLIPBOARD_READ_WRITE"],
+    "status": {"mac": "partly", "android": "partly"},
+    "why": "Writing is allowed, as copy buttons need; reading is refused, with no prompt",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "clipboard", "call": "navigator.clipboard.writeText('x')"}],
+    "test": ["probe:clipboard", "check:a copy button's click puts its text on the clipboard"]
+  },
+  {
+    "id": "perm-geolocation",
+    "name": "Location",
+    "api": "navigator.geolocation.getCurrentPosition()",
+    "permissions": ["GEOLOCATION", "GEOLOCATION_APPROXIMATE"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied with no prompt: error 1, User denied",
+    "needs": ["go-manager", "prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "geolocation", "call": "new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no, {timeout: 1500}))"}],
+    "test": ["probe:geolocation"]
+  },
+  {
+    "id": "perm-midi",
+    "name": "MIDI",
+    "api": "navigator.requestMIDIAccess()",
+    "permissions": ["MIDI", "MIDI_SYSEX"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied with no prompt; Chrome grants MIDI without sysex",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "midi", "call": "navigator.requestMIDIAccess()"}],
+    "test": ["probe:midi"]
+  },
+  {
+    "id": "perm-persist",
+    "name": "Persistent storage",
+    "api": "navigator.storage.persist()",
+    "permissions": ["PERSISTENT_STORAGE"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied, so it answers false",
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "persist", "call": "navigator.storage.persist()"}],
+    "test": ["probe:persist"]
+  },
+  {
+    "id": "perm-wake-lock",
+    "name": "Screen wake lock",
+    "api": "navigator.wakeLock.request()",
+    "permissions": ["WAKE_LOCK_SCREEN", "WAKE_LOCK_SYSTEM"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied, so it rejects; Chrome grants the screen lock",
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "wakeLock", "call": "navigator.wakeLock.request('screen')"}],
+    "test": ["probe:wakeLock"]
+  },
+  {
+    "id": "perm-idle",
+    "name": "Idle detection",
+    "api": "IdleDetector.requestPermission()",
+    "permissions": ["IDLE_DETECTION"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied with no prompt",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "idle", "call": "IdleDetector.requestPermission()"}],
+    "test": ["probe:idle"]
+  },
+  {
+    "id": "perm-nfc",
+    "name": "NFC",
+    "api": "new NDEFReader().scan()",
+    "permissions": ["NFC"],
+    "status": {"mac": "absent", "android": "quiet"},
+    "why": "Android only, and the permission is denied with no prompt",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "nfc", "call": "new NDEFReader().scan()"}],
+    "test": ["probe:nfc"]
+  },
+  {
+    "id": "perm-window-mgmt",
+    "name": "Window management",
+    "api": "getScreenDetails()",
+    "permissions": ["WINDOW_MANAGEMENT"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "The permission is denied with no prompt",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "windowManagement", "call": "getScreenDetails()"}],
+    "test": ["probe:windowManagement"]
+  },
+  {
+    "id": "perm-storage-access",
+    "name": "Storage access for embedded sites",
+    "api": "document.requestStorageAccess()",
+    "permissions": ["STORAGE_ACCESS_GRANT", "TOP_LEVEL_STORAGE_ACCESS"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Resolves where no access is needed; a cross-site frame that needs it is refused",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "storageAccess", "call": "document.requestStorageAccess()"}],
+    "test": ["probe:storageAccess"]
+  },
+  {
+    "id": "perm-xr",
+    "name": "Virtual and augmented reality",
+    "api": "navigator.xr.requestSession()",
+    "permissions": ["VR", "AR", "HAND_TRACKING"],
+    "status": {"mac": "quiet", "android": "quiet"},
+    "why": "Asking whether a session is supported answers; starting one is refused",
+    "needs": ["prompt"],
+    "owner": "engine/browser/permissions.cc:Permissions",
+    "probe": [{"name": "xr", "call": "navigator.xr.isSessionSupported('immersive-vr')"}],
+    "test": ["probe:xr"]
+  },
+  {
+    "id": "codecs-h264",
+    "name": "H.264, AAC and MP4",
+    "api": "<video src=x.mp4>, canPlayType('video/mp4')",
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "The build leaves out proprietary codecs, which need a licensing decision",
+    "needs": ["build"]
+  },
+  {
+    "id": "eme",
+    "name": "Protected video (Widevine)",
+    "api": "navigator.requestMediaKeySystemAccess()",
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "No Widevine: it needs Google's licence and its component",
+    "needs": ["build"]
+  },
+  {
+    "id": "pdf",
+    "name": "PDF viewer",
+    "api": "Opening a PDF in a tab",
+    "status": {"mac": "unknown", "android": "unknown"},
+    "why": "The PDF viewer is Chrome's; what a PDF link does today was not run",
+    "needs": ["build"]
+  },
+  {
+    "id": "spellcheck",
+    "name": "Spell check",
+    "api": "Red underlines in text fields",
+    "interface": {"name": "spellcheck.mojom.SpellCheckHost", "scope": ["frame"]},
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "Spell checking is Chrome's, on both its sides",
+    "needs": ["build"]
+  },
+  {
+    "id": "autofill",
+    "name": "Autofill and saved passwords",
+    "api": "Filling addresses, cards and passwords",
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "Autofill and the password manager are Chrome's",
+    "needs": ["go-manager"]
+  },
+  {
+    "id": "translate",
+    "name": "Translate this page",
+    "api": "Translating a page",
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "Page translation is Chrome's",
+    "needs": ["build"]
+  },
+  {
+    "id": "safe-browsing",
+    "name": "Safe Browsing",
+    "api": "Malware and phishing warnings",
+    "status": {"mac": "absent", "android": "absent"},
+    "why": "Safe Browsing is Chrome's service",
+    "needs": ["build"],
+    "test": ["basics:28"]
+  }
+]

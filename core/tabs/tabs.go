@@ -195,9 +195,24 @@ func (m *Manager) FirstWorkspace() string { return m.first() }
 // CreateIn opens a new tab at the end of window w, on the blank page, in a workspace, by
 // its id, and makes it active.
 func (m *Manager) CreateIn(w engine.WindowID, workspace string) engine.TabID {
+	return m.Add(w, workspace, true)
+}
+
+// Add opens a new tab at the end of window w, on the blank page, in a workspace, and
+// makes it active when foreground, or leaves it behind the active one.
+func (m *Manager) Add(w engine.WindowID, workspace string, foreground bool) engine.TabID {
 	id := m.create(w, workspace)
-	m.Activate(id)
+	m.shown(id, foreground)
 	return id
+}
+
+// shown makes a new tab active, or tells of it behind the active one.
+func (m *Manager) shown(id engine.TabID, foreground bool) {
+	if foreground {
+		m.Activate(id)
+	} else {
+		m.listChanged()
+	}
 }
 
 // create opens a new tab at the end of window w, on the blank page, in a workspace.

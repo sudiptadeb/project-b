@@ -200,8 +200,9 @@ func (m *Manager) CloseGroup(group string) {
 
 // CreateWith opens a new tab beside tab with in its group, starting one of the two when
 // it is in none, as a new tab in a group does: at the end of with's window, in with's
-// workspace, and makes it active. Returns 0 when with is no tab.
-func (m *Manager) CreateWith(with engine.TabID) engine.TabID {
+// workspace; active when foreground, or behind the active one, as a link opened in a new
+// tab is. Returns 0 when with is no tab.
+func (m *Manager) CreateWith(with engine.TabID, foreground bool) engine.TabID {
 	t := m.tabs[with]
 	if t == nil {
 		return 0
@@ -214,6 +215,6 @@ func (m *Manager) CreateWith(with engine.TabID) engine.TabID {
 		g, _ := m.group(t.Group)
 		m.join(id, t.Group, g.Tabs[len(g.Tabs)-1])
 	}
-	m.Activate(id)
+	m.shown(id, foreground)
 	return id
 }

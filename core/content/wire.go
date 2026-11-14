@@ -32,6 +32,9 @@ func WirePicker(h *Hooks, p Picker) {
 	wireKeys(h, p.Key)
 }
 
+// mediaTypes names blink::mojom::ContextMenuDataMediaType's values.
+var mediaTypes = map[int64]string{1: "image", 2: "video", 3: "audio", 4: "canvas", 5: "file", 6: "plugin"}
+
 // netErrAborted is net::ERR_ABORTED: a navigation replaced by a newer one, not a failure.
 const netErrAborted = -3
 
@@ -101,6 +104,17 @@ func Wire(h *Hooks, l engine.Listener) {
 		if c.ID > 0 {
 			l.LoadProgressChanged(engine.TabID(c.ID), progress)
 		}
+	})
+	// A long press or a right click on a link or an image in a tab's page: the shell draws
+	// the menu, since a phone has none of its own. Anything else, a selection, keeps
+	// content's way.
+	h.Delegate.AnswerHandleContextMenu(func(c WebContents, _ RenderFrameHost, p ContextMenuParams) (bool, bool) {
+		if c.ID <= 0 || p.LinkURL == "" && p.SrcURL == "" {
+			return false, false
+		}
+		l.ContextMenu(engine.TabID(c.ID), engine.ContextMenu{X: float64(p.X), Y: float64(p.Y), Link: p.LinkURL, LinkText: p.LinkText,
+			Src: p.SrcURL, Media: mediaTypes[p.MediaType], Selection: p.SelectionText})
+		return true, true
 	})
 	h.Observer.OnDidChangeVerticalScrollDirection(func(c WebContents, d VerticalScrollDirection) {
 		if c.ID > 0 && d != VerticalScrollDirectionNull {

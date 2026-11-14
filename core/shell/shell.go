@@ -35,6 +35,9 @@ type command struct {
 	Color     *string        `json:"color"`
 	Collapsed *bool          `json:"collapsed"`
 	On        bool           `json:"on"`
+	// Background opens newTab's tab behind the active one, as a link opened in a new
+	// tab is.
+	Background bool `json:"background"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -166,12 +169,23 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.tabs.Reload()
 	case "newTab":
 		m.Interaction(w, "tab.new", func() {
-			if c.GroupWith != 0 {
-				m.tabs.CreateWith(c.GroupWith)
-			} else if c.Workspace == nil {
-				m.tabs.Create(w)
-			} else {
-				m.tabs.CreateIn(w, *c.Workspace)
+			var id engine.TabID
+			switch {
+			case c.GroupWith != 0:
+				id = m.tabs.CreateWith(c.GroupWith, !c.Background)
+			case c.Workspace == nil:
+				// The active tab's workspace, or the first when the window has no tab.
+				workspace := m.tabs.FirstWorkspace()
+				if active, ok := m.tabs.Get(m.tabs.ActiveIn(w)); ok {
+					workspace = active.Workspace
+				}
+				id = m.tabs.Add(w, workspace, !c.Background)
+			default:
+				id = m.tabs.Add(w, *c.Workspace, !c.Background)
+			}
+			// With text, the new tab goes there: an address or a search.
+			if c.Text != "" {
+				m.tabs.Load(id, tabs.NormalizeInput(c.Text))
 			}
 		})
 	case "closeTab":
@@ -263,6 +277,12 @@ func (m *Manager) ThemeChanged(theme string) {
 // TabLayoutChanged tells the shells where the tabs go now.
 func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
+}
+
+// ContextMenu tells a tab's shell what a long press in its page was on.
+func (m *Manager) ContextMenu(tab engine.TabID, cm engine.ContextMenu) {
+	m.send(m.tabs.WindowOf(tab), map[string]any{"t": "contextMenu", "tab": tab, "x": cm.X, "y": cm.Y, "link": cm.Link,
+		"linkText": cm.LinkText, "src": cm.Src, "media": cm.Media, "selection": cm.Selection})
 }
 
 // ScrollDirectionChanged tells a tab's shell its page began to scroll down, or up.

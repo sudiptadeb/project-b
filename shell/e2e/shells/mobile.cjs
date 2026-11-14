@@ -355,6 +355,39 @@ const H = 915;
   await backKey();
   check('with nothing open, it goes back in the page', await until(async () => (await active()).url === 'https://example.com/back/one'));
 
+  // Slice 5: a long press on a link in the page. The shell draws the menu; Open in new tab
+  // in group opens the link behind, in the tab's group, starting one when it has none.
+  const linkSheet = ui.getByRole('dialog', { name: 'Link' });
+  await fire('menu', 'tab.new');
+  await until(inField);
+  await visit('example.com/article', 'https://example.com/article');
+  const reader = (await regions()).active;
+  const before5 = (await regions()).tabs.length;
+  await fire('contextMenu', 'https://example.com/linked/one', { tab: reader });
+  check('a long press on a link opens the shell\'s menu for it', await until(() => linkSheet.isVisible()));
+  check('Open in new tab in group comes first', (await linkSheet.getByRole('menuitem').first().innerText()).trim() === 'Open in new tab in group');
+  await shots('link');
+  await linkSheet.getByRole('menuitem', { name: 'Open in new tab in group' }).tap();
+  check('it opens the link behind, in a group with this tab', await until(async () => {
+    const r = await regions();
+    const opened = r.tabs.find((t) => t.url === 'https://example.com/linked/one');
+    return r.tabs.length === before5 + 1 && r.active === reader && opened && (await stripTabs.count()) === 2;
+  }), JSON.stringify((await regions()).tabs.map((t) => [t.id, t.url])));
+  await fire('contextMenu', 'https://example.com/linked/two', { tab: reader });
+  await linkSheet.getByRole('menuitem', { name: 'Open in new tab in group' }).tap();
+  check('a second joins the same group, still behind', await until(async () => (await stripTabs.count()) === 3 && (await regions()).active === reader));
+  await shots('link-group');
+  await stripTabs.nth(2).tap();
+  check('and the strip goes to it', await until(async () => (await active()).url === 'https://example.com/linked/two'));
+  await fire('contextMenu', 'https://example.com/linked/three', { tab: (await regions()).active });
+  await linkSheet.getByRole('menuitem', { name: 'Open in new tab', exact: true }).tap();
+  check('Open in new tab opens it behind too', await until(async () => (await regions()).tabs.some((t) => t.url === 'https://example.com/linked/three')) &&
+    (await active()).url === 'https://example.com/linked/two');
+  await fire('contextMenu', 'https://example.com/linked/four', { tab: (await regions()).active });
+  await until(() => linkSheet.isVisible());
+  await backKey();
+  check('the back key closes the link menu', await until(async () => !(await linkSheet.isVisible())));
+
   // Settings, from the menu.
   await menuButton.tap();
   await menu.getByRole('menuitem', { name: 'Settings' }).tap();

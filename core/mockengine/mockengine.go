@@ -735,6 +735,9 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 			default:
 				e.listener.ShellMessage(w, []byte(`{"t":"back"}`))
 			}
+		case "contextMenu":
+			// A long press on a link to value, as content reports it.
+			e.listener.ContextMenu(shown, engine.ContextMenu{X: 40, Y: 60, Link: value, LinkText: "a link"})
 		case "scroll":
 			// value is down or up, as a page that scrolls makes content say.
 			e.listener.ScrollDirectionChanged(shown, value == "down")

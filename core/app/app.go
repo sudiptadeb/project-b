@@ -271,6 +271,10 @@ func (a *App) LoadingChanged(tab engine.TabID, loading bool) {
 	a.Tabs.HandleLoadingChanged(tab, loading)
 }
 
+func (a *App) ContextMenu(tab engine.TabID, m engine.ContextMenu) {
+	a.Shell.ContextMenu(tab, m)
+}
+
 func (a *App) ScrollDirectionChanged(tab engine.TabID, down bool) {
 	a.Shell.ScrollDirectionChanged(tab, down)
 }

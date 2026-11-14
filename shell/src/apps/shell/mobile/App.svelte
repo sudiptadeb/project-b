@@ -5,6 +5,7 @@
   import CrashBar from './CrashBar.svelte';
   import Extensions from './Extensions.svelte';
   import GroupSheet from './GroupSheet.svelte';
+  import LinkSheet from './LinkSheet.svelte';
   import MenuSheet from './MenuSheet.svelte';
   import Strip from './Strip.svelte';
   import Switcher from './Switcher.svelte';
@@ -22,11 +23,14 @@
   // stays at the foot either way, as Chrome's does.
   const top = $derived(go.addressBarPosition === 'top');
   // What is open over the page: '', 'switcher', 'menu', 'extensions', 'group' (the active
-  // tab's, or the one in sheetGroup) or 'card' (cardTab's menu).
+  // tab's, or the one in sheetGroup), 'card' (cardTab's menu) or 'link' (a long press in
+  // the page).
   let sheet = $state('');
   let sheetGroup = $state('');
   let cardTab = $state(0);
   let askClose = $state(false);
+  // What a long press in the page was on, for the 'link' sheet.
+  let pressed = $state(null);
   // The workspace new tabs open in, and the switcher shows: the active tab's, until the
   // user picks another.
   let workspace = $state('');
@@ -158,6 +162,11 @@
       address.focus();
     },
     scroll: scrolled,
+    contextMenu: (m) => {
+      if (m.tab !== go.active) return;
+      pressed = m;
+      sheet = 'link';
+    },
     backKey,
     suggestions: (m) => address.suggestions(m),
   });
@@ -227,6 +236,15 @@
         }}
       />
     {/key}
+  {:else if sheet === 'link' && pressed}
+    <LinkSheet
+      menu={pressed}
+      onclose={() => (sheet = '')}
+      onopen={(m) => {
+        sheet = '';
+        send({ t: 'newTab', ...m });
+      }}
+    />
   {:else if sheet === 'card' && go.tabs.some((t) => t.id === cardTab)}
     {@const t = go.tabs.find((x) => x.id === cardTab)}
     {@const own = groupOf(go.groups, cardTab)}

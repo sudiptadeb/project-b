@@ -237,6 +237,9 @@ type Listener interface {
 	LoadingChanged(tab TabID, loading bool)
 	// LoadProgressChanged says how far the page's load has got, 0 to 1.
 	LoadProgressChanged(tab TabID, progress float64)
+	// ContextMenu says a long press or a right click in a tab's page was on a link, an
+	// image or a selection, which a shell may offer to act on.
+	ContextMenu(tab TabID, m ContextMenu)
 	// ScrollDirectionChanged says the page began to scroll down, or back up: a phone
 	// shell hides its bars while the page scrolls down.
 	ScrollDirectionChanged(tab TabID, down bool)
@@ -400,3 +403,16 @@ const (
 	ModeZoomed
 	ModeFullScreen
 )
+
+// ContextMenu is what a long press or a right click in a page was on, at X, Y in the
+// page: a link's address and words, an image's address (Media "image") or another
+// medium's, and the selected text.
+type ContextMenu struct {
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Link      string  `json:"link"`
+	LinkText  string  `json:"linkText"`
+	Src       string  `json:"src"`
+	Media     string  `json:"media"`
+	Selection string  `json:"selection"`
+}

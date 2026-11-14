@@ -111,6 +111,7 @@ gives the page the same two.
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
+| `contextMenu` | `tab`, `x`, `y`, `link`, `linkText`, `src`, `media`, `selection` | A long press or a right click in a tab's page was on a link or an image (content's `HandleContextMenu`, which Go answers as handled, so the shell draws the menu); `media` is `image`, `video` and so on |
 | `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
@@ -149,7 +150,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `ready` | | Asks for the snapshot. Nothing reaches a shell before it |
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH`, `frame` | The regions, the pages shown, and the band. Below. The SDK sends it |
-| `newTab` | `workspace`, optional: a workspace's id; or `groupWith`, a tab's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab. With `groupWith`, in that tab's workspace and group, starting a group of the two when it has none |
+| `newTab` | `workspace`, optional: a workspace's id; or `groupWith`, a tab's id; optional `text` and `background` | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab. With `groupWith`, in that tab's workspace and group, starting a group of the two when it has none. With `text`, the tab goes there, an address or a search; with `background`, it opens behind the active tab, as a link opened in a new tab does |
 | `createWorkspace` | `text`, `color` | Makes a workspace with that name and `#rrggbb` colour, at the end of the list |
 | `renameWorkspace` | `workspace`, `text` | Renames a workspace, by its id |
 | `editWorkspace` | `workspace`, `text`, `color` | Renames and recolours a workspace together; a name refused changes neither |
@@ -470,6 +471,11 @@ address field, and a menu button at the far right, in our tones.
   the bar goes to the tab before or after. Back is the phone's back key, and in the menu
   while there is somewhere to go back to. While a sheet is open or the address is
   edited, the back key closes that first (`backCloses`).
+- **A long press on a link** in the page opens the shell's sheet for it, since a phone
+  has no menu of its own: Open in new tab in group first, as Chrome has it, then Open in
+  new tab, Open in workspace, and Copy link; on an image, Open image in new tab and Copy
+  image address. Tabs opened from it open behind, so the group's strip gathers them while
+  the user reads on. A long press on text keeps Android's own selection.
 - **The pill's end** says Blocked, Crashed or Failed when the page is, as the standard
   shell's address bar does.
 - **The switcher** lies over the page, the bar still under it: a card per tab in two

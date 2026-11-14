@@ -70,7 +70,7 @@ func TestAGroupHoldsOneWorkspaceOfOneWindow(t *testing.T) {
 func TestANewTabWithATabJoinsOrStartsItsGroup(t *testing.T) {
 	m := oneWindow(&fakeEngine{})
 	a := m.CreateIn(1, "w1")
-	b := m.CreateWith(a)
+	b := m.CreateWith(a, true)
 	gs := m.GroupsIn(1)
 	if len(gs) != 1 || !slices.Equal(gs[0].Tabs, []engine.TabID{a, b}) || m.ActiveIn(1) != b {
 		t.Fatalf("groups %+v, active %d", gs, m.ActiveIn(1))
@@ -78,7 +78,7 @@ func TestANewTabWithATabJoinsOrStartsItsGroup(t *testing.T) {
 	if x, _ := m.Get(b); x.Workspace != "w1" || x.Group != gs[0].ID {
 		t.Fatalf("new tab %+v", x)
 	}
-	c := m.CreateWith(a)
+	c := m.CreateWith(a, true)
 	if got := groupTabs(m, 1); !slices.Equal(got[0], []engine.TabID{a, b, c}) {
 		t.Fatalf("groups %v", got)
 	}
@@ -118,5 +118,17 @@ func TestEditUngroupAndCloseAGroup(t *testing.T) {
 	m.CloseGroup(g)
 	if got := ids(m.AllIn(1)); !slices.Equal(got, []engine.TabID{a}) || len(m.GroupsIn(1)) != 0 {
 		t.Fatalf("tabs %v, groups %+v", got, m.GroupsIn(1))
+	}
+}
+
+func TestANewTabInAGroupCanOpenBehind(t *testing.T) {
+	m := oneWindow(&fakeEngine{})
+	a := m.Create(1)
+	b := m.CreateWith(a, false)
+	if m.ActiveIn(1) != a || len(m.GroupsIn(1)) != 1 || !slices.Equal(m.GroupsIn(1)[0].Tabs, []engine.TabID{a, b}) {
+		t.Fatalf("active %d, groups %+v", m.ActiveIn(1), m.GroupsIn(1))
+	}
+	if c := m.Add(1, "", false); m.ActiveIn(1) != a || len(m.AllIn(1)) != 3 || c == 0 {
+		t.Fatalf("active %d, tabs %v", m.ActiveIn(1), ids(m.AllIn(1)))
 	}
 }

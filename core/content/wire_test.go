@@ -77,6 +77,9 @@ func (r *recorder) LoadingChanged(tab engine.TabID, loading bool) {
 		r.note("loaded")
 	}
 }
+func (r *recorder) ContextMenu(tab engine.TabID, m engine.ContextMenu) {
+	r.note(fmt.Sprintf("menu %d %s %s %s", tab, m.Link, m.Src, m.Media))
+}
 func (r *recorder) ScrollDirectionChanged(tab engine.TabID, down bool) {
 	r.note(fmt.Sprintf("scroll %d %v", tab, down))
 }
@@ -258,6 +261,23 @@ func TestScrollDirectionReachesTheListener(t *testing.T) {
 	h.Dispatch(ObserverDidChangeVerticalScrollDirection, pack(WebContents{ID: 0}, int64(VerticalScrollDirectionDown)))
 	if !reflect.DeepEqual(r.got, []string{"scroll 2 true", "scroll 2 false"}) {
 		t.Fatalf("got %v", r.got)
+	}
+}
+
+// A long press on a link or an image in a tab is the shell's to show, and content is
+// told it was handled; one on anything else, and in the shell's own page, stays content's.
+func TestALongPressOnALinkReachesTheListener(t *testing.T) {
+	h, r, _ := wired(t)
+	ask := func(tab int64, p ContextMenuParams) bool {
+		handled, _ := h.Delegate.answerHandleContextMenu(WebContents{ID: tab}, RenderFrameHost{}, p)
+		return handled
+	}
+	if !ask(2, ContextMenuParams{LinkURL: "https://a.test/"}) || !ask(2, ContextMenuParams{SrcURL: "https://a.test/i.png", MediaType: 1}) ||
+		ask(2, ContextMenuParams{SelectionText: "words"}) || ask(0, ContextMenuParams{LinkURL: "https://a.test/"}) {
+		t.Fatalf("answers wrong, got %v", r.got)
+	}
+	if !reflect.DeepEqual(r.got, []string{"menu 2 https://a.test/  ", "menu 2  https://a.test/i.png image"}) {
+		t.Fatalf("got %q", r.got)
 	}
 }
 

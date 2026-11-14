@@ -7,9 +7,9 @@
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser_main_delegate.h"
 
-namespace {
-
-bool InitializeNative(
+// Every process's start: through JNI_OnLoad where a process has Java, and called by name in
+// Android 17's renderers, which have none (content/app/android/javaless_child_process_service.cc).
+bool NativeInitializationHook(
     base::android::LibraryProcessType library_process_type) {
   if (!content::android::OnJNIOnLoadInit()) {
     return false;
@@ -20,12 +20,10 @@ bool InitializeNative(
   return true;
 }
 
-}  // namespace
-
 JNI_EXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   base::android::InitVM(vm);
   // Kept until the main process starts the timeline; a child's is never read.
   project_b::timeline::Mark("main.entered");
-  base::android::SetNativeInitializationHook(InitializeNative);
+  base::android::SetNativeInitializationHook(NativeInitializationHook);
   return JNI_VERSION_1_4;
 }

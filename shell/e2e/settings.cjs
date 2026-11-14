@@ -55,7 +55,8 @@ async function startServer() {
   if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
     throw new Error(`port ${port} already has a server: stop it and run again`);
   }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-root=${profilesRoot}`, `-id=${profileID}`, `-flags=${moreFlags}`,
+  // The page is checked from the standard shell: Glide is the default.
+  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, '-use=standard', `-profile=${profile}`, `-root=${profilesRoot}`, `-id=${profileID}`, `-flags=${moreFlags}`,
     '-version=0.2.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`], { stdio: 'ignore' });
   for (let i = 0; i < 100; i++) {
     try {
@@ -137,7 +138,8 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await shell.goto(base + '/');
   await shell.frameLocator('iframe.mock-page').getByRole('button', { name: 'Navigate' }).waitFor();
   await settle(shell);
-  const root = (name) => shellFrame().evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name);
+  // '' while the shell loads again, as it does when the shell changes.
+  const root = async (name) => (await shellFrame()?.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name).catch(() => '')) ?? '';
 
   // The gear asks Go, and Go opens the settings page.
   check('settings starts closed', (await regions()).settingsOpen === false);
@@ -279,7 +281,9 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await resetButton.click();
   await confirm.getByLabel('Template').selectOption('Work');
   await confirm.getByRole('button', { name: 'Reset', exact: true }).click();
-  check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
+  check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal' && prefsFile().shell === 'glide'), JSON.stringify(prefsFile()));
+  // The rest is checked from the standard shell again.
+  await fetch(`${base}/settings/send`, { method: 'POST', body: JSON.stringify({ t: 'setShell', text: 'standard' }) });
   check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.strip').count()) > 0));
   check('and the Dock and the list', await until(async () => (await regions()).dock === '#5b7fd6' && listed().color === '#5b7fd6'), JSON.stringify(listed()));
   check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await templateNow()).trim() === 'Work'));

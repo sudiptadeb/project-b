@@ -11,7 +11,7 @@ func TestTheListedShellsAreAllButTheExample(t *testing.T) {
 	for _, s := range Listed() {
 		listed = append(listed, s.ID)
 	}
-	if len(listed) == 0 || listed[0] != "standard" || !Has("example") || Has("Example") {
+	if len(listed) == 0 || listed[0] != "glide" || !Has("example") || Has("Example") {
 		t.Fatalf("listed %v", listed)
 	}
 	for _, s := range Listed() {
@@ -44,8 +44,8 @@ func TestTheRegistryAndTheFoldersNameTheSameShells(t *testing.T) {
 }
 
 // A desktop offers no phone shell, a phone only those, and each starts on the first it
-// offers: standard on a desktop, mobile on a phone. A desktop loads either named outright;
-// a phone doesn't load standard, which the profile templates name.
+// offers: glide on a desktop, mobile on a phone. A desktop loads either named outright;
+// a phone doesn't load glide, which the profile templates name.
 func TestEachKindOfDeviceOffersItsOwnShells(t *testing.T) {
 	defer func(was bool) { OnPhone = was }(OnPhone)
 	for _, phone := range []bool{false, true} {
@@ -55,8 +55,8 @@ func TestEachKindOfDeviceOffersItsOwnShells(t *testing.T) {
 				t.Fatalf("on a phone %v, %s is offered", phone, s.ID)
 			}
 		}
-		want := map[bool]string{false: "standard", true: "mobile"}[phone]
-		if Default() != want || !Fits(want) || Fits("standard") == phone || !Fits("mobile") || Fits("nothing") {
+		want := map[bool]string{false: "glide", true: "mobile"}[phone]
+		if Default() != want || !Fits(want) || Fits("glide") == phone || !Fits("mobile") || Fits("nothing") {
 			t.Fatalf("on a phone %v, the default is %s", phone, Default())
 		}
 	}

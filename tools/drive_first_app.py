@@ -114,6 +114,11 @@ class App:
         app never reads the real list. bin is another binary than BIN to start."""
         if not any(x.startswith("--root=") for x in extra):
             extra = [f"--root={tempfile.mkdtemp(prefix='pb-root-')}", *extra]
+        # The checks are written against the standard shell: a new folder chooses it, as
+        # Glide is the default.
+        if profile and not os.path.exists(os.path.join(profile, "prefs.json")):
+            with open(os.path.join(profile, "prefs.json"), "w") as f:
+                json.dump({"shell": "standard"}, f)
         self.fifo = os.path.join(tempfile.mkdtemp(prefix="pb-driver-"), "fifo")
         os.mkfifo(self.fifo)
         self.log = open(os.path.join(OUT, "app.log"), "a")
@@ -1298,12 +1303,16 @@ def profile_checks():
     check("and runs on that folder", os.path.exists(os.path.join(root, "default", "timeline.log")), os.listdir(root))
     made = json.load(open(os.path.join(root, "default", "prefs.json")))
     check("made from the Personal template: its prefs are Personal's, and the list says so",
-          made == {"tabLayout": "vertical", "frameColor": "#4f9e9e", "theme": "system", "shell": "standard"} and first[0]["template"] == "Personal", (made, first))
+          made == {"tabLayout": "vertical", "frameColor": "#4f9e9e", "theme": "system", "shell": "glide"} and first[0]["template"] == "Personal", (made, first))
     check("the list records when the profile was used last", first[0].get("lastUsed", "") != "", first)
     started = subprocess.run([BIN, f"--root={root}", "--profile=default", PAGES + "clicks"], timeout=60, capture_output=True)
     check("a start naming the running profile by its id hands over and exits", started.returncode == 0, started.returncode)
-    app.wait(f"{ROWS}===2&&{VALUE}==={json.dumps(PAGES + 'clicks')}", 20)
-    check("and its URL opens in the running copy", True)
+    # The profile is Personal's, so on Glide: the new tab's page says where it is.
+    app.wait(f"{ROWS}===2", 20)
+    deadline = time.time() + 20
+    while json.loads(app.cmd("evaltab", 2, "location.href")) != PAGES + "clicks" and time.time() < deadline:
+        time.sleep(0.1)
+    check("and its URL opens in the running copy", json.loads(app.cmd("evaltab", 2, "location.href")) == PAGES + "clicks")
     app.close()
     started = subprocess.run([BIN, f"--root={root}", "--profile=nobody"], timeout=60, capture_output=True, text=True)
     check("a profile that isn't listed is refused", started.returncode == 1 and "no profile \"nobody\"" in started.stderr, (started.returncode, started.stderr[-300:]))
@@ -1514,9 +1523,11 @@ def relaunch_checks():
     add_work_profile(root)
     b = App(None, [f"--root={root}", "--profile=work"], clone)
     picker = App(None, [f"--root={root}", "--picker"], clone)
-    offer = "[...document.querySelectorAll('.update button')].some(b => b.textContent.includes('99.0.0 is ready'))"
+    # The profiles are on Glide, the default: its button says Relaunch to update to 99.0.0.
+    button = "[...document.querySelectorAll('button')].find(b => b.textContent.includes('99.0.0'))"
+    offer = f"!!{button}"
     check("each profile's copy offers the release staged in the root's update folder", bool(a.wait(offer, 20)) and bool(b.wait(offer, 20)))
-    a.js("document.querySelector('.update button').click(), 1")
+    a.js(f"{button}.click(), 1")
     check("relaunching one tells the other profile's copy to quit", b.proc.wait(timeout=30) == 0)
     check("and the picker copy", picker.proc.wait(timeout=30) == 0)
     check("and the copy asked quits once they have ended", a.proc.wait(timeout=30) == 0)

@@ -44,7 +44,8 @@ execFileSync('go', ['build', '-tags', 'extensions', '-o', bin, './cmd/dev'], { c
 
 let server;
 async function startServers() {
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`], { stdio: 'ignore' });
+  // The standard shell's extensions toolbar is the one checked: Glide is the default.
+  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, '-use=standard', `-profile=${profile}`], { stdio: 'ignore' });
   for (const url of [base + '/mock/regions']) {
     for (let i = 0; ; i++) {
       try {

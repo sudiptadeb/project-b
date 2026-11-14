@@ -63,17 +63,17 @@ func TestApplySetsWhatTheValuesHoldThroughTheSetters(t *testing.T) {
 	if strings.Join(heard, " ") != "horizontal #5b7fd6" {
 		t.Fatalf("heard %v", heard)
 	}
-	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark, Shell: "standard", AddressBarPosition: AddressBottom}) {
+	if got := New(dir).All(); got != (Prefs{TabLayout: TabsHorizontal, FrameColor: "#5b7fd6", Theme: ThemeDark, Shell: "glide", AddressBarPosition: AddressBottom}) {
 		t.Fatalf("saved %+v", got)
 	}
 }
 
-// The shell is a shell's id, standard by default; one the registry doesn't have keeps the
+// The shell is a shell's id, glide by default; one the registry doesn't have keeps the
 // default, as a value that isn't one does for every setting.
 func TestTheShellIsAShellsIDAndSurvivesARestart(t *testing.T) {
 	dir := t.TempDir()
 	m := New(dir)
-	if m.Shell() != "standard" {
+	if m.Shell() != "glide" {
 		t.Fatalf("default = %q", m.Shell())
 	}
 	var got []string
@@ -90,7 +90,7 @@ func TestTheShellIsAShellsIDAndSurvivesARestart(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "prefs.json"), []byte(`{"shell":"gone"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if New(dir).Shell() != "standard" {
+	if New(dir).Shell() != "glide" {
 		t.Fatalf("a shell that isn't one loads as %q", New(dir).Shell())
 	}
 }

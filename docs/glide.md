@@ -68,6 +68,7 @@ It uses what Go already gives every shell: the workspace messages (`createWorksp
   and the shell stay separate prefs. Over Project B's keys it gives Cmd+T to Open Command
   Bar, Cmd+D to Pin or Unpin Tab, and Option+Cmd+Left and Right to the previous and next
   Space. With another keymap, Cmd+T opens a new empty tab, which opens the Command Bar.
+- Glide is first in the registry, so the default shell, and the profile templates name it.
 
 ## Left out, on purpose
 

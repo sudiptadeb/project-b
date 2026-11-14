@@ -16,8 +16,9 @@ const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
 // The names of the shells the user can choose, as the registry lists them.
 const listedShells = JSON.parse(fs.readFileSync(path.join(root, 'core/shells/registry.json'), 'utf8')).filter((s) => !s.example && !s.phone).map((s) => s.name);
-const port = 8797;
-const base = `http://127.0.0.1:${port}`;
+// The mock engine's address, on a port the system gives it, which it prints once it listens:
+// two runs at once each have their own.
+let base = '';
 
 fs.mkdirSync(out, { recursive: true });
 // A listed profile, as a copy started on one has: its folder in a root beside the list.
@@ -31,9 +32,8 @@ const bin = path.join(out, 'dev');
 execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'core'), stdio: 'inherit' });
 
 // A release server whose stable channel is the version the app runs, so a check finds it
-// up to date. It counts manifest requests: each is one check.
+// up to date, on a port of its own. It counts manifest requests: each is one check.
 let manifests = 0;
-const releasePort = 8796;
 const releaseServer = http.createServer((req, res) => {
   manifests++;
   res.end(JSON.stringify({ spec: 1, project: 'project-b', published: '2026-11-09T00:00:00Z', channels: { stable: '0.2.0' }, releases: { '0.2.0': { assets: {} } } }));
@@ -51,21 +51,18 @@ fs.writeFileSync(moreFlags, JSON.stringify([
 
 let server;
 async function startServer() {
-  // A server left over from another run would answer in ours' place.
-  if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
-    throw new Error(`port ${port} already has a server: stop it and run again`);
-  }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-root=${profilesRoot}`, `-id=${profileID}`, `-flags=${moreFlags}`,
-    '-version=0.2.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`], { stdio: 'ignore' });
-  for (let i = 0; i < 100; i++) {
-    try {
-      await fetch(base + '/mock/regions');
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
-  throw new Error('server did not start');
+  server = spawn(bin, ['-addr=127.0.0.1:0', `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`, `-root=${profilesRoot}`, `-id=${profileID}`, `-flags=${moreFlags}`,
+    '-version=0.2.0', `-releases=http://127.0.0.1:${releaseServer.address().port}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`], { stdio: ['ignore', 'ignore', 'pipe'] });
+  base = await new Promise((resolve, reject) => {
+    let log = '';
+    server.stderr.setEncoding('utf8');
+    server.stderr.on('data', (text) => {
+      log += text;
+      const m = /mock engine on (http:\/\/\S+)/.exec(log);
+      if (m) resolve(m[1]);
+    });
+    server.once('exit', (code) => reject(new Error(`the mock engine ended, ${code}:\n${log}`)));
+  });
 }
 async function stopServer() {
   const gone = new Promise((r) => server.once('exit', r));
@@ -121,7 +118,7 @@ function contrast(a, b) {
 const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title}"`);
 
 (async () => {
-  await new Promise((r) => releaseServer.listen(releasePort, '127.0.0.1', r));
+  await new Promise((r) => releaseServer.listen(0, '127.0.0.1', r));
   await startServer();
   const browser = await chromium.launch();
   const errors = [];

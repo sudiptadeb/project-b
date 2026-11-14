@@ -12,8 +12,9 @@ const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
-const port = 8794;
-const base = `http://127.0.0.1:${port}`;
+// The mock engine's address, on a port the system gives it, which it prints once it listens:
+// two runs at once each have their own.
+let base = '';
 
 fs.mkdirSync(out, { recursive: true });
 const profiles = fs.mkdtempSync(path.join(os.tmpdir(), 'project-b-picker-'));
@@ -29,20 +30,17 @@ execFileSync('go', ['build', '-o', bin, './cmd/dev'], { cwd: path.join(root, 'co
 
 let server;
 async function startServer() {
-  // A server left over from another run would answer in ours' place.
-  if (await fetch(base + '/mock/regions').then(() => true, () => false)) {
-    throw new Error(`port ${port} already has a server: stop it and run again`);
-  }
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-root=${profiles}`, '-picker'], { stdio: 'ignore' });
-  for (let i = 0; i < 100; i++) {
-    try {
-      await fetch(base + '/mock/regions');
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-  }
-  throw new Error('server did not start');
+  server = spawn(bin, ['-addr=127.0.0.1:0', `-shell=${path.join(root, 'shell/dist')}`, `-root=${profiles}`, '-picker'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  base = await new Promise((resolve, reject) => {
+    let log = '';
+    server.stderr.setEncoding('utf8');
+    server.stderr.on('data', (text) => {
+      log += text;
+      const m = /mock engine on (http:\/\/\S+)/.exec(log);
+      if (m) resolve(m[1]);
+    });
+    server.once('exit', (code) => reject(new Error(`the mock engine ended, ${code}:\n${log}`)));
+  });
 }
 async function stopServer() {
   const gone = new Promise((r) => server.once('exit', r));

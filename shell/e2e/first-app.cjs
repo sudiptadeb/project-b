@@ -522,7 +522,8 @@ const stopServer = lib.stop;
   execFileSync('ditto', ['-c', '-k', '--keepParent', fakeApp(path.join(releases, 'new'), '0.2.0'), zip]);
   const good = fs.readFileSync(zip);
   let served = good;
-  const releasePort = 8798;
+  // On a port of its own, read once it listens.
+  let releasePort = 0;
   const releaseServer = http.createServer((req, res) => {
     if (req.url === '/releases.json') {
       res.end(JSON.stringify({ spec: 1, project: 'project-b', published: '2026-11-09T00:00:00Z', channels: { stable: '0.2.0' },
@@ -535,7 +536,8 @@ const stopServer = lib.stop;
       setTimeout(() => res.end(body.subarray(body.length >> 1)), 1500);
     }
   });
-  await new Promise((r) => releaseServer.listen(releasePort, '127.0.0.1', r));
+  await new Promise((r) => releaseServer.listen(0, '127.0.0.1', r));
+  releasePort = releaseServer.address().port;
   const updateArgs = () => ['-version=0.1.0', `-releases=http://127.0.0.1:${releasePort}/releases.json`, `-app=${path.join(installed, 'Project B.app')}`];
   const bubble = ui.locator('.update');
 

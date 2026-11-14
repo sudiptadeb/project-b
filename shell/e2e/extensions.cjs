@@ -12,8 +12,9 @@ const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
-const port = 8811;
-const base = `http://127.0.0.1:${port}`;
+// The mock engine's address, on a port the system gives it, which it prints once it listens:
+// two runs at once each have their own. A restart takes a new one.
+let base = '';
 const storeDir = path.join(root, '.tools/extensions');
 const unpacked = path.join(root, 'tools/test-extension');
 // The same extension as a package, as tools/pack-test-extension.py packs it.
@@ -44,18 +45,17 @@ execFileSync('go', ['build', '-tags', 'extensions', '-o', bin, './cmd/dev'], { c
 
 let server;
 async function startServers() {
-  server = spawn(bin, [`-addr=127.0.0.1:${port}`, `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`], { stdio: 'ignore' });
-  for (const url of [base + '/mock/regions']) {
-    for (let i = 0; ; i++) {
-      try {
-        await fetch(url);
-        break;
-      } catch {
-        if (i === 100) throw new Error(`${url} did not start`);
-        await new Promise((r) => setTimeout(r, 50));
-      }
-    }
-  }
+  server = spawn(bin, ['-addr=127.0.0.1:0', `-shell=${path.join(root, 'shell/dist')}`, `-profile=${profile}`], { stdio: ['ignore', 'ignore', 'pipe'] });
+  base = await new Promise((resolve, reject) => {
+    let log = '';
+    server.stderr.setEncoding('utf8');
+    server.stderr.on('data', (text) => {
+      log += text;
+      const m = /mock engine on (http:\/\/\S+)/.exec(log);
+      if (m) resolve(m[1]);
+    });
+    server.once('exit', (code) => reject(new Error(`the mock engine ended, ${code}:\n${log}`)));
+  });
 }
 async function stopServers() {
   for (const p of [server]) {

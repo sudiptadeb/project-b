@@ -218,3 +218,42 @@ func (m *Manager) CreateWith(with engine.TabID, foreground bool) engine.TabID {
 	m.shown(id, foreground)
 	return id
 }
+
+// Reorder moves tab id to index in its window's order, the place it has after the move,
+// clamped to the window. Its group follows where it lands, as dragging a tab does in
+// Chrome: between two tabs of one group it joins that group; out of its own group's run,
+// with neither neighbour in it, it leaves. The active tab stays as it was.
+func (m *Manager) Reorder(id engine.TabID, index int) {
+	win := m.windows[m.windowOf[id]]
+	if win == nil {
+		return
+	}
+	from := slices.Index(win.order, id)
+	index = max(0, min(index, len(win.order)-1))
+	if index == from {
+		return
+	}
+	win.order = slices.Insert(slices.Delete(win.order, from, from+1), index, id)
+	var left, right string
+	if index > 0 {
+		left = m.tabs[win.order[index-1]].Group
+	}
+	if index < len(win.order)-1 {
+		right = m.tabs[win.order[index+1]].Group
+	}
+	own := m.tabs[id].Group
+	switch {
+	case left != "" && left == right && left != own:
+		m.join(id, left, 0)
+	case own != "" && left != own && right != own:
+		m.leaveGroup(id)
+	}
+	if g, _ := m.group(m.tabs[id].Group); g != nil {
+		// A group's tabs keep the window's order, so a shell drawing the group sees the
+		// move.
+		slices.SortFunc(g.Tabs, func(a, b engine.TabID) int {
+			return slices.Index(win.order, a) - slices.Index(win.order, b)
+		})
+	}
+	m.listChanged()
+}

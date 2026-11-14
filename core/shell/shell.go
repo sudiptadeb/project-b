@@ -5,6 +5,7 @@ package shell
 
 import (
 	"encoding/json"
+	"slices"
 
 	"projectb/crash"
 	"projectb/engine"
@@ -38,6 +39,10 @@ type command struct {
 	// Background opens newTab's tab behind the active one, as a link opened in a new
 	// tab is.
 	Background bool `json:"background"`
+	// moveTab's: Index is the place the tab has in its window's order after the move, and
+	// Window the window it moves into, this one when left out.
+	Index  int             `json:"index"`
+	Window engine.WindowID `json:"window"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -188,6 +193,18 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 				m.tabs.Load(id, tabs.NormalizeInput(c.Text))
 			}
 		})
+	// A tab moves within its window, or into another at index; a window it leaves empty
+	// closes, as Move does for any tab.
+	case "moveTab":
+		id, to := engine.TabID(c.ID), c.Window
+		if to == 0 {
+			to = w
+		}
+		if m.tabs.WindowOf(id) == to {
+			m.tabs.Reorder(id, c.Index)
+		} else if m.tabs.WindowOf(id) != 0 && slices.Contains(m.window.Windows(), to) {
+			m.tabs.Move(id, to, max(0, min(c.Index, len(m.tabs.AllIn(to)))))
+		}
 	case "closeTab":
 		m.Interaction(w, "tab.close", func() { m.tabs.Close(engine.TabID(c.ID)) })
 	case "activateTab":

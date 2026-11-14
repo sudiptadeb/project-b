@@ -132,3 +132,42 @@ func TestANewTabInAGroupCanOpenBehind(t *testing.T) {
 		t.Fatalf("active %d, tabs %v", m.ActiveIn(1), ids(m.AllIn(1)))
 	}
 }
+
+// Reorder moves a tab in its window, clamped, keeping the active one; between two tabs of
+// a group it joins the group, and out of its group's run it leaves it.
+func TestReorderMovesATabAndItsGroupFollowsWhereItLands(t *testing.T) {
+	m := oneWindow(&fakeEngine{})
+	a, b, c, d := m.Create(1), m.Create(1), m.Create(1), m.Create(1)
+	order := func() []engine.TabID {
+		var out []engine.TabID
+		for _, t := range m.AllIn(1) {
+			out = append(out, t.ID)
+		}
+		return out
+	}
+	active := m.ActiveIn(1)
+	m.Reorder(d, 0)
+	if !slices.Equal(order(), []engine.TabID{d, a, b, c}) || m.ActiveIn(1) != active {
+		t.Fatalf("order %v, active %v", order(), m.ActiveIn(1))
+	}
+	m.Reorder(d, 99)
+	if !slices.Equal(order(), []engine.TabID{a, b, c, d}) {
+		t.Fatalf("clamped to the end: %v", order())
+	}
+	g := m.CreateGroup([]engine.TabID{a, b}, "", "")
+	// d dropped between a and b joins their group, in the window's order.
+	m.Reorder(d, 1)
+	if got := groupTabs(m, 1); len(got) != 1 || !slices.Equal(got[0], []engine.TabID{a, d, b}) {
+		t.Fatalf("groups after dropping d inside: %v, order %v", got, order())
+	}
+	// a dropped after c, with neither neighbour in its group, leaves it.
+	m.Reorder(a, 3)
+	if x, _ := m.Get(a); x.Group != "" || !slices.Equal(groupTabs(m, 1)[0], []engine.TabID{d, b}) {
+		t.Fatalf("a is in %q, groups %v, order %v", x.Group, groupTabs(m, 1), order())
+	}
+	// b moved to the other side of d stays in the group, which follows the new order.
+	m.Reorder(b, 0)
+	if got := groupTabs(m, 1); !slices.Equal(got[0], []engine.TabID{b, d}) || g == "" {
+		t.Fatalf("groups %v, order %v", got, order())
+	}
+}

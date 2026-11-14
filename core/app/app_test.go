@@ -1574,3 +1574,53 @@ func TestTheGlideKeymap(t *testing.T) {
 	press("Cmd+D", "glide.pin")
 	press("Option+Cmd+Right", "glide.spaceNext")
 }
+
+// moveTab from the shell: a tab moves in its window to the index given, the active one
+// staying; into another window it goes there at the index, clamped; a window it leaves
+// empty closes; an unknown window changes nothing.
+func TestTheShellMovesATab(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	r.shell(`{"t":"newTab"}`)
+	r.shell(`{"t":"newTab"}`)
+	ids := func(m map[string]any) []float64 {
+		var out []float64
+		for _, t := range m["tabs"].([]any) {
+			out = append(out, t.(map[string]any)["id"].(float64))
+		}
+		return out
+	}
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && len(m["tabs"].([]any)) == 3 })
+	if got := ids(m); !slices.Equal(got, []float64{1, 2, 3}) || m["active"] != 3.0 {
+		t.Fatalf("tabs %v, active %v", got, m["active"])
+	}
+	r.shell(`{"t":"moveTab","id":3,"index":0}`)
+	m = r.waitFor(func(m map[string]any) bool { return m["t"] == "tabs" && ids(m)[0] == 3 })
+	if got := ids(m); !slices.Equal(got, []float64{3, 1, 2}) || m["active"] != 3.0 {
+		t.Fatalf("after moving 3 first: tabs %v, active %v", got, m["active"])
+	}
+	r.shell(`{"t":"moveTab","id":1,"index":9,"window":77}`)
+	r.e.Settle()
+	if got := r.a.Tabs.WindowOf(1); got != 1 {
+		t.Fatalf("a move to an unknown window took the tab to %v", got)
+	}
+	var w2 engine.WindowID
+	r.e.Post(func() { w2, _ = r.a.NewWindow("") })
+	r.e.Settle()
+	r.shell(fmt.Sprintf(`{"t":"moveTab","id":1,"index":9,"window":%d}`, w2))
+	r.e.Settle()
+	if got := r.a.Tabs.AllIn(w2); r.a.Tabs.WindowOf(1) != w2 || got[len(got)-1].ID != 1 {
+		t.Fatalf("tab 1 is in %v, %v's tabs %v", r.a.Tabs.WindowOf(1), w2, got)
+	}
+	// Both of the second window's tabs move back to the first, and the window, left empty,
+	// closes.
+	first := r.a.Tabs.AllIn(w2)[0].ID
+	r.e.Post(func() {
+		r.a.ShellMessage(w2, []byte(fmt.Sprintf(`{"t":"moveTab","id":%d,"index":0,"window":1}`, first)))
+	})
+	r.e.Post(func() { r.a.ShellMessage(w2, []byte(`{"t":"moveTab","id":1,"index":0,"window":1}`)) })
+	r.e.Settle()
+	if slices.Contains(r.a.Window.Windows(), w2) {
+		t.Fatalf("window %v stays open with no tabs", w2)
+	}
+}

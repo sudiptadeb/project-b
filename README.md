@@ -10,6 +10,23 @@ Where the project stands: [docs/status.md](docs/status.md). How it is built:
 looks, for anyone drawing any of it: [docs/design-system.md](docs/design-system.md). How every
 feature logs and times itself: [docs/logging.md](docs/logging.md).
 
+## What it looks like
+
+The standard shell, tabs down the side, and the address field's suggestions:
+
+<img src="docs/screenshots/standard.png" width="49%"> <img src="docs/screenshots/suggestions.png" width="49%">
+
+Tabs on top, and the settings page:
+
+<img src="docs/screenshots/horizontal.png" width="49%"> <img src="docs/screenshots/settings.png" width="49%">
+
+The shell is a web page you can swap. The terminal shell with two panes, the fox shell with its
+menu, and minimal-svelte:
+
+<img src="docs/screenshots/terminal.png" width="32%"> <img src="docs/screenshots/fox.png" width="32%"> <img src="docs/screenshots/minimal-svelte.png" width="32%">
+
+These come from the last release's test runs: `tools/readme-shots.py` refreshes them.
+
 ## Get it working
 
 Or hand [requirements.prompt](requirements.prompt) to a coding agent on the machine and let

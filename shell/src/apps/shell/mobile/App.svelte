@@ -71,6 +71,14 @@
     }
   }
 
+  // A page that starts loading in the active tab brings the bars back, as Chrome's do.
+  let loading = '';
+  $effect(() => {
+    const now = tab.loading ? tab.url : '';
+    if (now && now !== loading) bars(true);
+    loading = now;
+  });
+
   function scrolled(m) {
     const editing = document.activeElement?.getAttribute('aria-label') === 'Address';
     if (m.tab === go.active && !sheet && !editing) bars(m.direction !== 'down');

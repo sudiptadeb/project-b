@@ -3,7 +3,7 @@
   { "id": "glide", "name": "Glide", "actions": [{ "id": "glide.commandBar", "title": "Open Command Bar" }, { "id": "glide.sidebar", "title": "Show or Hide Sidebar" }, { "id": "glide.pin", "title": "Pin or Unpin Tab" }, { "id": "glide.favorite", "title": "Add to Favorites" }, { "id": "glide.copyAddress", "title": "Copy Address" }, { "id": "glide.splitAdd", "title": "Add to Split View" }, { "id": "glide.splitRemove", "title": "Separate Split View" }, { "id": "glide.spacePrevious", "title": "Previous Space" }, { "id": "glide.spaceNext", "title": "Next Space" }, { "id": "glide.newSpace", "title": "New Space…" }, { "id": "glide.space1", "title": "Space 1" }, { "id": "glide.space2", "title": "Space 2" }, { "id": "glide.space3", "title": "Space 3" }, { "id": "glide.space4", "title": "Space 4" }, { "id": "glide.space5", "title": "Space 5" }, { "id": "glide.space6", "title": "Space 6" }, { "id": "glide.space7", "title": "Space 7" }, { "id": "glide.space8", "title": "Space 8" }, { "id": "glide.space9", "title": "Space 9" }] },
   { "id": "terminal", "name": "Terminal", "actions": [{ "id": "terminal.splitRight", "title": "Split Right" }, { "id": "terminal.splitDown", "title": "Split Down" }] },
   { "id": "fox", "name": "Fox" },
-  { "id": "minimal-svelte", "name": "Minimal (Svelte)" },
+  { "id": "minimal", "name": "Minimal" },
   { "id": "minimal-js", "name": "Minimal (JS)" },
   { "id": "example", "name": "Example", "example": true },
   { "id": "minimal-vue", "name": "Minimal (Vue)", "example": true },

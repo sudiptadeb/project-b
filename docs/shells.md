@@ -316,7 +316,7 @@ one of the shell's controls opens; a menu item's name may end with its key.
 - **Extensions**, while their flag is on, whose menu has **Manage extensions**.
 
 **The extensions.** Every shell shows the extensions' buttons and the install prompt, from
-`state.extensions`: the Vue shells with `ExtensionsToolbar`, `minimal-svelte` with its
+`state.extensions`: the Vue shells with `ExtensionsToolbar`, `minimal` with its
 own. What a shell draws carries the hooks the real app's extensions tests
 (`tools/drive_extensions.py`) find it by:
 
@@ -560,7 +560,7 @@ Each commit builds, leaves a working app, and carries its tests.
 The owner asked that the shell's API not depend on Vue, and that a shell in Svelte show
 where a shell's functional part ends and its presentation begins. The branch `shell-api`
 builds it: the SDK above with no framework in it, a Vue and a Svelte adapter over it, and
-`minimal-svelte`, a bare shell in Svelte that keeps every rule. This is the line it draws,
+`minimal`, a bare shell in Svelte that keeps every rule. This is the line it draws,
 and what is left to decide.
 
 ### The functional part: the SDK
@@ -635,7 +635,7 @@ the framework then knows what was read.
 
 ### What a shell's author writes
 
-In Vue, as the example above. In Svelte, as `minimal-svelte` does:
+In Vue, as the example above. In Svelte, as `minimal` does:
 
 ```svelte
 <script>
@@ -684,12 +684,12 @@ Drawing them is the shell's. The SDK keeps `state.extensions`, sends what goes b
 closes an open popup on a press elsewhere in the shell; each pinned button carries
 `data-extension="<id>"` so its own press isn't one. The Vue shells keep `ExtensionsToolbar`,
 which now takes `extensions` as a prop and sends through the SDK, and looks and works as
-it did. `minimal-svelte` draws plain buttons and a plain prompt with the same hooks.
+it did. `minimal` draws plain buttons and a plain prompt with the same hooks.
 `extensionsBuilt` from `@extensions` lets a shell's own buttons leave a build without
 extensions, and nothing of `@extensions` but that one constant reaches a Svelte shell, so
 no Vue does.
 
-What it costs: `minimal-svelte` is 51 KB, 20 KB gzipped, of which its extensions part is
+What it costs: `minimal` is 51 KB, 20 KB gzipped, of which its extensions part is
 under 5 KB, and 47 KB without extensions. The example, the same shell in Vue, is 81 KB,
 32 KB gzipped. The SDK alone is 13 KB, 5 KB gzipped.
 
@@ -698,18 +698,18 @@ under 5 KB, and 47 KB without extensions. The example, the same shell in Vue, is
 The shell asks for it with `setFrame(width)`, and the SDK sends it in the layout as
 `frame`. Go keeps it per window and the engine draws it from that width, as it already
 took the width with every layout, so the engine didn't change. The four Vue shells ask for
-4px and look as they did; `minimal-svelte` asks for none and its page reaches the window's
+4px and look as they did; `minimal` asks for none and its page reaches the window's
 edge. Rule 3 checks the pages lie inside the band the shell asked for. The snapshot no
 longer has `frameWidth`; the settings page had a copy it never read, which went too.
 
 ### The two minimal shells
 
-`minimal-svelte` and `minimal-js` are to be, in the owner's words, a tab bar, a toolbar, a
+`minimal` and `minimal-js` are to be, in the owner's words, a tab bar, a toolbar, a
 vertical list too, the simplest button placements, a simple layout, no rounding, with
 thought for many tabs. The SDK makes that easy: a shell draws `state.tabs` however it lays
 them out, marks its bars, and the SDK measures whatever moves. A strip that scrolls is
 marked `shell`, with `drag` spaces beside it, as the fox shell's is; a list that wraps or
-scrolls is the same. The spike's `minimal-svelte` is not that design: it only proves the
+scrolls is the same. The spike's `minimal` is not that design: it only proves the
 API, with every control plain.
 
 ### What the spike changed
@@ -721,7 +721,7 @@ API, with every control plain.
 3. Svelte joined the build, with its adapter. `svelte` 5 and `@sveltejs/vite-plugin-svelte`
    6 are new dependencies of `shell/`, so `npm install` there comes before the next build:
    the engine's build and the Android release both build from `shell/node_modules`.
-4. `minimal-svelte`, registered with `"example": true`, so it is offered nowhere.
+4. `minimal`, registered with `"example": true`, so it is offered nowhere.
 5. The band became the shell's.
 6. Rule 12, the basic controls, and the example's.
 
@@ -751,7 +751,7 @@ API, with every control plain.
   the only way a shell's own extensions buttons leave a build without extensions without
   Vue coming with them. Recommendation: keep it, named as the extensions session likes.
 - **A tab that becomes active.** The standard, fox and terminal shells, and
-  `minimal-svelte`, each repeat one rule: a tab with nothing in it wants the address, one
+  `minimal`, each repeat one rule: a tab with nothing in it wants the address, one
   with a page wants its page. It names the address field, which is presentation, so the
   SDK leaves it to the shell. Recommendation: leave it there.
 - **The standard shell's tab position.** `state.tabLayout` and `setTabLayout` are only the

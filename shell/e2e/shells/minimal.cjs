@@ -1,9 +1,9 @@
-// The minimal-svelte shell's own tests, on the mock engine: no band, the tab bar and the
+// The minimal shell's own tests, on the mock engine: no band, the tab bar and the
 // toolbar, one tab and many, the strip that scrolls with New Tab and the drag space kept,
 // the side list, the close button, the address field and its suggestions, the extensions'
 // buttons, menu and prompt from the mock store, the update and crash notices, light and
 // dark. The check covers what every shell does.
-// Run: node shell/e2e/shells/minimal-svelte.cjs   (from the repo root, after `npm run build`
+// Run: node shell/e2e/shells/minimal.cjs   (from the repo root, after `npm run build`
 // in shell/, and tools/pack-test-extension.py for the store)
 
 const { execFileSync } = require('child_process');
@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
 const lib = require('../lib.cjs');
 const { check, fire, regions, settle, until } = lib;
 
-const id = 'minimal-svelte';
+const id = 'minimal';
 // The test extension, as tools/pack-test-extension.py packs it into the mock store.
 const extension = 'oepjjojhhaclfhmopocgmdfbeiffpheh';
 const extensionName = 'Project B test extension';
@@ -121,7 +121,7 @@ const names = ['Example Domain', 'Mail · Work', 'Project B on GitHub', 'Weather
   };
 
   // One tab, and no band: the bars and the page reach the window's edges.
-  check('the window loads the minimal-svelte shell with its one tab', await until(async () => (await regions()).shell === id && (await tabs.count()) === 1 && (await regions()).visible.length === 1, 10000));
+  check('the window loads the minimal shell with its one tab', await until(async () => (await regions()).shell === id && (await tabs.count()) === 1 && (await regions()).visible.length === 1, 10000));
   await w.shell().evaluate(() => document.fonts.ready);
   check('Space Grotesk and Space Mono load from the shell\'s own folder',
     await w.shell().evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/"/g, '')).sort().join() === 'Space Grotesk,Space Mono'));

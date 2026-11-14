@@ -19,6 +19,8 @@ AppKit can be slower there.
 
 ## Results, 0.2.50, 2026-11-13
 
+`minimal-svelte` here is the shell now called Minimal (`minimal`).
+
 On a Mac Studio (M3 Ultra), from an agent's session; ms from process start, medians of warm
 starts.
 

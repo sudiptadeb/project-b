@@ -26,7 +26,7 @@ SHOTS = [
     (REAL, "settings-general.png", "settings.png", None),
     (VM, "terminal-split.png", "terminal.png", WINDOW),
     (VM, "fox-menu.png", "fox.png", WINDOW),
-    (VM, "minimal-svelte.png", "minimal-svelte.png", WINDOW),
+    (VM, "minimal.png", "minimal.png", WINDOW),
 ]
 
 

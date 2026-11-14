@@ -7,6 +7,7 @@
   import GroupSheet from './GroupSheet.svelte';
   import LinkSheet from './LinkSheet.svelte';
   import MenuSheet from './MenuSheet.svelte';
+  import PageNotice from './PageNotice.svelte';
   import Strip from './Strip.svelte';
   import Switcher from './Switcher.svelte';
   import Toolbar from './Toolbar.svelte';
@@ -192,7 +193,11 @@
     </div>
   {/if}
   <div class="stage">
-    <main use:page={go.active}></main>
+    <main use:page={go.active}>
+      {#if tab.url && !tab.loading && (tab.crashed || tab.error || tab.blocked)}
+        <PageNotice {tab} />
+      {/if}
+    </main>
     {#if group}
       <div class="bars" class:away class:gone>
         <Strip {group} tabs={tabsOf(group)} active={go.active} onsheet={() => onsheet('group')} onpick={pick} onclosetab={(id) => closeTabs([id])} onnewtab={() => newTab(go.active)} />
@@ -307,6 +312,7 @@
   }
 
   main {
+    position: relative;
     flex: 1;
     min-height: 0;
   }

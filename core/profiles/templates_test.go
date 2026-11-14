@@ -37,8 +37,8 @@ func TestPersonalIsTodaysDefaults(t *testing.T) {
 	}
 }
 
-func TestWorkHasItsTabsOnTopAndItsOwnColour(t *testing.T) {
-	if p := prefsFrom(t, "Work"); p.TabLayout != prefs.TabsHorizontal || p.FrameColor != "#5b7fd6" {
+func TestWorkHasItsOwnColourAndTheTabsOnTheSide(t *testing.T) {
+	if p := prefsFrom(t, "Work"); p.TabLayout != prefs.TabsVertical || p.FrameColor != "#5b7fd6" {
 		t.Fatalf("Work = %+v", p)
 	}
 }

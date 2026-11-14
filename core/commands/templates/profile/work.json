@@ -1,7 +1,7 @@
 {
   "name": "Work",
   "prefs": {
-    "tabLayout": "horizontal",
+    "tabLayout": "vertical",
     "frameColor": "#5b7fd6",
     "theme": "system",
     "shell": "standard"

@@ -64,8 +64,8 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 		p, _ := m["profile"].(map[string]any)
 		return m["t"] == "profile" && p["template"] == "Work"
 	})
-	// The shell hears each as Apply sets it: the tabs, then the colour.
-	r.waitFor(func(m map[string]any) bool { return m["t"] == "tabLayout" && m["tabLayout"] == "horizontal" })
+	// The shell hears the colour as Apply sets it; the tabs stay on the side, as both
+	// templates have them.
 	r.waitFor(func(m map[string]any) bool { return m["t"] == "windowColor" && m["windowColor"] == "#5b7fd6" })
 	if r.e.Layout(1).FrameColor != "#5b7fd6" || r.e.DockColor() != "#5b7fd6" {
 		t.Fatalf("the window is %s and the Dock %s", r.e.Layout(1).FrameColor, r.e.DockColor())
@@ -73,7 +73,7 @@ func TestResetToATemplateTakesItsValuesAndKeepsTheRest(t *testing.T) {
 	if listed, _, _ := list.Get(c.ID); listed.Color != "#5b7fd6" || listed.Template != "Work" || listed.Name != "Personal" {
 		t.Fatalf("listed %+v", listed)
 	}
-	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsHorizontal, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem, Shell: "standard", AddressBarPosition: prefs.AddressBottom}) {
+	if got := prefs.New(c.Dir).All(); got != (prefs.Prefs{TabLayout: prefs.TabsVertical, FrameColor: "#5b7fd6", Theme: prefs.ThemeSystem, Shell: "standard", AddressBarPosition: prefs.AddressBottom}) {
 		t.Fatalf("the prefs are %+v", got)
 	}
 	if items := r.suggestions("exam"); len(items) != 1 {

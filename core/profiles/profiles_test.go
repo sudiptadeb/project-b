@@ -139,8 +139,8 @@ func TestNewProfileFromATemplate(t *testing.T) {
 	if p.ID == First || len(p.ID) != 8 || p.Name != "Office" || p.Color != "#5b7fd6" || p.Template != "Work" {
 		t.Fatalf("made %+v", p)
 	}
-	if got := prefs.New(m.Dir(p.ID)).TabLayout(); got != prefs.TabsHorizontal {
-		t.Fatalf("its tabs are %s", got)
+	if got := prefs.New(m.Dir(p.ID)).All(); got.FrameColor != "#5b7fd6" || got.TabLayout != prefs.TabsVertical {
+		t.Fatalf("its prefs are %+v", got)
 	}
 	if listed, ok, _ := m.Get(p.ID); !ok || listed != p {
 		t.Fatalf("listed %+v", listed)

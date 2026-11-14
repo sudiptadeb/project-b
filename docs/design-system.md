@@ -259,7 +259,10 @@ contrast and focus rings first.
 **Terminal** (`shell/src/apps/shell/terminal/`):
 - Monospace, 12px on a 16px line, set on `.app`, for the whole shell.
 - Square corners on what floats (the suggestions) and on its marks (a workspace's square,
-  the loading dot); controls keep radius 4.
+  a pane's square in the strip); controls keep radius 4.
+- The strip's chip per window: a number in `--muted`, a name, and an 8px square per pane,
+  outlined in `--muted`, filled in `--text` for the pane the window shows, in `--accent`
+  while its page loads.
 - Dense bars: the strip 32px, a pane's title bar 20px, the prompt line 28px. Its controls
   are 20px square with 12px icons at a 1.2px stroke, and its suggestion rows 24px.
 - The `>` prompt mark, in `--icon`, `--accent` while the field has focus: the field's only

@@ -92,6 +92,12 @@ const { check, fire, regions, settle, until } = lib;
   check('the column beside the other pane, which keeps the full height', near(s[t1].y, s[t2].y) && near(s[t3].y + s[t3].h, s[t2].y + s[t2].h) && s[t1].x + s[t1].w <= s[t2].x, JSON.stringify(s));
   check('three panes in one group', (await chips.count()) === 1 && (await ui.locator('.chip [role=tab]').count()) === 3);
   check('pages inside the frame and apart with three panes', await insideAndApart());
+  // No pane is made smaller than 240 by 160: these are under 321 high, so Split down is
+  // off, and its key does nothing.
+  check('a pane too short for two has Split down disabled', (await title(t3).getByRole('button', { name: 'Split down' }).isDisabled()) && (await title(t1).getByRole('button', { name: 'Split down' }).isDisabled()) && !(await title(t3).getByRole('button', { name: 'Split right' }).isDisabled()));
+  await fire('key', 'splitDown');
+  await settle(page);
+  check('and Shift+Cmd+D does nothing there', (await regions()).tabs.length === 3);
   await page.frameLocator(`iframe.mock-page[data-tab="${t3}"]`).getByRole('button', { name: 'Navigate' }).waitFor();
   await shoot('split');
 
@@ -119,7 +125,7 @@ const { check, fire, regions, settle, until } = lib;
   await page.mouse.move(2000, gy, { steps: 6 });
   await page.mouse.up();
   await settle(page);
-  check('a drag past the edge leaves the pane its smallest size', near((await shown())[t2].w, 80), JSON.stringify(await shown()));
+  check('a drag past the edge leaves the pane its smallest size', near((await shown())[t2].w, 240), JSON.stringify(await shown()));
   // And back to where it was.
   const grip3 = await ui.locator('[role=separator][aria-orientation=vertical]').boundingBox();
   await page.mouse.move(grip3.x + grip3.width / 2 - 1, gy);
@@ -148,6 +154,19 @@ const { check, fire, regions, settle, until } = lib;
   const t4 = (await regions()).active;
   check('and shows it alone: the first group\'s panes are no longer shown', await until(() => showsOnly([t4])), JSON.stringify(await shown()));
 
+  // One chip per window: its number, its name, and a square per pane, each the pane's tab.
+  check('one numbered chip per window', JSON.stringify(await chips.locator('.number').allTextContents()) === '["1","2"]', JSON.stringify(await chips.locator('.number').allTextContents()));
+  check('a square per pane, each the pane\'s tab', (await chips.nth(0).locator('[role=tab]').count()) === 3 && (await chips.nth(1).locator('[role=tab]').count()) === 1);
+  check('a window is named for the host its pane shows', (await chips.nth(1).locator('.label').textContent()) === 'New Tab' && (await chips.nth(0).locator('.label').textContent()) === 'New Tab');
+  await chips.nth(0).locator('.name').click();
+  check('pressing a window\'s name shows it at the pane it showed last', await until(async () => (await regions()).active === t3 && (await showsOnly([t1, t2, t3]))));
+  check('that pane\'s square is filled', (await chips.nth(0).locator(`.pane.current[data-tab="${t3}"]`).count()) === 1);
+  await ui.locator(`[role=tab][data-tab="${t1}"]`).click();
+  check('and a press on a square shows that pane', await until(async () => (await regions()).active === t1));
+  check('whose window is then named for its host', await until(async () => (await chips.nth(0).locator('.label').textContent()) === 'one.test'));
+  await ui.locator(`[role=tab][data-tab="${t4}"]`).click();
+  await until(() => showsOnly([t4]));
+
   // A segment of the hidden group shows that group.
   await ui.locator(`[role=tab][data-tab="${t2}"]`).click();
   check('clicking a segment of a hidden group shows that group', await until(async () => (await regions()).active === t2 && (await showsOnly([t1, t2, t3]))));
@@ -158,6 +177,8 @@ const { check, fire, regions, settle, until } = lib;
   const groupOf = async (id) => (await regions()).tabs.find((t) => t.id === id).group;
   check('the split\'s tabs are one tab group in Go', (await groupOf(t1)) && (await groupOf(t1)) === (await groupOf(t2)) && (await groupOf(t1)) === (await groupOf(t3)));
   check('and the lone tab is in none', !(await groupOf(t4)));
+  await fetch(`${lib.base}/shell/send`, { method: 'POST', body: JSON.stringify({ t: 'editGroup', group: await groupOf(t1), name: 'review' }) });
+  check('a window whose group has a name is called by it', await until(async () => (await chips.nth(0).locator('.label').textContent()) === 'review'));
 
   // A tab a page opens from a tab in no group is a window of its own.
   await ui.locator(`[role=tab][data-tab="${t4}"]`).click();

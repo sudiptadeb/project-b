@@ -4,32 +4,35 @@ import { controlSpace, send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { ExtensionsToolbar } from '@extensions';
 import { chips, shown } from './panes.js';
 
-// The title bar: one chip per window, a segment per pane in it. A segment is the pane's tab;
-// pressing it makes that tab active, which shows its window.
+// The title bar: one chip per window, numbered, named for its tab group or the host it
+// shows, with a square per pane. A square is the pane's tab; pressing it makes that tab
+// active, which shows its window. Pressing the name shows the window at the pane it
+// showed last.
 </script>
 
 <template>
   <div v-shell class="strip">
     <div v-drag class="space" :style="{ width: controlSpace.left }"></div>
     <div class="chips" role="tablist" aria-label="Windows">
-      <div v-for="chip in chips" :key="chip.tabs[0].id" class="chip" :class="{ shown: chip.root === shown }">
+      <div v-for="(chip, n) in chips" :key="chip.tabs[0].id" class="chip" :class="{ shown: chip.root === shown }">
+        <button class="name" type="button" :title="chip.name" @click="send({ t: 'activateTab', id: chip.current.id })">
+          <span v-if="workspaceOf(chip.current)" class="workspace" role="img" :aria-label="`In ${workspaceOf(chip.current).name}`" :style="{ background: workspaceOf(chip.current).color }"></span>
+          <span class="number">{{ n + 1 }}</span>
+          <span class="label">{{ chip.name }}</span>
+        </button>
         <button
           v-for="tab in chip.tabs"
           :key="tab.id"
-          class="segment"
-          :class="{ active: tab.id === state.active }"
+          class="pane"
+          :class="{ current: tab.id === chip.current.id, loading: tab.loading }"
           type="button"
           role="tab"
           :data-tab="tab.id"
           :aria-selected="tab.id === state.active"
+          :aria-label="tabLabel(tab)"
           :title="tabLabel(tab)"
           @click="send({ t: 'activateTab', id: tab.id })"
-        >
-          <span v-if="workspaceOf(tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(tab).name}`" :style="{ background: workspaceOf(tab).color }"></span>
-          <img v-if="tab.favicon" class="icon" :src="tab.favicon" alt="" width="12" height="12" />
-          <span class="label">{{ tabLabel(tab) }}</span>
-          <span v-if="tab.loading" class="loading" role="img" aria-label="Loading"></span>
-        </button>
+        ><span class="square"></span></button>
       </div>
     </div>
     <button
@@ -84,16 +87,16 @@ import { chips, shown } from './panes.js';
   scrollbar-width: none;
 }
 
-/* A window: its panes side by side, in a hairline box. The shown one is the surface, with
-   the accent along its foot. */
+/* A window: its number and name, then a square per pane, the one it shows filled. The
+   shown window is the surface, with the accent along its foot. */
 .chip {
   display: flex;
+  align-items: center;
   flex: none;
   height: 20px;
-  border: 1px solid var(--line);
+  padding-right: 4px;
   border-radius: 4px;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .chip.shown {
@@ -101,35 +104,32 @@ import { chips, shown } from './panes.js';
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.segment {
+.chip:hover:not(.shown) {
+  background: var(--accent-tint);
+}
+
+.name {
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 160px;
-  padding: 0 8px;
+  gap: 8px;
+  height: 100%;
+  max-width: 200px;
+  padding: 0 4px 0 8px;
   border: 0;
+  border-radius: 4px;
   background: none;
   color: var(--muted);
   font: inherit;
   cursor: pointer;
 }
 
-.segment + .segment {
-  border-left: 1px solid var(--line);
-}
-
-.segment:hover {
-  background: var(--accent-tint);
-}
-
-.segment.active {
+.shown .name {
   color: var(--text);
-  font-weight: 500;
 }
 
-.segment:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring-inset);
+.number {
+  flex: none;
+  color: var(--muted);
 }
 
 .label {
@@ -138,11 +138,46 @@ import { chips, shown } from './panes.js';
   text-overflow: ellipsis;
 }
 
-.icon {
-  display: block;
+/* A pane: an 8px square in a 12px by 20px button, outlined, filled for the pane the window
+   shows; while its page loads, the square is in the accent. */
+.pane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   width: 12px;
-  height: 12px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.square {
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+}
+
+.pane.current {
+  color: var(--text);
+}
+
+.pane.current .square {
+  background: currentColor;
+}
+
+.pane.loading {
+  color: var(--accent);
+}
+
+.name:focus-visible,
+.pane:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-inset);
 }
 
 /* A workspace's colour, as a small square. */
@@ -150,14 +185,6 @@ import { chips, shown } from './panes.js';
   flex: none;
   width: 8px;
   height: 8px;
-}
-
-/* Loading, as a dot in the accent after the label. */
-.loading {
-  flex: none;
-  width: 4px;
-  height: 4px;
-  background: var(--accent);
 }
 
 /* New Tab and the gear: small square buttons, the strip's own. */

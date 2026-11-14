@@ -1,7 +1,7 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { keyLabel, send, state, tabLabel } from '@/sdk/vue.js';
-import { close, shown, split, zoom, zoomed } from './panes.js';
+import { close, shown, smallest, split, zoom, zoomed } from './panes.js';
 
 // One pane: a title bar over the place its tab's page shows. A press on the bar makes the
 // pane active.
@@ -18,6 +18,18 @@ const status = computed(() => {
   return '';
 });
 
+// The pane's size, so a split that would leave a pane under its smallest is disabled.
+const box = ref(null);
+const size = ref({ w: Infinity, h: Infinity });
+let watcher;
+onMounted(() => {
+  watcher = new ResizeObserver(([e]) => (size.value = { w: e.contentRect.width, h: e.contentRect.height }));
+  watcher.observe(box.value);
+});
+onBeforeUnmount(() => watcher.disconnect());
+const roomRight = computed(() => size.value.w >= 2 * smallest.row + 1);
+const roomDown = computed(() => size.value.h >= 2 * smallest.column + 1);
+
 function press() {
   if (!active.value) send({ t: 'activateTab', id: props.id });
 }
@@ -30,16 +42,16 @@ function hint(name, action) {
 </script>
 
 <template>
-  <div class="pane">
+  <div ref="box" class="pane">
     <div v-shell class="title" :class="{ active }" :data-pane="id" @pointerdown="press">
       <span class="label">{{ tabLabel(tab) }}</span>
       <span v-if="host" class="host">{{ host }}</span>
       <span v-if="status" class="status">{{ status }}</span>
       <span class="gap"></span>
-      <button class="control" type="button" aria-label="Split right" :title="hint('Split right', 'terminal.splitRight')" @pointerdown.stop @click="split(id, 'row')">
+      <button class="control" type="button" aria-label="Split right" :disabled="!roomRight" :title="hint('Split right', 'terminal.splitRight')" @pointerdown.stop @click="split(id, 'row')">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="10.8" height="10.8"/><path d="M6 .6v10.8"/></svg>
       </button>
-      <button class="control" type="button" aria-label="Split down" :title="hint('Split down', 'terminal.splitDown')" @pointerdown.stop @click="split(id, 'column')">
+      <button class="control" type="button" aria-label="Split down" :disabled="!roomDown" :title="hint('Split down', 'terminal.splitDown')" @pointerdown.stop @click="split(id, 'column')">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="10.8" height="10.8"/><path d="M.6 6h10.8"/></svg>
       </button>
       <button v-if="shown?.parts" class="control" type="button" aria-label="Zoom" :aria-pressed="zoomed === id" :class="{ on: zoomed === id }" :title="hint(zoomed === id ? 'Unzoom' : 'Zoom', 'terminal.zoom')" @pointerdown.stop @click="press(); zoom(id)">
@@ -126,14 +138,19 @@ function hint(name, action) {
   opacity: 0.8;
 }
 
-.control:hover {
+.control:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.control:hover:not(:disabled) {
   background: var(--hover);
   opacity: 1;
 }
 
 /* On the accent bar the toolbar's hover would wash the icon out, so it darkens instead,
    and the focus ring, in the accent itself, is drawn in the bar's ink. */
-.title.active .control:hover {
+.title.active .control:hover:not(:disabled) {
   background: var(--press);
 }
 

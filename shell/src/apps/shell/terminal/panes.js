@@ -5,7 +5,7 @@
 // adding up to 1. Go's tabs and groups are the truth the trees follow.
 
 import { computed, nextTick, reactive, ref } from 'vue';
-import { saveData, send, state } from '@/sdk/vue.js';
+import { saveData, send, state, tabLabel } from '@/sdk/vue.js';
 
 export const windows = reactive([]);
 
@@ -23,8 +23,17 @@ export const heirAsked = ref(0);
 // the pane closing ends it.
 export const zoomed = ref(0);
 
-// No pane is made narrower or shorter than these, in pixels, by a drag or a key.
-export const smallest = { row: 80, column: 80 };
+// No pane is made narrower or shorter than these, in pixels, by a split, a drag or a key:
+// most sites are built for 360px and up, and a page smaller than this is no use.
+export const smallest = { row: 240, column: 160 };
+
+// The pane each window last had active, by its window's key, so its chip goes back to it.
+const recent = reactive(new Map());
+
+// homeOf is the key of the window Go puts tab in: its tab group's, or its own.
+export function homeOf(tab) {
+  return tab.group ? `group ${tab.group}` : `tab ${tab.id}`;
+}
 // How far a resize key moves a divider, in pixels.
 const step = 32;
 
@@ -44,8 +53,27 @@ export const chips = computed(() => {
     .map((root) => ({ root, ids: tabsOf(root).filter((id) => byId.has(id)) }))
     .filter((c) => c.ids.length)
     .sort((a, b) => first(a.ids) - first(b.ids))
-    .map(({ root, ids }) => ({ root, tabs: ids.map((id) => byId.get(id)) }));
+    .map(({ root, ids }) => {
+      const tabs = ids.map((id) => byId.get(id));
+      const key = homeOf(tabs[0]);
+      const current = tabs.find((t) => t.id === state.active) || tabs.find((t) => t.id === recent.get(key)) || tabs[0];
+      return { root, tabs, key, current, name: nameOf(tabs[0], current) };
+    });
 });
+
+// nameOf is what a window's chip calls it: its tab group's name when it has one, else the
+// host of the pane it shows, else that pane's label.
+function nameOf(first, current) {
+  const group = first.group && state.groups?.find((g) => g.id === first.group);
+  if (group?.name) return group.name;
+  try {
+    const host = new URL(current.url).host;
+    if (host) return host;
+  } catch {
+    // No address yet.
+  }
+  return tabLabel(current);
+}
 
 // The pane the body shows the window of: the active one, or its heir while Go makes it so.
 export const focused = computed(() => heirAsked.value || state.active);
@@ -77,7 +105,8 @@ export function load(data) {
 export function follow() {
   const live = new Set(state.tabs.map((t) => t.id));
   const next = was && !live.has(was) ? heir(was, live) : 0;
-  const home = new Map(state.tabs.map((t) => [t.id, t.group ? `group ${t.group}` : `tab ${t.id}`]));
+  const home = new Map(state.tabs.map((t) => [t.id, homeOf(t)]));
+  if (home.has(state.active)) recent.set(home.get(state.active), state.active);
   const kept = [];
   const taken = new Set();
   for (const root of windows) {
@@ -173,6 +202,14 @@ function insert(beside, tab, dir) {
   }
 }
 
+// roomToSplit says whether the pane of tab is big enough to be split dir and leave both
+// panes their smallest size. A pane not on screen has room.
+export function roomToSplit(tab, dir) {
+  const r = paneOf(tab)?.getBoundingClientRect();
+  if (!r) return true;
+  return (dir === 'row' ? r.width : r.height) >= 2 * smallest[dir] + 1;
+}
+
 // fit is the way a pane is split when nothing asked: beside it when it is wider than tall,
 // else under it; beside it when it isn't on screen.
 function fit(tab) {
@@ -209,6 +246,7 @@ function heir(tab, live) {
 // split asks Go for a new tab in the tab group of tab, starting one of the two when it is
 // in none, to land beside the pane of tab: to its right for 'row', under it for 'column'.
 export function split(tab, dir) {
+  if (!roomToSplit(tab, dir)) return;
   zoomed.value = 0;
   asked = { beside: tab, dir };
   send({ t: 'newTab', groupWith: tab });

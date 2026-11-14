@@ -479,8 +479,11 @@ dense and square.
   2026-11-14: "panes are a shell feature... termy should use tab groups for split paned
   tabs"): a split's tabs are a group, so every other shell sees them together. How a
   window's panes lie is the shell's own, a tree: a split is a row or a column of parts with
-  their shares, a leaf is one tab. The strip on top has a chip per window, with a segment
-  per pane, each the tab's `role="tab"` element, in the order the panes lie on screen. The
+  their shares, a leaf is one tab. The strip on top has one chip per window: its number,
+  its name (its group's name, else the host of the pane it shows, else that pane's label),
+  and a square per pane, each the tab's `role="tab"` element, in the order the panes lie
+  on screen, the pane the window shows filled. Pressing the name shows the window at the
+  pane it showed last; pressing a square shows that pane. The
   chips follow Go's order, and the shell keeps Go's order the strip's: a tab Go puts
   elsewhere is moved (`moveTab`) to its place, so Cmd+1 to 9 and the next and previous tab
   keys go where the strip says. New Tab follows the chips, and at the strip's far end are
@@ -508,7 +511,9 @@ dense and square.
   pane is wider than tall, else under it. **A tab in no group** is a window of its own. A
   group ended anywhere breaks its window into a window per tab, as a tab taken out of one
   leaves it; a group made of lone tabs makes them one window. A window holds one pane
-  when Go ends a group at one tab. Dividers drag to resize, no pane smaller than 80px.
+  when Go ends a group at one tab. **No pane is smaller than 240 by 160:** a split that
+  would leave less is off (its button disabled, its key does nothing), and dividers drag
+  and keys move them only that far.
 - **Its own data** is `{windows, zoomed}`, each window's tree and the zoomed pane, naming
   tabs by id, and nothing Go has. It is fitted to Go's tabs and groups on the snapshot and
   on every `tabs`: a tab that is gone, or no longer in its window's group, leaves its tree,

@@ -84,7 +84,10 @@ function closeSub(refocus) {
   if (refocus) entries(menu.value).find((el) => +el.dataset.i === i)?.focus();
 }
 
+// The pointer coming onto a row opens its submenu, or closes another, after a moment; not
+// while the keys are driving, so a pointer resting where the menu opened changes nothing.
 function enter(item, i) {
+  if (!pointer.value) return;
   clearTimeout(hover);
   if (item.items) hover = setTimeout(() => openSub(i, false), 150);
   else if (open.value >= 0) hover = setTimeout(() => closeSub(false), 150);

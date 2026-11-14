@@ -25,6 +25,7 @@ class ContentClient : public content::ContentClient {
       ui::ResourceScaleFactor scale_factor) override;
   scoped_refptr<base::RefCountedMemory> GetDataResourceBytes(
       int resource_id) override;
+  gfx::Image& GetNativeImageNamed(int resource_id) override;
 };
 
 }  // namespace project_b

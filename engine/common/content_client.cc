@@ -39,4 +39,11 @@ scoped_refptr<base::RefCountedMemory> ContentClient::GetDataResourceBytes(
       resource_id);
 }
 
+// Content's own images, such as the default favicon a drag from a page shows when it has
+// no picture of its own. Content's default is an empty image, and a drag that showed it
+// aborted the app.
+gfx::Image& ContentClient::GetNativeImageNamed(int resource_id) {
+  return ui::ResourceBundle::GetSharedInstance().GetNativeImageNamed(resource_id);
+}
+
 }  // namespace project_b

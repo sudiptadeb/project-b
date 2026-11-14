@@ -140,6 +140,14 @@ type Engine interface {
 	// workspace keeps its own cookies and site storage, and a tab stays in its workspace for
 	// its life, as does every tab it opens.
 	CreateTab(workspace string) TabID
+	// SetFirstWorkspace says which workspace a tab the engine makes on its own goes in, one
+	// a client of the debugging port or an extension asks for: the first in the profile's
+	// list. The app says so at start, before any such tab, and whenever the first changes.
+	SetFirstWorkspace(workspace string)
+	// EraseWorkspace erases a workspace's site data and cache: its cookies, every kind of
+	// site storage, service workers and the HTTP cache. The app asks once it has closed
+	// the workspace's tabs. For "", the profile's own storage, extensions keep their own.
+	EraseWorkspace(workspace string)
 	CloseTab(tab TabID)
 	LoadURL(tab TabID, url string)
 
@@ -232,7 +240,7 @@ type Listener interface {
 
 	// TabOpened says a page opened a new tab (target=_blank, window.open). The engine
 	// has already created it, hidden, in workspace, its opener's; the app decides whether
-	// to show it. A tab a client of the debugging port asks for is in the default
+	// to show it. A tab a client of the debugging port asks for is in the first
 	// workspace, and may be in a window of its own, newWindow; a page's never is, so its
 	// tab goes in its window.
 	TabOpened(opener, tab TabID, url, workspace string, foreground, newWindow bool)

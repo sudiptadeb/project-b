@@ -125,6 +125,14 @@ class Engine {
   // The workspace a page is in, by the partition content made it in: Go's id for one, or
   // "" for the default.
   std::string WorkspaceOf(content::WebContents* contents) const;
+  // The workspace a tab the engine makes on its own goes in, one a client of the
+  // debugging port or an extension asks for: the first in the profile's list, as Go says.
+  void SetFirstWorkspace(const std::string& workspace);
+  const std::string& first_workspace() const { return first_workspace_; }
+  // Erases a workspace's site data and cache, once the tabs Go has just closed are gone,
+  // and marks workspace.erased on the timeline when it is done. For "", the profile's own
+  // storage, extensions' own data stays.
+  void EraseWorkspace(const std::string& workspace);
   void CloseTab(int64_t tab);
   void LoadURL(int64_t tab, const char* url);
   void GoBack(int64_t tab);
@@ -150,6 +158,7 @@ class Engine {
  private:
   PageTab* Add(std::unique_ptr<content::WebContents> contents,
                const std::string& workspace);
+  void Erase(const std::string& workspace);
   // Whichever of our pages has the keyboard: a settings page, a shell or a tab's.
   content::WebContents* FocusedContents() const;
   void UpdateTitle(AppWindow* window);
@@ -169,6 +178,7 @@ class Engine {
 
   std::map<int64_t, std::unique_ptr<PageTab>> tabs_;
   int64_t next_tab_ = 1;
+  std::string first_workspace_;
 };
 
 }  // namespace project_b

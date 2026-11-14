@@ -71,6 +71,10 @@ type Engine struct {
 	listener engine.Listener
 	nextTab  engine.TabID
 	tabs     map[engine.TabID]*tab
+	// first is the workspace the app last said is first; erased are the workspaces it
+	// asked to erase, in order. The mock makes no tab on its own, so only tests read them.
+	first  string
+	erased []string
 
 	// Written on the main thread, read by the dev server's goroutines.
 	mu         sync.Mutex
@@ -237,6 +241,16 @@ func (e *Engine) Workspace(id engine.TabID) string {
 	}
 	return ""
 }
+
+func (e *Engine) SetFirstWorkspace(workspace string) { e.first = workspace }
+
+// FirstWorkspace is the workspace the app last said is first. Main thread.
+func (e *Engine) FirstWorkspace() string { return e.first }
+
+func (e *Engine) EraseWorkspace(workspace string) { e.erased = append(e.erased, workspace) }
+
+// Erased are the workspaces the app asked to erase, in order. Main thread.
+func (e *Engine) Erased() []string { return slices.Clone(e.erased) }
 
 func (e *Engine) CloseTab(id engine.TabID) {
 	delete(e.tabs, id)

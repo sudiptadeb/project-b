@@ -199,6 +199,26 @@ Each commit builds, leaves a working app, and carries its tests.
 - With no workspaces, New Tab in Workspace shows disabled. The menu-list mechanism alone
   would show it enabled, opening on an empty submenu, so the engine reads a submenu's
   lists with the menu holding it.
+- The engine keeps which workspace is first, as Go last said (`set_first_workspace`,
+  `Engine::SetFirstWorkspace`), and makes the tabs it makes on its own there: one a client
+  of the debugging port asks for (`DevToolsManagerDelegate::CreateNewTarget`), and one an
+  extension opens through the engine, its options page or the page it names for after
+  it is removed (`OpenTab`).
+- A window an extension's own page opens, its popup's or its background page's
+  `window.open`, stays in the profile's own storage whichever workspace is first. Content
+  makes it there, the page's own, and a tab made in the first workspace in its place
+  would never load: `ExtensionHost::AddNewContents` answers content with no tab whatever
+  its delegate does, so content has none to load the navigation in once its own is gone
+  (`WebContentsImpl::CreateNewWindow`), which is what a page's tab without an opener
+  leans on.
+- Erasing a workspace is content's `BrowsingDataRemover` on its partition: every kind of
+  data a partition holds (cookies, local and session storage, IndexedDB, Cache Storage,
+  service workers, file systems, the privacy sandbox's stores) and the HTTP cache, for web
+  origins only (`erase_workspace`, `Engine::EraseWorkspace`). An extension's
+  `chrome-extension://` origin isn't a web origin, so in the profile's own storage an
+  extension keeps what it stored. The remover runs on a task after the closed tabs' own,
+  so they are gone first, and `workspace.erased` on the timeline says when it is done.
+  The partition's folder stays, as the remover leaves it.
 
 ## Not in this step
 

@@ -161,6 +161,14 @@ typedef struct PBEngineCalls {
   // Makes a hidden tab in a workspace, by Go's id for it, or in the default workspace for
   // "". A window's layout shows it.
   int64_t (*create_tab)(const char* workspace);
+  // The workspace a tab the engine makes on its own goes in, one a client of the debugging
+  // port or an extension asks for: the first in the profile's list. Go says which at start,
+  // before anything asks for such a tab, and again whenever the first changes.
+  void (*set_first_workspace)(const char* workspace);
+  // Erases a workspace's site data and cache: its cookies, every kind of site storage,
+  // service workers and the HTTP cache. Go asks once it has closed the workspace's tabs.
+  // For "", the profile's own storage, extensions' own data stays.
+  void (*erase_workspace)(const char* workspace);
   void (*close_tab)(int64_t tab);
   void (*load_url)(int64_t tab, const char* url);
   void (*go_back)(int64_t tab);

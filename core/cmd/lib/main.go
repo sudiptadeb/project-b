@@ -10,6 +10,8 @@ package main
 #include "pb_abi.h"
 
 static inline int64_t call_create_tab(const PBEngineCalls* c, const char* workspace) { return c->create_tab(workspace); }
+static inline void call_set_first_workspace(const PBEngineCalls* c, const char* workspace) { c->set_first_workspace(workspace); }
+static inline void call_erase_workspace(const PBEngineCalls* c, const char* workspace) { c->erase_workspace(workspace); }
 static inline void call_close_tab(const PBEngineCalls* c, int64_t tab) { c->close_tab(tab); }
 static inline void call_open_profile(const PBEngineCalls* c, const char* dir) { c->open_profile(dir); }
 static inline void call_set_window_page(const PBEngineCalls* c, int64_t window, const char* page) { c->set_window_page(window, page); }
@@ -85,6 +87,18 @@ func (e *nativeEngine) CreateTab(workspace string) engine.TabID {
 	c := C.CString(workspace)
 	defer C.free(unsafe.Pointer(c))
 	return engine.TabID(C.call_create_tab(e.calls, c))
+}
+
+func (e *nativeEngine) SetFirstWorkspace(workspace string) {
+	c := C.CString(workspace)
+	defer C.free(unsafe.Pointer(c))
+	C.call_set_first_workspace(e.calls, c)
+}
+
+func (e *nativeEngine) EraseWorkspace(workspace string) {
+	c := C.CString(workspace)
+	defer C.free(unsafe.Pointer(c))
+	C.call_erase_workspace(e.calls, c)
 }
 
 func (e *nativeEngine) CloseTab(tab engine.TabID) { C.call_close_tab(e.calls, C.int64_t(tab)) }

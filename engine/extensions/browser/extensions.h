@@ -40,8 +40,8 @@ class ExtensionsBrowserClient;
 // Every tab is in the one window, which Chrome's API knows by this id.
 inline constexpr int kWindowId = 1;
 
-// Opens a URL in a new tab, as a page asking for one does: the engine makes the tab and
-// tells Go.
+// Opens a URL in a new tab, as a page asking for one does: the engine makes the tab, in
+// the first workspace, and tells Go.
 void OpenTab(const GURL& url);
 
 // The extension runtime, as Go sees it: Chromium's //extensions for one profile. It is

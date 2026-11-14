@@ -8,11 +8,15 @@
 #include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/scoped_observation.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/browsing_data_filter_builder.h"
+#include "content/public/browser/browsing_data_remover.h"
 #include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/reload_type.h"
@@ -54,6 +58,45 @@ Engine* g_engine = nullptr;
 // folder.
 constexpr char kWorkspaceDomain[] = "workspace";
 
+// What erasing a workspace takes: everything a site keeps in a partition, and the cache.
+// The two left out change how the rest is removed, not what.
+constexpr uint64_t kErased =
+    content::BrowsingDataRemover::DATA_TYPE_ON_STORAGE_PARTITION &
+    ~(content::BrowsingDataRemover::DATA_TYPE_AVOID_CLOSING_CONNECTIONS |
+      content::BrowsingDataRemover::DATA_TYPE_LOGICAL_CLEAR);
+
+// Web origins, whatever their storage policy. An extension's chrome-extension:// origin
+// isn't one, so an extension keeps what it stored in the profile's own storage.
+constexpr uint64_t kErasedOrigins =
+    content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB |
+    content::BrowsingDataRemover::ORIGIN_TYPE_PROTECTED_WEB;
+
+// Waits for one erase, marks it on the timeline, and goes.
+class Eraser : public content::BrowsingDataRemover::Observer {
+ public:
+  Eraser(content::BrowsingDataRemover* remover, const std::string& workspace)
+      : workspace_(workspace) {
+    observation_.Observe(remover);
+  }
+
+ private:
+  void OnBrowsingDataRemoverDone(uint64_t failed_data_types) override {
+    timeline::Mark("workspace.erased", "workspace=" + workspace_);
+    delete this;
+  }
+
+  const std::string workspace_;
+  base::ScopedObservation<content::BrowsingDataRemover,
+                          content::BrowsingDataRemover::Observer>
+      observation_{this};
+};
+
+content::StoragePartitionConfig PartitionOf(content::BrowserContext* context,
+                                            const std::string& workspace) {
+  return content::StoragePartitionConfig::Create(
+      context, kWorkspaceDomain, workspace, /*in_memory=*/false);
+}
+
 // Every call from Go except post_wakeup must already be on the main thread.
 void CheckMainThread() {
   CHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
@@ -62,6 +105,16 @@ void CheckMainThread() {
 int64_t CallCreateTab(const char* workspace) {
   CheckMainThread();
   return g_engine->CreateTab(workspace)->id();
+}
+
+void CallSetFirstWorkspace(const char* workspace) {
+  CheckMainThread();
+  g_engine->SetFirstWorkspace(workspace);
+}
+
+void CallEraseWorkspace(const char* workspace) {
+  CheckMainThread();
+  g_engine->EraseWorkspace(workspace);
 }
 
 void CallCloseTab(int64_t tab) {
@@ -345,6 +398,8 @@ const PBEngineCalls* Engine::Calls() {
   static const PBEngineCalls calls = {
       .open_profile = CallOpenProfile,
       .create_tab = CallCreateTab,
+      .set_first_workspace = CallSetFirstWorkspace,
+      .erase_workspace = CallEraseWorkspace,
       .close_tab = CallCloseTab,
       .load_url = CallLoadURL,
       .go_back = CallGoBack,
@@ -585,10 +640,7 @@ PageTab* Engine::CreateTab(const std::string& workspace) {
   content::WebContents::CreateParams params(browser_context_);
   if (!workspace.empty()) {
     params.site_instance = content::SiteInstance::CreateForFixedStoragePartition(
-        browser_context_, GURL(),
-        content::StoragePartitionConfig::Create(browser_context_,
-                                                kWorkspaceDomain, workspace,
-                                                /*in_memory=*/false));
+        browser_context_, GURL(), PartitionOf(browser_context_, workspace));
   }
   params.initially_hidden = true;
   return Add(content::WebContents::Create(params), workspace);
@@ -606,6 +658,33 @@ std::string Engine::WorkspaceOf(content::WebContents* contents) const {
   return partition.partition_domain() == kWorkspaceDomain
              ? partition.partition_name()
              : std::string();
+}
+
+void Engine::SetFirstWorkspace(const std::string& workspace) {
+  first_workspace_ = workspace;
+}
+
+// Each closed tab dies on a later task (CloseTab), so the erase waits for a task after
+// theirs.
+void Engine::EraseWorkspace(const std::string& workspace) {
+  content::GetUIThreadTaskRunner({})->PostTask(
+      FROM_HERE,
+      base::BindOnce(&Engine::Erase, base::Unretained(this), workspace));
+}
+
+// The profile's own storage is the context's default partition, which the remover
+// erases when it is given none.
+void Engine::Erase(const std::string& workspace) {
+  auto filter = content::BrowsingDataFilterBuilder::Create(
+      content::BrowsingDataFilterBuilder::Mode::kPreserve);
+  if (!workspace.empty()) {
+    filter->SetStoragePartitionConfig(PartitionOf(browser_context_, workspace));
+  }
+  content::BrowsingDataRemover* remover =
+      browser_context_->GetBrowsingDataRemover();
+  remover->RemoveWithFilterAndReply(base::Time(), base::Time::Max(), kErased,
+                                    kErasedOrigins, std::move(filter),
+                                    new Eraser(remover, workspace));
 }
 
 // A new tab starts hidden, whoever made it. A window's layout is the only way to the

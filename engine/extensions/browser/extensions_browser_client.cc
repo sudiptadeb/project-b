@@ -77,7 +77,11 @@ class ExtensionHostDelegate : public extensions::ExtensionHostDelegate {
   void OnExtensionHostCreated(content::WebContents* web_contents) override {
     WebContentsObserver::CreateForWebContents(web_contents);
   }
-  // The page opened a window: it becomes a tab, as it does for any page.
+  // The page opened a window: it becomes a tab, as it does for any page. Content made it
+  // in the profile's own storage, the page's, and it stays there whichever workspace is
+  // first. A tab made in the first in its place would load nothing: ExtensionHost answers
+  // content's AddNewContents with no tab whatever happens here, so content has none to load
+  // the navigation in once its own is gone, as a page's tab does in PageTab::AddNewContents.
   void CreateTab(std::unique_ptr<content::WebContents> web_contents,
                  const GURL& target_url,
                  const extensions::ExtensionId& extension_id,

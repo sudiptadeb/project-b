@@ -252,7 +252,9 @@ The check holds every shell to these, knowing nothing else about it.
 4. **Each tab of the window is an element with `role="tab"` and `data-tab="<id>"`,** the
    active one with `aria-selected="true"`. A click on it makes that tab active. It may
    lie in a sheet one of the shell's controls opens, as a phone's tab switcher does: it is
-   always in the document, hidden while the sheet is closed.
+   always in the document, hidden while the sheet is closed. Tabs in a group
+   ([groups.md](groups.md)) are no different: a shell that draws no groups lists them as
+   any other, and every tab stays one click or one sheet away.
 5. **`focusAddressBar` puts the keyboard in the field named Address,** where an address
    and Enter take the active tab there.
 6. **Every control it draws is the shell's,** a control as `@/sdk/controls.js` says: it

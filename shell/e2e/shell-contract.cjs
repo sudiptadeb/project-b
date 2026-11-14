@@ -149,6 +149,25 @@ const rules = [
         }
         await otherEl.click();
         rule(4, 'a click on a tab makes it active', await until(async () => (await regions()).active === other && (await drawn()).find((t) => t.tab === other)?.selected === 'true'), JSON.stringify(await regions().then((r) => r.active)));
+        // Tab groups are Go's, whatever the shell makes of them (docs/groups.md): with two
+        // tabs in one, every tab is still an element, and a click still makes it active.
+        r = await regions();
+        await fetch(`${lib.base}/shell/send`, { method: 'POST', body: JSON.stringify({ t: 'createGroup', ids: r.tabs.slice(0, 2).map((t) => t.id) }) });
+        await settle(page);
+        d = await drawn();
+        rule(4, 'with two tabs in a group, each tab is still an element', r.tabs.every((t) => d.some((x) => x.tab === t.id)), JSON.stringify(d));
+        const grouped = r.tabs[1].id === r.active ? r.tabs[0].id : r.tabs[1].id;
+        const groupedEl = tabEls.nth((await drawn()).findIndex((t) => t.tab === grouped));
+        for (const opener of await ui.locator('[aria-haspopup], [aria-expanded]').filter({ visible: true }).all()) {
+          if (await groupedEl.isVisible()) break;
+          await opener.click();
+          if (!(await until(() => groupedEl.isVisible(), 500))) await page.keyboard.press('Escape');
+        }
+        await groupedEl.click();
+        rule(4, 'and a click on one in the group makes it active', await until(async () => (await regions()).active === grouped), JSON.stringify(await regions().then((r) => r.active)));
+        await fetch(`${lib.base}/shell/send`, { method: 'POST', body: JSON.stringify({ t: 'activateTab', id: other }) });
+        await until(async () => (await regions()).active === other);
+        await settle(page);
 
         // 5. The address bar.
         current = 5;
@@ -236,7 +255,11 @@ const rules = [
         // None on the shell: each control that opens something is pressed in turn, until
         // one shows it.
         const openers = await ui.locator('[aria-haspopup], [aria-expanded]').filter({ visible: true }).all();
-        while ((await settings.count()) === 0 && openers.length > 0) await openers.shift().click();
+        // One that shows nothing is closed again with Escape, as rule 12 does.
+        while ((await settings.count()) === 0 && openers.length > 0) {
+          await openers.shift().click();
+          if (!(await until(async () => (await settings.count()) > 0, 500))) await page.keyboard.press('Escape');
+        }
         const found = (await settings.count()) > 0;
         rule(11, 'a control named Settings is on the shell, or in a menu one of its controls opens', found);
         if (found) {
@@ -274,8 +297,9 @@ const rules = [
         const basic = async (what, locator, press, done) => {
           const found = await reach(locator);
           if (!rule(12, `${what}: found by its role and name`, !!found)) return;
+          const which = await found.evaluate((el) => el.outerHTML.slice(0, 80));
           await press(found);
-          rule(12, `${what}: does its job`, await done());
+          rule(12, `${what}: does its job`, await done(), which);
         };
         const click = (el) => el.click();
         const active = async () => {

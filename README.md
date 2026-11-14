@@ -12,6 +12,10 @@ feature logs and times itself: [docs/logging.md](docs/logging.md).
 
 ## What it looks like
 
+Glide, the default shell: Favorites, pinned tabs and folders down the side, and the Command Bar:
+
+<img src="docs/screenshots/glide.png" width="49%"> <img src="docs/screenshots/glide-command-bar.png" width="49%">
+
 The standard shell, tabs down the side, and the address field's suggestions:
 
 <img src="docs/screenshots/standard.png" width="49%"> <img src="docs/screenshots/suggestions.png" width="49%">
@@ -20,7 +24,7 @@ Tabs on top, and the settings page:
 
 <img src="docs/screenshots/horizontal.png" width="49%"> <img src="docs/screenshots/settings.png" width="49%">
 
-The shell is a web page you can swap. The terminal shell with two panes, the fox shell with its
+Each shell is a web page you can swap. The terminal shell with two panes, the fox shell with its
 menu, and minimal-svelte:
 
 <img src="docs/screenshots/terminal.png" width="32%"> <img src="docs/screenshots/fox.png" width="32%"> <img src="docs/screenshots/minimal-svelte.png" width="32%">

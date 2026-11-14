@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Refresh the README's screenshots in docs/screenshots/ from the last test runs.
 
-The standard shell's shots come from the app driver's run (build/real/, tools/test.sh app).
+Glide's and the standard shell's shots come from the app driver's run (build/real/, tools/test.sh app).
 The other shells' come from the newest VM run that has each one (~/PW_TOOLS/macos-vm/shots/,
 tools/vm/run.sh shells), cut down to the window so no desktop shows. Look at each one before
 committing: a shot from a failed run is not one to show.
@@ -18,6 +18,8 @@ OUT = os.path.join(ROOT, "docs", "screenshots")
 WINDOW = (80, 60, 1360, 780)  # where the VM checks place the window on its 1440x900 screen
 
 SHOTS = [
+    (REAL, "glide.png", "glide.png", None),
+    (REAL, "glide-command-bar.png", "glide-command-bar.png", None),
     (REAL, "5-tabs.png", "standard.png", None),
     (REAL, "3-suggestions.png", "suggestions.png", None),
     (REAL, "7-horizontal.png", "horizontal.png", None),

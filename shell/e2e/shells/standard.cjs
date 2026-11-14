@@ -50,7 +50,7 @@ const { check, fire, regions, settle, until } = lib;
   check('it opens at the press, in the page', Math.abs(box.x - (at.x + 120)) < 2 && Math.abs(box.y - (at.y + 80)) < 2, JSON.stringify({ box, at }));
   const cover = await regions({ x: at.x + at.w - 10, y: at.y + at.h - 10 });
   check('while open, a press anywhere is the shell\'s', cover.hit === 'shell', JSON.stringify(cover.hit));
-  check('the link\'s copy actions come after a line', JSON.stringify(await menu.evaluate((m) => [...m.children].map((c) => c.getAttribute('role') === 'separator' ? '-' : c.textContent.trim()))) === JSON.stringify(['Open Link in New Tab', 'Open Link in Workspace', 'Open Link in New Window', '-', 'Copy Link']));
+  check('the link\'s copy actions come after a line', JSON.stringify(await menu.evaluate((m) => [...m.children].map((c) => c.getAttribute('role') === 'separator' ? '-' : c.textContent.trim()))) === JSON.stringify(['Open Link in New Tab', 'Open Link in Workspace', 'Open Link in New Window', '-', 'Copy Link', 'Save Link As…']));
   const row = menu.getByRole('menuitem', { name: /^Open Link in Workspace/ });
   const chevron = await row.locator('.ui-menu-chevron').boundingBox();
   const rowBox = await row.boundingBox();

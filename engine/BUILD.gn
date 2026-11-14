@@ -203,6 +203,9 @@ source_set("browser") {
     "browser/devtools.h",
     "browser/devtools_session.cc",
     "browser/devtools_session.h",
+    "browser/downloads.cc",
+    "browser/downloads.h",
+    "browser/downloads_mac.mm",
     "browser/driver.h",
     "browser/driver.mm",
     "browser/engine.cc",
@@ -230,6 +233,7 @@ source_set("browser") {
   ]
   sources += get_target_outputs(":protocol_sources")
   deps = [
+    "//components/download/public/common:public",
     ":common",
     ":protocol_sources",
     "//base",

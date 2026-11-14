@@ -60,3 +60,34 @@ rule 16 ([shells.md](shells.md#what-every-shell-does)) is what catches it.
 **Android.** Go sends only presses on a link or an image. A long press on text or in a field keeps
 Android's own selection bar, which already copies, pastes and selects. The Mobile shell's link
 sheet opens on the same message, and still builds its own items from the press.
+
+## Downloads
+
+Today the engine has no `DownloadManagerDelegate`, so content refuses every download. The
+engine gets one; Go decides where each file goes and keeps the list; the shell draws the list;
+the Save panel is the system's own.
+
+**The flow.** A page starts a download, or a menu's Save Link As does. The engine asks Go
+where it goes (`PB_EVENT_DOWNLOAD_TARGET`: the download's id, its tab, address, suggested
+name and type). Go answers with a path, with whether to show the Save panel at it first, or
+with nothing to refuse it, as policy says. By default a file goes to `~/Downloads` under its
+own name, with ` (1)`, ` (2)` added when that name is taken, and no panel; Save Link As and
+Save Image As show the panel. The engine then reports each change
+(`PB_EVENT_DOWNLOAD_UPDATED`: progress, done, cancelled, failed, paused), and Go keeps the
+list.
+
+**The list.** `state.downloads` is this profile's, newest first, each `{id, name, url,
+path, state, received, total, paused}`, `state` being `progress`, `done`, `cancelled` or
+`failed`. Go keeps the finished ones in the profile's `downloads.json`, the last 100, so the
+list is there after a restart; one still running when the app quit comes back `failed`.
+The shell asks for one action at a time, `downloadAction {id, action}`: `open` the file,
+`reveal` it in Finder, `cancel`, `pause`, `resume`, or `remove` it from the list (the file
+stays). `clearDownloads` removes every finished one.
+
+**The shell.** A control named Downloads shows once the list has one, and opens the list:
+each download a `listitem` by its file name, its progress while it runs, Open and Show in
+Finder once done, Cancel while it runs. Standard puts the control in its toolbar and shows a
+download's progress on it. The contract's rule 17 checks it, by role and name.
+
+**Android.** Downloads go to the app's own files and open through Android's share sheet.
+Built after the Mac's.

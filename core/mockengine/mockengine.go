@@ -90,6 +90,7 @@ type Engine struct {
 	dockColor  string
 	edits      []engine.EditCommand
 	clipboard  string
+	downloads  downloads
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
@@ -759,6 +760,9 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 				json.Unmarshal([]byte(value), &m)
 			}
 			e.listener.ContextMenu(shown, m)
+		case "download":
+			// The page starts a download of value.
+			e.download(shown, value, false)
 		case "scroll":
 			// value is down or up, as a page that scrolls makes content say.
 			e.listener.ScrollDirectionChanged(shown, value == "down")

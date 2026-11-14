@@ -26,6 +26,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents.h"
+#include "project_b/engine/browser/downloads.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/page_tab.h"
@@ -177,6 +178,36 @@ void CallEdit(int32_t command) {
 void CallWriteClipboard(const char* text, size_t length) {
   CheckMainThread();
   g_engine->WriteClipboard(std::string(text, length));
+}
+
+void CallDownloadURL(int64_t tab, const char* url, int save_as) {
+  CheckMainThread();
+  PageTab* page = g_engine->tab(tab);
+  if (!page) {
+    return;
+  }
+  // Asking for the manager makes the profile's downloads, if nothing has yet.
+  page->contents()->GetBrowserContext()->GetDownloadManager();
+  if (Downloads* downloads = Downloads::Get()) {
+    downloads->DownloadURL(page->contents(), GURL(url), save_as);
+  }
+}
+
+void CallDownloadCommand(uint32_t download, int32_t command) {
+  CheckMainThread();
+  if (Downloads* downloads = Downloads::Get()) {
+    downloads->Command(download, command);
+  }
+}
+
+void CallOpenFile(const char* path) {
+  CheckMainThread();
+  OpenFile(base::FilePath::FromUTF8Unsafe(path));
+}
+
+void CallRevealFile(const char* path) {
+  CheckMainThread();
+  RevealFile(base::FilePath::FromUTF8Unsafe(path));
 }
 
 void CallOpenSettings(int64_t window) {
@@ -426,6 +457,10 @@ const PBEngineCalls* Engine::Calls() {
       .duplicate_tab = CallDuplicateTab,
       .edit = CallEdit,
       .write_clipboard = CallWriteClipboard,
+      .download_url = CallDownloadURL,
+      .download_command = CallDownloadCommand,
+      .open_file = CallOpenFile,
+      .reveal_file = CallRevealFile,
       .create_window = CallCreateWindow,
       .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,

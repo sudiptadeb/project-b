@@ -61,7 +61,30 @@ typedef enum PBEvent {
                                         // answers s: json, Go's engine.Menu, its items
                                         // now. Asked each time a menu holding it opens
   PB_EVENT_PICKER_MESSAGE = 16,         // i: window, s: json, from its picker page
+  PB_EVENT_DOWNLOAD_TARGET = 17,        // i: download, i: its tab or 0, s: url, s: the
+                                        // file name content suggests, s: mime type, i: it
+                                        // asked for the Save panel; answers s: json,
+                                        // {"path", "prompt"}, or no path to refuse it
+  PB_EVENT_DOWNLOAD_UPDATED = 18,       // i: download, s: path, s: url, s: mime type,
+                                        // i: PBDownloadState, i: bytes received, i: total
+                                        // bytes or -1, i: paused
 } PBEvent;
+
+// Where a download is.
+typedef enum PBDownloadState {
+  PB_DOWNLOAD_PROGRESS = 0,
+  PB_DOWNLOAD_DONE = 1,
+  PB_DOWNLOAD_CANCELLED = 2,
+  PB_DOWNLOAD_FAILED = 3,
+} PBDownloadState;
+
+// What can be done to a running download.
+typedef enum PBDownloadCommand {
+  PB_DOWNLOAD_CANCEL = 1,
+  PB_DOWNLOAD_PAUSE = 2,
+  PB_DOWNLOAD_RESUME = 3,
+  PB_DOWNLOAD_REMOVE = 4,
+} PBDownloadCommand;
 
 // Modifier bits, as Go's engine.Mods has them.
 typedef enum PBMods {
@@ -185,6 +208,13 @@ typedef struct PBEngineCalls {
   void (*edit)(int32_t command);
   // Puts plain text on the system clipboard, as a page's Copy would.
   void (*write_clipboard)(const char* text, size_t length);
+  // Downloads url as tab's page would, through the Save panel when save_as.
+  void (*download_url)(int64_t tab, const char* url, int save_as);
+  // Runs a PBDownloadCommand on a running download.
+  void (*download_command)(uint32_t download, int32_t command);
+  // Opens a file as the OS would, or shows it in the file manager.
+  void (*open_file)(const char* path);
+  void (*reveal_file)(const char* path);
   // Makes a window and the page covering it, chrome://<page>/: a shell, "shell/<id>", or
   // "picker" in a copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.

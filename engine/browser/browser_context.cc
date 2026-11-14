@@ -1,5 +1,7 @@
 #include "project_b/engine/browser/browser_context.h"
 
+#include "project_b/engine/browser/downloads.h"
+
 namespace project_b {
 
 BrowserContext::BrowserContext() = default;
@@ -25,8 +27,17 @@ bool BrowserContext::IsOffTheRecord() {
   return path_.empty();
 }
 
+// Our pages download nothing. A phone's downloads come later (docs/daily-driver.md).
 content::DownloadManagerDelegate* BrowserContext::GetDownloadManagerDelegate() {
+#if BUILDFLAG(IS_MAC)
+  if (!downloads_ && !path_.empty()) {
+    downloads_ = std::make_unique<Downloads>();
+    downloads_->SetDownloadManager(GetDownloadManager());
+  }
+  return downloads_.get();
+#else
   return nullptr;
+#endif
 }
 
 content::BrowserPluginGuestManager* BrowserContext::GetGuestManager() {

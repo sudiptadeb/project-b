@@ -30,6 +30,10 @@ static inline double call_get_zoom(const PBEngineCalls* c, int64_t tab) { return
 static inline int64_t call_duplicate_tab(const PBEngineCalls* c, int64_t tab) { return c->duplicate_tab(tab); }
 static inline void call_edit(const PBEngineCalls* c, int32_t command) { c->edit(command); }
 static inline void call_write_clipboard(const PBEngineCalls* c, const char* text, size_t length) { c->write_clipboard(text, length); }
+static inline void call_download_url(const PBEngineCalls* c, int64_t tab, const char* url, int save_as) { c->download_url(tab, url, save_as); }
+static inline void call_download_command(const PBEngineCalls* c, uint32_t download, int32_t command) { c->download_command(download, command); }
+static inline void call_open_file(const PBEngineCalls* c, const char* path) { c->open_file(path); }
+static inline void call_reveal_file(const PBEngineCalls* c, const char* path) { c->reveal_file(path); }
 static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
 static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
 static inline void call_send_to_settings(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_settings(window, json, length); }
@@ -145,6 +149,32 @@ func (e *nativeEngine) WriteClipboard(text string) {
 	cs := C.CString(text)
 	defer C.free(unsafe.Pointer(cs))
 	C.call_write_clipboard(e.calls, cs, C.size_t(len(text)))
+}
+
+func (e *nativeEngine) DownloadURL(tab engine.TabID, url string, saveAs bool) {
+	cs := C.CString(url)
+	defer C.free(unsafe.Pointer(cs))
+	save := C.int(0)
+	if saveAs {
+		save = 1
+	}
+	C.call_download_url(e.calls, C.int64_t(tab), cs, save)
+}
+
+func (e *nativeEngine) DownloadCommand(id engine.DownloadID, c engine.DownloadCommand) {
+	C.call_download_command(e.calls, C.uint32_t(id), C.int32_t(c))
+}
+
+func (e *nativeEngine) OpenFile(path string) {
+	cs := C.CString(path)
+	defer C.free(unsafe.Pointer(cs))
+	C.call_open_file(e.calls, cs)
+}
+
+func (e *nativeEngine) RevealFile(path string) {
+	cs := C.CString(path)
+	defer C.free(unsafe.Pointer(cs))
+	C.call_reveal_file(e.calls, cs)
 }
 
 func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }
@@ -372,6 +402,7 @@ func startProfile(c profiles.Choice) {
 		BlockedHosts: blocked,
 		Update:       updateConfig(c),
 		CrashReports: filepath.Join(home, "Library/Logs/DiagnosticReports"),
+		DownloadsDir: filepath.Join(home, "Downloads"),
 	})
 	content.Wire(hooks, theApp)
 	owner.Serve(func(urls []string) { native.Post(func() { theApp.Handover(urls) }) }, quit)

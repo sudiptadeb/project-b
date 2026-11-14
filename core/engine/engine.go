@@ -169,6 +169,13 @@ type Engine interface {
 	Edit(c EditCommand)
 	// WriteClipboard puts plain text on the system clipboard.
 	WriteClipboard(text string)
+	// DownloadURL downloads url as tab's page would, through the Save panel when saveAs.
+	DownloadURL(tab TabID, url string, saveAs bool)
+	// DownloadCommand acts on a running download.
+	DownloadCommand(id DownloadID, c DownloadCommand)
+	// OpenFile opens a file as the OS would; RevealFile shows it in the file manager.
+	OpenFile(path string)
+	RevealFile(path string)
 
 	// CreateWindow makes window w, with its page, and puts it on screen with its first
 	// layout, a little down and right of window near, or where a first window goes when
@@ -307,7 +314,67 @@ type Listener interface {
 	// as JSON. ErrUnknownCommand leaves the reply to content, which says it has no such
 	// method.
 	DevToolsCommand(method string, params []byte) (result any, err error)
+
+	// DownloadTarget asks where a download goes, before any of it is saved. A target
+	// with no path refuses it.
+	DownloadTarget(r DownloadRequest) DownloadTarget
+	// DownloadUpdated says what a download is now: on each change once it has a path.
+	DownloadUpdated(d Download)
 }
+
+// DownloadID is the engine's number for a download, for this run only.
+type DownloadID uint32
+
+// DownloadRequest is a download about to start: its tab, 0 for none, its address, the
+// file name the engine suggests from its headers, its type, and whether it asked for the
+// Save panel, as Save Link As does.
+type DownloadRequest struct {
+	ID     DownloadID
+	Tab    TabID
+	URL    string
+	Name   string
+	Mime   string
+	SaveAs bool
+}
+
+// DownloadTarget is where a download goes, and whether the Save panel shows first,
+// starting there.
+type DownloadTarget struct {
+	Path   string `json:"path"`
+	Prompt bool   `json:"prompt"`
+}
+
+// DownloadState is where a download is.
+type DownloadState int
+
+const (
+	DownloadProgress DownloadState = iota
+	DownloadDone
+	DownloadCancelled
+	DownloadFailed
+)
+
+// Download is a download as the engine reports it. Total is -1 when unknown.
+type Download struct {
+	ID       DownloadID
+	Path     string
+	URL      string
+	Mime     string
+	State    DownloadState
+	Received int64
+	Total    int64
+	Paused   bool
+}
+
+// DownloadCommand is what can be done to a running download.
+type DownloadCommand int
+
+const (
+	DownloadCancel DownloadCommand = iota + 1
+	DownloadPause
+	DownloadResume
+	DownloadRemove
+)
 
 // ErrUnknownCommand is DevToolsCommand's answer for a method it doesn't have.
 var ErrUnknownCommand = errors.New("unknown command")

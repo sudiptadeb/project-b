@@ -3,8 +3,11 @@
 package app
 
 import (
+	"path/filepath"
+
 	"projectb/commands"
 	"projectb/crash"
+	"projectb/downloads"
 	"projectb/engine"
 	"projectb/flags"
 	"projectb/history"
@@ -35,6 +38,9 @@ type Config struct {
 	Update       update.Config
 	// CrashReports is the folder macOS writes its crash reports to.
 	CrashReports string
+	// DownloadsDir is where downloads go: the user's Downloads folder in the real app, and
+	// a Downloads folder in the profile when it is "".
+	DownloadsDir string
 }
 
 // App holds the managers and is the engine's listener: each function only forwards.
@@ -55,6 +61,8 @@ type App struct {
 	Workspaces *workspaces.Manager
 	// ShellData is what each shell saves for the whole profile, beside its prefs.
 	ShellData *shelldata.Manager
+	// Downloads is the profile's downloads.
+	Downloads *downloads.Manager
 
 	actions []*commands.Action
 	// menus are the windows' open right-click menus.
@@ -81,6 +89,11 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Suggest = suggest.New(a.History)
 	a.Workspaces = workspaces.New(cfg.ProfileDir)
 	a.ShellData = shelldata.New(cfg.ProfileDir)
+	if cfg.DownloadsDir == "" {
+		cfg.DownloadsDir = filepath.Join(cfg.ProfileDir, "Downloads")
+	}
+	a.Downloads = downloads.New(e, cfg.ProfileDir, cfg.DownloadsDir)
+	a.Downloads.Load()
 	a.Tabs = tabs.New(e, a.Workspaces.First)
 	a.Prefs = prefs.New(cfg.ProfileDir)
 	a.Flags = flags.New(cfg.ProfileDir)
@@ -98,6 +111,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell.AddPart(a.workspaceShellPart(e))
 	a.Shell.AddPart(a.shellDataPart())
 	a.menus = newContextMenus(a, e)
+	a.Shell.AddPart(a.downloadsShellPart())
 	a.Shell.AddPart(a.menus.shellPart())
 	// Every action a shell can run by name, for a shell that lists them, as Glide's
 	// Command Bar does.
@@ -390,3 +404,14 @@ func (a *App) WindowFocused(w engine.WindowID) {
 }
 
 func (a *App) ProcessCrashed(p engine.ProcessCrash) { a.Crash.ProcessCrashed(p) }
+
+// DownloadTarget refuses a download from an address policy blocks; the list says where
+// the rest go.
+func (a *App) DownloadTarget(r engine.DownloadRequest) engine.DownloadTarget {
+	if !a.Policy.IsAllowedURL(r.URL) {
+		return engine.DownloadTarget{}
+	}
+	return a.Downloads.Target(r)
+}
+
+func (a *App) DownloadUpdated(d engine.Download) { a.Downloads.Updated(d) }

@@ -27,6 +27,8 @@ const (
 	eventWindowFocused  Hook = 14
 	eventMenuList       Hook = 15
 	eventPickerMessage  Hook = 16
+	eventDownloadTarget Hook = 17
+	eventDownloadUpdate Hook = 18
 )
 
 var eventNames = map[Hook]string{
@@ -46,6 +48,8 @@ var eventNames = map[Hook]string{
 	eventWindowFocused:  "engine.WindowFocused",
 	eventMenuList:       "engine.MenuList",
 	eventPickerMessage:  "engine.PickerMessage",
+	eventDownloadTarget: "engine.DownloadTarget",
+	eventDownloadUpdate: "engine.DownloadUpdated",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -76,6 +80,8 @@ type Events struct {
 	OnModsChanged     func(m engine.Mods)
 	OnProcessCrashed  func(p engine.ProcessCrash)
 	OnDevTools        func(method string, params []byte) (result any, err error)
+	OnDownloadTarget  func(r engine.DownloadRequest) engine.DownloadTarget
+	OnDownloadUpdated func(d engine.Download)
 
 	// more are the events a build tag adds, by number.
 	more map[Hook]func(r *reader) (Value, bool)
@@ -157,6 +163,19 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 				PID:      int(r.int()),
 				URL:      r.str(),
 			})
+		}
+	case eventDownloadTarget:
+		// The answer is where it goes, as JSON; none refuses it.
+		if e.OnDownloadTarget == nil {
+			return Value{}, false
+		}
+		t := e.OnDownloadTarget(engine.DownloadRequest{ID: engine.DownloadID(r.int()), Tab: engine.TabID(r.int()), URL: r.str(), Name: r.str(), Mime: r.str(), SaveAs: r.bool()})
+		b, _ := json.Marshal(t)
+		return Value{S: string(b)}, true
+	case eventDownloadUpdate:
+		if e.OnDownloadUpdated != nil {
+			e.OnDownloadUpdated(engine.Download{ID: engine.DownloadID(r.int()), Path: r.str(), URL: r.str(), Mime: r.str(),
+				State: engine.DownloadState(r.int()), Received: r.int(), Total: r.int(), Paused: r.bool()})
 		}
 	case eventMenuList:
 		// The answer is the list's items now, as the menu bar's JSON has them.

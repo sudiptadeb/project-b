@@ -134,10 +134,14 @@ func (c *contextMenus) actions(t tabs.Tab, cm engine.ContextMenu) []menuAction {
 			add("link", "link.newWindow", "Open Link in New Window", true)
 		}
 		add("link", "link.copy", "Copy Link", true)
+		if opens(cm.Link) {
+			add("link", "link.saveAs", "Save Link As…", true)
+		}
 	}
 	if cm.Src != "" && cm.Media == "image" {
 		if opens(cm.Src) {
 			add("image", "image.newTab", "Open Image in New Tab", true)
+			add("image", "image.saveAs", "Save Image As…", true)
 		}
 		add("image", "image.copyAddress", "Copy Image Address", true)
 	}
@@ -183,6 +187,10 @@ func (c *contextMenus) run(m *contextMenu, id string) {
 		c.a.Tabs.OpenFrom(0, m.Link, strings.TrimPrefix(id, "link.workspace."), false)
 	case id == "link.copy":
 		c.e.WriteClipboard(m.Link)
+	case id == "link.saveAs":
+		c.e.DownloadURL(m.Tab, m.Link, true)
+	case id == "image.saveAs":
+		c.e.DownloadURL(m.Tab, m.Src, true)
 	case id == "image.newTab":
 		c.a.Tabs.OpenFrom(m.Tab, m.Src, t.Workspace, false)
 	case id == "image.copyAddress":

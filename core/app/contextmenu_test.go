@@ -45,7 +45,7 @@ func TestARightClickSendsWhatCanRunThere(t *testing.T) {
 	r.show(1)
 
 	link := r.rightClick(`{"link":"https://b.test/","linkText":"b"}`)
-	if got := ids(link); !slices.Equal(got, []string{"link.newTab", "link.newWindow", "link.copy"}) {
+	if got := ids(link); !slices.Equal(got, []string{"link.newTab", "link.newWindow", "link.copy", "link.saveAs"}) {
 		t.Fatalf("link menu = %v", got)
 	}
 	if link["link"] != "https://b.test/" || link["tab"] != float64(1) {
@@ -54,7 +54,7 @@ func TestARightClickSendsWhatCanRunThere(t *testing.T) {
 	if got := ids(r.rightClick(`{"link":"mailto:a@b.test"}`)); !slices.Equal(got, []string{"link.copy"}) {
 		t.Fatalf("a mail link opens no tab: %v", got)
 	}
-	if got := ids(r.rightClick(`{"src":"https://a.test/i.png","media":"image"}`)); !slices.Equal(got, []string{"image.newTab", "image.copyAddress"}) {
+	if got := ids(r.rightClick(`{"src":"https://a.test/i.png","media":"image"}`)); !slices.Equal(got, []string{"image.newTab", "image.saveAs", "image.copyAddress"}) {
 		t.Fatalf("image menu = %v", got)
 	}
 	sel := r.rightClick(`{"selection":"set up your workspace and open the dashboard"}`)

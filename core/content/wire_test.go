@@ -116,6 +116,14 @@ func (r *recorder) ProcessCrashed(p engine.ProcessCrash) {
 	r.note(fmt.Sprintf("%s %s %d %d %s", p.Type, p.Status, p.ExitCode, p.PID, p.URL))
 }
 
+func (r *recorder) DownloadTarget(d engine.DownloadRequest) engine.DownloadTarget {
+	r.note(fmt.Sprintf("download %d %d %s %s", d.ID, d.Tab, d.URL, d.Name))
+	return engine.DownloadTarget{Path: "/d/" + d.Name}
+}
+func (r *recorder) DownloadUpdated(d engine.Download) {
+	r.note(fmt.Sprintf("downloaded %d %s %d/%d", d.ID, d.Path, d.Received, d.Total))
+}
+
 func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 	r.note("devtools " + method + " " + string(params))
 	switch method {

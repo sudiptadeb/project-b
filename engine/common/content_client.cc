@@ -1,6 +1,7 @@
 #include "project_b/engine/common/content_client.h"
 
 #include "base/memory/ref_counted_memory.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
 
 #if BUILDFLAG(PB_EXTENSIONS)
@@ -31,6 +32,10 @@ std::string_view ContentClient::GetDataResource(
     ui::ResourceScaleFactor scale_factor) {
   return ui::ResourceBundle::GetSharedInstance().GetRawDataResourceForScale(
       resource_id, scale_factor);
+}
+
+std::u16string ContentClient::GetLocalizedString(int message_id) {
+  return l10n_util::GetStringUTF16(message_id);
 }
 
 scoped_refptr<base::RefCountedMemory> ContentClient::GetDataResourceBytes(

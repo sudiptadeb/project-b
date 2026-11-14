@@ -810,32 +810,49 @@ def profile_checks():
 
 
 WORK_DOT = (194, 65, 12)  # The colour workspace_checks gives Work.
+MAIN_DOT = (52, 112, 208)  # Main's, #3470d0.
+WORK, SHOPPING = "0a1b2c3d", "4e5f6a7b"
 
 
-def workspace_checks():
-    """Workspaces on a real screen: Tab, New Tab in Workspace opens on the workspaces the
-    profile lists, read as the menu opens, and a tab opened from it shows a dot in its
-    workspace's colour, with the tabs on the side and on top. The list is written as
-    Settings, Workspaces writes it."""
-    guest("/usr/bin/killall", "project_b")
-    fresh_profile()
-    listed = {"workspaces": [{"id": "0a1b2c3d", "name": "Work", "color": "#c2410c"}, {"id": "4e5f6a7b", "name": "Shopping", "color": "#7c3aed"}]}
-    guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {PROFILE}/workspaces.json", "sh", json.dumps(listed))
-    launch()
-    time.sleep(1.5)
-    win = window_or_stop("the app starts on its first profile")
+def new_tab_in(workspace):
+    """Tab, New Tab in Workspace, then a workspace by name, by real clicks. Returns the names
+    the submenu listed."""
     open_menu("Tab")
     item = 'menu item "New Tab in Workspace" of menu "Tab" of menu bar item "Tab" of menu bar 1'
     x, y, w, h = map(float, in_front(f"get {{position, size}} of {item}").split(","))
     desk.click(x + w / 2, y + h / 2)
     time.sleep(0.6)
     names = [n.strip() for n in in_front(f'get name of every menu item of menu "New Tab in Workspace" of {item}').split(",")]
-    shot("p4-tab-menu-workspaces")
-    check("Tab, New Tab in Workspace lists the profile's workspaces", [n for n in names if n != "missing value"] == ["Work", "Shopping"], str(names))
-    x, y, w, h = map(float, in_front(f'get {{position, size}} of menu item "Work" of menu "New Tab in Workspace" of {item}').split(","))
+    x, y, w, h = map(float, in_front(f'get {{position, size}} of menu item "{workspace}" of menu "New Tab in Workspace" of {item}').split(","))
     desk.click(x + w / 2, y + h / 2)
     time.sleep(1)
+    return [n for n in names if n != "missing value"]
+
+
+def workspace_checks():
+    """Workspaces on a real screen. A fresh profile has only Main and its tabs show no dot.
+    A list in the old format, without Main, gets Main at the top, and Tab, New Tab in
+    Workspace lists all three, read as the menu opens. With three, the first tab shows Main's
+    blue dot, and a tab opened in Work shows Work's, with the tabs on the side and on top."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    launch()
+    time.sleep(1.5)
+    win = window_or_stop("the app starts on its first profile")
+    blue = near(crop(desk.image(), win[0], win[1] + 40, 220, 200), MAIN_DOT, 24).sum()
+    check("a fresh profile's tab shows no workspace dot", blue <= 4, f"{blue} pixels of Main's blue")
+    guest("/usr/bin/killall", "project_b")
+    until(lambda: guest("/usr/bin/pgrep", "-x", "project_b"), lambda p: p == "", 10)
+    listed = {"workspaces": [{"id": WORK, "name": "Work", "color": "#c2410c"}, {"id": SHOPPING, "name": "Shopping", "color": "#7c3aed"}]}
+    guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {PROFILE}/workspaces.json", "sh", json.dumps(listed))
+    launch()
+    time.sleep(1.5)
+    win = window_or_stop("the app starts on its first profile")
+    sidebar = crop(desk.image(), win[0], win[1] + 40, 220, 200)
+    check("with three workspaces, the first tab shows Main's blue dot", near(sidebar, MAIN_DOT, 24).sum() > 4)
+    names = new_tab_in("Work")
     shot("p4-dots-side")
+    check("Tab, New Tab in Workspace lists Main and the profile's workspaces", names == ["Main", "Work", "Shopping"], str(names))
     sidebar = crop(desk.image(), win[0], win[1] + 40, 220, 200)
     check("a tab opened in Work shows Work's dot, with the tabs on the side", near(sidebar, WORK_DOT, 24).sum() > 4)
     open_menu("View")
@@ -845,6 +862,81 @@ def workspace_checks():
     shot("p4-dots-top")
     strip = crop(desk.image(), win[0], win[1], win[2], 40)
     check("and with the tabs on top", near(strip, WORK_DOT, 24).sum() > 4)
+    guest("/usr/bin/killall", "project_b")
+
+
+WSDEL = "/tmp/pb-wsdel"  # In the guest: the driver's pipe and output, for workspace_delete_checks.
+
+
+def workspace_delete_checks():
+    """Deleting a workspace in Settings, Workspaces, by real clicks: its row's menu ends with
+    Delete… in red, a dialog asks first and names its open tabs, and Delete closes them while
+    settings stays open. Deleting the workspace that holds all a window's tabs keeps the
+    window with one new tab. With one workspace left, Delete… can't be chosen. The driver
+    only finds the controls; that storage is erased is checked in tools/drive_first_app.py."""
+    guest("/usr/bin/killall", "project_b")
+    profile = f"{WSDEL}-profile"  # Beside WSDEL, which driven() empties.
+    fresh_profile(profile, profile)
+    listed = {"version": 2, "workspaces": [{"id": "", "name": "Main", "color": "#3470d0"},
+                                           {"id": WORK, "name": "Work", "color": "#c2410c"},
+                                           {"id": SHOPPING, "name": "Shopping", "color": "#7c3aed"}]}
+    guest("/bin/sh", "-c", f"printf '%s' \"$1\" > {profile}/workspaces.json", "sh", json.dumps(listed))
+    ask = driven(WSDEL, profile, [f"--user-data-dir={profile}"])
+    js = lambda expr: json.loads(ask("eval", expr) or "null")
+
+    def settings(expr):
+        answer = ask("evalsettings", expr)
+        return None if answer.startswith("ERR") else json.loads(answer or "null")
+
+    win = window_or_stop("the app starts with its driver")
+    tabs = lambda: js("document.querySelectorAll('[role=tab]').length")
+    new_tab_in("Work")
+    new_tab_in("Work")
+    check("two tabs opened in Work, beside Main's", until(tabs, lambda n: n == 3) == 3, str(tabs()))
+
+    # Settings covers the whole window, so its page's points are the window's.
+    def click(finder):
+        r = until(lambda: settings(f"(e=>e&&{RECT}(e))({finder})"), bool, 10)
+        if not r:
+            check(f"settings shows {finder}", False)
+            sys.exit(1)
+        desk.click(win[0] + r[0] + r[2] / 2, win[1] + r[1] + r[3] / 2)
+        time.sleep(0.6)
+
+    row = lambda ws: json.dumps(f'[data-workspace="{ws}"]')
+    actions = lambda name: f"document.querySelector('[aria-label=\"Actions for {name}\"]')"
+    delete_item = "[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.trim()==='Delete…')"
+    click_on(js(f"{RECT}(document.querySelector('button.settings'))"), win)
+    click("[...document.querySelectorAll('.nav-item')].find(b=>b.textContent==='Workspaces')")
+    click(actions("Work"))
+    items = settings("[...document.querySelectorAll('[role=menuitem]')].map(b=>b.textContent.trim())") or []
+    colour = settings(f"(e=>e&&getComputedStyle(e).color)({delete_item})") or ""
+    rgb = [int(n) for n in re.findall(r"\d+", colour)[:3]]
+    shot("p4-workspace-menu")
+    check("a workspace's menu ends with Delete…, in red",
+          items[-1:] == ["Delete…"] and len(rgb) == 3 and rgb[0] > 150 and rgb[1] < 110 and rgb[2] < 110, f"{items} {colour}")
+    click(delete_item)
+    asked = until(lambda: settings("(d=>d&&d.textContent.replace(/\\s+/g,' ').trim())(document.querySelector('dialog[open]'))"), bool, 10) or ""
+    shot("p4-workspace-delete")
+    check("Delete… asks first, naming its open tabs",
+          "Delete Work?" in asked and "Its 2 open tabs close, and its cookies and site data are erased." in asked, asked)
+    click("[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='Delete')")
+    gone = until(lambda: settings(f"!document.querySelector({row(WORK)})"), bool, 10)
+    check("Delete removes it and closes its tabs, with settings still open", gone and until(tabs, lambda n: n == 1) == 1, f"{gone} {tabs()}")
+
+    click(actions("Main"))
+    click(delete_item)
+    click("[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='Delete')")
+    gone = until(lambda: settings(f"!document.querySelector({row('')})"), bool, 10)
+    shot("p4-workspace-last")
+    check("deleting the workspace that held all of a window's tabs keeps the window, with one new tab",
+          gone and len(windows()) == 1 and until(tabs, lambda n: n == 1) == 1, f"{gone} {windows()} {tabs()}")
+
+    click(actions("Shopping"))
+    off = settings(f"(e=>!!e&&(e.disabled||e.getAttribute('aria-disabled')==='true'))({delete_item})")
+    click(delete_item)
+    check("with one workspace left, Delete… can't be chosen",
+          off and not settings("!!document.querySelector('dialog[open]')") and settings(f"!!document.querySelector({row(SHOPPING)})"), str(off))
     guest("/usr/bin/killall", "project_b")
 
 
@@ -1238,6 +1330,7 @@ if sys.argv[1:] in (["update"], ["update-retry"]):
 # "check.py workspaces" runs only the checks of workspaces.
 if sys.argv[1:] == ["workspaces"]:
     workspace_checks()
+    workspace_delete_checks()
     finished = True
     sys.exit(1 if counts()["FAIL"] else 0)
 
@@ -1712,6 +1805,7 @@ state_checks()
 profile_checks()
 picker_checks()
 workspace_checks()
+workspace_delete_checks()
 shell_checks()
 finished = True
 sys.exit(1 if counts()["FAIL"] else 0)

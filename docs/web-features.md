@@ -64,13 +64,15 @@ A key Go doesn't know, a status that isn't one of the list, a probe name used tw
 
 ## In settings
 
-Settings, Web features lists every row, read only, with a filter by name, API, status or
-reason. Each row shows the feature's name (its API in the tooltip), what a page gets on the
-platform the app runs on (Works, Turned off, Fails quietly, Absent, Partly, Crashes the
-page, Not checked), and the `why` line. Go sends the rows in the settings snapshot
+Settings, Web features lists every row, read only, with a filter by name, reason or status.
+The rows are grouped by what a page gets on the platform the app runs on, worst first, each
+heading with its count: Fails quietly, Partly, Turned off, Absent, Works, then any other
+(Crashes the page, Not checked). Each row shows the feature's name (its API in the
+tooltip), its status as a tag, and the `why` line, which wraps. Only Fails quietly's tag is
+in `--danger`; the rest are neutral. Go sends the rows in the settings snapshot
 (`webfeatures.View()`, for `runtime.GOOS`); the page never reads the file. The section is
 `shell/src/apps/settings/WebFeatures.vue`, and `shell/e2e/settings.cjs` checks it on the mock
-engine: every row there, the Mac's status and the reason, nothing to change, and the filter.
+engine: every row there in its group with the counts, the Mac's status and the reason, the Fails quietly tag, nothing to change, and the filter.
 
 ## The statuses
 

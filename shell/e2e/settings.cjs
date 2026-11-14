@@ -443,21 +443,45 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await sizes.press('Enter');
   await until(() => JSON.stringify(flagsFile()) === '{}');
 
-  // Web features: the registry, as Go sends it for this platform, only shown.
+  // Web features: the registry, as Go sends it for this platform, only shown, in groups by
+  // status, worst first.
   await page.getByRole('button', { name: 'Web features' }).click();
-  const featureList = page.getByRole('region', { name: 'Web features' });
-  const featureRows = featureList.locator('.row');
+  const featureSection = page.locator('.content');
+  const featureRows = featureSection.locator('.card .row');
+  const featureHeadings = async () => featureSection.locator('h2').allTextContents();
+  const macCount = (s) => webFeatures.filter((f) => f.status.mac === s).length;
+  const statusOrder = [['quiet', 'Fails quietly'], ['partly', 'Partly'], ['off', 'Turned off'], ['absent', 'Absent'], ['works', 'Works'], ['kills', 'Crashes the page'], ['unknown', 'Not checked']];
+  const wantHeadings = statusOrder.filter(([s]) => macCount(s)).map(([s, t]) => `${t} (${macCount(s)})`);
   check('Web features lists every row of the registry', await until(async () => (await featureRows.count()) === webFeatures.length), `${await featureRows.count()} of ${webFeatures.length}`);
-  const badgeRow = featureList.locator('.row', { hasText: 'App badge' }).first();
+  check('in groups by what a page gets on the Mac, worst first, each with its count', JSON.stringify(await featureHeadings()) === JSON.stringify(wantHeadings), JSON.stringify(await featureHeadings()));
+  check('each group holds its rows', (await page.getByRole('region', { name: `Fails quietly (${macCount('quiet')})` }).locator('.row').count()) === macCount('quiet'));
+  check('a line above the filter says what the section is', await page.getByText('How web features behave in Project B, and why. Read-only.').isVisible());
+  const badgeRow = featureSection.locator('.row', { hasText: 'App badge' }).first();
   check('each says what a page gets on the Mac, and why', (await badgeRow.locator('.tag').textContent()) === 'Fails quietly' && (await badgeRow.textContent()).includes(webFeatures.find((f) => f.id === 'badge').why));
-  check('a feature the engine turns off says so', (await featureList.locator('.row', { hasText: 'Installed related apps' }).locator('.tag').textContent()) === 'Turned off');
-  check('and nothing on it can be changed', (await featureList.locator('input, select, button').count()) === 0);
+  const colours = (loc) => loc.evaluate((e) => [getComputedStyle(e).color, getComputedStyle(e).boxShadow]);
+  const danger = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--danger)';
+    document.body.append(probe);
+    const c = getComputedStyle(probe).color;
+    probe.remove();
+    return c;
+  });
+  const [quietText, quietBorder] = await colours(badgeRow.locator('.tag'));
+  check('only Fails quietly is marked, in --danger text and border', quietText === danger && quietBorder.includes(danger), `${quietText} ${quietBorder} want ${danger}`);
+  const offTag = featureSection.locator('.row', { hasText: 'Installed related apps' }).locator('.tag');
+  const [offText, offBorder] = await colours(offTag);
+  check('a feature the engine turns off says so, in a neutral tag', (await offTag.textContent()) === 'Turned off' && offText !== danger && !offBorder.includes(danger));
+  const longWhy = featureSection.locator('.row', { hasText: 'Line wrap on view-source pages' }).locator('.why');
+  check('a long reason wraps rather than being cut', await longWhy.evaluate((e) => e.scrollWidth <= e.clientWidth));
+  check('and nothing on it can be changed', (await featureSection.locator('select, button, input:not(.filter)').count()) === 0);
   const featureFilter = page.getByLabel('Filter web features');
   await featureFilter.fill('turned off');
-  const off = webFeatures.filter((f) => f.status.mac === 'off').length;
-  check('the filter keeps the rows that match, by status too', await until(async () => (await featureRows.count()) === off), `${await featureRows.count()} of ${off}`);
-  await featureFilter.fill('no such feature');
-  check('and says when none does', await until(async () => (await featureList.getByText('No features match').isVisible()) && (await featureRows.count()) === 1));
+  check('the filter keeps the rows that match, by status too, with the group\'s count', await until(async () => (await featureRows.count()) === macCount('off') && JSON.stringify(await featureHeadings()) === JSON.stringify([`Turned off (${macCount('off')})`])), JSON.stringify(await featureHeadings()));
+  await featureFilter.fill('play billing');
+  check('and by the reason', await until(async () => (await featureRows.count()) === 1 && (await featureRows.first().textContent()).includes('Digital goods')));
+  await featureFilter.fill('getInstalledRelatedApps');
+  check('but not by the API', await until(async () => (await featureSection.getByText('No features match').isVisible()) && (await featureRows.count()) === 1));
   await featureFilter.press('Escape');
   check('Escape empties the filter, and leaves the page', await until(async () => (await featureRows.count()) === webFeatures.length) && (await regions()).settingsOpen === true);
   await page.screenshot({ path: path.join(out, 'settings-web-features.png') });

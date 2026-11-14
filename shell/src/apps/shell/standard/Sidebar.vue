@@ -2,21 +2,12 @@
 import { send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { shown } from '@/keys.js';
 import { view } from './state.js';
-
-// As the phone's drawer, choosing a tab or opening a new one closes it; closing a tab
-// leaves it open for the next.
-const props = defineProps({ drawer: Boolean });
-
-function open(msg) {
-  send(msg);
-  if (props.drawer) view.sidebar = false;
-}
 </script>
 
 <template>
-  <nav v-shell class="sidebar" :class="{ closed: !view.sidebar, drawer }" aria-label="Tabs">
+  <nav v-shell class="sidebar" :class="{ closed: !view.sidebar }" aria-label="Tabs">
     <div class="inner">
-      <button class="row new-tab" type="button" @click="open({ t: 'newTab' })">
+      <button class="row new-tab" type="button" @click="send({ t: 'newTab' })">
         <span class="icon">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
         </span>
@@ -33,8 +24,8 @@ function open(msg) {
           :data-tab="tab.id"
           tabindex="0"
           :aria-selected="tab.id === state.active"
-          @click="open({ t: 'activateTab', id: tab.id })"
-          @keydown.enter="open({ t: 'activateTab', id: tab.id })"
+          @click="send({ t: 'activateTab', id: tab.id })"
+          @keydown.enter="send({ t: 'activateTab', id: tab.id })"
           @auxclick.middle="send({ t: 'closeTab', id: tab.id })"
         >
           <span class="icon">
@@ -65,20 +56,6 @@ function open(msg) {
 
 .sidebar.closed {
   width: 0;
-}
-
-/* The drawer lies over the toolbar and the page, full height, with the settings panel's
-   shadow. */
-.sidebar.drawer {
-  height: 100%;
-  width: 280px;
-  max-width: 85%;
-  border-right: 1px solid var(--line);
-  box-shadow: var(--shadow-float);
-}
-
-.sidebar.drawer .inner {
-  width: 100%;
 }
 
 .inner {
@@ -211,27 +188,5 @@ function open(msg) {
 .close:hover {
   background: var(--press);
   color: var(--text);
-}
-
-/* Fingers need bigger targets than a mouse does, a touch screen has no hover to show a
-   close button with, and a phone has no Command key. */
-.touch .row {
-  height: 44px;
-  padding-right: 4px;
-}
-
-.touch .close {
-  width: 32px;
-  height: 32px;
-  visibility: visible;
-}
-
-.touch .row:hover:not(.active),
-.touch .close:hover {
-  background: none;
-}
-
-.touch .hint {
-  display: none;
 }
 </style>

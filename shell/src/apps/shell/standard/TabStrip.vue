@@ -187,31 +187,4 @@ import { controlSpace as controls, send, state, tabLabel, workspaceOf } from '@/
   background: rgba(255, 255, 255, 0.14);
 }
 
-/* Fingers need bigger targets than a mouse does, and there is no hover to show a close
-   button with. */
-.touch .strip {
-  height: 56px;
-}
-
-.touch .tab {
-  height: 40px;
-  padding-right: 4px;
-}
-
-.touch .close {
-  width: 32px;
-  height: 32px;
-}
-
-.touch .new-tab {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 0;
-}
-
-.touch .tab:hover:not(.active),
-.touch .new-tab:hover,
-.touch .close:hover {
-  background: none;
-}
 </style>

@@ -1,11 +1,9 @@
 <script setup>
 import { computed } from 'vue';
 import { send, state } from '@/sdk/vue.js';
-import { phone } from './state.js';
 
 // The update manager's state, shown the way a browser shows a link's address: a small
-// bubble in the page's bottom-left corner, there only while something is happening. On a
-// phone a ready release goes to Android's package installer rather than a relaunch.
+// bubble in the page's bottom-left corner, there only while something is happening.
 function relaunch() {
   send({ t: 'relaunch' });
 }
@@ -32,7 +30,7 @@ const percent = computed(() => {
       ></span>
     </template>
     <button v-else-if="state.update.phase === 'ready'" type="button" @click="relaunch">
-      Project B {{ state.update.version }} is ready. <b>{{ phone ? 'Install' : 'Relaunch' }} to update</b>
+      Project B {{ state.update.version }} is ready. <b>Relaunch to update</b>
     </button>
     <span v-else role="status" :title="state.update.error">Update{{ state.update.version ? ' to ' + state.update.version : '' }} failed: {{ state.update.error }}</span>
   </div>

@@ -2,14 +2,12 @@
 import { watchEffect } from 'vue';
 import PageView from './PageView.vue';
 import Sidebar from './Sidebar.vue';
-import TabIcons from './TabIcons.vue';
 import TabStrip from './TabStrip.vue';
 import TopBar from './TopBar.vue';
 import { setFrame, state } from '@/sdk/vue.js';
-import { phone, tabsOnTop, view } from './state.js';
+import { tabsOnTop } from './state.js';
 
-// Every layout shows the same tabs from the same state; only where they sit differs. On a
-// phone they are favicons under the toolbar, and the sidebar is a drawer over everything.
+// Every layout shows the same tabs from the same state; only where they sit differs.
 
 // The window draws a 4px band of the frame colour around its edge, and the shell paints
 // its own strips in that colour and width, as CSS variables on the root, so there is one
@@ -29,18 +27,13 @@ watchEffect(() => {
   <div class="app">
     <TabStrip v-if="tabsOnTop" />
     <TopBar />
-    <TabIcons v-if="phone" />
     <div class="body">
       <div class="edge left"></div>
-      <Sidebar v-if="!tabsOnTop && !phone" />
+      <Sidebar v-if="!tabsOnTop" />
       <PageView />
       <div class="edge right"></div>
     </div>
     <div class="edge bottom"></div>
-    <!-- A tap outside the drawer closes it, and goes no further. -->
-    <div v-if="phone && view.sidebar" v-shell class="drawer" @click.self="view.sidebar = false">
-      <Sidebar drawer />
-    </div>
   </div>
 </template>
 
@@ -79,9 +72,4 @@ watchEffect(() => {
   height: var(--frame-width);
 }
 
-.drawer {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-}
 </style>

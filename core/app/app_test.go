@@ -1524,3 +1524,17 @@ func TestProfileDataOutlivesARestart(t *testing.T) {
 		t.Fatalf("snapshot profileData %v", m["profileData"])
 	}
 }
+
+// A shell's snapshot lists the actions it can run, by title.
+func TestTheShellHearsTheActionsByTitle(t *testing.T) {
+	r := start(t, t.TempDir())
+	defer r.stop()
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "snapshot" })
+	found := false
+	for _, a := range m["actions"].([]any) {
+		found = found || a.(map[string]any)["id"] == "app.settings"
+	}
+	if !found {
+		t.Fatalf("no app.settings in the snapshot's actions: %v", m["actions"])
+	}
+}

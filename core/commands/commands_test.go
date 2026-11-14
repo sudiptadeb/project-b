@@ -251,3 +251,21 @@ func TestAMenuListIsReadWhenItsMenuOpens(t *testing.T) {
 		t.Fatalf("chose %v", chosen)
 	}
 }
+
+// Titles lists the actions in the menus that can run now, each once, in the menus' order.
+func TestTitlesListWhatCanRun(t *testing.T) {
+	off := false
+	m, _ := manager(t, t.TempDir(), &off)
+	m.Register(Action{ID: "tab.close", Title: "Close Tab", Enabled: func() bool { return false }})
+	got := m.Titles()
+	ids := map[string]bool{}
+	for _, a := range got {
+		if ids[a.ID] {
+			t.Fatalf("%s listed twice", a.ID)
+		}
+		ids[a.ID] = true
+	}
+	if !ids["tab.new"] || !ids["app.settings"] || ids["tab.close"] {
+		t.Fatalf("titles %v", got)
+	}
+}

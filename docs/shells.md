@@ -118,7 +118,8 @@ gives the page the same two.
 | `profileData` | `profileData`: what this shell saved for the profile | A shell in any window of the profile saved it |
 
 The snapshot's `profileData` is what this shell last saved for the profile, `null` when
-nothing.
+nothing. Its `actions` is every action in the menus that can run then, `{id, title}`, in
+the menus' order, for a shell that lists them to run by name (`run`).
 
 A tab is `{id, url, title, loading, progress, blocked, crashed, error, favicon, canGoBack,
 canGoForward, workspace, group}`, `group` the id of its tab group, absent when it is in

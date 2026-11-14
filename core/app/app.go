@@ -95,6 +95,12 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
 	a.Shell.AddPart(a.workspaceShellPart(e))
 	a.Shell.AddPart(a.shellDataPart())
+	// Every action a shell can run by name, for a shell that lists them, as Glide's
+	// Command Bar does.
+	a.Shell.AddPart(shell.Part{
+		Snapshot: func(into map[string]any) { into["actions"] = a.Commands.Titles() },
+		Handle:   func(engine.WindowID, string, []byte) bool { return false },
+	})
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
 	a.Settings.AddPart(a.workspaceSettingsPart(e))

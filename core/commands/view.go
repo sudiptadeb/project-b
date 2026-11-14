@@ -182,3 +182,34 @@ func (m *Manager) ShownKeys() map[string]string {
 	}
 	return out
 }
+
+// ActionTitle is one action as a shell lists it to run by name.
+type ActionTitle struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// Titles is every action in the menus on this platform that can run now, in the menus'
+// order, each once, with its title: what a shell lists to run by name, such as Glide's
+// Command Bar.
+func (m *Manager) Titles() []ActionTitle {
+	out := []ActionTitle{}
+	seen := map[string]bool{}
+	var walk func(nodes []Node)
+	walk = func(nodes []Node) {
+		for _, n := range nodes {
+			if n.Only != "" && n.Only != m.platform {
+				continue
+			}
+			walk(n.Items)
+			a, ok := m.actions[n.Action]
+			if !ok || seen[a.ID] || a.Enabled != nil && !a.Enabled() {
+				continue
+			}
+			seen[a.ID] = true
+			out = append(out, ActionTitle{ID: a.ID, Title: a.Title})
+		}
+	}
+	walk(m.tree)
+	return out
+}

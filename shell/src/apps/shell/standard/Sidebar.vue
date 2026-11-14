@@ -1,7 +1,15 @@
 <script setup>
+import { computed } from 'vue';
 import { send, state, tabLabel, workspaceOf } from '@/sdk/vue.js';
 import { shown } from '@/keys.js';
+import { entries, groupLabel } from './groups.js';
+import { openMenu } from './menu.js';
 import { view } from './state.js';
+
+// The list, flat: a group's header, then its tabs, which carry the group for their rule.
+const rows = computed(() =>
+  entries(state).flatMap((e) => (e.group ? [{ header: e.group }, ...e.tabs.map((tab) => ({ tab, group: e.group }))] : [e])),
+);
 </script>
 
 <template>
@@ -15,28 +23,47 @@ import { view } from './state.js';
         <span v-if="state.keys['tab.new']" class="hint" aria-hidden="true">{{ shown(state.keys['tab.new'], state.platform) }}</span>
       </button>
       <div class="tabs" role="tablist" aria-label="Open tabs">
+        <template v-for="r in rows" :key="r.header ? 'g' + r.header.id : r.tab.id">
+        <button
+          v-if="r.header"
+          type="button"
+          class="row group"
+          :data-group="r.header.id"
+          :aria-expanded="!r.header.collapsed"
+          :title="groupLabel(r.header)"
+          @click="send({ t: 'editGroup', group: r.header.id, collapsed: !r.header.collapsed })"
+          @contextmenu="openMenu('group', r.header.id, $event)"
+          @keydown.shift.f10="openMenu('group', r.header.id, $event)"
+        >
+          <span class="icon"><span class="swatch" :style="{ background: r.header.color }"></span></span>
+          <span class="title" :class="{ muted: !r.header.name }">{{ groupLabel(r.header) }}</span>
+          <span class="chevron" :class="{ collapsed: r.header.collapsed }" aria-hidden="true"></span>
+        </button>
         <div
-          v-for="tab in state.tabs"
-          :key="tab.id"
+          v-else
           class="row tab"
-          :class="{ active: tab.id === state.active }"
+          :class="{ active: r.tab.id === state.active, grouped: r.group }"
+          :style="r.group ? { '--group': r.group.color } : null"
           role="tab"
-          :data-tab="tab.id"
+          :data-tab="r.tab.id"
           tabindex="0"
-          :aria-selected="tab.id === state.active"
-          @click="send({ t: 'activateTab', id: tab.id })"
-          @keydown.enter="send({ t: 'activateTab', id: tab.id })"
-          @auxclick.middle="send({ t: 'closeTab', id: tab.id })"
+          :aria-selected="r.tab.id === state.active"
+          @click="send({ t: 'activateTab', id: r.tab.id })"
+          @keydown.enter="send({ t: 'activateTab', id: r.tab.id })"
+          @keydown.shift.f10="openMenu('tab', r.tab.id, $event)"
+          @auxclick.middle="send({ t: 'closeTab', id: r.tab.id })"
+          @contextmenu="openMenu('tab', r.tab.id, $event)"
         >
           <span class="icon">
-            <img v-if="tab.favicon" :src="tab.favicon" alt="" width="16" height="16" />
+            <img v-if="r.tab.favicon" :src="r.tab.favicon" alt="" width="16" height="16" />
           </span>
-          <span class="title" :class="{ muted: !tab.title }">{{ tabLabel(tab) }}</span>
-          <span v-if="workspaceOf(tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(tab).name}`" :title="workspaceOf(tab).name" :style="{ background: workspaceOf(tab).color }"></span>
-          <button class="close" type="button" :aria-label="`Close ${tabLabel(tab)}`" @click.stop="send({ t: 'closeTab', id: tab.id })">
+          <span class="title" :class="{ muted: !r.tab.title }">{{ tabLabel(r.tab) }}</span>
+          <span v-if="workspaceOf(r.tab)" class="workspace" role="img" :aria-label="`In ${workspaceOf(r.tab).name}`" :title="workspaceOf(r.tab).name" :style="{ background: workspaceOf(r.tab).color }"></span>
+          <button class="close" type="button" :aria-label="`Close ${tabLabel(r.tab)}`" @click.stop="send({ t: 'closeTab', id: r.tab.id })">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7.43.9.75 7.58M.9.75l6.68 6.68"/></svg>
           </button>
         </div>
+        </template>
       </div>
       <div class="rest"></div>
     </div>
@@ -143,6 +170,45 @@ import { view } from './state.js';
 
 .title.muted {
   color: var(--muted);
+}
+
+/* A group's header: its colour, its name, and a chevron that folds it. */
+.group .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.chevron {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 6px 2px;
+  border-right: 1.5px solid var(--icon);
+  border-bottom: 1.5px solid var(--icon);
+  transform: rotate(45deg);
+}
+
+.chevron.collapsed {
+  margin-bottom: 0;
+  transform: rotate(-45deg);
+}
+
+/* A grouped tab sits in from the edge, on a rule in its group's colour. */
+.tab.grouped {
+  position: relative;
+  margin-left: 12px;
+}
+
+.tab.grouped::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--group);
 }
 
 /* The workspace a tab is in, as a dot in its colour. */

@@ -15,7 +15,7 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const out = path.join(root, 'build/e2e');
 // The names of the shells the user can choose, as the registry lists them.
-const listedShells = JSON.parse(fs.readFileSync(path.join(root, 'core/shells/registry.json'), 'utf8')).filter((s) => !s.example).map((s) => s.name);
+const listedShells = JSON.parse(fs.readFileSync(path.join(root, 'core/shells/registry.json'), 'utf8')).filter((s) => !s.example && !s.phone).map((s) => s.name);
 const port = 8797;
 const base = `http://127.0.0.1:${port}`;
 

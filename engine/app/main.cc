@@ -21,6 +21,7 @@ int main(int argc, const char** argv) {
       .timeline_now = PBTimelineNow,
       .timeline_record = PBTimelineRecord,
       .timeline_page_origin = PBTimelinePageOrigin,
+      .free = PBFree,
   };
   return ProjectBMain(argc, argv, &go);
 }

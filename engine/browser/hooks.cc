@@ -81,7 +81,7 @@ std::string TakeString(const PBValue& result) {
     return std::string();
   }
   std::string s(result.s, result.len);
-  free(const_cast<char*>(result.s));
+  Go().free(const_cast<char*>(result.s));
   return s;
 }
 

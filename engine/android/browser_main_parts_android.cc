@@ -70,6 +70,13 @@ void BrowserMainParts::StartApp(const std::string& blocked_hosts) {
           },
           browser_context_.get()),
       base::DoNothing());
+  // Go's profile is the one folder Android gives the app, named outright as the desktop's
+  // --user-data-dir does: without the claim, Go's managers would save beside nothing. One
+  // process holds it, so the claim is always this copy's.
+  char* claimed = Go().claim_profile(ProfileDir().DirName().value().c_str(), "",
+                                     ProfileDir().value().c_str(), 0, "");
+  CHECK(claimed);
+  Go().free(claimed);
   Go().start(Engine::Calls(), blocked_hosts.c_str(), hooks::kTableHash);
   child_processes_ = std::make_unique<ChildProcesses>();
 }

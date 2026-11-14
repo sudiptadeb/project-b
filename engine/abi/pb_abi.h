@@ -304,6 +304,10 @@ typedef struct PBGoCalls {
                           size_t text_length);
   // The moment one of our pages' own clock started, by its channel's name.
   void (*timeline_page_origin)(const char* page, int64_t t);
+
+  // Frees a string Go returned, with the allocator that made it: Go's C library's. The
+  // content library's own free is Chromium's allocator on Android, which can't.
+  void (*free)(void* p);
 } PBGoCalls;
 
 #endif  // PROJECT_B_ENGINE_ABI_PB_ABI_H_

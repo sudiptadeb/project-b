@@ -517,6 +517,12 @@ func PBGoStats() *C.char {
 	return C.CString(string(b))
 }
 
+// PBFree frees a string Go returned, for the engine, whose own free may be another
+// allocator's.
+//
+//export PBFree
+func PBFree(p unsafe.Pointer) { C.free(p) }
+
 // PBVersion is what --version prints first: the release this build is, or "development
 // build" for one that isn't a release. The caller frees the string.
 //

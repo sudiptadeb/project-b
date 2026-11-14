@@ -69,12 +69,6 @@ class Fixture(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 def http_json(method, url, body=None, headers=None, timeout=60):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json", **(headers or {})})
@@ -120,6 +114,26 @@ class Lines:
     def has(self, s):
         with self.cond:
             return any(s in line for line in self.text)
+
+    def search(self, pattern):
+        """The first match of pattern in what the process has printed, or None."""
+        with self.cond:
+            return next((m for line in self.text if (m := re.search(pattern, line))), None)
+
+
+# ChromeDriver started with --port=0 takes a free port, and says which once it listens.
+STARTED = r"started successfully on port (\d+)"
+
+
+def start_chromedriver(binary, log_path):
+    """Starts ChromeDriver on a port of its own, and returns it, the Lines of what it prints,
+    and its address, once it says where it listens."""
+    cd = subprocess.Popen([binary, "--port=0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    lines = Lines(cd, log_path)
+    if not lines.wait(lambda: lines.search(STARTED), 15):
+        cd.kill()
+        raise RuntimeError(f"ChromeDriver didn't say it started: {log_path}")
+    return cd, lines, f"http://127.0.0.1:{lines.search(STARTED).group(1)}"
 
 
 class Driver:
@@ -301,12 +315,8 @@ def defaults(scratch):
 
 
 def session(fixture, extra_args=(), full=True):
-    cd_port = free_port()
     fifo = make_fifo()
-    cd = subprocess.Popen([CHROMEDRIVER, f"--port={cd_port}"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-    lines = Lines(cd, os.path.join(OUT, "chromedriver.log"))
-    lines.wait(lambda: lines.has("started successfully"), 15)
-    wd = f"http://127.0.0.1:{cd_port}"
+    cd, lines, wd = start_chromedriver(CHROMEDRIVER, os.path.join(OUT, "chromedriver.log"))
     mode = "pipe" if "--remote-debugging-pipe" in extra_args else "port"
     caps = {"capabilities": {"alwaysMatch": {"browserName": "chrome", "goog:chromeOptions": {
         "binary": BIN, "args": [f"--pb-driver={fifo}", *extra_args]}}}}

@@ -40,7 +40,7 @@ PAGE = b"""<!doctype html><title>Green</title>
 <style>html, body { margin: 0; height: 100%; background: rgb(31, 122, 77); }</style>"""
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from drive_chromedriver import free_port, http_json  # noqa: E402
+from drive_chromedriver import http_json, start_chromedriver  # noqa: E402
 
 
 class Fixture(http.server.BaseHTTPRequestHandler):
@@ -90,18 +90,9 @@ def main():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
-    port = free_port()
-    cd = subprocess.Popen([CHROMEDRIVER, f"--port={port}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    wd = f"http://127.0.0.1:{port}"
+    cd, _, wd = start_chromedriver(CHROMEDRIVER, os.path.join(OUT, "chromedriver.log"))
     base = None
     try:
-        deadline = time.time() + 15
-        while time.time() < deadline:
-            try:
-                if http_json("GET", wd + "/status", timeout=2)[0] == 200:
-                    break
-            except OSError:
-                time.sleep(0.1)
         caps = {"capabilities": {"alwaysMatch": {"goog:chromeOptions": {"binary": BIN}}}}
         status, r = http_json("POST", wd + "/session", caps, timeout=90)
         if status != 200:

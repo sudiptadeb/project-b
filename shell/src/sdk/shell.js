@@ -77,6 +77,10 @@ export const state = {
   // are the buttons' words, cancel "" for an alert. A shell shows its active tab's and
   // answers with answerDialog (dialogs.js).
   dialogs: [],
+  // The active tab's search while its find bar is open, or null: {tab, text, matches,
+  // active}, active counting from 1 and 0 for none. find.js acts on it; focusFind asks the
+  // shell to put the keyboard in its bar.
+  find: null,
   // The shell's own data, as it last saved it for this window, or null: what it needs to
   // lay itself out again after a reload. It comes only in the snapshot.
   data: null,
@@ -86,7 +90,7 @@ export const state = {
 };
 
 // The messages that are only state: each sets the fields it carries.
-const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads', 'dialogs']);
+const updates = new Set(['tabs', 'theme', 'windowColor', 'controls', 'keys', 'workspaces', 'update', 'crashLog', 'tabLayout', 'addressBarPosition', 'extensions', 'profileData', 'contextMenu', 'downloads', 'dialogs', 'find']);
 
 const listeners = [];
 

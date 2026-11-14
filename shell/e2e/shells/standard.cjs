@@ -171,6 +171,25 @@ const { check, fire, regions, settle, until } = lib;
   await ask.getByRole('button', { name: 'Cancel' }).click();
   check('Cancel answers no', await until(async () => (await regions()).dialogAnswers?.[2]?.ok === false));
 
+  // Find in page: the find key opens the bar with the keyboard in it.
+  const finder = ui.getByRole('textbox', { name: 'Find in page' });
+  await fire('menu', 'find.open');
+  check('the find key opens a field named Find in page, with the keyboard in it', await until(async () => (await finder.isVisible()) && (await finder.evaluate((el) => el === document.activeElement))));
+  await finder.pressSequentially('mock');
+  const bar = ui.getByRole('search', { name: 'Find in page' });
+  check('typing searches, and the count shows', await until(async () => (await bar.innerText()).includes('1 of 3')));
+  await shoot('find');
+  await finder.press('Enter');
+  check('Enter shows the next match', await until(async () => (await bar.innerText()).includes('2 of 3')));
+  await finder.press('Shift+Enter');
+  await finder.press('Shift+Enter');
+  check('Shift+Enter the one before', await until(async () => (await bar.innerText()).includes('3 of 3')));
+  await finder.fill('nothing');
+  await finder.dispatchEvent('input');
+  check('a search with no match says so', await until(async () => (await bar.innerText()).includes('No results')));
+  await finder.press('Escape');
+  check('Escape closes it, and Go ends the search', await until(async () => (await finder.count()) === 0 && (await regions()).findsStopped?.length > 0));
+
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();
   await lib.done();

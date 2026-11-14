@@ -80,6 +80,7 @@ of it.
 | `@/sdk/shell.js` | `state`: everything Go sends, as a plain object; a field is replaced whole when it changes, never changed in place. `onChange(fn)`: calls `fn(fields)` after each change, with the fields that changed. `connect(handlers, afterDraw)`: says `ready`, keeps `state`, calls the shell's `handlers[kind](message)` after each message, and once the snapshot is drawn reports the layout and says `shown`. `send(msg)`. `saveData(value)`. `saveProfileData(value)`. `focusPage()`. `setFrame(width)`. The helpers, each given the state it reads: `activeTab(state)`, `workspaceOf(state, tab)`, `controlSpace(state)`, `keyLabel(state, action)`, and `tabLabel(tab)`. It puts the theme's colours on the root. |
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/contextmenu.js` | What a shell sends about the right-click menu, `state.contextMenu`: `chooseContextItem(menu, id)`, `closeContextMenu(menu)`, and `contextMenuPoint(menu)`, where in the window the press was. |
+| `@/sdk/find.js` | `findText(tab, text)`, `findNext(tab, forward)` and `closeFind(tab)`, for `state.find`, each naming the tab whose bar it is. |
 | `@/sdk/dialogs.js` | `answerDialog(id, ok, text)`, and `dialogFor(state, tab)`, the dialog a tab's page waits on. |
 | `@/sdk/downloads.js` | What a shell sends about `state.downloads`: `downloadAction(id, action)` and `clearDownloads()`. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
@@ -128,6 +129,8 @@ gives the page the same two.
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
+| `find` | `find`: the active tab's search while its find bar is open, `{tab, text, matches, active}`, or `null` | A search ran, its count changed, the bar opened or closed, or another tab shows ([daily-driver.md](daily-driver.md#find-in-page)) |
+| `focusFind` | | The find key was pressed: the keyboard goes to the find bar |
 | `dialogs` | `dialogs`: the dialogs pages wait on, oldest first | A page asked, or one was answered or dropped ([daily-driver.md](daily-driver.md#javascript-dialogs)) |
 | `downloads` | `downloads`: the profile's downloads, newest first | One started, moved on, ended or left the list ([daily-driver.md](daily-driver.md#downloads)) |
 | `contextMenu` | `contextMenu`: the open right-click menu, or `null` | A right click in a tab's page, or a long press on a link or an image on a phone: what it was on and the actions that can run there ([daily-driver.md](daily-driver.md#right-click)); `null` once it is answered, or its tab closes, navigates or is no longer shown |
@@ -200,6 +203,9 @@ none. The snapshot also has `running` (the version), `platform`
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
 | `contextMenuChoose` | `id`, `item` | Runs action `item` of right-click menu `id`; Go closes the menu |
 | `contextMenuClose` | `id` | The menu went without running anything |
+| `findText` | `tab`, `text` | Searches the tab's page afresh; nothing once its bar has closed |
+| `findNext` | `tab`, `forward` | Shows the next match in the tab's page, or the one before |
+| `findClose` | `tab` | Closes the tab's bar, keeping the match shown selected |
 | `answerDialog` | `id`, `ok`, `text` | Answers a page's dialog; `text` is a prompt's |
 | `downloadAction` | `id`, `action`: `open`, `reveal`, `cancel`, `pause`, `resume` or `remove` | Acts on one download; `remove` takes it off the list and leaves the file |
 | `clearDownloads` | | Takes every finished download off the list |
@@ -328,6 +334,11 @@ The check holds every shell to these, knowing nothing else about it.
     opens a list where each download is a `listitem` by its file name, a finished one with
     Open and Show in Finder, which make Go open the file or show it
     ([daily-driver.md](daily-driver.md#downloads)). The shells that don't have it yet are
+    listed in the check, with who brings each.
+20. **On a desktop, the find key (`find.open`) opens a text box named Find in page with the
+    keyboard in it;** what is typed searches the active tab's page and the count shows,
+    Enter shows the next match, and Escape closes it and ends the search
+    ([daily-driver.md](daily-driver.md#find-in-page)). The shells that don't have it yet are
     listed in the check, with who brings each.
 
 **The names a shell gives its basic controls.** Each is a button, or a menu item in a menu

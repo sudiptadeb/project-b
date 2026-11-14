@@ -12,6 +12,7 @@ export { activeTab, controlSpace, focusPage, keyLabel, saveData, saveProfileData
 export { chooseContextItem, closeContextMenu, contextMenuPoint } from './contextmenu.js';
 export { clearDownloads, downloadAction } from './downloads.js';
 export { answerDialog, dialogFor } from './dialogs.js';
+export { closeFind, findNext, findText } from './find.js';
 
 export const state = $state({ ...sdk.state });
 sdk.onChange((fields) => Object.assign(state, fields));

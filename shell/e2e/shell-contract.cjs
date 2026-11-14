@@ -32,6 +32,7 @@ const rules = {
   15: 'A page\'s alert, confirm and prompt show as an alertdialog with Go\'s buttons by name, a prompt with a field; the answer reaches the page; another tab shown hides it, and back shows it',
   16: 'On a desktop, a right click in a page opens a menu of Go\'s actions there; choosing one makes Go do it; Escape, or a press outside, closes it',
   17: 'On a desktop, a control named Downloads shows once there is a download, and opens a list of them by file name, a finished one with Open and Show in Finder',
+  20: 'On a desktop, the find key opens a text box named Find in page with the keyboard in it; typing searches and shows the count; Enter shows the next match; Escape closes it',
 };
 
 // The desktop shells that don't draw the right-click menu yet, and who brings it to each
@@ -57,6 +58,18 @@ const noDialogsYet = {
   'minimal-vue': 'r4 brings it',
   example: 'r4 brings it',
   mobile: 'r3 brings it, with the dialogs on Android',
+};
+
+// The desktop shells that don't draw a find bar yet, and who brings each. Rule 20 holds
+// every other desktop shell to it.
+const noFindYet = {
+  glide: 'r6 brings it',
+  terminal: 'r4 brings it',
+  fox: 'r4 brings it',
+  'minimal-svelte': 'r4 brings it',
+  'minimal-js': 'r4 brings it',
+  'minimal-vue': 'r4 brings it',
+  example: 'r4 brings it',
 };
 
 // The desktop shells that don't draw the downloads list yet, and who brings it to each.
@@ -483,6 +496,28 @@ const noDownloadsYet = {
         await page.keyboard.press('Escape');
       } catch (e) {
         rule(17, 'its checks ran to their end', false, e.message.split('\n')[0]);
+      }
+    }
+
+    // 20. Find in page, on a desktop shell.
+    if (shell.phone) {
+      rule(20, 'not for a phone yet', true);
+    } else if (noFindYet[id]) {
+      rule(20, `not checked yet: ${noFindYet[id]}`, true);
+    } else {
+      try {
+        const field = ui.getByRole('textbox', { name: 'Find in page' });
+        await fire('menu', 'find.open');
+        rule(20, 'the find key opens a text box named Find in page, with the keyboard in it', await until(async () => (await field.isVisible()) && (await field.evaluate((el) => el === document.activeElement))));
+        await field.pressSequentially('mock');
+        const shows = (s) => until(async () => (await ui.locator('body').innerText()).includes(s));
+        rule(20, 'typing searches, and the count shows', await shows('3'));
+        await field.press('Enter');
+        rule(20, 'Enter shows the next match', await shows('2'));
+        await field.press('Escape');
+        rule(20, 'Escape closes it, and Go ends the search', await until(async () => (await field.count()) === 0 && (await regions()).findsStopped?.length > 0));
+      } catch (e) {
+        rule(20, 'its checks ran to their end', false, e.message.split('\n')[0]);
       }
     }
 

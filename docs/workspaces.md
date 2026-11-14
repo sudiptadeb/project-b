@@ -46,15 +46,16 @@ as built so far, and the order of building at the end says which steps are done.
   `engine.Listener.TabOpened`); the engine reads it from the tab's partition. The driver
   opens a tab in a workspace by id (`opentab`, "" for the profile's own storage). The mock
   engine keeps each tab's workspace, and a tab its page opens is in it
-  (`mockengine.Engine.Workspace`); it keeps the first workspace as Go last said, for the
-  tests (`FirstWorkspace`).
+  (`mockengine.Engine.Workspace`); for the tests it keeps the first workspace as Go last
+  said, and each erase Go asks for, with how many of the workspace's tabs were still open
+  (`FirstWorkspace`, `Erased`).
 - Go keeps the list, in `workspaces.json` in the profile folder beside `prefs.json`:
   `{"version": 2, "workspaces": [{"id": "", "name": "Main", "color": "#3470d0"}, {"id":
   "0a1b2c3d", "name": "Work", "color": "#5b7fd6"}]}`, in the user's order, which starts as
   Main and then the order they were made. Main's colour is the first the settings page
   offers. Every other id is eight hex digits Go makes, and never changes; a workspace needs
   a name no other has, whatever its case, and a `#rrggbb` colour (`core/workspaces`,
-  `workspaces.Manager`: `List`, `First`, `Create`, `SetName`, `SetColor`, `Move`,
+  `workspaces.Manager`: `List`, `First`, `Create`, `SetName`, `SetColor`, `Move`, `Delete`,
   `OnChanged`). A profile from before Main, a list without `version` or no file, gets Main
   at the top of its list once, when the list is read: the one upgrade step
   (`workspaces.New`). From the next change on the file says version 2. A copy on a folder
@@ -79,15 +80,15 @@ as built so far, and the order of building at the end says which steps are done.
   with it. A tab in a workspace the list doesn't hold shows none. Every shell has the list
   in its snapshot, and hears it again, `{"t": "workspaces", "workspaces": [...]}`, when it
   changes, so the dots follow at once (`core/app/workspaces.go`,
-  `shell/src/apps/shell/standard/`). The mock's page fires
-  a menu item by its action, as the menu bar does (`/mock/fire`, kind `menu`).
+  `shell/src/apps/shell/standard/`). The mock's page fires a menu item by its action, as
+  the menu bar does (`/mock/fire`, kind `menu`).
 - Settings has a Workspaces section, after Profile: a list of rows, each with the
   workspace's colour, its name and the number of tabs open in it, and a menu (the ⋯
   button, or a right-click on the row) with New tab in workspace, Edit…, Move up, Move
-  down and, after a separator, Delete… in the danger colour. Main is a row like any other. New tab in workspace opens a tab in it in the page's
-  window and closes the page (`openInWorkspace`). New workspace…
-  on the heading's right and Edit… open one dialog with the name and the colour (the
-  presets, or any other). A new one starts on the first preset no workspace has. Names are
+  down and, after a separator, Delete… in the danger colour. Main is a row like any other.
+  New tab in workspace opens a tab in it in the page's window and closes the page
+  (`openInWorkspace`). New workspace… on the heading's right and Edit… open one dialog
+  with the name and the colour (the presets, or any other). A new one starts on the first preset no workspace has. Names are
   unique whatever their case: the dialog says so under the name, and Go refuses one too.
   The order is the user's, and the Tab menu lists them in it. Go answers with the list as
   it is now (`createWorkspace`, `editWorkspace` with the name and colour together,
@@ -95,9 +96,8 @@ as built so far, and the order of building at the end says which steps are done.
   `{"t": "workspaces", ...}`), so the dots change at once and the Tab menu has the change
   the next time it opens. The page has the counts in its snapshot and hears them again,
   `{"t": "workspaceTabs", ...}`, when a tab opening or closing changes them. Every copy has
-  the section, a copy on a folder named outright
-  (`--user-data-dir`) too: the list is the folder's, as its prefs are, and nothing about
-  it needs the profile list (`core/app/workspaces.go`,
+  the section, a copy on a folder named outright (`--user-data-dir`) too: the list is the
+  folder's, as its prefs are, and nothing about it needs the profile list (`core/app/workspaces.go`,
   `shell/src/apps/settings/Workspaces.vue`).
 - A workspace can be deleted, but not the last one. Delete… asks first, in a dialog,
   "Delete Work?", that says how many of its tabs close and that its cookies and site data
@@ -112,6 +112,11 @@ as built so far, and the order of building at the end says which steps are done.
   history stays, as it is the profile's (`App.deleteWorkspace`,
   `Engine::EraseWorkspace`). A Main deleted stays deleted: the list says version 2 by
   then.
+- Workspaces are Go's, for every shell to use. A shell makes, renames, edits, moves and
+  deletes them with the settings page's messages, naming a workspace by `workspace` where
+  the page says `id`, and Go applies the same rules to both, through one handler
+  (`changeWorkspaces`, `workspaceShellPart`, `workspaceSettingsPart`). A shell that doesn't
+  want workspaces can keep to one ([shells.md](shells.md), "Decided").
 
 ## Decided
 
@@ -196,6 +201,8 @@ Each commit builds, leaves a working app, and carries its tests.
    places in the first workspace, in Go and in the engine.
 8. Done. The dot only while there are two or more workspaces.
 9. Done. Deleting a workspace: its tabs close, then its storage is erased.
+10. Done. A shell makes, edits, moves and deletes workspaces with the settings page's
+    messages.
 
 ## Decided while building
 

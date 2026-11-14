@@ -19,6 +19,14 @@ the real app; "What the real app adds" lists the little the mock can't show.
   author on top of them: a shell may use it, or talk to Go itself.
 - How a shell shows the extensions is the shell's own, and so is the band around the
   window.
+- 2026-11-14, the owner: "think of the shells as external code which can interact with our
+  go core... the go core has features which are shell independent so every shell gets to
+  use those... tab groups... workspaces... if a shell doesnot want to support work spaces
+  it can choose to merge everything or use only one workspace or something". Go's
+  features, workspaces and tab groups when they land, are the shell's to use, not the
+  shell's to own: every shell gets them through the messages. A shell that doesn't want a
+  feature still copes with Go's data: for workspaces it can keep to one, for tab groups it
+  can draw them or take every tab out of its group itself.
 
 ## Where a shell lives
 
@@ -116,7 +124,10 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
   (`Cmd+T`); `@/keys.js` and `keyLabel` show it as the menus do.
 - `workspaces` is each workspace's `{id, name, color}`, in the user's order, one at least.
   Main, the profile's own storage, has the id `""`. A tab's `workspace` is its workspace's
-  id.
+  id. Every shell and the settings page hear the list again whenever it changes, whoever
+  changed it. The workspace messages are the settings page's, and keep its rules: a name
+  no other workspace has, whatever its case, and never deleting the last. A shell names
+  the workspace by `workspace`, as `newTab` does, where the settings page says `id`.
 - `suggestions` has the `id` the shell asked with and `items`, each `{url, title}`.
 - `extensions` is `{buttons, popup, prompt}`. A button is `{id, name, title, icon, badge,
   badgeColor, badgeTextColor, enabled, pinned}`, in the order the menu lists them; `popup`
@@ -132,6 +143,11 @@ canGoForward, workspace}`. The snapshot also has `running` (the version), `platf
 | `shown` | | The snapshot is drawn and the layout sent |
 | `layout` | `shell`, `controls`, `drag`, `tabs`, `viewW`, `viewH`, `frame` | The regions, the pages shown, and the band. Below. The SDK sends it |
 | `newTab` | `workspace`, optional: a workspace's id | Opens a tab in this window and makes it active, in the workspace named, or without one in the active tab's, or the first in the list when the window has no tab |
+| `createWorkspace` | `text`, `color` | Makes a workspace with that name and `#rrggbb` colour, at the end of the list |
+| `renameWorkspace` | `workspace`, `text` | Renames a workspace, by its id |
+| `editWorkspace` | `workspace`, `text`, `color` | Renames and recolours a workspace together; a name refused changes neither |
+| `moveWorkspace` | `workspace`, `by`: -1 or 1 | Moves a workspace one place up or down the list |
+| `deleteWorkspace` | `workspace` | Deletes a workspace: Go takes it out of the list, closes its tabs in every window, and erases its storage. The last one is refused |
 | `closeTab` | `id` | Closes a tab |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |

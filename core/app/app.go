@@ -89,7 +89,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Commands.RegisterList(a.workspaceList())
 	a.Commands.RegisterList(a.shellList())
 	a.Shell = shell.New(e, a.Tabs, a.Suggest, a.Window, a.Prefs, a.Update, a.Crash, a.Commands.Run, a.Commands.ShownKeys, a.Commands.Platform())
-	a.Shell.AddPart(a.workspaceShellPart())
+	a.Shell.AddPart(a.workspaceShellPart(e))
 	a.Settings = settings.New(e, a.Window, a.Prefs, a.Flags, a.Update, a.Commands)
 	a.Settings.OnRelaunch(func() { relaunch.Self(); a.quit() })
 	a.Settings.AddPart(a.workspaceSettingsPart(e))

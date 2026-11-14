@@ -1254,6 +1254,46 @@ func TestTheSettingsPageDeletesAWorkspace(t *testing.T) {
 	}
 }
 
+// A shell changes the workspaces with the settings page's messages, naming a workspace by
+// "workspace", under the same rules: it makes, edits and moves one, and every shell hears
+// the list; its delete closes the workspace's tabs and only then has the engine erase it;
+// and the last one isn't deleted.
+func TestAShellChangesTheWorkspaces(t *testing.T) {
+	dir := t.TempDir()
+	r := start(t, dir)
+	defer r.stop()
+	list := func(m map[string]any) []any { l, _ := m["workspaces"].([]any); return l }
+	r.shell(`{"t":"createWorkspace","text":"Work","color":"#5b7fd6"}`)
+	m := r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" && len(list(m)) == 2 })
+	work := list(m)[1].(map[string]any)["id"].(string)
+	r.shell(`{"t":"editWorkspace","workspace":"` + work + `","text":"Office","color":"#c2410c"}`)
+	r.shell(`{"t":"moveWorkspace","workspace":"` + work + `","by":-1}`)
+	r.waitFor(func(m map[string]any) bool {
+		if m["t"] != "workspaces" {
+			return false
+		}
+		w := list(m)[0].(map[string]any)
+		return w["id"] == work && w["name"] == "Office" && w["color"] == "#c2410c"
+	})
+	var tab engine.TabID
+	r.e.Post(func() { tab = r.a.Tabs.CreateIn(1, work) })
+	r.shell(`{"t":"deleteWorkspace","workspace":"` + work + `"}`)
+	r.waitFor(func(m map[string]any) bool { return m["t"] == "workspaces" && len(list(m)) == 1 })
+	r.shell(`{"t":"deleteWorkspace","workspace":""}`)
+	r.e.Settle()
+	var left []tabs.Tab
+	var erased []mockengine.Erase
+	var open bool
+	r.e.Post(func() { left, erased = r.a.Tabs.All(), r.e.Erased(); _, open = r.a.Tabs.Get(tab) })
+	r.e.Settle()
+	if open || len(left) != 1 || left[0].Workspace != "" || !reflect.DeepEqual(erased, []mockengine.Erase{{Workspace: work}}) {
+		t.Fatalf("left %+v, the engine erased %+v", left, erased)
+	}
+	if l := workspaces.New(dir).List(); len(l) != 1 || l[0].ID != "" {
+		t.Fatalf("the profile's list holds %+v", l)
+	}
+}
+
 // View, Shell lists the shells the user can choose, with a tick on the one in use. Choosing
 // another makes it the profile's and loads it in the window, which hears nothing until it
 // says it's ready; what the old shell claimed of the window goes, and the tab stays shown.

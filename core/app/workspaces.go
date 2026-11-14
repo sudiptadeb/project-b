@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"maps"
 	"slices"
 
@@ -33,28 +32,68 @@ func (a *App) workspaceList() commands.List {
 }
 
 // workspaceShellPart gives a window's shell the workspaces in its snapshot, for the dot on
-// each tab in one.
-func (a *App) workspaceShellPart() shell.Part {
+// each tab, and takes the same changes to them the settings page does: workspaces are
+// Go's, for every shell to use. A shell names the workspace by "workspace", as its newTab
+// does, since "id" is a number in a shell's messages.
+func (a *App) workspaceShellPart(e engine.Engine) shell.Part {
 	return shell.Part{
 		Snapshot: func(into map[string]any) { into["workspaces"] = a.Workspaces.List() },
-		Handle:   func(engine.WindowID, string, []byte) bool { return false },
+		Handle: func(_ engine.WindowID, t string, msg []byte) bool {
+			var c struct {
+				Workspace string `json:"workspace"`
+				Text      string `json:"text"`
+				Color     string `json:"color"`
+				By        int    `json:"by"`
+			}
+			json.Unmarshal(msg, &c)
+			return a.changeWorkspaces(e, t, workspaceChange{ID: c.Workspace, Text: c.Text, Color: c.Color, By: c.By})
+		},
 	}
 }
 
-// workspaceCommand is what the settings page's Workspaces section sends.
-type workspaceCommand struct {
+// workspaceChange is a change to the list, as the settings page sends it: the workspace by
+// its id, a name, a colour, and the places to move it by.
+type workspaceChange struct {
 	ID    string `json:"id"`
 	Text  string `json:"text"`
 	Color string `json:"color"`
 	By    int    `json:"by"`
 }
 
+// changeWorkspaces makes a change to the list, by the message's t, whoever asks: the
+// settings page or a shell, under the same rules. It says whether t was one of its.
+func (a *App) changeWorkspaces(e engine.Engine, t string, c workspaceChange) bool {
+	var err error
+	switch t {
+	case "createWorkspace":
+		_, err = a.Workspaces.Create(c.Text, c.Color)
+	case "renameWorkspace":
+		err = a.Workspaces.SetName(c.ID, c.Text)
+	// The name and colour come together. The name goes first, so a name refused changes
+	// nothing.
+	case "editWorkspace":
+		if err = a.Workspaces.SetName(c.ID, c.Text); err == nil {
+			err = a.Workspaces.SetColor(c.ID, c.Color)
+		}
+	case "moveWorkspace":
+		err = a.Workspaces.Move(c.ID, c.By)
+	case "deleteWorkspace":
+		err = a.deleteWorkspace(e, c.ID)
+	default:
+		return false
+	}
+	if err != nil {
+		timeline.Warnf("workspaces: %v", err)
+	}
+	return true
+}
+
 // workspaceSettingsPart is the settings page's Workspaces section: the list, each with the
 // number of tabs open in it, New workspace with a name and a colour, editing one's name and
-// colour, moving one up or down the list, and deleting one. Every copy has it, a copy on a
-// folder named outright too, since the list is the profile folder's. The pages hear the
-// list again through its OnChanged, as the shells do, and the counts again when a tab opens
-// or closes and they differ.
+// colour, moving one up or down the list, deleting one, and a new tab in one. Every copy
+// has it, a copy on a folder named outright too, since the list is the profile folder's.
+// The pages hear the list again through its OnChanged, as the shells do, and the counts
+// again when a tab opens or closes and they differ.
 func (a *App) workspaceSettingsPart(e engine.Engine) settings.Part {
 	counts := a.workspaceTabs()
 	a.Tabs.OnListChanged(func() {
@@ -69,40 +108,20 @@ func (a *App) workspaceSettingsPart(e engine.Engine) settings.Part {
 			into["workspaceTabs"] = counts
 		},
 		Handle: func(w engine.WindowID, t string, msg []byte) bool {
-			var c workspaceCommand
+			var c workspaceChange
 			json.Unmarshal(msg, &c)
-			var err error
-			switch t {
-			case "createWorkspace":
-				_, err = a.Workspaces.Create(c.Text, c.Color)
-			case "renameWorkspace":
-				err = a.Workspaces.SetName(c.ID, c.Text)
-			// The page's dialog sends a workspace's name and colour together. The name goes
-			// first, so a name refused changes nothing.
-			case "editWorkspace":
-				if err = a.Workspaces.SetName(c.ID, c.Text); err == nil {
-					err = a.Workspaces.SetColor(c.ID, c.Color)
-				}
-			case "moveWorkspace":
-				err = a.Workspaces.Move(c.ID, c.By)
-			case "deleteWorkspace":
-				err = a.deleteWorkspace(e, c.ID)
+			if t != "openInWorkspace" {
+				return a.changeWorkspaces(e, t, c)
+			}
 			// New tab in workspace: a tab in it at the end of the page's own window, and the
 			// page closes so the tab is what the user sees, as choosing it in the Tab menu
 			// does.
-			case "openInWorkspace":
-				if !slices.ContainsFunc(a.Workspaces.List(), func(x workspaces.Workspace) bool { return x.ID == c.ID }) {
-					err = errors.New("no workspace " + c.ID)
-					break
-				}
-				a.Shell.Interaction(w, "tab.new", func() { a.Tabs.CreateIn(w, c.ID) })
-				a.Settings.Close(w)
-			default:
-				return false
+			if !slices.ContainsFunc(a.Workspaces.List(), func(x workspaces.Workspace) bool { return x.ID == c.ID }) {
+				timeline.Warnf("workspaces: no workspace %s", c.ID)
+				return true
 			}
-			if err != nil {
-				timeline.Warnf("workspaces: %v", err)
-			}
+			a.Shell.Interaction(w, "tab.new", func() { a.Tabs.CreateIn(w, c.ID) })
+			a.Settings.Close(w)
 			return true
 		},
 	}

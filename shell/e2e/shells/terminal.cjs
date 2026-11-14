@@ -1,5 +1,5 @@
 // The terminal shell's own tests, on the mock engine: its panes in groups, the splits, the
-// dividers, the groups kept in its own data across a reload, and the gear. The contract
+// dividers, the groups kept in its own data across a reload, its keys, and the gear. The contract
 // every shell keeps is shell-contract.cjs's.
 // Run: node shell/e2e/shells/terminal.cjs   (from the repo root, after `npm run build` in shell/)
 
@@ -180,10 +180,48 @@ const { check, fire, regions, settle, until } = lib;
   await title(t2).getByRole('button', { name: /^Close/ }).click();
   check('closing the other leaves one pane with the body to itself', await until(async () => JSON.stringify((await shown())[t1]) === JSON.stringify(one)), JSON.stringify({ one, now: await shown() }));
 
+  // Its own keys, which Go sends it as actions while it is on: Cmd+D splits the active pane
+  // right and Shift+Cmd+D down, as the buttons do, whose titles show the keys.
+  const button = (name) => title(t1).getByRole('button', { name });
+  check('the split buttons show their keys', (await button('Split right').getAttribute('title')) === 'Split right (⌘D)' && (await button('Split down').getAttribute('title')) === 'Split down (⇧⌘D)');
+  await fire('key', 'splitRight');
+  check('Cmd+D splits the active pane right', await until(async () => (await regions()).visible.length === 2));
+  const t6 = (await regions()).tabs.find((t) => t.id !== t1 && t.id !== t4).id;
+  s = await shown();
+  check('Cmd+D: the new pane beside it, on the same line, and active', near(s[t1].y, s[t6].y) && near(s[t1].h, s[t6].h) && s[t1].x + s[t1].w <= s[t6].x && (await regions()).active === t6, JSON.stringify(s));
+  await fire('key', 'splitDown');
+  check('Shift+Cmd+D splits the active pane down', await until(async () => (await regions()).visible.length === 3));
+  const t7 = (await regions()).tabs.find((t) => t.id !== t1 && t.id !== t4 && t.id !== t6).id;
+  s = await shown();
+  check('Shift+Cmd+D: the new pane under it, in the same column', near(s[t6].x, s[t7].x) && near(s[t6].w, s[t7].w) && s[t6].y + s[t6].h <= s[t7].y, JSON.stringify(s));
+  check('the keys split within the shown group', (await chips.count()) === 2 && (await ui.locator('.chip.shown [role=tab]').count()) === 3 && await insideAndApart());
+
   // The gear at the strip's far end opens the settings page.
   check('settings starts closed', (await regions()).settingsOpen === false);
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   check('the gear opens the settings page', await until(async () => (await regions()).settingsOpen === true));
+
+  await fire('key', 'closeTab');
+  check('Cmd+W closes it', await until(async () => (await regions()).settingsOpen === false));
+
+  // With another shell on, Cmd+D is the page's: Go doesn't run the terminal's action, so
+  // the shell hears nothing of it. A title set after it is the mark that it has heard all
+  // Cmd+D could have sent.
+  await fire('menu', 'shells:standard');
+  check('View, Shell switches to standard', await until(async () => /\/shell\/standard\//.test(w.shell()?.url()) && (await ui.locator('[role=tab]').count()) === (await regions()).tabs.length, 10000));
+  await w.shell().evaluate(() => {
+    const own = window.__shellReceive;
+    window.heard = [];
+    window.__shellReceive = (json) => {
+      window.heard.push(JSON.parse(json));
+      own(json);
+    };
+  });
+  const count = (await regions()).tabs.length;
+  await fire('key', 'splitRight');
+  await fire('title', 'After Cmd+D', { tab: (await regions()).active });
+  const heard = () => w.shell().evaluate(() => window.heard.map((m) => (m.t === 'tab' ? m.tab.title : m.t)));
+  check('with standard on, Cmd+D does nothing to the shell', await until(async () => (await heard()).includes('After Cmd+D')) && !(await heard()).includes('action') && (await regions()).tabs.length === count, JSON.stringify(await heard()));
 
   check('no errors', w.errors.length === 0, w.errors.join(' | '));
   await browser.close();

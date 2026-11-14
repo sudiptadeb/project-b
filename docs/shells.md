@@ -59,7 +59,7 @@ of it.
 | `@/sdk/regions.js` | The markers a shell marks its elements with, each with `mark(el)` and `unmark(el)`. `shell`: this element is the shell's, so presses on it reach the shell. `drag`: this element moves the window wherever it has no control: an empty space, or a whole bar of controls, whose gaps then drag; its controls, and anything in it marked `shell`, stay the shell's. `page`: `mark(el, tab)` and `update(el, tab)`, this tab's page shows here; 0 shows none. |
 | `@/sdk/extensions.js` | What a shell sends about extensions: `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`, `answerExtensionPrompt(on)`. |
 | `@/sdk/controls.js` | `controls`: the one selector for what a control is, something the user presses or types in (buttons, links with an address, fields, selects, text areas, `role="tab"` and `role="button"`, anything with a `tabindex`). The SDK finds a drag bar's controls by it, and the check reads it for rule 6. |
-| `@/sdk/vue.js` | The Vue adapter: `state`, a reactive copy that follows the SDK's; `activeTab` and `controlSpace` as computeds; `workspaceOf(tab)`; `connect(handlers)`, which waits for Vue's `nextTick`; the directives `v-shell`, `v-drag` and `v-page="tab.id"`; and `send`, `saveData`, `focusPage`, `setFrame`, `tabLabel`. |
+| `@/sdk/vue.js` | The Vue adapter: `state`, a reactive copy that follows the SDK's; `activeTab` and `controlSpace` as computeds; `workspaceOf(tab)` and `keyLabel(action)`; `connect(handlers)`, which waits for Vue's `nextTick`; the directives `v-shell`, `v-drag` and `v-page="tab.id"`; and `send`, `saveData`, `focusPage`, `setFrame`, `tabLabel`. |
 | `@/sdk/svelte.svelte.js` | The Svelte 5 adapter: `state`, a `$state` copy that follows the SDK's; `connect(handlers)`, which waits for Svelte's `tick`; the actions `use:shell`, `use:drag` and `use:page={tab.id}`; and the SDK's helpers, given that `state`. |
 | `@/theme.js`, `@/tones.js`, `@/design.css` | The colours, made from the frame colour, and the shared controls ([design-system.md](design-system.md)). |
 | `@extensions` | `ExtensionsToolbar`: the Vue shells' extensions buttons, their menu and the install prompt, drawn from `state.extensions`. `extensionsBuilt`: whether the build has extensions. |
@@ -382,7 +382,9 @@ dense and square.
   strip's far end are the extensions and a gear that opens settings. Each pane has a title
   bar with split right, split down and close; a press on it makes the pane active. The
   prompt line at the foot is the address bar, with back, forward and reload, and the update
-  when one is ready.
+  when one is ready. Cmd+D splits the active pane right and Shift+Cmd+D down, its own
+  actions `terminal.splitRight` and `terminal.splitDown`; the split buttons' titles show
+  the keys.
 - **The active tab is the focused pane,** and the group shown is the one that holds it.
   Closing the active pane makes the pane that takes its room active first, so its group
   stays shown.
@@ -392,9 +394,9 @@ dense and square.
   has. It is fitted to Go's list on the snapshot and on every `tabs`: a tab that is gone
   leaves its tree, its share going to the part before it; a split left with one part
   becomes that part.
-- **It leaves out** keys and menu items to split and close (a shell's own commands have no
-  message yet), dimming the pages of panes that aren't active, dragging panes between
-  groups, broadcasting input, and the notice of the last run's crash.
+- **It leaves out** a key to close a pane, dimming the pages of panes that aren't active,
+  dragging panes between groups, broadcasting input, and the notice of the last run's
+  crash.
 
 ## The fox shell
 

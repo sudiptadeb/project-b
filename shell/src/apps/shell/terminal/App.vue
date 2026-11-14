@@ -4,7 +4,7 @@ import PaneTree from './PaneTree.vue';
 import PromptLine from './PromptLine.vue';
 import TopStrip from './TopStrip.vue';
 import { connect, setFrame, state } from '@/sdk/vue.js';
-import { follow, load, shown } from './panes.js';
+import { follow, load, shown, split } from './panes.js';
 import { prompt } from './prompt.js';
 
 // A terminal's window: a strip of groups on top, the shown group's panes in the body, and
@@ -12,11 +12,19 @@ import { prompt } from './prompt.js';
 // 4px band.
 setFrame(4);
 
+// Its own actions, as the registry lists them, which Go sends while this shell is on: each
+// splits the active pane, as its buttons do.
+const actions = {
+  'terminal.splitRight': () => split(state.active, 'row'),
+  'terminal.splitDown': () => split(state.active, 'column'),
+};
+
 connect({
   snapshot: () => load(state.data),
   tabs: follow,
   suggestions: (m) => prompt.suggestions(m.id, m.items || []),
   focusAddressBar: () => prompt.focus(),
+  action: (m) => actions[m.id](),
 });
 
 // A pane that becomes active with nothing in it wants an address; one with a page wants

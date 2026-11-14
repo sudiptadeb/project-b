@@ -16,6 +16,7 @@ sdk.onChange((fields) => Object.assign(state, fields));
 export const activeTab = computed(() => sdk.activeTab(state));
 export const controlSpace = computed(() => sdk.controlSpace(state));
 export const workspaceOf = (tab) => sdk.workspaceOf(state, tab);
+export const keyLabel = (action) => sdk.keyLabel(state, action);
 
 // connect, with Vue's nextTick as the wait for the view to draw.
 export const connect = (handlers) => sdk.connect(handlers, nextTick);

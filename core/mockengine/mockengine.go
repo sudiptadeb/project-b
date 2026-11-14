@@ -47,6 +47,8 @@ var Keys = map[string]engine.Key{
 	"tab3":            {Code: '3', Mods: engine.ModCmd},
 	"tab9":            {Code: '9', Mods: engine.ModCmd},
 	"settings":        {Code: 0xBC, Mods: engine.ModCmd},
+	"splitRight":      {Code: 'D', Mods: engine.ModCmd},
+	"splitDown":       {Code: 'D', Mods: engine.ModCmd | engine.ModShift},
 }
 
 // tab is one mock tab's session history and what its page shows.

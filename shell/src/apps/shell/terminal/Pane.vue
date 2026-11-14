@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { send, state, tabLabel } from '@/sdk/vue.js';
+import { keyLabel, send, state, tabLabel } from '@/sdk/vue.js';
 import { close, split } from './panes.js';
 
 // One pane: a title bar over the place its tab's page shows. A press on the bar makes the
@@ -21,6 +21,12 @@ const status = computed(() => {
 function press() {
   if (!active.value) send({ t: 'activateTab', id: props.id });
 }
+
+// A control's tooltip: its name, and its key when it has one.
+function hint(name, action) {
+  const key = keyLabel(action);
+  return key ? `${name} (${key})` : name;
+}
 </script>
 
 <template>
@@ -30,10 +36,10 @@ function press() {
       <span v-if="host" class="host">{{ host }}</span>
       <span v-if="status" class="status">{{ status }}</span>
       <span class="gap"></span>
-      <button class="control" type="button" aria-label="Split right" title="Split right" @pointerdown.stop @click="split(id, 'row')">
+      <button class="control" type="button" aria-label="Split right" :title="hint('Split right', 'terminal.splitRight')" @pointerdown.stop @click="split(id, 'row')">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="10.8" height="10.8"/><path d="M6 .6v10.8"/></svg>
       </button>
-      <button class="control" type="button" aria-label="Split down" title="Split down" @pointerdown.stop @click="split(id, 'column')">
+      <button class="control" type="button" aria-label="Split down" :title="hint('Split down', 'terminal.splitDown')" @pointerdown.stop @click="split(id, 'column')">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="10.8" height="10.8"/><path d="M.6 6h10.8"/></svg>
       </button>
       <button class="control" type="button" :aria-label="`Close ${tabLabel(tab)}`" title="Close" @pointerdown.stop @click="close(id)">

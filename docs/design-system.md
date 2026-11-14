@@ -61,6 +61,12 @@ neither reaches 4.5 (the red preset in dark, a mid blue like Work's in light) it
 away from the label it picked, a little at a time, until it does; so the accent can differ
 slightly from the frame. `shell/e2e/settings.cjs` checks every preset, light and dark.
 
+**In dark mode a button's label reads clearly high,** the owner's rule (2026-11-14): the
+label on a filled button keeps the contrast `--on-accent` gives it, and nothing dims the
+fill or the words to soften the button against the dark bar. The slate preset's white
+label at 5.7 to 1 is the example he chose over a softer accent. 4.5 is the floor, not the
+aim.
+
 Check light and dark with three frame colours: the default `#4f9e9e`, a dark one and a light
 one. `tones.js` must keep every pair readable.
 

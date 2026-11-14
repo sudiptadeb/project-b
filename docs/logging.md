@@ -210,6 +210,9 @@ and add the command that starts it to `spans` in `shell/src/bridge.js`.
     python3 tools/timeline.py timeline.log t.json   # the same from anybody's file
     python3 tools/timeline.py timeline.log          # every span in the file, with its stages
 
+For where the time and memory go, per shell and against a bare native app, see
+docs/benchmarks.md.
+
 Each start is on a fresh profile; it opens settings, opens, shows and closes tabs, and
 moves the tabs there and back, by clicks and keys. There are three baselines, each compared with its own
 kind: `mac.json`, from the desktop session of a person logged in (`tools/on_screen.py

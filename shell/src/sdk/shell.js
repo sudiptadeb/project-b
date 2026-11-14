@@ -126,8 +126,11 @@ export function activeTab(s) {
   return s.tabs.find((t) => t.id === s.active) || emptyTab;
 }
 
-// workspaceOf is the workspace a tab is in, or undefined for one the list doesn't hold.
+// workspaceOf is the workspace a tab is in, for a shell to show it by: undefined while the
+// profile has one workspace only, as every tab is then in it, and for one the list doesn't
+// hold.
 export function workspaceOf(s, tab) {
+  if (s.workspaces.length < 2) return undefined;
   return s.workspaces.find((w) => w.id === tab.workspace);
 }
 

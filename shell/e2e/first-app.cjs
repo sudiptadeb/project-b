@@ -600,9 +600,12 @@ const stopServer = lib.stop;
   check('the running release keeps working', (await bar.inputValue()) === 'https://example.org/');
   releaseServer.close();
 
-  // A tab shows a dot in its workspace's colour, in both layouts: one in Work, and the
-  // first, in Main, which Go puts above a list from before it. The tab is opened as Tab, New
-  // Tab in Workspace does, and New Tab from it opens in it too.
+  // With one workspace, Main, every tab is in it, and none shows a dot.
+  check('with one workspace no tab shows a dot', (await ui.locator('[role=tab]').count()) > 0 && (await ui.locator('[role=tab] .workspace').count()) === 0);
+
+  // With two, a tab shows a dot in its workspace's colour, in both layouts: one in Work,
+  // and the first, in Main, which Go puts above a list from before it. The tab is opened as
+  // Tab, New Tab in Workspace does, and New Tab from it opens in it too.
   await stopServer();
   fs.writeFileSync(path.join(profile, 'workspaces.json'), JSON.stringify({ workspaces: [{ id: '0a1b2c3d', name: 'Work', color: '#5b7fd6' }] }));
   await startServer();

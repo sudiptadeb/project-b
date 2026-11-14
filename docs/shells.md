@@ -408,7 +408,8 @@ address field, and a menu button at the far right, in our tones.
 - **The tab strip** is the title bar. Tabs share it between a minimum and a maximum width;
   past the minimum it scrolls sideways, with arrows at its ends, New Tab fixed at its end,
   and the active tab always scrolled into view. "List all tabs" at its right opens a menu
-  of every tab. A tab in a workspace has a line in the workspace's colour along its top.
+  of every tab. While the profile has two or more workspaces, a tab has a line in its
+  workspace's colour along its top.
 - **The navigation bar** has back, forward, and reload, which is Stop (`run nav.stop`)
   while the page loads; the address field, centred, with the suggestions attached under it
   and the active tab's workspace at its right end; the extensions; and the menu button,
@@ -490,6 +491,9 @@ What every shell needs, whatever it looks like:
   `page` with `update(el, tab)`.
 - `activeTab(state)`, `workspaceOf(state, tab)`, `tabLabel(tab)`, `keyLabel(state,
   action)`, `controlSpace(state)`: helpers that read the state they are given.
+  `workspaceOf` is the workspace a shell shows a tab in, by a dot or its name, and is
+  undefined while the profile has one workspace only, so every shell leaves the dot out
+  then.
 - `pressExtension(id, el)`, `pinExtension(id, on)`, `manageExtensions()`,
   `answerExtensionPrompt(on)`: what goes back about extensions.
 - `controls`: the selector for what a control is.

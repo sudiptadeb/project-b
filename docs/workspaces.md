@@ -71,11 +71,15 @@ as built so far, and the order of building at the end says which steps are done.
   (`{"list": "workspaces"}` in the menu template), read when the menu opens, as the
   Profiles menu is. It lists every workspace, a single one too. Choosing one opens a new tab
   in it, at the end of the window in front.
-- A tab shows a small dot in its workspace's colour after its title, in the sidebar and in
-  the strip on top, named for the workspace to a screen reader. A tab in a workspace the
-  list doesn't hold shows none. Every shell has the list in its snapshot, and hears it
-  again, `{"t": "workspaces", "workspaces": [...]}`, when it changes, so the dots follow at
-  once (`core/app/workspaces.go`, `shell/src/apps/shell/standard/`). The mock's page fires
+- While the profile has two or more workspaces, a tab shows a small dot in its workspace's
+  colour after its title, in the sidebar and in the strip on top, named for the workspace
+  to a screen reader. With one, every tab is in it, and no tab shows a dot. The SDK's
+  `workspaceOf` says so for every shell (`shell/src/sdk/shell.js`): the fox shell's line on
+  a tab and the workspace's name in its address field, and the minimal shells' square, go
+  with it. A tab in a workspace the list doesn't hold shows none. Every shell has the list
+  in its snapshot, and hears it again, `{"t": "workspaces", "workspaces": [...]}`, when it
+  changes, so the dots follow at once (`core/app/workspaces.go`,
+  `shell/src/apps/shell/standard/`). The mock's page fires
   a menu item by its action, as the menu bar does (`/mock/fire`, kind `menu`).
 - Settings has a Workspaces section, after Profile: a list of rows, each with the
   workspace's colour, its name and the number of tabs open in it, and a menu (the ⋯
@@ -146,7 +150,8 @@ app, a tab made over DevTools, a tab an extension opens, a new window's first ta
   the Profiles menu is.
 - Settings: a Workspaces section, with the list, New workspace (a name and a colour), and
   edit and reorder.
-- The shell shows a tab's workspace as a dot in the workspace's colour on the tab.
+- The shell shows a tab's workspace as a dot in the workspace's colour on the tab, while
+  there are two or more.
 
 **Extensions see every tab and aren't told its workspace,** as decided. Content scripts
 and network rules work in every workspace.
@@ -155,7 +160,8 @@ and network rules work in every workspace.
 
 Proposed with the design, and settled by the owner's word of 2026-11-14:
 
-1. A workspace is shown by a coloured dot on the tab, and by nothing else for now.
+1. A workspace is shown by a coloured dot on the tab, and by nothing else for now. With
+   one workspace only there is no dot.
 2. A new profile starts with one workspace, Main, the profile's own storage. A profile from
    before gets Main at the top of its list once.
 
@@ -175,6 +181,7 @@ Each commit builds, leaves a working app, and carries its tests.
    naming one.
 7. Done. No default: Main in every profile, the profile's own storage, and a tab nothing
    places in the first workspace, in Go and in the engine.
+8. Done. The dot only while there are two or more workspaces.
 
 ## Decided while building
 

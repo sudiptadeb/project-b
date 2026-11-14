@@ -39,8 +39,7 @@ VERSION = "155.0.8059.41"
 
 # What Go thinks the tabs are, as the shell shows them.
 ROWS = "document.querySelectorAll('[role=tab]').length"
-# The active row's title: the standard shell's .title, or Glide's .label.
-ACTIVE_ROW_TITLE = "document.querySelector('[role=tab][aria-selected=true]').querySelector('.title, .label').textContent"
+ACTIVE_ROW_TITLE = "document.querySelector('[role=tab][aria-selected=true] .title').textContent"
 
 PAGES = {
     "/": b"""<!doctype html><title>Fixture</title>

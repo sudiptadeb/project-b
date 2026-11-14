@@ -1370,7 +1370,7 @@ func TestViewShellSwitchesTheShellLive(t *testing.T) {
 		t.Fatalf("View, Shell lists %+v", items)
 	}
 	for i, s := range listed {
-		if items[i].Title != s.Name || items[i].Action != "shells:"+s.ID || items[i].Checked != (s.ID == "glide") {
+		if items[i].Title != s.Name || items[i].Action != "shells:"+s.ID || items[i].Checked != (s.ID == "standard") {
 			t.Fatalf("View, Shell lists %+v", items)
 		}
 	}

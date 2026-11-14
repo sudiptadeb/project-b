@@ -1,4 +1,4 @@
-# Glide: the default shell
+# Glide: a shell to choose
 
 `glide`, built 2026-11-14 from the spec in `project-b-research/arc-shell/spec.md`, under its
 section 0, the owner's decisions of that day. Arc gave the look; the behaviour is ours and
@@ -68,7 +68,6 @@ It uses what Go already gives every shell: the workspace messages (`createWorksp
   and the shell stay separate prefs. Over Project B's keys it gives Cmd+T to Open Command
   Bar, Cmd+D to Pin or Unpin Tab, and Option+Cmd+Left and Right to the previous and next
   Space. With another keymap, Cmd+T opens a new empty tab, which opens the Command Bar.
-- Glide is first in the registry, so the default shell, and the profile templates name it.
 
 ## Left out, on purpose
 

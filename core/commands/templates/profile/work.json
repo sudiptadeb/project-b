@@ -4,6 +4,6 @@
     "tabLayout": "horizontal",
     "frameColor": "#5b7fd6",
     "theme": "system",
-    "shell": "glide"
+    "shell": "standard"
   }
 }

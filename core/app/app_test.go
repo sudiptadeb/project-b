@@ -1,11 +1,16 @@
 package app_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -1573,4 +1578,50 @@ func TestTheGlideKeymap(t *testing.T) {
 	press("Cmd+T", "glide.commandBar")
 	press("Cmd+D", "glide.pin")
 	press("Option+Cmd+Right", "glide.spaceNext")
+}
+
+// The settings page's Install update hands a ready release to the installer, as the
+// shell's button does, on a phone build: it once relaunched the app instead, which on a
+// phone does nothing.
+func TestTheSettingsPageInstallsAReadyUpdate(t *testing.T) {
+	apk := []byte("an APK, as far as the updater cares")
+	sum := sha256.Sum256(apk)
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/asset" {
+			w.Write(apk)
+			return
+		}
+		fmt.Fprintf(w, `{"spec":1,"project":"project-b","published":"2026-11-14T00:00:00Z","channels":{"stable":"0.9.0"},
+		  "releases":{"0.9.0":{"assets":{"%s/%s":{"url":"%s/asset","sha256":"%s","size":%d}}}}}`,
+			runtime.GOOS, runtime.GOARCH, srv.URL, hex.EncodeToString(sum[:]), len(apk))
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	installed := make(chan string, 4)
+	r := startWith(t, app.Config{ProfileDir: dir, Profiles: profiles.New(t.TempDir()), Update: update.Config{
+		Project: "project-b", Version: "0.1.0", Releases: srv.URL, StateDir: filepath.Join(dir, "updates"),
+		Install: func(apk string) { installed <- apk }}})
+	defer r.stop()
+	r.e.Post(func() { r.a.Update.CheckNow() })
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var s update.State
+		done := make(chan struct{})
+		r.e.Post(func() { s = r.a.Update.State(); close(done) })
+		<-done
+		if s.Phase == update.Ready {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	r.settings(`{"t":"relaunch"}`)
+	select {
+	case got := <-installed:
+		if b, err := os.ReadFile(got); err != nil || string(b) != string(apk) {
+			t.Fatalf("installed %q: %q %v", got, b, err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the settings page's Install update never reached the installer")
+	}
 }

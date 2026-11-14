@@ -191,7 +191,12 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 	case "setFlag":
 		m.flags.Set(c.ID, c.Text)
 	case "relaunch":
-		if m.relaunch != nil {
+		// With a release ready, relaunching is applying it, as the shell's own button
+		// does: on a phone that hands it to Android's installer, which a plain relaunch
+		// never would.
+		if m.update.State().Phase == update.Ready {
+			m.update.Relaunch()
+		} else if m.relaunch != nil {
 			m.relaunch()
 		}
 	default:

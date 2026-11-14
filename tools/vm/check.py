@@ -58,10 +58,16 @@ PORT = 8765
 ALPHA = f"http://127.0.0.1:{PORT}/alpha.html"
 BRAVO = f"http://127.0.0.1:{PORT}/bravo.html"
 CHARLIE = f"http://127.0.0.1:{PORT}/charlie.html"
+DRAG_IMAGE = f"http://127.0.0.1:{PORT}/drag-image.html"
 PAGE_HTML = {
     "alpha.html": "<title>Alpha</title><body style='margin:0;background:#2b6cb0;color:#fff;font:64px sans-serif'><p>Alpha</p>",
     "bravo.html": "<title>Bravo</title><body style='margin:0;background:#dd6b20;color:#fff;font:64px sans-serif'><p>Bravo</p>",
     "charlie.html": "<title>Charlie</title><body style='margin:0;background:#2f855a;color:#fff;font:64px sans-serif'><p>Charlie</p>",
+    # Hides the drag's ghost image with an empty one, a common trick: content then asks for
+    # a default icon that the app has to supply.
+    "drag-image.html": "<title>Drag</title><body style='margin:0'><div id=d draggable=true "
+                       "style='width:400px;height:300px;background:#e53e3e'></div>"
+                       "<script>d.ondragstart=e=>e.dataTransfer.setDragImage(new Image(),0,0)</script>",
 }
 ROOT = "/Users/admin/.project-b"
 PROFILE = f"{ROOT}/default"
@@ -668,6 +674,37 @@ def window_checks():
     check("closing the last window quits", gone)
     if not gone:
         guest("/usr/bin/killall", "project_b")
+
+
+DRAG_RED = (229, 62, 62)  # drag-image.html's box.
+
+
+def drag_image_checks():
+    """A page that hides its drag image with an empty one keeps the app running when its box
+    is dragged with the real mouse. Up to 0.2.59 the app aborted: content fell back to a
+    default icon, and ours was empty."""
+    guest("/usr/bin/killall", "project_b")
+    fresh_profile()
+    time.sleep(1)
+    launch()
+    time.sleep(1.5)
+    window_or_stop("the app starts for the drag check")
+    go_to(DRAG_IMAGE)
+    until(titles, lambda t: t[:1] == ["Drag"])
+    box = until(lambda: np.argwhere(near(desk.image(), DRAG_RED, 12)), lambda found: len(found) > 1000)
+    if box is None or len(box) <= 1000:
+        check("the drag check's box shows", False, "no red box on screen")
+        return
+    y, x = box.mean(axis=0) / desk.scale
+    drag(int(x), int(y), int(x) + 150, int(y) + 120)
+    time.sleep(2)
+    shot("drag-image")
+    alive = guest("/usr/bin/pgrep", "-x", "project_b") != "" and window() is not None
+    check("dragging a box whose page hides the drag image with an empty one leaves the app running", alive,
+          "" if alive else "the app is gone")
+    if not alive:
+        return
+    quit_app()
 
 
 MOVED = "/tmp/pb-move"  # In the guest: the driver's pipe and output, and a profile, for move_checks.
@@ -1806,6 +1843,7 @@ check("Cmd+Q ends the app", quit_app())
 window_checks()
 move_checks()
 state_checks()
+drag_image_checks()
 profile_checks()
 picker_checks()
 workspace_checks()

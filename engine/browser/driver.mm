@@ -12,6 +12,7 @@
 #include "base/functional/callback.h"
 #include "base/json/json_writer.h"
 #include "base/memory/ref_counted.h"
+#include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/process/process.h"
 #include "base/strings/string_number_conversions.h"
@@ -29,6 +30,7 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
@@ -267,16 +269,41 @@ unsigned short CodeForChar(unichar c) {
 
 void Capture(const std::string& id, const std::string& path);
 
+// The reply to one eval. Content drops the result's callback, unrun, when the page the
+// script went to is destroyed first, as a settings page is when it closes. So the reply
+// watches the page, and answers "ERR gone" if it goes before the result comes. It
+// answers once either way, and goes with its answer.
+class EvalReply : public content::WebContentsObserver {
+ public:
+  EvalReply(const std::string& id, content::WebContents* contents)
+      : content::WebContentsObserver(contents), id_(id) {}
+
+  base::OnceCallback<void(base::Value)> Result() {
+    return base::BindOnce(&EvalReply::Answer, weak_factory_.GetWeakPtr());
+  }
+
+ private:
+  void Answer(base::Value value) {
+    std::string json;
+    base::JSONWriter::Write(value, &json);
+    Done(json);
+  }
+
+  // content::WebContentsObserver:
+  void WebContentsDestroyed() override { Done("ERR gone"); }
+
+  void Done(const std::string& text) {
+    Reply(id_, text);
+    delete this;
+  }
+
+  const std::string id_;
+  base::WeakPtrFactory<EvalReply> weak_factory_{this};
+};
+
 void Eval(const std::string& id, content::WebContents* contents, const std::string& js) {
   contents->GetPrimaryMainFrame()->ExecuteJavaScriptForTests(
-      base::UTF8ToUTF16(js),
-      base::BindOnce(
-          [](const std::string& id, base::Value value) {
-            std::string json;
-            base::JSONWriter::Write(value, &json);
-            Reply(id, json);
-          },
-          id),
+      base::UTF8ToUTF16(js), (new EvalReply(id, contents))->Result(),
       /*world_id=*/0);
 }
 

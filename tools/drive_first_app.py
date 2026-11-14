@@ -8,6 +8,7 @@ exercised, and neither are full screen and the clipboard, which need a person's 
 session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no display. Run it from the repo root:
 
     python3 tools/drive_first_app.py
+    python3 tools/drive_first_app.py driver     # only the driver itself
     python3 tools/drive_first_app.py settings   # only menus, keys and the settings page
     python3 tools/drive_first_app.py timeline   # only the timeline
     python3 tools/drive_first_app.py cookies    # only cookies kept across a restart
@@ -31,6 +32,7 @@ import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -166,18 +168,26 @@ class App:
                 self.cond.wait(left)
             return self.replies.pop(key)
 
-    def cmd(self, *parts, timeout=20):
+    def send(self, *parts):
+        """Sends a command without waiting for its reply, and returns the key wait_reply
+        takes for it."""
         self.next += 1
         key = str(self.next)
         self.writer.write(" ".join([key, *map(str, parts)]) + "\n")
         self.writer.flush()
-        return self.wait_reply(key, timeout)
+        return key
+
+    def cmd(self, *parts, timeout=20):
+        return self.wait_reply(self.send(*parts), timeout)
 
     def js(self, expr, page=False, timeout=20, tab=None):
         """Runs expr in the shell, the focused tab's page with page, or tab's page, by Go's
-        id for it."""
+        id for it. The driver's ERR, for a tab that isn't there or a page that went before
+        it answered, is a failure."""
         where = ["evaltab", tab] if tab else ["evalpage" if page else "eval"]
         r = self.cmd(*where, expr.replace("\n", " "), timeout=timeout)
+        if r.startswith("ERR"):
+            raise RuntimeError(f"{' '.join(map(str, where))}: {r}")
         return json.loads(r) if r != "" else None
 
     def wait(self, expr, timeout=15, page=False, tab=None):
@@ -363,6 +373,23 @@ def version_checks():
 STARTUP = ["process.start", "main.entered", "content.ready", "go.starting", "window.created", "shell.created",
            "shell.navigation_start", "window.shown", "go.started", "shell.committed",
            "shell.script", "shell.mounted", "shell.ready", "shell.snapshot", "app.ready"]
+
+
+def driver_checks():
+    """The driver itself: every command answers. An eval in a page that is destroyed before
+    its result comes is answered ERR gone: here a page held by a server that takes the
+    connection and never answers, whose tab then closes."""
+    app = App(tempfile.mkdtemp(prefix="pb-profile-"))
+    silent = socket.create_server(("127.0.0.1", 0))
+    tab = open_in(app, "", PAGES)
+    held = app.send("evaltab", tab, f"(()=>{{const r=new XMLHttpRequest();r.open('GET','http://127.0.0.1:{silent.getsockname()[1]}/',false);r.send();return 1}})()")
+    app.cmd("choosemenu", "File", "Close Tab")
+    try:
+        check("an eval whose page closes before its result comes is answered: ERR gone", app.wait_reply(held) == "ERR gone")
+    except TimeoutError as e:
+        check("an eval whose page closes before its result comes is answered: ERR gone", False, e)
+    silent.close()
+    app.close()
 
 
 def timeline_checks():
@@ -1939,5 +1966,5 @@ def quit_checks():
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    parts = {"settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "glide": [glide_checks], "quit": [quit_checks]}
-    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, glide_checks, quit_checks]))
+    parts = {"driver": [driver_checks], "settings": [settings_checks], "timeline": [timeline_checks], "cookies": [cookie_checks], "visible": [visible_tabs_checks], "windows": [window_checks], "move": [move_checks], "bounds": [bounds_checks], "profiles": [profile_checks], "copies": [copies_checks], "picker": [picker_checks], "relaunch": [relaunch_checks], "workspaces": [workspace_checks, workspace_menu_checks, workspace_delete_checks], "shells": [shell_checks], "glide": [glide_checks], "quit": [quit_checks]}
+    run_parts(parts.get(" ".join(sys.argv[1:]), [version_checks, driver_checks, timeline_checks, browsing_checks, settings_checks, visible_tabs_checks, window_checks, move_checks, bounds_checks, profile_checks, copies_checks, picker_checks, relaunch_checks, cookie_checks, workspace_checks, workspace_menu_checks, workspace_delete_checks, shell_checks, glide_checks, quit_checks]))

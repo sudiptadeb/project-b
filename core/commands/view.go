@@ -65,7 +65,9 @@ func (m *Manager) View() View {
 	inTree := map[string]bool{}
 	var walk func(path string, nodes []Node, locked bool)
 	walk = func(path string, nodes []Node, parentLocked bool) {
-		var g *Group
+		// The group's index, not a pointer: a submenu walked in between adds groups, and
+		// the slice may move.
+		g := -1
 		for _, n := range nodes {
 			if n.Only != "" && n.Only != m.platform {
 				continue
@@ -85,11 +87,11 @@ func (m *Manager) View() View {
 				continue
 			}
 			inTree[a.ID] = true
-			if g == nil {
+			if g < 0 {
 				v.Groups = append(v.Groups, Group{Title: path})
-				g = &v.Groups[len(v.Groups)-1]
+				g = len(v.Groups) - 1
 			}
-			g.Actions = append(g.Actions, m.actionView(a, n.Locked, template))
+			v.Groups[g].Actions = append(v.Groups[g].Actions, m.actionView(a, n.Locked, template))
 		}
 	}
 	walk("", m.tree, false)

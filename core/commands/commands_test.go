@@ -155,6 +155,26 @@ func TestTheViewMarksChangesAndClashes(t *testing.T) {
 	}
 }
 
+func TestTheViewKeepsActionsAfterASubmenu(t *testing.T) {
+	full := false
+	m, _ := manager(t, t.TempDir(), &full)
+	m.tree = []Node{{Title: "View", Items: []Node{
+		{Action: "tab.new"},
+		{Title: "More", Items: []Node{{Action: "tab.close"}}},
+		{Action: "nav.reload"},
+	}}}
+	var got []string
+	for _, g := range m.View().Groups {
+		for _, a := range g.Actions {
+			got = append(got, g.Title+": "+a.ID)
+		}
+	}
+	want := "View: tab.new, View: nav.reload, View › More: tab.close"
+	if strings.Join(got, ", ") != want {
+		t.Fatalf("the view has %q, want %q", strings.Join(got, ", "), want)
+	}
+}
+
 func TestABadFileIsSetAside(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "keymap.json"), []byte("{nope"), 0o644)

@@ -38,9 +38,8 @@ const noMenuYet = {
   glide: 'r6 brings it',
   terminal: 'r4 brings it',
   fox: 'r4 brings it',
-  'minimal-svelte': 'r4 brings it',
+  minimal: 'r4 brings it',
   'minimal-js': 'r4 brings it',
-  'minimal-vue': 'r4 brings it',
   example: 'r4 brings it',
 };
 

@@ -179,7 +179,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `addToGroup`, `removeFromGroup` | `id`, and `group` to add to | Puts a tab in a group, or takes it out |
 | `editGroup` | `group`, and any of `name`, `color`, `collapsed` | Changes what is sent |
 | `ungroup`, `closeGroup` | `group` | Ends a group, its tabs staying; or closes its tabs |
-| `closeTab` | `id` | Closes a tab |
+| `moveTab` | `id`, `index`, optional `window` | Moves a tab to `index` in its window's order, the place it has after the move, clamped; the active tab stays. Between two tabs of a group it joins the group, and out of its group's run it leaves it ([groups.md](groups.md)). With `window`, another window's id, it moves into that window at `index`, which it leaves if it was its last tab; an unknown window changes nothing. Tearing a tab off into a new window comes with the standard shell's dragging. With pins: an unpinned tab stops after the pinned ones, and a pinned tab moves only among them |
 | `activateTab` | `id` | Makes a tab the active one |
 | `navigate` | `text` | Takes the active tab to an address or a search |
 | `back`, `forward`, `reload` | | Act on the active tab |

@@ -34,6 +34,10 @@ they were made. The shell sends `createGroup`, `addToGroup`, `removeFromGroup`,
 `editGroup`, `ungroup` and `closeGroup`, and `newTab` with `groupWith`
 ([shells.md](shells.md#the-messages)).
 
+Moving a tab with `moveTab` follows the group where it lands: dropped between two tabs of a
+group it joins it, and out of its group's run it leaves it; a group's tabs keep the
+window's order.
+
 ## Not in this step
 
 Moving a group to another window, reordering groups, dragging tabs between workspaces or

@@ -38,7 +38,7 @@
   </div>
   <div class="rows" role="menu" aria-label={link ? 'Link' : 'Image'}>
     {#if list === 'workspaces'}
-      {#each [{ id: '', name: 'Default', color: '' }, ...workspaces] as w (w.id)}
+      {#each workspaces as w (w.id)}
         <button class="row" role="menuitem" onclick={() => onopen({ text: url, workspace: w.id, background: true })}>
           <span class="dot" style:background={w.color || 'var(--muted)'}></span>
           <span class="name">{w.name}</span>
@@ -51,7 +51,7 @@
       <button class="row" role="menuitem" onclick={() => onopen({ text: url, background: true })}>
         <Icon name="tab" /><span class="name">Open in new tab</span>
       </button>
-      {#if workspaces.length}
+      {#if workspaces.length > 1}
         <button class="row" role="menuitem" onclick={() => (list = 'workspaces')}>
           <Icon name="workspace" /><span class="name">Open in workspace</span><Icon name="chevron" />
         </button>

@@ -7,7 +7,7 @@
   // The ⋯ sheet: a row of the page's actions, Back while there is somewhere to go back to
   // (the phone's back key does it too), Forward, Reload or Stop, New tab, and New tab in
   // group while the tab is in one; then Workspaces, where new tabs open, while there are
-  // any, Extensions while their flag is on, the update while one is ready, and Settings.
+  // two or more, Extensions while their flag is on, the update while one is ready, and Settings.
   // Each acts and closes the sheet, but Workspaces and Extensions, which open their own.
   let { tab, group, workspace, onclose, onnewtab, onsheet, onworkspace } = $props();
   let list = $state('');
@@ -24,7 +24,7 @@
 <Sheet label="Menu" {onclose}>
   {#if list === 'workspaces'}
     <div class="rows" role="menu" aria-label="Workspaces">
-      {#each [{ id: '', name: 'Default', color: '' }, ...workspaces] as w (w.id)}
+      {#each workspaces as w (w.id)}
         <button class="row" role="menuitemradio" aria-checked={workspace === w.id} onclick={() => { onworkspace(w.id); onclose(); }}>
           <span class="dot" style:background={w.color || 'var(--muted)'}></span>
           <span class="name">{w.name}</span>
@@ -49,7 +49,7 @@
       {/if}
     </div>
     <div class="rows" role="menu" aria-label="More">
-      {#if workspaces.length}
+      {#if workspaces.length > 1}
         <button class="row" role="menuitem" onclick={() => (list = 'workspaces')}>
           <Icon name="workspace" />
           <span class="name">Workspaces</span>

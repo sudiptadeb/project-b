@@ -165,9 +165,9 @@ const H = 915;
   // Workspaces: chips in the switcher, and where new tabs open.
   await tabsButton.tap();
   const chips = switcher.getByRole('radio');
-  check('the switcher has a chip per workspace, Default first', await until(async () => (await chips.allInnerTexts()).join() === 'Default,Work'), await switcher.locator('.head').innerHTML());
+  check('the switcher has a chip per workspace, Main first', await until(async () => (await chips.allInnerTexts()).join() === 'Main,Work'), await switcher.locator('.head').innerHTML());
   await chips.nth(1).tap();
-  check('Work shows none of the default\'s cards', await until(async () => (await cards.filter({ visible: true }).count()) === 0));
+  check('Work shows none of Main\'s cards', await until(async () => (await cards.filter({ visible: true }).count()) === 0));
   await switcher.getByRole('button', { name: 'New Tab' }).tap();
   check('+ there opens a tab in Work', await until(async () => (await regions()).tabs.length === 3 && (await active()).workspace === '0a1b2c3d'), JSON.stringify(await active()));
   await visit('example.com/work', 'https://example.com/work');

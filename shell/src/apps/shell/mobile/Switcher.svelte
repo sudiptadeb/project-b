@@ -5,7 +5,7 @@
   import { gesture } from './gesture.js';
   import { groupLabel, groupOf } from './groups.js';
 
-  // The tab switcher, over the page: the workspaces as chips while there are any, which
+  // The tab switcher, over the page: the workspaces as chips while there are two or more, which
   // choose the cards shown, and New tab; then two columns of cards, the active one ringed.
   // A tab's card: a tap shows it, its × or a swipe sideways closes it, a long press opens
   // its menu (oncard), and held and dragged onto another card it joins that one's group or
@@ -57,9 +57,9 @@
 
 <div class="switcher" hidden={!open} use:shell role="dialog" aria-label="Tabs">
   <div class="head">
-    {#if workspaces.length}
+    {#if workspaces.length > 1}
       <div class="chips" role="radiogroup" aria-label="Workspace">
-        {#each [{ id: '', name: 'Default', color: '' }, ...workspaces] as w (w.id)}
+        {#each workspaces as w (w.id)}
           <button class="chip" role="radio" aria-checked={workspace === w.id} onclick={() => (workspace = w.id)}>
             {#if w.color}<span class="dot" style:background={w.color}></span>{/if}{w.name}
           </button>

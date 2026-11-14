@@ -306,6 +306,22 @@ One driver trap: Android takes the app zygote down a few seconds after a force s
 reused the dying zygote once and hung until it was killed, after which no renderer would start. The driver waits for
 it to go. A user won't force-stop and relaunch inside a few seconds, but it's worth knowing.
 
+### Android 17's renderers
+
+From Android 17 (API 37) content starts renderers with no Java in them, as native services, so the app needs two
+things the older releases don't, both copied from content shell. Without either, the app closed on open on a
+Galaxy A55 on Android 17 (0.2.56), and 0.2.57 fixed it.
+
+- **The services.** `AndroidManifest.xml.jinja2` declares `NativeOnlySandboxedProcessService0` and `1`, one on the
+  app zygote and one off it, which name `libproject_b_content.so` and `NativeChildProcessService_onCreate`.
+  Without them the first renderer's launch throws in the main process.
+- **The start hook.** `library_loader.cc` defines `NativeInitializationHook` as a global function. A renderer
+  with no Java has no `JNI_OnLoad`, so `content/app/android/javaless_child_process_service.cc` calls the hook by
+  name, and a weak default that returns false stands in when the library has none: the renderer then stops at
+  "Failed to initialize native" and every page shows as crashed.
+
+Checked on an Android 17 emulator (opens, loads `example.com`) and on an Android 10 one (opens).
+
 ## Signing
 
 The APK is signed with `android.keystore` in the key folder (`tools/keys.sh`: `$KEYKOSH_ROOT/project-b`, else
@@ -384,5 +400,7 @@ driver reads that tree (`uiautomator dump`) to find what to touch and to wait fo
 the shell's layout needs no new numbers; a control that loses its label does.
 
     amarit start project-b-emu          # the emulator: AVD project-b-test, adb serial emulator-5600
+    # Also stopped and ready: project-b-emu-29 (Android 10, emulator-5604), project-b-emu-16k
+    # (Android 16, 16 KB pages, emulator-5602) and project-b-emu-37 (Android 17, emulator-5606).
     tools/test.sh android               # PB_APK picks another APK than build/android/project-b-content.apk
     amarit stop project-b-emu

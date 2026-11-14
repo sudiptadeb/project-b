@@ -35,6 +35,9 @@ From the owner:
 
 ## Colour
 
+The colours come from the profile's frame colour and theme, which are Go's prefs, not a
+shell's ([shells.md](shells.md#colours)).
+
 Never write a colour literal in a component. Use these variables, which `tones.js` sets:
 
 | Variable | Use |

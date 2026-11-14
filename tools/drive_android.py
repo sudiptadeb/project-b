@@ -184,9 +184,10 @@ def menu(label):
     """Taps an item of the Mobile shell's menu sheet, which the ⋯ button opens. A tap the
     shell missed, as it can while it draws again after the GPU process died, is tried once
     more."""
-    press("Menu")
-    if until(lambda: find("shell", label=label), 5) is None:
+    for _ in range(3):
         press("Menu")
+        if until(lambda: find("shell", label=label), 5) is not None:
+            break
     press(label)
 
 
@@ -237,10 +238,12 @@ def launch(block=""):
     see("shell", timeout=60, label="Menu")
     # A run that ended in a kill leaves a notice over the top of the page. It is shell, so
     # it would take the touches meant for the page.
-    notice = find("shell", label="Close")
+    # The Mobile shell's has Dismiss.
+    dismiss = lambda: find("shell", label="Close") or find("shell", text="Dismiss")
+    notice = dismiss()
     if notice is not None:
         tap(middle(notice))
-        until(lambda: find("shell", label="Close") is None)
+        until(lambda: dismiss() is None)
 
 
 def processes():
@@ -416,6 +419,11 @@ def browsing():
     adb("shell", "input", "swipe", str(across), str(top + high * 3 // 4), str(across), str(top + high // 4), "300")
     check("a swipe scrolls the page under the shell", asked("/scrolled"), str(served[:3]))
     shot("10-scrolled")
+    check("scrolling down, the shell's bars give the page their room", until(lambda: box(see("page"))[3] > bottom + 100) is not None,
+          "%d then %d" % (bottom, box(see("page"))[3]))
+    shot("10a-bars-away")
+    adb("shell", "input", "swipe", str(across), str(top + high // 4), str(across), str(top + high * 3 // 4), "300")
+    check("scrolling back up brings them back", until(lambda: box(see("page"))[3] == bottom) is not None, "%d then %d" % (bottom, box(see("page"))[3]))
 
     # Typing into a page goes through the keyboard to the page, not the shell.
     go(BASE + "/input")
@@ -524,8 +532,8 @@ def mobile_shell():
         see("shell", label="Settings")
         shot("32-menu-" + scheme)
         key(4)
-        press(next(n.get("content-desc") for n in [see("shell", label=lambda l: (l or "").startswith("Group "))]))
-        see("shell", label="Group name")
+        tap(middle(see("shell", kind="android.widget.Button", label=lambda l: (l or "").startswith("Group "))))
+        see("shell", text="Ungroup")
         shot("33-group-" + scheme)
         key(4)
         type_in_bar("page")

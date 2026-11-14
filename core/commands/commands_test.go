@@ -191,6 +191,23 @@ func TestABadFileIsSetAside(t *testing.T) {
 	}
 }
 
+// A bad file's problem names the line and says what is wrong in words, not Go's error.
+func TestABadFileSaysWhereTheMistakeIs(t *testing.T) {
+	for _, c := range []struct{ file, want string }{
+		{"{\n  \"follows\": \"chrome\",\n}\n", "keymap.json has a mistake on line 3: } isn't expected there, so the defaults are in use. Your file is kept as keymap.json.bad"},
+		{"{\n  \"follows\": \"chrome\"", "keymap.json has a mistake at the end: the file stops before it is complete, so the defaults are in use. Your file is kept as keymap.json.bad"},
+		{"{\n  \"follows\": 3\n}", "keymap.json has a mistake on line 2: \"follows\" should be text, not a number, so the defaults are in use. Your file is kept as keymap.json.bad"},
+	} {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "keymap.json"), []byte(c.file), 0o644)
+		full := false
+		m, _ := manager(t, dir, &full)
+		if got := m.View().Problems; len(got) != 1 || got[0] != c.want {
+			t.Errorf("for %q the problem is %q, want %q", c.file, got, c.want)
+		}
+	}
+}
+
 // macOS App Shortcuts arrive by title and become bindings marked fromOS.
 func TestOSBindingsJoinTheKeymap(t *testing.T) {
 	full := false

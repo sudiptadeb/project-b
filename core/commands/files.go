@@ -1,13 +1,16 @@
 package commands
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -189,13 +192,82 @@ func readJSON(file string, v any) (ok bool, err error) {
 		return false, err
 	}
 	if err := json.Unmarshal(b, v); err != nil {
+		name := filepath.Base(file)
 		bad := file + ".bad"
 		if renameErr := os.Rename(file, bad); renameErr != nil {
-			return false, fmt.Errorf("%s doesn't parse (%v) and couldn't be moved aside: %v", filepath.Base(file), err, renameErr)
+			return false, fmt.Errorf("%s has a mistake %s, so the defaults are in use. It couldn't be moved aside: %v", name, mistake(b, err), renameErr)
 		}
-		return false, fmt.Errorf("%s didn't parse (%v); it is kept as %s", filepath.Base(file), err, filepath.Base(bad))
+		return false, fmt.Errorf("%s has a mistake %s, so the defaults are in use. Your file is kept as %s", name, mistake(b, err), filepath.Base(bad))
 	}
 	return true, nil
+}
+
+// mistake says where in b a JSON error is and what is wrong there, in words, such as
+// "on line 4: \"keys\" should be text".
+func mistake(b []byte, err error) string {
+	var syntax *json.SyntaxError
+	var typ *json.UnmarshalTypeError
+	switch {
+	case errors.As(err, &syntax):
+		if syntax.Offset >= int64(len(b)) {
+			return "at the end: the file stops before it is complete"
+		}
+		at := fmt.Sprintf("on line %d", lineAt(b, syntax.Offset))
+		if c, ok := strings.CutPrefix(syntax.Error(), "invalid character '"); ok {
+			if i := strings.Index(c, "'"); i > 0 {
+				return at + ": " + c[:i] + " isn't expected there"
+			}
+		}
+		return at
+	case errors.As(err, &typ):
+		at := fmt.Sprintf("on line %d", lineAt(b, typ.Offset))
+		if typ.Field == "" {
+			return at + ": the file should be an object"
+		}
+		return fmt.Sprintf("%s: %q should be %s, not %s", at, typ.Field, kind(typ.Type), valueKind(typ.Value))
+	}
+	return "(" + err.Error() + ")"
+}
+
+// lineAt is the 1-based line of the byte at offset.
+func lineAt(b []byte, offset int64) int {
+	if offset > int64(len(b)) {
+		offset = int64(len(b))
+	}
+	return bytes.Count(b[:offset], []byte("\n")) + 1
+}
+
+func kind(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.String:
+		return "text"
+	case reflect.Bool:
+		return "true or false"
+	case reflect.Slice, reflect.Array:
+		return "a list"
+	case reflect.Map, reflect.Struct:
+		return "an object"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
+		return "a number"
+	}
+	return t.String()
+}
+
+// valueKind names a JSON value kind as encoding/json reports it ("string", "array", ...).
+func valueKind(v string) string {
+	switch {
+	case v == "string":
+		return "text"
+	case v == "bool":
+		return "true or false"
+	case v == "array":
+		return "a list"
+	case v == "object":
+		return "an object"
+	case strings.HasPrefix(v, "number"):
+		return "a number"
+	}
+	return v
 }
 
 func writeJSON(file string, v any) error {

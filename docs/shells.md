@@ -236,6 +236,22 @@ The SDK does these for a shell on it. A shell that talks to Go itself does them 
 7. For the timeline only: it answers `paint` with a `timeline` entry of kind `end` and that
    span once it has drawn. Without it the span stays open.
 
+## Colours
+
+The owner, 2026-11-14: "colors live in go... shells can choose to maintain there own... or
+change the browser pref via some shell config page if they want to... standard uses the go
+prefs itself".
+
+- **The profile's colour is Go's:** the frame colour pref (`frameColor`), which the window's
+  band, the Dock and the profile list follow, and which reaches a shell as `windowColor`.
+  The theme is Go's too (`theme`). The settings page is where the user changes them.
+- **Standard uses Go's prefs and keeps no colour of its own,** painting from `windowColor`
+  and `theme` through `tones.js`.
+- **Another shell may keep colours of its own** for its own look, in its own data, but the
+  frame colour stays the profile's.
+- **A shell may change Go's colour pref** from a page of its own: shells are privileged,
+  and set any of Go's prefs with `setPref` ([Go's prefs](#gos-prefs)).
+
 ## A shell's own data
 
 `saveData(value)` sends the whole value; Go keeps the latest for the window and never

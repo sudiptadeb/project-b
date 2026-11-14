@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "base/base_switches.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
@@ -40,26 +41,40 @@ namespace project_b {
 
 namespace {
 
-// Web APIs whose browser side is Chrome's, not content's: a page that calls one asks for
-// an interface no one binds, and content kills its renderer for it, as DuckDuckGo's
-// search did with getInstalledRelatedApps on Android. Turned off, they are simply not
-// there, and a page that checks for them carries on without.
+// Web APIs whose browser side is Chrome's, not content's, and that are on by default: a
+// page that uses one asks for an interface no one binds, and content kills its renderer
+// for it, as DuckDuckGo's search did with getInstalledRelatedApps on Android. Turned off,
+// they are simply not there, and a page that checks for them carries on without.
+// docs/research/web-features lists each; one with no feature to turn off gets an empty
+// binder instead (ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame).
 constexpr char kChromeOnlyBlinkFeatures[] =
-    "InstalledApp,WebShare,DigitalGoods,PaymentRequest,SubApps";
+    "InstalledApp,DigitalGoods,OnDeviceWebSpeechAvailable,"
+    "InstallOnDeviceSpeechRecognition,PaymentLinkDetection";
+// PaymentRequest's Blink feature is set again per page from this one, so it is turned off
+// here. Content's empty binder already kept it from killing; now it is not there either.
+constexpr char kChromeOnlyFeatures[] = "WebPayments";
 
-// The browser process turns them off; content passes the switch to every renderer.
+// Appends features to the list switch already holds, if any.
+void AppendToList(base::CommandLine* command_line,
+                  const char* list_switch,
+                  const char* features) {
+  std::string list = features;
+  std::string given = command_line->GetSwitchValueASCII(list_switch);
+  if (!given.empty()) {
+    list = given + "," + list;
+  }
+  command_line->AppendSwitchASCII(list_switch, list);
+}
+
+// The browser process turns them off; content passes both switches to every renderer.
 void DisableChromeOnlyBlinkFeatures() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kProcessType)) {
     return;
   }
-  std::string features = kChromeOnlyBlinkFeatures;
-  std::string given =
-      command_line->GetSwitchValueASCII(switches::kDisableBlinkFeatures);
-  if (!given.empty()) {
-    features = given + "," + features;
-  }
-  command_line->AppendSwitchASCII(switches::kDisableBlinkFeatures, features);
+  AppendToList(command_line, switches::kDisableBlinkFeatures,
+               kChromeOnlyBlinkFeatures);
+  AppendToList(command_line, switches::kDisableFeatures, kChromeOnlyFeatures);
 }
 
 }  // namespace

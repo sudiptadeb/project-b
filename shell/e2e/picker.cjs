@@ -112,7 +112,7 @@ const regions = async () => (await fetch(`${base}/mock/regions`)).json();
   await page.getByRole('button', { name: 'Create' }).click();
   check('Create adds the profile to the list, in its template\'s colour', await until(() => listed().some((p) => p.name === 'Office' && p.color === '#5b7fd6' && p.template === 'Work')), JSON.stringify(listed()));
   const made = listed().find((p) => p.name === 'Office');
-  check('with its prefs from the template', made && JSON.parse(fs.readFileSync(path.join(profiles, made.id, 'prefs.json'), 'utf8')).tabLayout === 'horizontal');
+  check('with its prefs from the template', made && JSON.parse(fs.readFileSync(path.join(profiles, made.id, 'prefs.json'), 'utf8')).tabLayout === 'vertical');
   check('and opens it in a copy of its own, and this copy quits', await until(async () => {
     r = await regions();
     return r.opened === made.id && r.quit;

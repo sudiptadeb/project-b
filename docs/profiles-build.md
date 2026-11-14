@@ -20,7 +20,8 @@ built so far, and the order of building at the end says which steps are done.
   keeps for a profile takes its one folder (`core/app/app.go`).
 - Templates are files of values in `core/commands/templates/profile/`, beside the keymap
   and menu templates and built in the same way: a name and pref values, nothing else.
-  Personal is today's defaults; Work has the tabs on top and the frame colour `#5b7fd6`.
+  Personal is today's defaults; Work has the frame colour `#5b7fd6`. Both have the tabs on
+  the side, the default.
   They hold the profile's own prefs only (the tabs, the frame colour, the theme), not
   automatic updates, which are app-wide. Making a profile from one writes its values as
   the profile's `prefs.json`; the list keeps the template's name only to show it
@@ -130,7 +131,7 @@ profile comes later.
 
 **Templates.** A template is a file of values shipped in the app, beside the keymap and
 menu templates: a name and the pref values. Two ship: Personal, with today's defaults, and
-Work, with another colour and the tabs on top. New Profile asks for a name and a template;
+Work, with another colour. New Profile asks for a name and a template;
 Go makes the folder, writes the template's values as the profile's prefs, adds it to the
 list and opens it. The profile remembers the template's name only to show it, and no code
 asks which template a profile came from.

@@ -276,8 +276,8 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   await resetButton.click();
   await confirm.getByLabel('Template').selectOption('Work');
   await confirm.getByRole('button', { name: 'Reset', exact: true }).click();
-  check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'horizontal'), JSON.stringify(prefsFile()));
-  check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.strip').count()) > 0));
+  check('reset writes the template\'s values over the prefs', await until(() => prefsFile().frameColor === '#5b7fd6' && prefsFile().tabLayout === 'vertical'), JSON.stringify(prefsFile()));
+  check('the shell follows at once', await until(async () => (await root('--frame')) === '#5b7fd6' && (await ui.locator('.sidebar').count()) > 0));
   check('and the Dock and the list', await until(async () => (await regions()).dock === '#5b7fd6' && listed().color === '#5b7fd6'), JSON.stringify(listed()));
   check('the list and the page name the template reset to', await until(async () => listed().template === 'Work' && (await templateNow()).trim() === 'Work'));
   await settle(page);

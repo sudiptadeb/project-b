@@ -21,6 +21,7 @@ session (tools/check_full_screen.py, tools/check_clipboard.py). This needs no di
     python3 tools/drive_first_app.py picker     # only the picker
     python3 tools/drive_first_app.py workspaces # only workspaces: their storage, New Tab in Workspace, and deleting one
     python3 tools/drive_first_app.py shells     # only every shell: starting on it, and switching to it live
+    python3 tools/drive_first_app.py webapis    # only the web APIs in core/webfeatures/registry.json
 
 Results go to build/real/. Each screenshot is what content rendered, drawn shell over
 page by the driver. It is not read back from the window.
@@ -43,6 +44,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import timeline  # noqa: E402
+import web_features  # noqa: E402
 from drive_chromedriver import cdp, ws_open  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -1945,35 +1947,43 @@ def glide_checks():
     app.close()
 
 
-# Web APIs whose browser side is Chrome's. Content kills a renderer that asks for an interface
-# the browser has no binder for, so a page calling one of these crashes. Found by
-# docs/research/web-features/.
-KILLERS = {
-    "setAppBadge": "navigator.setAppBadge(3)",
-    "clearAppBadge": "navigator.clearAppBadge()",
-    "on-device SpeechRecognition.available": "SpeechRecognition.available({langs: ['en-US'], processLocally: true})",
-    "SpeechRecognition.install": "SpeechRecognition.install({langs: ['en-US'], processLocally: true})",
-}
+# Web APIs whose browser side is Chrome's, each call from the web-features registry
+# (core/webfeatures/registry.json). Content kills a renderer that asks for an interface the
+# browser has no binder for, so a page calling one of those crashes.
+KILLERS = web_features.probes()
 
 
 def web_api_checks():
-    """A page that calls a web API whose browser side is Chrome's keeps its renderer, and a
-    copy button's click puts its text on the clipboard."""
+    """A page that calls each web API in the web-features registry keeps its renderer and
+    gets what the registry says it gets on the Mac; a service worker that sets the badge
+    keeps its process, and a copy button's click puts its text on the clipboard, as the
+    registry says."""
     app = App(tempfile.mkdtemp(prefix="pb-profile-"))
     log = os.path.join(OUT, "app.log")
-    for name, call in KILLERS.items():
+    wrong, unknown = [], []
+    for row, probe in KILLERS:
         visit(app, PAGES + "store")
         start = os.path.getsize(log)
-        app.js(f"(() => {{ try {{ Promise.resolve({call}).catch(() => 0) }} catch (e) {{}} return 1 }})()", page=True)
-        time.sleep(2)
+        app.js(f"(() => {{ window.seen = ''; {web_features.OUTCOME}(() => {probe['call']}).then(s => window.seen = s); return 1 }})()", page=True)
+        time.sleep(2.5)
         try:
-            alive = app.js("document.title", page=True, timeout=5) == "Store"
+            title, seen = app.js("[document.title, window.seen]", page=True, timeout=5)
         except (RuntimeError, TimeoutError):
-            alive = False
+            title, seen = None, None
         with open(log, errors="replace") as f:
             f.seek(start)
             killed = [l.split("Received bad user message: ", 1)[-1].strip() for l in f if "bad Mojo message" in l]
-        check(f"a page that calls {name} keeps its renderer", alive and not killed, "; ".join(killed) or ("" if alive else "the page stopped answering"))
+        alive = title == "Store" and not killed
+        check(f"a page that calls {probe['name']} keeps its renderer", alive, "; ".join(killed) or ("" if alive else "the page stopped answering"))
+        seen = (seen or "pending") if alive else "killed"
+        if row["status"]["mac"] == "unknown":
+            unknown.append(f"{row['id']} ({probe['name']}): {seen}")
+        wrong.append(web_features.mismatch(row, probe, "mac", seen))
+    wrong = [w for w in wrong if w]
+    check(f"the {len(KILLERS)} calls give what the web-features registry says for the Mac", not wrong, "; ".join(wrong))
+    if unknown:
+        print("  not yet known on the Mac, seen now: " + "; ".join(unknown), flush=True)
+    status = web_features.feature("badge-sw")["status"]["mac"]
     visit(app, PAGES + "badge-worker")
     start = os.path.getsize(log)
     time.sleep(3)
@@ -1981,6 +1991,8 @@ def web_api_checks():
         f.seek(start)
         killed = [l.split("Received bad user message: ", 1)[-1].strip() for l in f if "bad Mojo message" in l]
     check("a service worker that calls setAppBadge keeps its process", not killed, "; ".join(killed))
+    check("as the registry's badge-sw says", bool(killed) == (status == "kills"), f"badge-sw is {status} on mac")
+    status = web_features.feature("clipboard-async")["status"]["mac"]
     visit(app, PAGES + "copy")
     page_click(app, "#copy")
     try:
@@ -1989,6 +2001,7 @@ def web_api_checks():
         pass
     title = app.js("document.title", page=True)
     check("a copy button's click puts its text on the clipboard", title == "copied", title)
+    check("as the registry's clipboard-async says", (title == "copied") == (status in ("works", "partly")), f"clipboard-async is {status} on mac")
     app.close()
 
 

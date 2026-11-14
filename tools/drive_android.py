@@ -23,8 +23,12 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import xml.etree.ElementTree as ET
 import zipfile
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import web_features  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SDK = os.path.expanduser("~/Library/Android/sdk")
@@ -54,79 +58,43 @@ PAGES = {
     "/to-blocked": None,
 }
 
-# Web APIs whose browser side is a frame interface: Chrome binds them, content doesn't. When the
-# browser has no binder, content kills the asking renderer for a bad message, as DuckDuckGo's
-# search did on Android with getInstalledRelatedApps. The ones that open a system picker over
-# the app are left out, since the picker would take the touches meant for the next part.
-WEB_APIS = {
-    "installedApps": "navigator.getInstalledRelatedApps()",
-    "share": "navigator.share({url: location.href})",
-    "passwordCredential": "navigator.credentials.store(new PasswordCredential({id: 'a', password: 'b'}))",
-    "credentialsGet": "navigator.credentials.get({password: true, mediation: 'silent'})",
-    "otp": "navigator.credentials.get({otp: {transport: ['sms']}, signal: AbortSignal.timeout(1500)})",
-    "webauthn": "navigator.credentials.create({publicKey: {challenge: new Uint8Array(16), rp: {name: 'x'},"
-                " user: {id: new Uint8Array(4), name: 'u', displayName: 'u'}, pubKeyCredParams: [{type: 'public-key', alg: -7}], timeout: 1500}})",
-    "fedcm": "navigator.credentials.get({identity: {providers: [{configURL: 'https://example.com/c', clientId: 'x'}]},"
-             " signal: AbortSignal.timeout(1500)})",
-    "setAppBadge": "navigator.setAppBadge(3)",
-    "paymentRequest": "new PaymentRequest([{supportedMethods: 'https://example.com/pay'}],"
-                      " {total: {label: 't', amount: {currency: 'USD', value: '1'}}}).canMakePayment()",
-    "digitalGoods": "getDigitalGoodsService('https://play.google.com/billing')",
-    "subApps": "navigator.subApps.list()",
-    "speechOnDevice": "SpeechRecognition.available({langs: ['en-US'], processLocally: true})",
-    "speechInstall": "SpeechRecognition.install({langs: ['en-US'], processLocally: true})",
-    # Blink asks for the payment link's handler as soon as the link is in a main frame's document.
-    "paymentLink": "document.head.append(Object.assign(document.createElement('link'), {rel: 'facilitated-payment', href: 'https://example.com/pay'}))",
-    "contacts": "navigator.contacts.select(['name'])",
-    "idle": "IdleDetector.requestPermission()",
-    "wakeLock": "navigator.wakeLock.request('screen')",
-    "nfc": "new NDEFReader().scan()",
+# Web APIs whose browser side is Chrome's: each call of the web-features registry
+# (core/webfeatures/registry.json). When the browser has no binder for the interface one asks
+# for, content kills the asking renderer for a bad message, as DuckDuckGo's search did on
+# Android with getInstalledRelatedApps. The registry leaves out the ones that open a system
+# picker over the app, since the picker would take the touches meant for the next part.
+REGISTRY_APIS = web_features.probes()
+# And some whose browser side is content's own, so they aren't in the registry: called so
+# that a page using them is seen to keep its renderer too.
+CONTENT_APIS = {
     "battery": "navigator.getBattery()",
-    "geolocation": "new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no, {timeout: 1500}))",
-    "notification": "Notification.requestPermission()",
-    "persist": "navigator.storage.persist()",
-    "clipboard": "navigator.clipboard.writeText('x')",
-    "enumerateDevices": "navigator.mediaDevices.enumerateDevices()",
-    "orientationLock": "screen.orientation.lock('landscape')",
-    "bluetooth": "navigator.bluetooth.getAvailability()",
-    "usb": "navigator.usb.getDevices()",
-    "serial": "navigator.serial.getPorts()",
-    "hid": "navigator.hid.getDevices()",
-    "presentation": "new PresentationRequest(['https://example.com']).getAvailability()",
-    "keyboardLock": "navigator.keyboard.lock()",
-    "speechSynthesis": "speechSynthesis.getVoices()",
-    "eyeDropper": "new EyeDropper().open()",
-    "windowManagement": "getScreenDetails()",
-    "localFonts": "queryLocalFonts()",
-    "storageAccess": "document.requestStorageAccess()",
     "topics": "document.browsingTopics()",
     "sharedStorage": "sharedStorage.set('a', 'b')",
     "adAuction": "navigator.runAdAuction({})",
     "interestGroup": "navigator.joinAdInterestGroup({})",
     "privateToken": "document.hasPrivateToken('https://example.com')",
     "launchQueue": "launchQueue.setConsumer(() => {})",
-    "xr": "navigator.xr.isSessionSupported('immersive-vr')",
-    "midi": "navigator.requestMIDIAccess()",
     "webgpu": "navigator.gpu.requestAdapter()",
-    "translator": "Translator.availability({sourceLanguage: 'en', targetLanguage: 'fr'})",
-    "summarizer": "Summarizer.availability()",
-    "languageModel": "LanguageModel.availability()",
     "pressure": "new PressureObserver(() => {}).observe('cpu')",
     "handwriting": "navigator.createHandwritingRecognizer({languages: ['en']})",
     "barcode": "new BarcodeDetector().detect(new ImageData(1, 1))",
     "face": "new FaceDetector().detect(new ImageData(1, 1))",
     "text": "new TextDetector().detect(new ImageData(1, 1))",
 }
+WEB_APIS = dict([(probe["name"], probe["call"]) for _, probe in REGISTRY_APIS] + list(CONTENT_APIS.items()))
 
 # Calls every one of them when the page loads and again on a tap, which some need, waiting at most
-# 2 s for each, then says so; and says again a moment later, so a renderer killed after it
-# answered still shows.
+# 2 s for each, then says what each gave; and says again a moment later, so a renderer killed
+# after it answered still shows.
 PAGES["/apis"] = ("<title>APIs</title><button style='position:fixed;inset:0;width:100%;height:100%'>apis</button><script>"
                   "const calls = {" + ",".join("%s: () => %s" % kv for kv in WEB_APIS.items()) + "};"
+                  "const outcome = " + web_features.OUTCOME + ";"
                   "function run(when) {"
-                  " Promise.all(Object.values(calls).map(call => { try { return Promise.race([Promise.resolve(call()).catch(() => 0),"
-                  " new Promise(done => setTimeout(done, 2000))]) } catch (e) { return 0 } }))"
-                  " .then(() => fetch('/apis-ran?' + when)).then(() => setTimeout(() => fetch('/apis-alive?' + when), 3000)) }"
+                  " const names = Object.keys(calls);"
+                  " Promise.all(names.map(name => outcome(calls[name])))"
+                  " .then(seen => fetch('/apis-ran?' + when + '&seen=' + encodeURIComponent(JSON.stringify("
+                  "Object.fromEntries(names.map((name, i) => [name, seen[i]]))))))"
+                  " .then(() => setTimeout(() => fetch('/apis-alive?' + when), 3000)) }"
                   "run('load'); document.querySelector('button').onclick = () => run('tap')</script>")
 
 served = []
@@ -713,7 +681,8 @@ def a_page_spins():
 
 
 def web_apis():
-    """A page that calls each web API whose browser side is Chrome's keeps its renderer."""
+    """A page that calls each web API whose browser side is Chrome's keeps its renderer, and
+    each call gives what the web-features registry says it gives on Android."""
     launch()
     adb("logcat", "-c")
     go(BASE + "/apis")
@@ -724,10 +693,22 @@ def web_apis():
         # Content says which interface it found no binder for.
         killed = [line.split("Received bad user message: ", 1)[-1] for line in adb("logcat", "-d").splitlines()
                   if "bad Mojo message" in line]
-        check("a page that calls %d web APIs on %s keeps its renderer" % (len(WEB_APIS), "a tap" if when == "tap" else "load"),
+        on = "a tap" if when == "tap" else "load"
+        check("a page that calls %d web APIs on %s keeps its renderer" % (len(WEB_APIS), on),
               lived and not killed, "; ".join(killed) or ("" if lived else "no word from the page after the calls"))
         if not lived:
             return
+        ran = next(s for s in served if s.startswith("/apis-ran?%s&seen=" % when))
+        seen = json.loads(urllib.parse.unquote(ran.split("&seen=", 1)[1]))
+        wrong = [web_features.mismatch(row, probe, "android", "killed" if killed else seen[probe["name"]])
+                 for row, probe in REGISTRY_APIS]
+        wrong = [w for w in wrong if w]
+        check("and its %d calls of the web-features registry give what it says for Android, on %s" % (len(REGISTRY_APIS), on),
+              not wrong, "; ".join(wrong))
+        unknown = ["%s (%s): %s" % (row["id"], probe["name"], seen[probe["name"]])
+                   for row, probe in REGISTRY_APIS if row["status"]["android"] == "unknown"]
+        if unknown:
+            print("  not yet known on Android, seen on %s: %s" % (on, "; ".join(unknown)), flush=True)
     shot("18b-web-apis")
 
 

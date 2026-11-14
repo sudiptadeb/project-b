@@ -37,7 +37,7 @@ type Prefs struct {
 
 // Defaults are the settings before the user changes any.
 func Defaults() Prefs {
-	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem, Shell: "standard"}
+	return Prefs{TabLayout: TabsVertical, FrameColor: "#4f9e9e", Theme: ThemeSystem, Shell: shells.Default()}
 }
 
 func isTheme(t string) bool { return t == ThemeSystem || t == ThemeLight || t == ThemeDark }
@@ -72,7 +72,7 @@ func New(dir string) *Manager {
 			if !isTheme(s.Theme) {
 				s.Theme = ThemeSystem
 			}
-			if !shells.Has(s.Shell) {
+			if !shells.Fits(s.Shell) {
 				s.Shell = Defaults().Shell
 			}
 			m.prefs = s

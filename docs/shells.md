@@ -440,6 +440,30 @@ address field, and a menu button at the far right, in our tones.
   a bookmarks bar, a sidebar, customising the toolbar, and print and find in the menu,
   which have no action yet.
 
+## The mobile shell
+
+`mobile`: the phone's shell, in Svelte, everything at the thumb. Its guideline is
+`project-b-research/mobile-shell/spec.md`.
+
+- **The registry marks it `"phone": true`.** A phone offers and loads only phone shells,
+  so it starts on Mobile even where a profile's pref names `standard`, as the templates do;
+  a desktop offers none, though it loads one named outright, as the mock does for the
+  shell's tests in a phone-sized window.
+- **One bar at the foot, 48px:** the address pill, which shows the host and the lock and
+  becomes the field when tapped, with the suggestions over it, the closest nearest the
+  thumb; the tab count, which opens the switcher; and ⋯, the menu sheet. A swipe along
+  the bar goes to the tab before or after. Back is the phone's back key, and in the menu
+  while there is somewhere to go back to.
+- **The switcher** lies over the page, the bar still under it: a card per tab in two
+  columns, the workspaces as chips that choose which cards show and where + opens a tab.
+  Its cards are the tabs' `role="tab"` elements, kept in the document while it is closed.
+  Closing the last tab leaves a new one: the window never has none.
+- **The menu sheet:** Back, Forward, Reload or Stop, New tab; then Workspaces (where new
+  tabs open), Extensions while their flag is on, the update when one is ready, and
+  Settings.
+- **The band:** none. A desktop window's buttons, as on the mock, get a strip of their
+  own above the page, which a phone has no need of.
+
 ## Not in this step
 
 Keys and menu items for a shell's own commands, such as a split, which came later

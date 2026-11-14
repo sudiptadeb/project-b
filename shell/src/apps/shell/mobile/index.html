@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content">
+<title>Project B</title>
+<style>
+  html, body, #app { height: 100%; margin: 0; background: transparent; }
+  /* The shell is not a page: it never scrolls or zooms, and a swipe over it must not
+     rubber-band it. */
+  html, body { overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

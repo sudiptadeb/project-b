@@ -1,11 +1,15 @@
 #include "project_b/engine/common/main_delegate.h"
 
+#include <string>
+
 #include "base/check.h"
+#include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
 #include "base/logging/logging_settings.h"
 #include "base/path_service.h"
 #include "build/build_config.h"
+#include "content/public/common/content_switches.h"
 #include "project_b/engine/common/content_client.h"
 #include "project_b/engine/common/extensions_on.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -34,10 +38,37 @@
 
 namespace project_b {
 
+namespace {
+
+// Web APIs whose browser side is Chrome's, not content's: a page that calls one asks for
+// an interface no one binds, and content kills its renderer for it, as DuckDuckGo's
+// search did with getInstalledRelatedApps on Android. Turned off, they are simply not
+// there, and a page that checks for them carries on without.
+constexpr char kChromeOnlyBlinkFeatures[] =
+    "InstalledApp,WebShare,DigitalGoods,PaymentRequest,SubApps";
+
+// The browser process turns them off; content passes the switch to every renderer.
+void DisableChromeOnlyBlinkFeatures() {
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kProcessType)) {
+    return;
+  }
+  std::string features = kChromeOnlyBlinkFeatures;
+  std::string given =
+      command_line->GetSwitchValueASCII(switches::kDisableBlinkFeatures);
+  if (!given.empty()) {
+    features = given + "," + features;
+  }
+  command_line->AppendSwitchASCII(switches::kDisableBlinkFeatures, features);
+}
+
+}  // namespace
+
 MainDelegate::MainDelegate() = default;
 MainDelegate::~MainDelegate() = default;
 
 std::optional<int> MainDelegate::BasicStartupComplete() {
+  DisableChromeOnlyBlinkFeatures();
 #if BUILDFLAG(IS_MAC)
   // Inside an app, content looks for its files under the "framework bundle". We have
   // no framework, so that's the app's Contents folder.

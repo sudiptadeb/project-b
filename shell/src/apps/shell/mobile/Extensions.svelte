@@ -112,7 +112,7 @@
 
   .pin {
     flex: none;
-    height: 40px;
+    height: 48px;
     margin-right: 12px;
     padding: 0 12px;
     border: 1px solid var(--line);
@@ -169,6 +169,10 @@
     margin: 8px 0;
     padding-left: 20px;
     font-size: 13px;
+  }
+
+  .answers .text-button {
+    height: 48px;
   }
 
   .answers {

@@ -74,7 +74,7 @@
 
   button {
     margin-top: 12px;
-    height: 40px;
+    height: 48px;
     padding: 0 20px;
     border-radius: 20px;
   }

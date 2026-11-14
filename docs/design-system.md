@@ -94,6 +94,7 @@ No monospace in the UI. Code-like strings (a permission name, a host) are body t
 | Settings row | at least 48px high, padding 8px 16px |
 | Gaps | 4px between toolbar buttons, 8px between buttons in a group, 12px between an icon and its text in a header |
 | Touch | buttons grow to 40px; hover does nothing |
+| A phone | every control a finger presses is at least 48px each way, Android's least (48dp; a CSS pixel is a dp on a phone). What it draws may be smaller inside its target, as a 32px chip in a 48px row. The Mobile shell's tests check every control on each screen (`shell/e2e/shells/mobile.cjs`) |
 
 ## Surfaces and elevation
 

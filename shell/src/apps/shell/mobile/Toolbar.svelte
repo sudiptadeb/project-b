@@ -51,27 +51,27 @@
     align-items: center;
     gap: 4px;
     height: 48px;
-    padding: 0 4px 0 8px;
+    padding: 0 0 0 8px;
     box-sizing: border-box;
     background: var(--bar);
-    border-top: 1px solid var(--line);
+    /* The hairline drawn over the 48px row, so its 48px buttons fill it. */
+    box-shadow: inset 0 1px var(--line);
     touch-action: pan-y;
   }
 
   .toolbar.top {
-    border-top: 0;
-    border-bottom: 1px solid var(--line);
+    box-shadow: inset 0 -1px var(--line);
   }
 
   button {
     flex: none;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
-    border-radius: 20px;
+    border-radius: 24px;
     background: none;
     color: var(--icon);
   }

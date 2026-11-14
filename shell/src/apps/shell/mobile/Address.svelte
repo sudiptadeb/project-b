@@ -172,10 +172,12 @@
     color: var(--icon);
   }
 
+  /* The field and its Clear reach 48px, the toolbar's height, past the 40px pill. */
   input {
     flex: 1;
     min-width: 0;
-    height: 100%;
+    height: 48px;
+    margin: -4px 0;
     padding: 0;
     border: 0;
     outline: none;
@@ -209,8 +211,9 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 48px;
+    height: 48px;
+    margin: -4px -6px -4px 0;
     padding: 0;
     border: 0;
     border-radius: 50%;

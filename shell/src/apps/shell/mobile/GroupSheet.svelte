@@ -87,7 +87,7 @@
   .head input {
     flex: 1;
     min-width: 0;
-    height: 40px;
+    height: 48px;
     font-size: 14px;
   }
 
@@ -108,8 +108,8 @@
   .swatches button {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -181,7 +181,7 @@
 
   .answers .text-button,
   .ask .text-button {
-    height: 40px;
+    height: 48px;
     padding: 0 16px;
     border-radius: 8px;
   }

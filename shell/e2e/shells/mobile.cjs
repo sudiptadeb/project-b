@@ -47,7 +47,17 @@ const H = 915;
       return t.url === url && !t.loading;
     });
   };
+  // Every control a finger presses is 48px or more each way, Android's least (48dp; a CSS
+  // pixel is a dp on a phone). Lists those that aren't.
+  const { controls: controlSelector } = await import('../../src/sdk/controls.js');
+  const smallTargets = () => w.shell().evaluate((sel) => [...document.querySelectorAll(sel)]
+    .filter((el) => el.checkVisibility({ visibilityProperty: true }) && el.getBoundingClientRect().width > 0)
+    .map((el) => ({ what: el.getAttribute('aria-label') || el.textContent.trim().slice(0, 20) || el.tagName, r: el.getBoundingClientRect() }))
+    .filter(({ r }) => r.width < 47.5 || r.height < 47.5)
+    .map(({ what, r }) => `${what} ${Math.round(r.width)}x${Math.round(r.height)}`), controlSelector);
   const shots = async (what) => {
+    const small = await smallTargets();
+    check(`every control is 48px or more each way: ${what}`, small.length === 0, small.join(', '));
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme });
       await settle(page);
@@ -192,10 +202,10 @@ const H = 915;
   check('New group opens a new tab in edit mode', await until(async () => (await regions()).tabs.length === 4 && (await active()).url === '' && await inField()));
   check('and the strip shows the group, the tab and the new one', await until(async () => (await strip.isVisible()) && (await stripTabs.count()) === 2));
   const stripBox = await box('[role=group][aria-label^="Group "]');
-  check('the strip is 44px, just over the toolbar', Math.round(stripBox.height) === 44 && Math.round(stripBox.bottom) === H - 48, JSON.stringify(stripBox));
+  check('the strip is 49px with its hairline, just over the toolbar', Math.round(stripBox.height) === 49 && Math.round(stripBox.bottom) === H - 48, JSON.stringify(stripBox));
   check('the page ends over the strip', await until(async () => {
     const v = (await regions()).visible[0].rect;
-    return v.y + v.h === H - 48 - 44;
+    return v.y + v.h === H - 48 - 49;
   }), JSON.stringify((await regions()).visible));
   await visit('example.com/group/two', 'https://example.com/group/two');
   const g2 = (await regions()).active;
@@ -240,7 +250,7 @@ const H = 915;
   // The strip's × closes the active tab and goes to its neighbour in the group.
   await until(async () => (await regions()).active === g2);
   await strip.getByRole('button', { name: /^Close / }).tap();
-  check('the strip\'s × closes the active tab and goes to the next in the group', await until(async () => (await regions()).active === g3 && (await stripTabs.count()) === 2));
+  check('a tap on the active favicon in the strip closes it, and the strip goes to the next in the group', await until(async () => (await regions()).active === g3 && (await stripTabs.count()) === 2));
   await stripTabs.last().click({ button: 'right' });
   check('a long press on a favicon closes its tab, and a group of one ends', await until(async () => (await regions()).tabs.length === 3 && !(await strip.isVisible())));
 
@@ -312,7 +322,7 @@ const H = 915;
   const pageRect = async () => (await regions()).visible[0].rect;
   const act = (await regions()).active;
   // With the bars: down to the toolbar, or to the strip while the tab is in a group.
-  const foot = async () => H - 48 - ((await strip.isVisible()) ? 44 : 0);
+  const foot = async () => H - 48 - ((await strip.isVisible()) ? 49 : 0);
   await until(async () => (await pageRect()).y + (await pageRect()).h === await foot());
   const withBars = await pageRect();
   await fire('scroll', 'down', { tab: act });
@@ -430,7 +440,7 @@ const H = 915;
   }), JSON.stringify(await box('.toolbar')));
   check('the page lies under it, down to the foot or the strip', await until(async () => {
     const v = (await regions()).visible[0].rect;
-    return v.y === topY + 48 && v.y + v.h === H - ((await strip.isVisible()) ? 44 : 0);
+    return v.y === topY + 48 && v.y + v.h === H - ((await strip.isVisible()) ? 49 : 0);
   }), JSON.stringify((await regions()).visible));
   await fire('menu', 'tab.new');
   await until(inField);

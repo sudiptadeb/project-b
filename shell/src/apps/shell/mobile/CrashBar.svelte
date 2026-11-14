@@ -16,12 +16,16 @@
     flex: none;
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 44px;
+    gap: 4px;
+    height: 49px;
     padding: 0 4px 0 16px;
     background: var(--bar);
     border-top: 1px solid var(--line);
     font-size: 12px;
+  }
+
+  button {
+    height: 48px;
   }
 
   span {

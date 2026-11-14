@@ -61,7 +61,7 @@
       <div class="chips" role="radiogroup" aria-label="Workspace">
         {#each workspaces as w (w.id)}
           <button class="chip" role="radio" aria-checked={workspace === w.id} onclick={() => (workspace = w.id)}>
-            {#if w.color}<span class="dot" style:background={w.color}></span>{/if}{w.name}
+            {#if w.color}<span class="dot" style:background={w.color}></span>{/if}<span>{w.name}</span>
           </button>
         {/each}
       </div>
@@ -174,24 +174,38 @@
     flex: 1;
   }
 
+  /* A chip is a 32px pill in a 48px target. */
   .chip {
+    position: relative;
     flex: none;
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    height: 48px;
     padding: 0 12px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--surface);
+    border: 0;
+    background: none;
     color: var(--text);
     font-size: 13px;
     font-weight: 500;
   }
 
-  .chip[aria-checked='true'] {
+  .chip::before {
+    content: '';
+    position: absolute;
+    inset: 8px 0;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+  }
+
+  .chip[aria-checked='true']::before {
     border-color: transparent;
     background: var(--accent-soft);
+  }
+
+  .chip > span {
+    position: relative;
   }
 
   .dot {
@@ -204,8 +218,8 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
     border-radius: 20px;
@@ -270,7 +284,7 @@
     flex: none;
     display: flex;
     align-items: center;
-    height: 40px;
+    height: 48px;
     padding-left: 12px;
   }
 
@@ -289,8 +303,8 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: 0;
     background: none;

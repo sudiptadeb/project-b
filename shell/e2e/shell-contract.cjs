@@ -19,7 +19,7 @@ const rules = [
   'It says ready, draws the snapshot, and says shown',
   "The active tab's page shows, after every change, and no page is given the keyboard before it shows",
   "The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of this window",
-  'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active',
+  'Each tab is an element with role=tab and data-tab, the active one aria-selected; a click makes it active, on the shell or in a sheet one of its controls opens',
   'focusAddressBar puts the keyboard in the field named Address, where an address and Enter take the active tab there',
   'Every control it draws is the shell\'s: a press on it reaches the shell',
   'A press in the middle of a page it shows reaches that page',
@@ -139,7 +139,15 @@ const rules = [
         rule(4, 'each of Go\'s tabs is an element with role=tab and its data-tab, in order', JSON.stringify(d.map((t) => t.tab)) === JSON.stringify(r.tabs.map((t) => t.id)), JSON.stringify({ drawn: d, go: r.tabs.map((t) => t.id) }));
         rule(4, 'the active one, and only it, is aria-selected', d.every((t) => (t.selected === 'true') === (t.tab === r.active)), JSON.stringify({ drawn: d, active: r.active }));
         const other = r.tabs.find((t) => t.id !== r.active).id;
-        await tabEls.nth(r.tabs.findIndex((t) => t.id === other)).click();
+        // A tab may be in a sheet one of the shell's controls opens, as a phone's switcher
+        // is: each is pressed in turn until the tab shows, and closed again with Escape.
+        const otherEl = tabEls.nth(r.tabs.findIndex((t) => t.id === other));
+        for (const opener of await ui.locator('[aria-haspopup], [aria-expanded]').filter({ visible: true }).all()) {
+          if (await otherEl.isVisible()) break;
+          await opener.click();
+          if (!(await until(() => otherEl.isVisible(), 500))) await page.keyboard.press('Escape');
+        }
+        await otherEl.click();
         rule(4, 'a click on a tab makes it active', await until(async () => (await regions()).active === other && (await drawn()).find((t) => t.tab === other)?.selected === 'true'), JSON.stringify(await regions().then((r) => r.active)));
 
         // 5. The address bar.

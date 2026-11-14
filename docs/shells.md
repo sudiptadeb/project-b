@@ -240,7 +240,9 @@ The check holds every shell to these, knowing nothing else about it.
 3. The pages it shows lie inside the band it asked for, don't overlap, and are all tabs of
    this window.
 4. **Each tab of the window is an element with `role="tab"` and `data-tab="<id>"`,** the
-   active one with `aria-selected="true"`. A click on it makes that tab active.
+   active one with `aria-selected="true"`. A click on it makes that tab active. It may
+   lie in a sheet one of the shell's controls opens, as a phone's tab switcher does: it is
+   always in the document, hidden while the sheet is closed.
 5. **`focusAddressBar` puts the keyboard in the field named Address,** where an address
    and Enter take the active tab there.
 6. **Every control it draws is the shell's,** a control as `@/sdk/controls.js` says: it

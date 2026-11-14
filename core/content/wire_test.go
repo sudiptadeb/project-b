@@ -141,6 +141,11 @@ func (r *recorder) FindReply(tab engine.TabID, request, matches, active int, fin
 	r.note(fmt.Sprintf("find %d %d %d/%d %v", tab, request, active, matches, final))
 }
 
+func (r *recorder) PageFullScreen(tab engine.TabID, on bool) {
+	r.note(fmt.Sprintf("full screen %d %v", tab, on))
+}
+func (r *recorder) IsPageFullScreen(engine.TabID) bool { return false }
+
 func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 	r.note("devtools " + method + " " + string(params))
 	switch method {

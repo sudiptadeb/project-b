@@ -138,3 +138,16 @@ naming the tab whose bar it is, so a key typed as another tab comes forward goes
 keeps the match shown selected. A bar opened afresh starts with the last text searched for,
 and a page that loads again is searched again. Contract rule 20 holds every desktop shell to
 it. In Standard the bar hangs from the page's top right.
+
+## Video full screen
+
+A page's `requestFullscreen`, as a video's full screen button calls, reaches Go through
+content's `EnterFullscreenModeForTab`. Go puts the window in full screen, unless it is already,
+and tells its shell, `state.pageFullScreen`, the tab, or 0; the engine then has the page sized
+again, and content asks Go (`IsFullscreenForTabOrPending`) whether the page has the screen,
+which settles the page's promise. The shell lays that page across the whole window, with no
+band and nothing of its own. It ends when the page calls `exitFullscreen`, when Escape is
+pressed (Go takes it before the page, and asks the engine's `exit_page_full_screen`), when
+another tab shows or the tab closes, and when the window leaves full screen through its own
+button. The window then goes back to how it was. Contract rule 21 holds every desktop shell to
+it.

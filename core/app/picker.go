@@ -205,6 +205,8 @@ func (p *Picker) FilesChosen(engine.TabID, int, string)       {}
 func (p *Picker) DialogOpened(engine.Dialog)                  {}
 func (p *Picker) DialogClosed(engine.DialogID)                {}
 func (p *Picker) FindReply(engine.TabID, int, int, int, bool) {}
+func (p *Picker) PageFullScreen(engine.TabID, bool)           {}
+func (p *Picker) IsPageFullScreen(engine.TabID) bool          { return false }
 func (p *Picker) DevToolsCommand(string, []byte) (any, error) { return nil, engine.ErrUnknownCommand }
 
 // Handover is the request of a copy started to pick while this one runs: the picker comes

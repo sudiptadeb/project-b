@@ -9,6 +9,8 @@
 #include "build/build_config.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/hooks.h"
@@ -220,6 +222,25 @@ void PageTab::RunFileChooser(content::RenderFrameHost* render_frame_host,
   FileChooser::Run(id_, render_frame_host, std::move(listener), params);
 }
 #endif
+
+void PageTab::EnterFullscreenModeForTab(content::RenderFrameHost* requesting_frame,
+                                        const blink::mojom::FullscreenOptions& options) {
+  WebContentsDelegateHooks::EnterFullscreenModeForTab(requesting_frame, options);
+  SynchronizeVisualProperties();
+}
+
+void PageTab::ExitFullscreenModeForTab(content::WebContents* web_contents) {
+  WebContentsDelegateHooks::ExitFullscreenModeForTab(web_contents);
+  SynchronizeVisualProperties();
+}
+
+// Content asks Go whether the page is in full screen as it sizes the page, and tells the
+// page what it found.
+void PageTab::SynchronizeVisualProperties() {
+  if (content::RenderWidgetHostView* view = contents_->GetRenderWidgetHostView()) {
+    view->GetRenderWidgetHost()->SynchronizeVisualProperties();
+  }
+}
 
 bool PageTab::TakeFocus(content::WebContents* source, bool reverse) {
   Engine::Get()->FocusShellForTraversal(id_, reverse);

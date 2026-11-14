@@ -73,6 +73,8 @@ type App struct {
 	dialogs *pageDialogs
 	// finds are the tabs' open searches.
 	finds *pageFinds
+	// fulls are the windows whose page fills the screen.
+	fulls *pageFulls
 	// keyIn is which page had the keyboard at the last key press.
 	keyIn engine.Surface
 	// lastWindow is the id of the window made last; Go numbers them from 1.
@@ -122,6 +124,7 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Shell.AddPart(a.dialogs.shellPart())
 	a.finds = newPageFinds(a, e)
 	a.Shell.AddPart(a.finds.shellPart())
+	a.fulls = newPageFulls(a, e)
 	a.Shell.AddPart(a.menus.shellPart())
 	// Every action a shell can run by name, for a shell that lists them, as Glide's
 	// Command Bar does.
@@ -370,6 +373,10 @@ func themeOf(t string) engine.Theme {
 // Key hands a key press to the commands manager, which decides what it runs.
 func (a *App) Key(k engine.Key, phase engine.KeyPhase, in engine.Surface) bool {
 	a.keyIn = in
+	// Escape leaves a page's full screen before the page sees it.
+	if phase == engine.KeyBeforePage && a.fulls.key(k) {
+		return true
+	}
 	// The key press the window put on the timeline has reached us.
 	timeline.End("input.key")
 	return a.Commands.Key(k, phase)
@@ -387,6 +394,7 @@ func (a *App) SettingsMessage(w engine.WindowID, msg []byte) { a.Settings.Handle
 
 func (a *App) WindowChanged(w engine.WindowID, s engine.WindowState) {
 	a.Window.HandleWindowChanged(w, s)
+	a.fulls.windowChanged(w, s)
 }
 
 func (a *App) ShellCrashed(w engine.WindowID) {

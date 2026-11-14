@@ -36,6 +36,7 @@ static inline void call_open_file(const PBEngineCalls* c, const char* path) { c-
 static inline void call_reveal_file(const PBEngineCalls* c, const char* path) { c->reveal_file(path); }
 static inline void call_find(const PBEngineCalls* c, int64_t tab, int32_t request, const char* text, int forward, int find_next) { c->find(tab, request, text, forward, find_next); }
 static inline void call_stop_finding(const PBEngineCalls* c, int64_t tab) { c->stop_finding(tab); }
+static inline void call_exit_page_full_screen(const PBEngineCalls* c, int64_t tab) { c->exit_page_full_screen(tab); }
 static inline void call_answer_dialog(const PBEngineCalls* c, int64_t dialog, int ok, const char* text) { c->answer_dialog(dialog, ok, text); }
 static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
 static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
@@ -203,6 +204,10 @@ func (e *nativeEngine) Find(tab engine.TabID, request int, text string, forward,
 }
 
 func (e *nativeEngine) StopFinding(tab engine.TabID) { C.call_stop_finding(e.calls, C.int64_t(tab)) }
+
+func (e *nativeEngine) ExitPageFullScreen(tab engine.TabID) {
+	C.call_exit_page_full_screen(e.calls, C.int64_t(tab))
+}
 
 func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }
 

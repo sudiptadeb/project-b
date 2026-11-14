@@ -36,6 +36,7 @@ const (
 // Keys are the names the mock page uses for key presses, as a Mac keyboard has them.
 var Keys = map[string]engine.Key{
 	"focusAddressBar": {Code: 'L', Mods: engine.ModCmd},
+	"escape":          {Code: 0x1b},
 	"newTab":          {Code: 'T', Mods: engine.ModCmd},
 	"newWindow":       {Code: 'N', Mods: engine.ModCmd},
 	"closeTab":        {Code: 'W', Mods: engine.ModCmd},
@@ -771,6 +772,9 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 				json.Unmarshal([]byte(value), &m)
 			}
 			e.listener.ContextMenu(shown, m)
+		case "pageFullscreen":
+			// The page asks to fill the screen, as a video's button does.
+			e.listener.PageFullScreen(shown, true)
 		case "alert", "confirm", "prompt", "beforeunload":
 			// The page asks; value is its words.
 			e.openDialog(shown, kind, value)

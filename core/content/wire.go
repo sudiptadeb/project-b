@@ -129,6 +129,21 @@ func Wire(h *Hooks, l engine.Listener) {
 			Src: p.SrcURL, Media: mediaTypes[p.MediaType], Selection: p.SelectionText, Editable: p.IsEditable})
 		return true, true
 	})
+	// A page's full screen: Go decides how the window shows it, and says whether a tab's
+	// page has it when content asks.
+	h.Delegate.OnEnterFullscreenModeForTab(func(c WebContents, _ RenderFrameHost, _ FullscreenOptions) {
+		if c.ID > 0 {
+			l.PageFullScreen(engine.TabID(c.ID), true)
+		}
+	})
+	h.Delegate.OnExitFullscreenModeForTab(func(c WebContents, _ WebContents) {
+		if c.ID > 0 {
+			l.PageFullScreen(engine.TabID(c.ID), false)
+		}
+	})
+	h.Delegate.AnswerIsFullscreenForTabOrPending(func(c WebContents, _ WebContents) (bool, bool) {
+		return c.ID > 0 && l.IsPageFullScreen(engine.TabID(c.ID)), true
+	})
 	h.Delegate.OnFindReply(func(c WebContents, _ WebContents, request, matches int64, _ GfxRect, active int64, final bool) {
 		if c.ID > 0 {
 			l.FindReply(engine.TabID(c.ID), int(request), int(matches), int(active), final)

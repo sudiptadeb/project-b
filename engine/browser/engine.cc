@@ -238,6 +238,13 @@ void CallStopFinding(int64_t tab) {
   }
 }
 
+void CallExitPageFullScreen(int64_t tab) {
+  CheckMainThread();
+  if (PageTab* page = g_engine->tab(tab)) {
+    page->contents()->ExitFullscreen(/*will_cause_resize=*/true);
+  }
+}
+
 void CallOpenSettings(int64_t window) {
   CheckMainThread();
   g_engine->OpenSettings(window);
@@ -492,6 +499,7 @@ const PBEngineCalls* Engine::Calls() {
       .answer_dialog = CallAnswerDialog,
       .find = CallFind,
       .stop_finding = CallStopFinding,
+      .exit_page_full_screen = CallExitPageFullScreen,
       .create_window = CallCreateWindow,
       .set_window_page = CallSetWindowPage,
       .request_window = CallRequestWindow,

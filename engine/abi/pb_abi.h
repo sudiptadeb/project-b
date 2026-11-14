@@ -242,6 +242,8 @@ typedef struct PBEngineCalls {
   void (*find)(int64_t tab, int32_t request, const char* text, int forward, int find_next);
   // Ends a tab's search, keeping the active match selected.
   void (*stop_finding)(int64_t tab);
+  // Takes a tab's page out of full screen, as its own exitFullscreen() would.
+  void (*exit_page_full_screen)(int64_t tab);
   // Makes a window and the page covering it, chrome://<page>/: a shell, "shell/<id>", or
   // "picker" in a copy that hasn't chosen its profile. It puts it on screen with its first layout, a
   // little down and right of window near, or where a first window goes when near is 0.

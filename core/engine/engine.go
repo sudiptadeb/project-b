@@ -183,6 +183,9 @@ type Engine interface {
 	// selected.
 	Find(tab TabID, request int, text string, forward, next bool)
 	StopFinding(tab TabID)
+	// ExitPageFullScreen takes a tab's page out of full screen, as its own
+	// exitFullscreen() would; PageFullScreen follows.
+	ExitPageFullScreen(tab TabID)
 
 	// CreateWindow makes window w, with its page, and puts it on screen with its first
 	// layout, a little down and right of window near, or where a first window goes when
@@ -342,6 +345,11 @@ type Listener interface {
 	// FindReply says how a search in a tab's page went: the matches so far, which one is
 	// active, from 1, and whether the count is final.
 	FindReply(tab TabID, request, matches, active int, final bool)
+
+	// PageFullScreen says a tab's page asked to fill the screen, as a video's full screen
+	// button does, or to stop. IsPageFullScreen is the engine asking whether it does now.
+	PageFullScreen(tab TabID, on bool)
+	IsPageFullScreen(tab TabID) bool
 }
 
 // DialogID is the engine's number for a page's dialog.

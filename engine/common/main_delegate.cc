@@ -11,6 +11,7 @@
 #include "base/path_service.h"
 #include "build/build_config.h"
 #include "content/public/common/content_switches.h"
+#include "project_b/engine/buildflags/buildflags.h"
 #include "project_b/engine/common/content_client.h"
 #include "project_b/engine/common/extensions_on.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -41,19 +42,6 @@ namespace project_b {
 
 namespace {
 
-// Web APIs whose browser side is Chrome's, not content's, and that are on by default: a
-// page that uses one asks for an interface no one binds, and content kills its renderer
-// for it, as DuckDuckGo's search did with getInstalledRelatedApps on Android. Turned off,
-// they are simply not there, and a page that checks for them carries on without.
-// docs/research/web-features lists each; one with no feature to turn off gets an empty
-// binder instead (ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame).
-constexpr char kChromeOnlyBlinkFeatures[] =
-    "InstalledApp,DigitalGoods,OnDeviceWebSpeechAvailable,"
-    "InstallOnDeviceSpeechRecognition,PaymentLinkDetection";
-// PaymentRequest's Blink feature is set again per page from this one, so it is turned off
-// here. Content's empty binder already kept it from killing; now it is not there either.
-constexpr char kChromeOnlyFeatures[] = "WebPayments";
-
 // Appends features to the list switch already holds, if any.
 void AppendToList(base::CommandLine* command_line,
                   const char* list_switch,
@@ -66,6 +54,14 @@ void AppendToList(base::CommandLine* command_line,
   command_line->AppendSwitchASCII(list_switch, list);
 }
 
+// Web APIs whose browser side is Chrome's, not content's, and that are on by default: a
+// page that uses one asks for an interface no one binds, and content kills its renderer
+// for it, as DuckDuckGo's search did with getInstalledRelatedApps on Android. Turned off,
+// they are simply not there, and a page that checks for them carries on without. The
+// lists are the rows of core/webfeatures/registry.json that are off (docs/web-features.md);
+// one with no feature to turn off gets an empty binder instead
+// (ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame).
+//
 // The browser process turns them off; content passes both switches to every renderer.
 void DisableChromeOnlyBlinkFeatures() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
@@ -73,8 +69,9 @@ void DisableChromeOnlyBlinkFeatures() {
     return;
   }
   AppendToList(command_line, switches::kDisableBlinkFeatures,
-               kChromeOnlyBlinkFeatures);
-  AppendToList(command_line, switches::kDisableFeatures, kChromeOnlyFeatures);
+               BUILDFLAG(PB_DISABLE_BLINK_FEATURES));
+  AppendToList(command_line, switches::kDisableFeatures,
+               BUILDFLAG(PB_DISABLE_FEATURES));
 }
 
 }  // namespace

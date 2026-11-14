@@ -2,8 +2,16 @@
 
 import("//build/buildflag_header.gni")
 import("//project_b/engine/flags.gni")
+import("//project_b/engine/web_features.gni")
 
 buildflag_header("buildflags") {
   header = "buildflags.h"
-  flags = [ "PB_EXTENSIONS=$project_b_extensions" ]
+  flags = [
+    "PB_EXTENSIONS=$project_b_extensions",
+
+    # The web features turned off, from core/webfeatures/registry.json: the values of
+    # --disable-blink-features and --disable-features, as C strings.
+    "PB_DISABLE_BLINK_FEATURES=\"$project_b_disable_blink_features\"",
+    "PB_DISABLE_FEATURES=\"$project_b_disable_features\"",
+  ]
 }

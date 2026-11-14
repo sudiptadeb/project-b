@@ -1,0 +1,18 @@
+# The web features the engine turns off: the rows of core/webfeatures/registry.json that
+# are off, each naming the Blink runtime features and the base features that turn it off.
+# engine/buildflags passes both lists to main_delegate.cc. docs/web-features.md.
+
+_disable_blink_features = []
+_disable_features = []
+foreach(_feature, read_file("//project_b/core/webfeatures/registry.json", "json")) {
+  if (defined(_feature.disable_blink_features)) {
+    _disable_blink_features += _feature.disable_blink_features
+  }
+  if (defined(_feature.disable_features)) {
+    _disable_features += _feature.disable_features
+  }
+}
+
+# Each as a switch's value: names separated by commas.
+project_b_disable_blink_features = string_join(",", _disable_blink_features)
+project_b_disable_features = string_join(",", _disable_features)

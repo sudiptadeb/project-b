@@ -8,8 +8,13 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/service_worker_version_base_info.h"
+#include "mojo/public/cpp/bindings/binder_map.h"
 #include "project_b/engine/browser/browser_main_parts.h"
 #include "services/network/public/mojom/network_context.mojom.h"
+#include "third_party/blink/public/mojom/badging/badging.mojom.h"
+#include "third_party/blink/public/mojom/persistent_renderer_prefs.mojom.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/posix/global_descriptors.h"
@@ -107,6 +112,33 @@ void ContentBrowserClient::ConfigureNetworkContextParams(
 std::vector<base::FilePath>
 ContentBrowserClient::GetNetworkContextsParentDirectory() {
   return {CopyDir()};
+}
+
+// A binder that takes the receiver and drops it: the call goes nowhere, and the page that
+// made it keeps its renderer, where an interface with no binder at all gets it killed.
+template <typename Context, typename Interface>
+void DropReceiver(Context, mojo::PendingReceiver<Interface>) {}
+
+void ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
+    content::RenderFrameHost* render_frame_host,
+    mojo::BinderMapWithContext<content::RenderFrameHost*>* map) {
+  // navigator.setAppBadge, which chat and mail pages call. It has no feature to turn off.
+  map->Add<blink::mojom::BadgeService>(
+      &DropReceiver<content::RenderFrameHost*, blink::mojom::BadgeService>);
+  // The line wrap box on a view-source: page.
+  map->Add<blink::mojom::PersistentRendererPrefsService>(
+      &DropReceiver<content::RenderFrameHost*,
+                    blink::mojom::PersistentRendererPrefsService>);
+}
+
+void ContentBrowserClient::RegisterBrowserInterfaceBindersForServiceWorker(
+    content::BrowserContext* browser_context,
+    const content::ServiceWorkerVersionBaseInfo& service_worker_version_info,
+    mojo::BinderMapWithContext<const content::ServiceWorkerVersionBaseInfo&>* map) {
+  // navigator.setAppBadge from a push handler.
+  map->Add<blink::mojom::BadgeService>(
+      &DropReceiver<const content::ServiceWorkerVersionBaseInfo&,
+                    blink::mojom::BadgeService>);
 }
 
 }  // namespace project_b

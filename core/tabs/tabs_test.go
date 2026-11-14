@@ -26,6 +26,7 @@ func (f *fakeEngine) CreateTab(workspace string) engine.TabID {
 }
 
 func (f *fakeEngine) DuplicateTab(engine.TabID) engine.TabID { f.next++; return f.next }
+func (f *fakeEngine) WriteClipboard(string)                  {}
 func (f *fakeEngine) CloseTab(id engine.TabID)               { f.closed = append(f.closed, id) }
 func (f *fakeEngine) LoadURL(engine.TabID, string)           {}
 

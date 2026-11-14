@@ -88,6 +88,7 @@ type Engine struct {
 	menu       engine.Menu
 	dockColor  string
 	edits      []engine.EditCommand
+	clipboard  string
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
@@ -487,6 +488,19 @@ func (e *Engine) Edit(c engine.EditCommand) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.edits = append(e.edits, c)
+}
+
+func (e *Engine) WriteClipboard(text string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.clipboard = text
+}
+
+// Clipboard is the text the app last put on the clipboard.
+func (e *Engine) Clipboard() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.clipboard
 }
 
 // Edits are the editing commands the app ran, in order.

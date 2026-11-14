@@ -29,6 +29,7 @@ static inline void call_set_zoom(const PBEngineCalls* c, int64_t tab, double fac
 static inline double call_get_zoom(const PBEngineCalls* c, int64_t tab) { return c->get_zoom(tab); }
 static inline int64_t call_duplicate_tab(const PBEngineCalls* c, int64_t tab) { return c->duplicate_tab(tab); }
 static inline void call_edit(const PBEngineCalls* c, int32_t command) { c->edit(command); }
+static inline void call_write_clipboard(const PBEngineCalls* c, const char* text, size_t length) { c->write_clipboard(text, length); }
 static inline void call_open_settings(const PBEngineCalls* c, int64_t window) { c->open_settings(window); }
 static inline void call_close_settings(const PBEngineCalls* c, int64_t window) { c->close_settings(window); }
 static inline void call_send_to_settings(const PBEngineCalls* c, int64_t window, const char* json, size_t length) { c->send_to_settings(window, json, length); }
@@ -139,6 +140,12 @@ func (e *nativeEngine) DuplicateTab(tab engine.TabID) engine.TabID {
 }
 
 func (e *nativeEngine) Edit(c engine.EditCommand) { C.call_edit(e.calls, C.int32_t(c)) }
+
+func (e *nativeEngine) WriteClipboard(text string) {
+	cs := C.CString(text)
+	defer C.free(unsafe.Pointer(cs))
+	C.call_write_clipboard(e.calls, cs, C.size_t(len(text)))
+}
 
 func (e *nativeEngine) OpenSettings(w engine.WindowID) { C.call_open_settings(e.calls, C.int64_t(w)) }
 

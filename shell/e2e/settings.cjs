@@ -452,12 +452,20 @@ const menuHas = (menu, title) => JSON.stringify(menu).includes(`"title":"${title
   check('a key the browser wins carries a tag, and a page-first key none', await until(async () => (await page.locator('button.action', { hasText: 'Close Tab' }).textContent()).includes('Browser first, not in full screen') && !(await page.locator('button.action', { hasText: 'Open Location' }).textContent()).includes('Browser first')));
   check('the list has no buttons of its own: no plus, remove or reset', (await page.getByRole('button', { name: /^(Add a key for|Remove |Reset (?!all))/ }).count()) === 0);
   check('the keymap follows its template until an edit', keymapFile() === null);
-  check('a shell\'s own actions are listed with their keys, hidden from the menu', await until(async () => {
-    const row = (name) => page.getByRole('region', { name: 'View › Terminal', exact: true }).locator('button.action', { hasText: name }).textContent();
-    const right = await row('Split Right');
-    const down = await row('Split Down');
-    return right.includes('⌘D') && right.includes('Hidden') && down.includes('⇧⌘D') && down.includes('Hidden');
+  check('with the standard shell in use, no shell\'s own actions show, and no Shells part', (await page.getByRole('region', { name: 'Shells' }).count()) === 0 &&
+    (await page.locator('button.action', { hasText: 'Split Right' }).count()) === 0 && (await page.locator('button.action', { hasText: 'Open Command Bar' }).count()) === 0);
+  await fetch(`${base}/settings/send`, { method: 'POST', body: JSON.stringify({ t: 'setShell', text: 'glide' }) });
+  check('with Glide in use, its own actions are listed last, under a Shells part, marked In use', await until(async () => {
+    const glide = page.getByRole('region', { name: 'Glide', exact: true });
+    if (!(await glide.count()) || !(await page.getByRole('region', { name: 'Shells' }).count())) return false;
+    const add = await glide.locator('button.action', { hasText: 'Add to Split View' }).textContent();
+    const last = await page.locator('section[aria-label]').last().getAttribute('aria-label');
+    return (await glide.locator('h2').textContent()).includes('In use') && add.includes('Hidden') && last === 'Glide';
   }));
+  check('and the shells that are off show none of theirs', (await page.locator('button.action', { hasText: 'Split Right' }).count()) === 0);
+  await page.screenshot({ path: path.join(out, 'settings-keyboard-shells.png'), fullPage: true });
+  await fetch(`${base}/settings/send`, { method: 'POST', body: JSON.stringify({ t: 'setShell', text: 'standard' }) });
+  check('switching back takes the Shells part away', await until(async () => (await page.getByRole('region', { name: 'Shells' }).count()) === 0));
   await openRow('New Tab');
   await page.getByRole('button', { name: 'Add key' }).click();
   await page.keyboard.press('Meta+Shift+KeyK');

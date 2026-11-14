@@ -89,6 +89,10 @@ const groups = computed(() => {
     a.keys.some((k) => k.keys.toLowerCase().includes(q) || shown(k.keys, platform.value).toLowerCase().includes(q));
   return kb.value.groups.map((g) => ({ ...g, actions: g.actions.filter(hit) })).filter((g) => g.actions.length);
 });
+// The app's groups first, then the shell in use's own actions under a heading of their
+// own; Go sends only the shell in use's.
+const ordered = computed(() => [...groups.value.filter((g) => !g.shell), ...groups.value.filter((g) => g.shell)]);
+const firstShell = computed(() => ordered.value.find((g) => g.shell));
 
 // Escape in the filter empties it, or leaves it when it is empty; never the page.
 function onFilterEscape(e) {
@@ -327,8 +331,14 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
       </div>
     </section>
 
-    <section v-for="g in groups" :key="g.title" :aria-label="g.title">
-      <h2>{{ g.title }}</h2>
+    <template v-for="g in ordered" :key="g.title">
+    <section v-if="g === firstShell" class="shells" aria-label="Shells">
+      <h2 class="shells-title">Shells</h2>
+      <p class="shells-note">Actions a shell adds. They work while that shell is the one in use.</p>
+    </section>
+    <section :aria-label="g.shell || g.title">
+      <h2 v-if="g.shell">{{ g.shell }} <span class="tag">In use</span></h2>
+      <h2 v-else>{{ g.title }}</h2>
       <div class="card">
         <template v-for="a in g.actions" :key="a.id">
           <button :id="'action-' + a.id" type="button" class="action" :aria-expanded="open === a.id" @click="toggle(a.id)">
@@ -421,6 +431,7 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
         </template>
       </div>
     </section>
+    </template>
 
     <Dialog v-if="asking" :title="askTitle" @close="asking = ''">
       <template #buttons>
@@ -432,6 +443,26 @@ const replaceable = (t) => !t.key.locked && !t.key.fromOS;
 </template>
 
 <style scoped>
+.shells {
+  margin-top: 12px;
+}
+
+.shells-title {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.shells-note {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+h2 .tag {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
 /* The card clips its rows' hover and open colour to its corners, and its width decides
    the columns below. */
 .card {

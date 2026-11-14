@@ -31,6 +31,9 @@ type Action struct {
 	// held, as the OS's app switcher does: it runs when they are let go. Run from a menu
 	// or a button, where nothing is held, it runs at once.
 	Release func()
+	// Shell names the shell whose own action this is, "" for the app's: Keyboard settings
+	// lists it under that shell, and only while the shell is on (Enabled).
+	Shell string
 }
 
 // List is a part of a menu that changes while the app runs, such as the profiles. Its

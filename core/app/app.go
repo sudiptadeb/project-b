@@ -168,6 +168,8 @@ func Start(e engine.Engine, cfg Config) *App {
 	a.Tabs.OnListChanged(a.Commands.RefreshMenu)
 	a.Prefs.OnTabLayoutChanged(func(string) { a.Commands.RefreshMenu() })
 	a.Prefs.OnShellChanged(func(string) { a.Commands.RefreshMenu() })
+	// Keyboard settings lists only the shell in use's own actions.
+	a.Prefs.OnShellChanged(func(string) { a.Settings.KeyboardChanged() })
 	a.Window.OnControlsChanged(func(engine.WindowID, engine.Rect, float64) { a.Commands.RefreshMenu() })
 	a.Commands.Load()
 	for _, start := range starters {

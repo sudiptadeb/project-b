@@ -13,9 +13,11 @@ type View struct {
 	Problems  []string  `json:"problems"`
 }
 
-// Group is one menu's actions, its title the path to it ("View › Developer").
+// Group is one menu's actions, its title the path to it ("View › Developer"). Shell names
+// the shell whose own actions they are, "" for the app's; the page lists those apart.
 type Group struct {
 	Title   string       `json:"title"`
+	Shell   string       `json:"shell,omitempty"`
 	Actions []ActionView `json:"actions"`
 }
 
@@ -87,8 +89,13 @@ func (m *Manager) View() View {
 				continue
 			}
 			inTree[a.ID] = true
+			// A shell's own action shows only while its shell is on: keys for a shell
+			// you aren't using are set once you switch to it.
+			if a.Shell != "" && a.Enabled != nil && !a.Enabled() {
+				continue
+			}
 			if g < 0 {
-				v.Groups = append(v.Groups, Group{Title: path})
+				v.Groups = append(v.Groups, Group{Title: path, Shell: a.Shell})
 				g = len(v.Groups) - 1
 			}
 			v.Groups[g].Actions = append(v.Groups[g].Actions, m.actionView(a, n.Locked, template))

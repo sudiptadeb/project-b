@@ -91,6 +91,13 @@ class Window {
 #if BUILDFLAG(IS_ANDROID)
   // Android's views need the Java WebContents, which a native view can't lead back to.
   void SetShellContents(content::WebContents* contents);
+  // A native shell (docs/native-shell.md): the platform's own views for the shell id, in
+  // the shell's place over the pages, speaking the shell's messages through the window.
+  void SetNativeShell(const std::string& id);
+  void SendToNativeShell(const std::string& json);
+  void FocusNativeShell();
+  // Takes the shell out of the window, a page's or the native one, before another comes.
+  void RemoveShell();
   void AddPageContents(content::WebContents* contents);
   void RemovePageContents(content::WebContents* contents);
 

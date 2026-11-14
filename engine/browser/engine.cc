@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,20 @@
 namespace project_b {
 
 namespace {
+
+#if BUILDFLAG(IS_ANDROID)
+// A native shell's page, "native/<id>": no page, but the platform's own views for the shell
+// id, which the window makes (docs/native-shell.md).
+constexpr std::string_view kNativeShell = "native/";
+
+bool IsNativeShell(const std::string& page) {
+  return page.starts_with(kNativeShell);
+}
+
+std::string NativeShellId(const std::string& page) {
+  return page.substr(kNativeShell.size());
+}
+#endif
 
 Engine* g_engine = nullptr;
 
@@ -290,7 +305,7 @@ void CallCreateWindow(int64_t window,
 
 void CallSetWindowPage(int64_t window, const char* page) {
   CheckMainThread();
-  g_engine->window(window)->shell->SetPage(page);
+  g_engine->SetWindowPage(window, page);
 }
 
 void CallSetWindowLayout(int64_t window,
@@ -550,16 +565,24 @@ void Engine::CreateWindow(int64_t id,
   if (AppWindow* other = window(near)) {
     w->window->PlaceNear(other->window.get());
   }
-  w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
-  timeline::Mark("shell.created");
 #if BUILDFLAG(IS_ANDROID)
-  w->window->SetShellContents(w->shell->contents());
+  if (IsNativeShell(page)) {
+    w->native_shell = true;
+    w->window->SetNativeShell(NativeShellId(page));
+  } else {
+    w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
+    w->window->SetShellContents(w->shell->contents());
+  }
 #else
+  w->shell = std::make_unique<ShellPage>(pages_context_, id, page);
   w->window->SetShellView(w->shell->contents()->GetNativeView());
 #endif
+  timeline::Mark("shell.created");
   AppWindow* raw = w.get();
   windows_[id] = std::move(w);
-  raw->shell->Load();
+  if (raw->shell) {
+    raw->shell->Load();
+  }
   // The frame is in the first layout, so even the window's first frame on screen is the
   // frame colour. It still shows before any renderer has drawn.
   if (raw->window->SetLayout(std::move(layout))) {
@@ -629,7 +652,36 @@ void Engine::Quit() {
   quit_.Run();
 }
 
+void Engine::SetWindowPage(int64_t window, const std::string& page) {
+  AppWindow* w = this->window(window);
+#if BUILDFLAG(IS_ANDROID)
+  // A native shell and a page are different views: the one there leaves the window, then
+  // the other comes.
+  const bool to_native = IsNativeShell(page);
+  if (to_native || w->native_shell) {
+    w->window->RemoveShell();
+    w->shell.reset();
+    w->native_shell = to_native;
+    if (to_native) {
+      w->window->SetNativeShell(NativeShellId(page));
+    } else {
+      w->shell = std::make_unique<ShellPage>(pages_context_, window, page);
+      w->window->SetShellContents(w->shell->contents());
+      w->shell->Load();
+    }
+    return;
+  }
+#endif
+  w->shell->SetPage(page);
+}
+
 void Engine::FocusShellForTraversal(int64_t from_tab, bool reverse) {
+#if BUILDFLAG(IS_ANDROID)
+  if (WindowOf(from_tab)->native_shell) {
+    WindowOf(from_tab)->window->FocusNativeShell();
+    return;
+  }
+#endif
   content::WebContents* shell = WindowOf(from_tab)->shell->contents();
   shell->Focus();
   shell->FocusThroughTabTraversal(reverse);
@@ -831,7 +883,8 @@ int64_t Engine::DuplicateTab(int64_t tab) {
 content::WebContents* Engine::FocusedContents() const {
   for (const auto& [id, w] : windows_) {
     std::vector<content::WebContents*> pages = {
-        w->settings ? w->settings->contents() : nullptr, w->shell->contents()};
+        w->settings ? w->settings->contents() : nullptr,
+        w->shell ? w->shell->contents() : nullptr};
     for (const VisibleTab& v : w->visible) {
       pages.push_back(tab(v.tab)->contents());
     }
@@ -950,11 +1003,24 @@ void Engine::FocusShell(int64_t window) {
   if (w->settings) {
     return;
   }
+#if BUILDFLAG(IS_ANDROID)
+  if (w->native_shell) {
+    w->window->FocusNativeShell();
+    return;
+  }
+#endif
   w->shell->contents()->Focus();
 }
 
 void Engine::SendToShell(int64_t window, const char* json, size_t length) {
-  this->window(window)->shell->Send(std::string(json, length));
+  AppWindow* w = this->window(window);
+#if BUILDFLAG(IS_ANDROID)
+  if (w->native_shell) {
+    w->window->SendToNativeShell(std::string(json, length));
+    return;
+  }
+#endif
+  w->shell->Send(std::string(json, length));
 }
 
 }  // namespace project_b

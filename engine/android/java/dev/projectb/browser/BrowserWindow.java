@@ -46,8 +46,13 @@ final class BrowserWindow extends FrameLayout {
     private final float density;
 
     private long nativeWindow;
+    // The view the shell is in, which refuses a touch the layout says is the page's.
+    private ShellHolder shellHolder;
+    // The shell: a page's ContentView, or a native shell drawn by Android's own views
+    // (docs/native-shell.md). One of the two.
     private ContentView shellView;
     private WebContents shellContents;
+    private NativeShell nativeShell;
     private final Map<WebContents, ContentView> pages = new HashMap<>();
     private WebContents shownContents;
     private ContentView shownView;
@@ -150,11 +155,14 @@ final class BrowserWindow extends FrameLayout {
     // The keyboard goes where the finger went. Each view takes focus for itself.
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
-        if (e.getActionMasked() == MotionEvent.ACTION_DOWN && shellView != null) {
+        if (e.getActionMasked() == MotionEvent.ACTION_DOWN && shellHolder != null) {
             if (overlayView != null) {
                 overlayView.requestFocus();
             } else if (inShell(e.getX(), e.getY())) {
-                shellView.requestFocus();
+                // A native shell's own views take the keyboard as they are touched.
+                if (shellView != null) {
+                    shellView.requestFocus();
+                }
             } else if (shownView != null) {
                 shownView.requestFocus();
             }
@@ -195,11 +203,53 @@ final class BrowserWindow extends FrameLayout {
 
     @CalledByNative
     private void setShell(WebContents contents) {
-        FrameLayout holder = new ShellHolder(getContext());
+        shellHolder = new ShellHolder(getContext());
         shellContents = contents;
-        shellView = attach(contents, holder, matchParent());
-        addView(holder, matchParent());
+        shellView = attach(contents, shellHolder, matchParent());
+        addShellHolder();
         contents.updateWebContentsVisibility(Visibility.VISIBLE);
+    }
+
+    /** The native shell called id, in the shell's place over the pages. */
+    @CalledByNative
+    private void setNativeShell(String id) {
+        shellHolder = new ShellHolder(getContext());
+        nativeShell =
+                NativeShells.make(
+                        id,
+                        getContext(),
+                        json -> BrowserWindowJni.get().shellMessage(nativeWindow, json));
+        shellHolder.addView(nativeShell.getView(), matchParent());
+        addShellHolder();
+        // Chosen in settings, it comes while settings is still open over it.
+        showNativeShell(overlayView == null);
+    }
+
+    // Over the pages, under settings when it is open.
+    private void addShellHolder() {
+        addView(shellHolder, overlayView != null ? indexOfChild(overlayView) : -1, matchParent());
+    }
+
+    /** What Go sends the native shell, as a shell's page hears it through __shellReceive. */
+    @CalledByNative
+    private void receiveShell(String json) {
+        nativeShell.receive(json);
+    }
+
+    /** The keyboard for the native shell: its address field. */
+    @CalledByNative
+    private void focusNativeShell() {
+        nativeShell.focus();
+    }
+
+    /** The shell leaves, a page's or the native one, before another shell comes. */
+    @CalledByNative
+    private void removeShell() {
+        removeView(shellHolder);
+        shellHolder = null;
+        shellView = null;
+        shellContents = null;
+        nativeShell = null;
     }
 
     /** A new tab's view, hidden until showPage. The engine tells its page it's hidden. */
@@ -237,6 +287,7 @@ final class BrowserWindow extends FrameLayout {
         overlayView = attach(contents, this, matchParent(), -1);
         contents.updateWebContentsVisibility(Visibility.VISIBLE);
         overlayView.requestFocus();
+        showNativeShell(false);
     }
 
     @CalledByNative
@@ -244,6 +295,16 @@ final class BrowserWindow extends FrameLayout {
         removeView(overlayView);
         overlayContents = null;
         overlayView = null;
+        showNativeShell(true);
+    }
+
+    // The settings page is drawn in the surface, and Android draws every view over the
+    // surface: a native shell would cover it, so it hides while settings is open. A shell
+    // page is drawn in the surface too, under settings, and needs nothing.
+    private void showNativeShell(boolean show) {
+        if (nativeShell != null) {
+            nativeShell.getView().setVisibility(show ? View.VISIBLE : View.INVISIBLE);
+        }
     }
 
     private ContentView attach(WebContents contents, ViewGroup parent, FrameLayout.LayoutParams params) {
@@ -396,6 +457,8 @@ final class BrowserWindow extends FrameLayout {
                 int height);
 
         boolean backKey(long nativeBrowserWindow);
+
+        void shellMessage(long nativeBrowserWindow, String json);
 
         void stop(long nativeBrowserWindow);
     }

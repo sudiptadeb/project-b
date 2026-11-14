@@ -11,6 +11,8 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/location.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/memory/raw_ptr.h"
 #include "cc/slim/layer.h"
 #include "cc/slim/solid_color_layer.h"
@@ -60,6 +62,11 @@ class BrowserWindow : public content::CompositorClient {
   // Children draw in order: the shown page first, the shell last, on top.
   void SetShell(content::WebContents* contents) {
     root_->AddChild(contents->GetNativeView()->GetLayer());
+  }
+
+  // A shell page's layer leaves when the window shows another shell.
+  void RemoveShell(content::WebContents* contents) {
+    contents->GetNativeView()->GetLayer()->RemoveFromParent();
   }
 
   // Only the shown page's layer is in the tree.
@@ -179,6 +186,25 @@ class BrowserWindow : public content::CompositorClient {
 
   void Stop(JNIEnv* env) { Go().stop(); }
 
+  // A message from the native shell, as chrome.send('shell') brings one from a shell's
+  // page. It crosses in a task of its own, so one the shell sends while Go is calling it
+  // (shown, in answer to the snapshot) never re-enters Go. Android has one window, 1.
+  void ShellMessage(JNIEnv* env, const JavaRef<jstring>& jjson) {
+    std::string json = base::android::ConvertJavaStringToUTF8(env, jjson);
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](std::string json) {
+                         if (!Engine::Get()->window(1)) {
+                           return;
+                         }
+                         hooks::Args args;
+                         args.Int(1);
+                         args.Str(std::move(json));
+                         hooks::Fire(PB_EVENT_SHELL_MESSAGE, args);
+                       },
+                       std::move(json)));
+  }
+
  private:
   // A phone's window fills the screen and never moves, which is what full screen means to the
   // window manager: nothing drags. There are no window buttons and the corners are square.
@@ -225,6 +251,8 @@ struct Window::Impl {
   int theme = -1;
   // The last layout, which SetPages hands Java with the page.
   Layout layout;
+  // The shell's page, while the shell is one; null for a native shell.
+  raw_ptr<content::WebContents> shell = nullptr;
   raw_ptr<content::WebContents> shown = nullptr;
 };
 
@@ -252,9 +280,34 @@ void Window::Close() {
 void Window::SetTitle(const std::u16string& title) {}
 
 void Window::SetShellContents(content::WebContents* contents) {
+  impl_->shell = contents;
   g_browser_window->SetShell(contents);
   Java_BrowserWindow_setShell(AttachCurrentThread(), g_browser_window->java(),
                               contents->GetJavaWebContents());
+}
+
+void Window::SetNativeShell(const std::string& id) {
+  JNIEnv* env = AttachCurrentThread();
+  Java_BrowserWindow_setNativeShell(env, g_browser_window->java(),
+                                    base::android::ConvertUTF8ToJavaString(env, id));
+}
+
+void Window::SendToNativeShell(const std::string& json) {
+  JNIEnv* env = AttachCurrentThread();
+  Java_BrowserWindow_receiveShell(env, g_browser_window->java(),
+                                  base::android::ConvertUTF8ToJavaString(env, json));
+}
+
+void Window::FocusNativeShell() {
+  Java_BrowserWindow_focusNativeShell(AttachCurrentThread(), g_browser_window->java());
+}
+
+void Window::RemoveShell() {
+  if (impl_->shell) {
+    g_browser_window->RemoveShell(impl_->shell);
+    impl_->shell = nullptr;
+  }
+  Java_BrowserWindow_removeShell(AttachCurrentThread(), g_browser_window->java());
 }
 
 void Window::AddPageContents(content::WebContents* contents) {

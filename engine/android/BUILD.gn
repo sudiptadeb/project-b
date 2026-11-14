@@ -207,6 +207,35 @@ android_resources("resources") {
   ]
 }
 
+# The native shells, in Kotlin (docs/native-shell.md). Chromium compiles .kt files in an
+# android_library only from its own allowlist, so they are compiled beside it, as Go is:
+# build_kotlin.py, then a prebuilt jar with Kotlin's standard library.
+action("native_shells_kotlin") {
+  script = "build_kotlin.py"
+  sources = [
+    "java/dev/projectb/browser/MobileNativeShell.kt",
+    "java/dev/projectb/browser/NativeShell.kt",
+  ]
+  _android_jar = android_sdk_jar
+  inputs = [ _android_jar ]
+  outputs = [ "$target_gen_dir/native_shells.jar" ]
+  args = [
+           rebase_path("//third_party/kotlinc/current/bin/kotlinc", root_build_dir),
+           rebase_path("//third_party/jdk/current", root_build_dir),
+           rebase_path(_android_jar, root_build_dir),
+           rebase_path(outputs[0], root_build_dir),
+         ] + rebase_path(sources, root_build_dir)
+}
+
+android_java_prebuilt("native_shells_java") {
+  jar_path = "$target_gen_dir/native_shells.jar"
+  supports_android = true
+  deps = [
+    ":native_shells_kotlin",
+    "//third_party/kotlin_stdlib:kotlin_stdlib_java",
+  ]
+}
+
 android_library("java") {
   resources_package = "dev.projectb.browser"
   deps = [
@@ -227,6 +256,7 @@ android_library("java") {
     "//third_party/androidx:androidx_core_core_java",
     "//third_party/jni_zero:jni_zero_java",
     "//ui/android:ui_java",
+    ":native_shells_java",
   ]
   srcjar_deps = [ ":jni_headers" ]
   sources = [

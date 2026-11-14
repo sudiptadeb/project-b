@@ -310,9 +310,12 @@ can test the feel of both". So:
 
 ### Packaging
 
-- `engine/android/BUILD.gn`'s `android_library("java")` takes the `.kt` files beside the
-  `.java` ones; Chromium's rules compile them with `//third_party/kotlinc` and add the
-  Kotlin standard library, which R8 shrinks with the rest.
+- **Kotlin is compiled beside GN's Java rules.** Chromium's `android_library` compiles a
+  `.kt` file only from an allowlist (`build/config/android/internal_rules.gni`), and we make
+  no upstream edits, so `engine/android/build_kotlin.py` compiles the shells with Chromium's
+  own `//third_party/kotlinc` and JDK against the SDK's `android.jar`, and an
+  `android_java_prebuilt` brings the jar into the APK with Kotlin's standard library, which
+  R8 shrinks with the rest. The Java that holds the bridge depends on it.
 - No new dependency: views, `org.json`, and the `androidx.core` already in the APK.
 - Built in the container as a release is, from this worktree copied to its own folder
   (`/work/native-mobile`), so it never touches another session's tree.

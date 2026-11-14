@@ -86,7 +86,7 @@ int64_t HomeWindow(const App& app, content::WebContents* contents) {
     content::WebContents* home =
         app.event == PB_EVENT_SETTINGS_MESSAGE
             ? (w->settings ? w->settings->contents() : nullptr)
-        : w->shell->app() == app.host ? w->shell->contents()
+        : w->shell && w->shell->app() == app.host ? w->shell->contents()
                                       : nullptr;
     if (home == contents) {
       return id;

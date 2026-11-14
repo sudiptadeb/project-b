@@ -43,7 +43,10 @@ class Engine {
     ~AppWindow();
     const int64_t id;
     std::unique_ptr<Window> window;
+    // The shell's page, or none while the window shows a native shell, drawn by the
+    // platform's own views (native_shell, docs/native-shell.md).
     std::unique_ptr<ShellPage> shell;
+    bool native_shell = false;
     std::unique_ptr<SettingsPage> settings;
     std::vector<VisibleTab> visible;
     // The visible tab whose page has, or last had, the keyboard here, or 0. The window
@@ -109,6 +112,9 @@ class Engine {
                     const std::string& page,
                     Window::Layout layout,
                     std::vector<VisibleTab> tabs);
+  // Loads another page over the window: a shell's, the picker, or a native shell, whose
+  // page is "native/<id>" and which the window makes as its platform's view.
+  void SetWindowPage(int64_t window, const std::string& page);
   // Ends the app, every window at once.
   void Quit();
 

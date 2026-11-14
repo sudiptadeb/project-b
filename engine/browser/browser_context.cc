@@ -57,7 +57,7 @@ content::SSLHostStateDelegate* BrowserContext::GetSSLHostStateDelegate() {
 
 content::PermissionControllerDelegate*
 BrowserContext::GetPermissionControllerDelegate() {
-  return nullptr;
+  return &permissions_;
 }
 
 content::ReduceAcceptLanguageControllerDelegate*

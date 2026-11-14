@@ -192,6 +192,7 @@ source_set("browser") {
   sources = [
     "abi/pb_abi.h",
     "browser/browser_context.cc",
+    "browser/permissions.cc",
     "browser/browser_context.h",
     "browser/browser_main_parts.h",
     "browser/browser_main_parts.mm",

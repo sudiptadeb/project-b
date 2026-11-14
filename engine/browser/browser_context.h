@@ -5,6 +5,7 @@
 
 #include "base/files/file_path.h"
 #include "content/public/browser/browser_context.h"
+#include "project_b/engine/browser/permissions.h"
 
 namespace project_b {
 
@@ -46,6 +47,7 @@ class BrowserContext : public content::BrowserContext {
       override;
 
   const base::FilePath path_;
+  Permissions permissions_;
 };
 
 }  // namespace project_b

@@ -1,6 +1,14 @@
 package content
 
-import "projectb/engine"
+import (
+	"runtime"
+
+	"projectb/engine"
+)
+
+// linksAndImagesOnly is a phone's way: only a long press on a link or an image is the
+// shell's, and one on text or in a field keeps Android's own selection bar.
+var linksAndImagesOnly = runtime.GOOS == "android"
 
 // Picker is the engine's listener in a copy that hasn't chosen its profile: the picker's
 // window, its page, the menu and the keys.
@@ -105,15 +113,14 @@ func Wire(h *Hooks, l engine.Listener) {
 			l.LoadProgressChanged(engine.TabID(c.ID), progress)
 		}
 	})
-	// A long press or a right click on a link or an image in a tab's page: the shell draws
-	// the menu, since a phone has none of its own. Anything else, a selection, keeps
-	// content's way.
+	// A right click, or a long press, in a tab's page: the shell draws the menu
+	// (docs/daily-driver.md), except where linksAndImagesOnly says it stays content's.
 	h.Delegate.AnswerHandleContextMenu(func(c WebContents, _ RenderFrameHost, p ContextMenuParams) (bool, bool) {
-		if c.ID <= 0 || p.LinkURL == "" && p.SrcURL == "" {
+		if c.ID <= 0 || linksAndImagesOnly && p.LinkURL == "" && p.SrcURL == "" {
 			return false, false
 		}
 		l.ContextMenu(engine.TabID(c.ID), engine.ContextMenu{X: float64(p.X), Y: float64(p.Y), Link: p.LinkURL, LinkText: p.LinkText,
-			Src: p.SrcURL, Media: mediaTypes[p.MediaType], Selection: p.SelectionText})
+			Src: p.SrcURL, Media: mediaTypes[p.MediaType], Selection: p.SelectionText, Editable: p.IsEditable})
 		return true, true
 	})
 	h.Observer.OnDidChangeVerticalScrollDirection(func(c WebContents, d VerticalScrollDirection) {

@@ -515,6 +515,13 @@ func (m *Manager) OpenFor(tab engine.TabID, u string) {
 	}
 }
 
+// OpenFrom opens a URL in a new tab that tab opener's page asked for, as a link opened in
+// a new tab is: in opener's window and group, or in the window in front for 0, in the
+// workspace given, shown or behind the active one.
+func (m *Manager) OpenFrom(opener engine.TabID, u, workspace string, foreground bool) engine.TabID {
+	return m.open(opener, u, workspace, foreground)
+}
+
 func (m *Manager) open(opener engine.TabID, u, workspace string, foreground bool) engine.TabID {
 	id := m.eng.CreateTab(workspace)
 	m.HandleTabOpened(opener, id, u, workspace, foreground)
@@ -733,6 +740,9 @@ func (m *Manager) listChanged() {
 		f()
 	}
 }
+
+// SearchURL is a search for the words, however they read.
+func SearchURL(words string) string { return searchURL + url.QueryEscape(strings.TrimSpace(words)) }
 
 // NormalizeInput turns address bar text into a URL, or a search for anything else.
 func NormalizeInput(text string) string {

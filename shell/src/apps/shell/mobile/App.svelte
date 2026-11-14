@@ -171,8 +171,10 @@
       address.focus();
     },
     scroll: scrolled,
-    contextMenu: (m) => {
-      if (m.tab !== go.active) return;
+    // Go's right-click menu: the sheet opens on one for the shown tab. Go drops it when
+    // the tab changes, and says so with null.
+    contextMenu: ({ contextMenu: m }) => {
+      if (!m || m.tab !== go.active) return;
       pressed = m;
       sheet = 'link';
     },

@@ -279,11 +279,8 @@ func (m *Manager) TabLayoutChanged(layout string) {
 	m.sendAll(map[string]any{"t": "tabLayout", "tabLayout": layout})
 }
 
-// ContextMenu tells a tab's shell what a long press in its page was on.
-func (m *Manager) ContextMenu(tab engine.TabID, cm engine.ContextMenu) {
-	m.send(m.tabs.WindowOf(tab), map[string]any{"t": "contextMenu", "tab": tab, "x": cm.X, "y": cm.Y, "link": cm.Link,
-		"linkText": cm.LinkText, "src": cm.Src, "media": cm.Media, "selection": cm.Selection})
-}
+// SendTo sends one window's shell a message.
+func (m *Manager) SendTo(w engine.WindowID, v any) { m.send(w, v) }
 
 // ScrollDirectionChanged tells a tab's shell its page began to scroll down, or up.
 func (m *Manager) ScrollDirectionChanged(tab engine.TabID, down bool) {

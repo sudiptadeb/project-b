@@ -264,9 +264,24 @@ func TestScrollDirectionReachesTheListener(t *testing.T) {
 	}
 }
 
-// A long press on a link or an image in a tab is the shell's to show, and content is
-// told it was handled; one on anything else, and in the shell's own page, stays content's.
+// A right click in a tab is the shell's to show, and content is told it was handled; one
+// in the shell's own page stays content's. On a phone, only one on a link or an image is
+// the shell's.
+func TestARightClickReachesTheListener(t *testing.T) {
+	h, r, _ := wired(t)
+	ask := func(tab int64, p ContextMenuParams) bool {
+		handled, _ := h.Delegate.answerHandleContextMenu(WebContents{ID: tab}, RenderFrameHost{}, p)
+		return handled
+	}
+	if !ask(2, ContextMenuParams{SelectionText: "words"}) || !ask(2, ContextMenuParams{IsEditable: true}) || !ask(2, ContextMenuParams{}) ||
+		ask(0, ContextMenuParams{LinkURL: "https://a.test/"}) {
+		t.Fatalf("answers wrong, got %v", r.got)
+	}
+}
+
 func TestALongPressOnALinkReachesTheListener(t *testing.T) {
+	linksAndImagesOnly = true
+	t.Cleanup(func() { linksAndImagesOnly = false })
 	h, r, _ := wired(t)
 	ask := func(tab int64, p ContextMenuParams) bool {
 		handled, _ := h.Delegate.answerHandleContextMenu(WebContents{ID: tab}, RenderFrameHost{}, p)

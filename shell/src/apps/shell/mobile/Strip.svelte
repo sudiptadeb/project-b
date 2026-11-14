@@ -27,7 +27,7 @@
         <button
           class="tab"
           data-tab={tab.id}
-          aria-label={tabLabel(tab)}
+          aria-label="Go to {tabLabel(tab)}"
           aria-current={tab.id === active ? 'page' : undefined}
           onclick={() => onpick(tab.id)}
           oncontextmenu={(e) => {

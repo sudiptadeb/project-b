@@ -6,6 +6,7 @@
 #include "base/base64.h"
 #include "base/functional/bind.h"
 #include "base/strings/string_number_conversions.h"
+#include "build/build_config.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/web_contents.h"
@@ -13,6 +14,9 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
+#if BUILDFLAG(IS_MAC)
+#include "project_b/engine/browser/file_chooser.h"
+#endif
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/codec/png_codec.h"
@@ -199,6 +203,15 @@ bool PageTab::HandleKeyboardEvent(content::WebContents* source,
   return WebContentsDelegateHooks::HandleKeyboardEvent(source, event) ||
          Window::HandleUnhandledKey(event);
 }
+
+#if BUILDFLAG(IS_MAC)
+// The phone's own picker already opens; the Mac's goes through Go first.
+void PageTab::RunFileChooser(content::RenderFrameHost* render_frame_host,
+                             scoped_refptr<content::FileSelectListener> listener,
+                             const blink::mojom::FileChooserParams& params) {
+  FileChooser::Run(id_, render_frame_host, std::move(listener), params);
+}
+#endif
 
 bool PageTab::TakeFocus(content::WebContents* source, bool reverse) {
   Engine::Get()->FocusShellForTraversal(id_, reverse);

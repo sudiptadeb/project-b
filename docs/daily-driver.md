@@ -91,3 +91,18 @@ download's progress on it. The contract's rule 17 checks it, by role and name.
 
 **Android.** Downloads go to the app's own files and open through Android's share sheet.
 Built after the Mac's.
+
+## File upload
+
+The panel is the system's own, so no shell draws anything. A page's `<input type=file>`
+reaches the engine (`RunFileChooser`), which asks Go first (`PB_EVENT_FILE_CHOOSER`: the tab,
+whether it picks one file, several, a folder or a file to save, and the types it accepts).
+Go lets it open while the page's address is one policy allows, and names the folder: the one
+files were last chosen from in this run, or the system's choice. The engine then shows the
+open panel as a sheet on the page's window, limited to the accepted types with All Files
+still offered, and hands the page what was chosen; a folder upload gets every file under
+it. The engine tells Go where they came from (`PB_EVENT_FILES_CHOSEN`) for the next panel.
+Cancelling, or a refusal, answers the page with nothing, as a cancelled panel does.
+
+**Android.** The phone's own picker already opens through content, without Go. Bringing it
+through Go's policy comes with the Android pass.

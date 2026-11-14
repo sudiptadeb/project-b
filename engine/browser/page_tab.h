@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/memory/weak_ptr.h"
+#include "build/build_config.h"
 #include "project_b/engine/browser/hooks_gen.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/geometry/size.h"
@@ -72,6 +73,11 @@ class PageTab : public WebContentsObserverHooks, public WebContentsDelegateHooks
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
+#if BUILDFLAG(IS_MAC)
+  void RunFileChooser(content::RenderFrameHost* render_frame_host,
+                      scoped_refptr<content::FileSelectListener> listener,
+                      const blink::mojom::FileChooserParams& params) override;
+#endif
 
   const int64_t id_;
   const std::string workspace_;

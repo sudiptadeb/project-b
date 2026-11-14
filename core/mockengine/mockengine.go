@@ -91,6 +91,7 @@ type Engine struct {
 	edits      []engine.EditCommand
 	clipboard  string
 	downloads  downloads
+	chooser    []engine.FileChooserAnswer
 	// focused is the tab last given the keyboard, by FocusTab or a press in its page.
 	focused engine.TabID
 	// unshownFocus are the tabs FocusTab was asked for while no window showed them.
@@ -505,6 +506,13 @@ func (e *Engine) Clipboard() string {
 	return e.clipboard
 }
 
+// FileChoosers are the app's answers to the pages' file panels, in order.
+func (e *Engine) FileChoosers() []engine.FileChooserAnswer {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]engine.FileChooserAnswer(nil), e.chooser...)
+}
+
 // Edits are the editing commands the app ran, in order.
 func (e *Engine) Edits() []engine.EditCommand {
 	e.mu.Lock()
@@ -760,6 +768,16 @@ func (e *Engine) Fire(w engine.WindowID, tab engine.TabID, kind, value string) {
 				json.Unmarshal([]byte(value), &m)
 			}
 			e.listener.ContextMenu(shown, m)
+		case "chooseFile":
+			// The page asks for a file; the user picks one in folder value, or cancels
+			// with "".
+			a := e.listener.FileChooser(engine.FileChooserRequest{Tab: shown, Mode: engine.FileChooserOpen})
+			e.mu.Lock()
+			e.chooser = append(e.chooser, a)
+			e.mu.Unlock()
+			if a.Allow && value != "" {
+				e.listener.FilesChosen(shown, 1, value)
+			}
 		case "download":
 			// The page starts a download of value.
 			e.download(shown, value, false)

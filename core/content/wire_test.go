@@ -124,6 +124,14 @@ func (r *recorder) DownloadUpdated(d engine.Download) {
 	r.note(fmt.Sprintf("downloaded %d %s %d/%d", d.ID, d.Path, d.Received, d.Total))
 }
 
+func (r *recorder) FileChooser(q engine.FileChooserRequest) engine.FileChooserAnswer {
+	r.note(fmt.Sprintf("file chooser %d %d %v", q.Tab, q.Mode, q.Accept))
+	return engine.FileChooserAnswer{Allow: true}
+}
+func (r *recorder) FilesChosen(tab engine.TabID, count int, folder string) {
+	r.note(fmt.Sprintf("files chosen %d %d %s", tab, count, folder))
+}
+
 func (r *recorder) DevToolsCommand(method string, params []byte) (any, error) {
 	r.note("devtools " + method + " " + string(params))
 	switch method {

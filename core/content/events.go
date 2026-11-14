@@ -3,6 +3,7 @@ package content
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"projectb/engine"
 	"projectb/timeline"
@@ -29,6 +30,8 @@ const (
 	eventPickerMessage  Hook = 16
 	eventDownloadTarget Hook = 17
 	eventDownloadUpdate Hook = 18
+	eventFileChooser    Hook = 19
+	eventFilesChosen    Hook = 20
 )
 
 var eventNames = map[Hook]string{
@@ -50,6 +53,8 @@ var eventNames = map[Hook]string{
 	eventPickerMessage:  "engine.PickerMessage",
 	eventDownloadTarget: "engine.DownloadTarget",
 	eventDownloadUpdate: "engine.DownloadUpdated",
+	eventFileChooser:    "engine.FileChooser",
+	eventFilesChosen:    "engine.FilesChosen",
 }
 
 // terminationNames are how a child process ended, as engine.ProcessCrash says it. The
@@ -82,6 +87,8 @@ type Events struct {
 	OnDevTools        func(method string, params []byte) (result any, err error)
 	OnDownloadTarget  func(r engine.DownloadRequest) engine.DownloadTarget
 	OnDownloadUpdated func(d engine.Download)
+	OnFileChooser     func(r engine.FileChooserRequest) engine.FileChooserAnswer
+	OnFilesChosen     func(tab engine.TabID, count int, folder string)
 
 	// more are the events a build tag adds, by number.
 	more map[Hook]func(r *reader) (Value, bool)
@@ -176,6 +183,21 @@ func (e *Events) dispatch(id Hook, r *reader) (Value, bool) {
 		if e.OnDownloadUpdated != nil {
 			e.OnDownloadUpdated(engine.Download{ID: engine.DownloadID(r.int()), Path: r.str(), URL: r.str(), Mime: r.str(),
 				State: engine.DownloadState(r.int()), Received: r.int(), Total: r.int(), Paused: r.bool()})
+		}
+	case eventFileChooser:
+		// The answer is whether the panel opens, and where, as JSON; none refuses it.
+		if e.OnFileChooser == nil {
+			return Value{}, false
+		}
+		req := engine.FileChooserRequest{Tab: engine.TabID(r.int()), Mode: engine.FileChooserMode(r.int())}
+		if accept := r.str(); accept != "" {
+			req.Accept = strings.Split(accept, ",")
+		}
+		b, _ := json.Marshal(e.OnFileChooser(req))
+		return Value{S: string(b)}, true
+	case eventFilesChosen:
+		if e.OnFilesChosen != nil {
+			e.OnFilesChosen(engine.TabID(r.int()), int(r.int()), r.str())
 		}
 	case eventMenuList:
 		// The answer is the list's items now, as the menu bar's JSON has them.

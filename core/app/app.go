@@ -67,6 +67,8 @@ type App struct {
 	actions []*commands.Action
 	// menus are the windows' open right-click menus.
 	menus *contextMenus
+	// lastFolder is where files were last chosen from for a page.
+	lastFolder string
 	// keyIn is which page had the keyboard at the last key press.
 	keyIn engine.Surface
 	// lastWindow is the id of the window made last; Go numbers them from 1.

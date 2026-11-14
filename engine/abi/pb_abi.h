@@ -68,6 +68,12 @@ typedef enum PBEvent {
   PB_EVENT_DOWNLOAD_UPDATED = 18,       // i: download, s: path, s: url, s: mime type,
                                         // i: PBDownloadState, i: bytes received, i: total
                                         // bytes or -1, i: paused
+  PB_EVENT_FILE_CHOOSER = 19,           // i: tab, i: 0 one file, 1 several, 2 a folder,
+                                        // 3 a file to save; s: the accept types, comma
+                                        // separated; answers s: json, {"allow", "folder"}
+                                        // where the panel opens; none refuses
+  PB_EVENT_FILES_CHOSEN = 20,           // i: tab, i: how many files, s: the folder they
+                                        // came from
 } PBEvent;
 
 // Where a download is.

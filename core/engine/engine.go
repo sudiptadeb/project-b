@@ -320,6 +320,37 @@ type Listener interface {
 	DownloadTarget(r DownloadRequest) DownloadTarget
 	// DownloadUpdated says what a download is now: on each change once it has a path.
 	DownloadUpdated(d Download)
+
+	// FileChooser asks whether a page may open the file panel, and where it opens. The
+	// panel is the system's own.
+	FileChooser(r FileChooserRequest) FileChooserAnswer
+	// FilesChosen says the user chose count files in the panel, from folder.
+	FilesChosen(tab TabID, count int, folder string)
+}
+
+// FileChooserMode is what a page's file panel picks.
+type FileChooserMode int
+
+const (
+	FileChooserOpen FileChooserMode = iota
+	FileChooserOpenMultiple
+	FileChooserFolder
+	FileChooserSave
+)
+
+// FileChooserRequest is a page asking for files: its tab, what it picks, and the types
+// it accepts, such as ".pdf" or "image/*", none for any.
+type FileChooserRequest struct {
+	Tab    TabID
+	Mode   FileChooserMode
+	Accept []string
+}
+
+// FileChooserAnswer says whether the panel opens, and in which folder, "" for the
+// system's choice.
+type FileChooserAnswer struct {
+	Allow  bool   `json:"allow"`
+	Folder string `json:"folder"`
 }
 
 // DownloadID is the engine's number for a download, for this run only.

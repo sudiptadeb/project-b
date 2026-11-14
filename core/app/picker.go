@@ -197,7 +197,11 @@ func (p *Picker) ProcessCrashed(engine.ProcessCrash)                            
 func (p *Picker) DownloadTarget(engine.DownloadRequest) engine.DownloadTarget {
 	return engine.DownloadTarget{}
 }
-func (p *Picker) DownloadUpdated(engine.Download)             {}
+func (p *Picker) DownloadUpdated(engine.Download) {}
+func (p *Picker) FileChooser(engine.FileChooserRequest) engine.FileChooserAnswer {
+	return engine.FileChooserAnswer{}
+}
+func (p *Picker) FilesChosen(engine.TabID, int, string)       {}
 func (p *Picker) DevToolsCommand(string, []byte) (any, error) { return nil, engine.ErrUnknownCommand }
 
 // Handover is the request of a copy started to pick while this one runs: the picker comes

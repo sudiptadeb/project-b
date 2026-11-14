@@ -210,6 +210,8 @@ source_set("browser") {
     "browser/driver.mm",
     "browser/engine.cc",
     "browser/engine.h",
+    "browser/file_chooser.cc",
+    "browser/file_chooser.h",
     "browser/go.cc",
     "browser/go.h",
     "browser/hooks.cc",
@@ -233,6 +235,7 @@ source_set("browser") {
   ]
   sources += get_target_outputs(":protocol_sources")
   deps = [
+    "//ui/shell_dialogs",
     "//components/download/public/common:public",
     ":common",
     ":protocol_sources",

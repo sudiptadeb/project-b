@@ -273,6 +273,26 @@ ordinary action in the keymap ([menus-shortcuts.md](menus-shortcuts.md#a-shells-
 
 The check holds every shell to these, knowing nothing else about it.
 
+**Rule numbers.** A rule's number is its name in the check and in reports, and never
+changes once given. They are handed out by range, so builders working at once don't take
+the same one (settled 2026-11-14):
+
+| Numbers | What, or whose |
+|---|---|
+| 1–13 | The first rules, below. |
+| 14 | The splash before Go's data. |
+| 15 | JavaScript dialogs. |
+| 16 | The right-click menu. |
+| 17 | Downloads. |
+| 18 | A window with no tabs. |
+| 19 | Our own pages' tabs: a title, not an address field. |
+| 20–29 | The daily-driver features still to come: find in page, video full screen, HTTP sign-in, file upload and what follows them. |
+| 30–39 | Permissions and their prompt, tabs restored after a crash, certificate warnings, error pages. |
+| 40–49 | Pinned tabs, and Go features after them. |
+
+A rule whose feature a shell doesn't have yet lists that shell in the check, with who brings
+it there; a phone shell may be left out of a rule for a desktop feature.
+
 1. It says `ready`, draws the snapshot, and says `shown`.
 2. **The active tab's page shows,** after every change: a new tab, another made active, a
    close, a tab a page opened, a resize. It asks for a page's keyboard (`focusTab`) only once

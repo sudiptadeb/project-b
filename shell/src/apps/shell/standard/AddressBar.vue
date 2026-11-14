@@ -197,8 +197,9 @@ watch(
 </template>
 
 <style scoped>
-/* Taller than the icon buttons beside it, as Ulaa's is, with 6px of bar above and below. The Ulaa design's omnibox has no border: the
-   white fill on the tinted bar is the edge. The focus ring stays inside the bar. */
+/* Taller than the icon buttons beside it, with 6px of bar above and below. Edged as the
+   design system's text field is, a --line hairline; the focus ring replaces it while
+   typing, and stays inside the bar. */
 .field {
   position: relative;
   flex: 1;
@@ -209,6 +210,7 @@ watch(
   margin: 0;
   border-radius: 6px;
   background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
   box-sizing: border-box;
 }
 

@@ -100,18 +100,17 @@ import { view } from './state.js';
 }
 
 .row:hover {
-  background: var(--hover);
+  background: var(--accent-tint);
 }
 
 .row:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--focus-ring-inset);
 }
 
-/* Borders carry separation: the active tab is a white card with a line, no shadow. */
+/* The selected tab as Settings marks its selected section: --accent-soft. */
 .row.active {
-  background: var(--surface);
-  border-color: var(--line);
+  background: var(--accent-soft);
 }
 
 .new-tab {

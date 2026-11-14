@@ -1381,6 +1381,14 @@ def copies_checks():
     b = App(None, [f"--root={root}", "--profile=work"])
     b.wait("!!document.querySelector('input')", 30)
     check("two profiles run at once, each in a copy of its own", a.proc.poll() is None and b.proc.poll() is None and a.proc.pid != b.proc.pid)
+    # On a desktop the copy started second came to the front, and the OS took the key
+    # window from the first. The driver holds the first's key, as a click on it makes it,
+    # so a click in its address bar still gives its shell the keyboard.
+    try:
+        focus_bar(a)
+        check("a click in the address bar of the copy behind gives it the keyboard", True)
+    except TimeoutError as e:
+        check("a click in the address bar of the copy behind gives it the keyboard", False, e)
     check("each copy's Dock icon has a dot in its profile's colour", (a.cmd("dockdot"), b.cmd("dockdot")) == ("#4f9e9e", "#5b7fd6"), (a.cmd("dockdot"), b.cmd("dockdot")))
     shown = lambda app: [(i["title"], i["checked"]) for m in json.loads(app.cmd("menu")) if m["title"] == "Profiles" for i in m["items"] if i != "-"]
     check("the Profiles menu lists both, with a tick on this one", shown(a) == [("Personal", True), ("Work", False), ("Profiles…", False)] and shown(b) == [("Personal", False), ("Work", True), ("Profiles…", False)], (shown(a), shown(b)))

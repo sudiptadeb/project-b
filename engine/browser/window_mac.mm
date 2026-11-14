@@ -280,6 +280,18 @@ NSColor* Hex(uint32_t rgb) {
   return _forceKeyForDriver || [super isMainWindow];
 }
 
+// On a desktop the OS takes the key window away whenever another app comes to the front,
+// as another copy of the app does as it starts. Content's views hear of it from here, and
+// from then on a view that becomes first responder no longer gives its page the keyboard,
+// so the driver's clicks would land in a window whose pages never get focus. While the
+// driver holds the window key it stays key, as a person's click on it would make it.
+- (void)resignKeyWindow {
+  if (_forceKeyForDriver) {
+    return;
+  }
+  [super resignKeyWindow];
+}
+
 // Whether the app itself moves the window from a press here, a point in the window: a
 // drag area below the title bar, outside the edges AppKit resizes from. The window server
 // moves the window by itself from the drag areas in the title bar, but only there: below

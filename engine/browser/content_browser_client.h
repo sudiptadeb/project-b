@@ -20,6 +20,18 @@ class ContentBrowserClient : public ContentBrowserClientHooks {
   ContentBrowserClient& operator=(const ContentBrowserClient&) = delete;
   ~ContentBrowserClient() override;
 
+  // Empty binders for the interfaces Chrome binds that pages ask for with no feature to
+  // turn off, so a page that asks keeps its renderer: app badges, and view-source's line
+  // wrap box. Their calls go nowhere.
+  void RegisterBrowserInterfaceBindersForFrame(
+      content::RenderFrameHost* render_frame_host,
+      mojo::BinderMapWithContext<content::RenderFrameHost*>* map) override;
+  void RegisterBrowserInterfaceBindersForServiceWorker(
+      content::BrowserContext* browser_context,
+      const content::ServiceWorkerVersionBaseInfo& service_worker_version_info,
+      mojo::BinderMapWithContext<const content::ServiceWorkerVersionBaseInfo&>* map)
+      override;
+
  private:
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;

@@ -242,6 +242,8 @@ void ExtensionsContentBrowserClient::RegisterAssociatedInterfaceBindersForServic
 void ExtensionsContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
     content::RenderFrameHost* render_frame_host,
     mojo::BinderMapWithContext<content::RenderFrameHost*>* map) {
+  ContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(render_frame_host,
+                                                                map);
   const extensions::Extension* extension = ExtensionFor(
       render_frame_host->GetBrowserContext(),
       render_frame_host->GetSiteInstance()->GetSecurityPrincipal());

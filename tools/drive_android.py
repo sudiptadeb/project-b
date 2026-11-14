@@ -89,7 +89,7 @@ BASE = "localhost:%d" % PORT
 
 
 def adb(*args):
-    return subprocess.run(ADB + list(args), capture_output=True, text=True).stdout
+    return subprocess.run(ADB + list(args), capture_output=True, text=True, errors="replace").stdout
 
 
 def shot(name):

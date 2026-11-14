@@ -147,15 +147,23 @@ class BrowserWindow : public content::CompositorClient {
     view->OnPhysicalBackingSizeChanged(gfx::Size(width, height));
   }
 
-  // The phone's back key closes settings while it is open, as its close button does, and is
-  // otherwise the shell's back button while the tab has somewhere to go back to.
-  // Android has one window, 1.
+  // The phone's back key closes settings while it is open, as its close button does; then
+  // goes to the shell while it has something open the key closes; and is otherwise the
+  // shell's back button while the tab has somewhere to go back to. Android has one
+  // window, 1.
   bool BackKey(JNIEnv* env) {
     if (Engine::Get()->window(1)->settings) {
       hooks::Args args;
       args.Int(1);
       args.Str(R"({"t":"close"})");
       hooks::Fire(PB_EVENT_SETTINGS_MESSAGE, args);
+      return true;
+    }
+    if (Engine::Get()->window(1)->shell_back) {
+      hooks::Args args;
+      args.Int(1);
+      args.Str(R"({"t":"backKey"})");
+      hooks::Fire(PB_EVENT_SHELL_MESSAGE, args);
       return true;
     }
     PageTab* tab = Engine::Get()->FocusedTab(Engine::Get()->window(1));

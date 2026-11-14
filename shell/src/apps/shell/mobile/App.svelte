@@ -36,6 +36,20 @@
   // The bars while the page scrolls down: away, sliding off the screen, then gone, their
   // room given to the page in one step, so the page is resized once and not every frame.
   // Back with the page scrolling up, another tab, the address or a sheet.
+  // Whether the address is being edited, which the phone's back key ends, as it closes a
+  // sheet: while either is so, the engine gives the key to the shell (backCloses).
+  let editing = $state(false);
+  $effect(() => send({ t: 'backCloses', on: !!sheet || editing }));
+
+  // The phone's back key: the sheet open closes, or the editing ends.
+  function backKey() {
+    if (sheet) sheet = '';
+    else if (editing) {
+      address.blur();
+      focusPage();
+    }
+  }
+
   let away = $state(false);
   let gone = $state(false);
   let sliding = 0;
@@ -144,6 +158,7 @@
       address.focus();
     },
     scroll: scrolled,
+    backKey,
     suggestions: (m) => address.suggestions(m),
   });
 </script>
@@ -156,7 +171,7 @@
   {/if}
   {#if top}
     <div class="bars head" class:away class:gone>
-      <Toolbar {tab} top count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+      <Toolbar {tab} top count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} onedit={(on) => (editing = on)} bind:address />
     </div>
   {/if}
   <div class="stage">
@@ -185,7 +200,7 @@
   <div class="bars" class:away class:gone>
     <CrashBar />
     {#if !top}
-      <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} bind:address />
+      <Toolbar {tab} count={go.tabs.length} {sheet} {onsheet} onswipe={swipe} onedit={(on) => (editing = on)} bind:address />
     {/if}
   </div>
   {#if sheet === 'menu'}

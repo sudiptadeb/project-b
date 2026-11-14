@@ -329,6 +329,32 @@ const H = 915;
   check('the address bar called for brings them back', await until(async () => (await box('.toolbar')).bottom === H && await inField()));
   await page.keyboard.press('Escape');
 
+  // The phone's back key closes what the shell has open, then goes back in the page.
+  // A person's press comes a moment after the sheet opens, once the shell has told Go.
+  const backKey = async () => {
+    await settle(page);
+    await fire('backKey');
+  };
+  await tabsButton.tap();
+  await until(() => switcher.isVisible());
+  await backKey();
+  check('the back key closes the switcher', await until(async () => !(await switcher.isVisible())));
+  await menuButton.tap();
+  await until(() => menu.isVisible());
+  await backKey();
+  check('and the menu', await until(async () => !(await menu.isVisible())));
+  await field.tap();
+  await until(inField);
+  await backKey();
+  check('and ends editing the address', await until(async () => !(await inField())));
+  const here = await active();
+  await fire('navigate', 'https://example.com/back/one', { tab: here.id });
+  await until(async () => (await active()).url === 'https://example.com/back/one' && !(await active()).loading);
+  await fire('navigate', 'https://example.com/back/two', { tab: here.id });
+  await until(async () => (await active()).url === 'https://example.com/back/two' && !(await active()).loading);
+  await backKey();
+  check('with nothing open, it goes back in the page', await until(async () => (await active()).url === 'https://example.com/back/one'));
+
   // Settings, from the menu.
   await menuButton.tap();
   await menu.getByRole('menuitem', { name: 'Settings' }).tap();

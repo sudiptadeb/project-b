@@ -111,6 +111,7 @@ gives the page the same two.
 | `action` | `id`: one of the shell's own actions | Its key was pressed, or its menu item chosen, while this shell is on |
 | `suggestions` | `id`, `items` | In answer to `suggest` |
 | `paint` | `span` | Go wants a timeline span ended once this is drawn |
+| `backKey` | | The phone's back key, while the shell said it closes something (`backCloses`) |
 | `scroll` | `tab`, `direction`: `down` or `up` | A tab's page began to scroll down, or back up (content's `DidChangeVerticalScrollDirection`) |
 | `extensions` | `extensions`: the buttons, the open popup and the prompt | While the Extensions flag is on: an extension changed, or the active tab did |
 
@@ -171,6 +172,7 @@ none. The snapshot also has `running` (the version), `platform`
 | `relaunch`, `dismissCrash` | | The update bubble's and the crash notice's buttons |
 | `setTabLayout` | `text`: `vertical` or `horizontal` | Sets the tab position pref, which only the standard shell reads |
 | `setAddressBarPosition` | `text`: `bottom` or `top` | Sets the address bar position pref, which only the Mobile shell reads |
+| `backCloses` | `on` | While on, the phone's back key comes to the shell as `backKey`, before the page's history: the shell has a sheet open, or the address in edit |
 | `extensionClick` | `extension`, `rect` | A press on an extension's button at `rect`: Go opens its popup under it, closes it when it is the one open, or tells the extension it was clicked |
 | `extensionPin` | `extension`, `on` | Puts the extension's button on the toolbar, or takes it off |
 | `extensionsManage` | | Opens settings at its Extensions section |
@@ -466,7 +468,10 @@ address field, and a menu button at the far right, in our tones.
   becomes the field when tapped, with the suggestions over it, the closest nearest the
   thumb; the tab count, which opens the switcher; and ⋯, the menu sheet. A swipe along
   the bar goes to the tab before or after. Back is the phone's back key, and in the menu
-  while there is somewhere to go back to.
+  while there is somewhere to go back to. While a sheet is open or the address is
+  edited, the back key closes that first (`backCloses`).
+- **The pill's end** says Blocked, Crashed or Failed when the page is, as the standard
+  shell's address bar does.
 - **The switcher** lies over the page, the bar still under it: a card per tab in two
   columns, the workspaces as chips that choose which cards show and where + opens a tab.
   Its cards are the tabs' `role="tab"` elements, kept in the document while it is closed.

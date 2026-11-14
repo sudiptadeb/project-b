@@ -329,6 +329,13 @@ void CallFocusShell(int64_t window) {
   g_engine->FocusShell(window);
 }
 
+void CallSetShellBack(int64_t window, int on) {
+  CheckMainThread();
+  if (auto* w = g_engine->window(window)) {
+    w->shell_back = on != 0;
+  }
+}
+
 void CallSendToShell(int64_t window, const char* json, size_t length) {
   CheckMainThread();
   g_engine->SendToShell(window, json, length);
@@ -420,6 +427,7 @@ const PBEngineCalls* Engine::Calls() {
       .focus_tab = CallFocusTab,
       .focus_shell = CallFocusShell,
       .send_to_shell = CallSendToShell,
+      .set_shell_back = CallSetShellBack,
       .open_settings = CallOpenSettings,
       .close_settings = CallCloseSettings,
       .send_to_settings = CallSendToSettings,

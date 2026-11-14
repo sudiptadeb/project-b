@@ -215,6 +215,9 @@ typedef struct PBEngineCalls {
   void (*focus_tab)(int64_t tab);
   void (*focus_shell)(int64_t window);
   void (*send_to_shell)(int64_t window, const char* json, size_t length);
+  // Whether the phone's back key goes to the shell first: while on, the window reports
+  // the key on the shell's channel as {"t":"backKey"}. Only Android has the key.
+  void (*set_shell_back)(int64_t window, int on);
   // A window's settings page, over the whole window in its own page while open.
   void (*open_settings)(int64_t window);
   void (*close_settings)(int64_t window);

@@ -7,7 +7,7 @@
   // ⋯, which opens the menu; they stay while the address is edited, so the tabs are a tap
   // away from an empty new tab too. A swipe
   // sideways along it goes to the tab before or after (onswipe, -1 or 1).
-  let { tab, count, top, sheet, onsheet, onswipe, address = $bindable() } = $props();
+  let { tab, count, top, sheet, onsheet, onswipe, onedit, address = $bindable() } = $props();
   let editing = $state(false);
   let start = null;
 
@@ -30,7 +30,10 @@
 </script>
 
 <div class="toolbar" role="group" aria-label="Toolbar" class:top use:shell use:drag onpointerdown={down} onpointerup={up} onpointercancel={() => (start = null)}>
-  <Address bind:this={address} {tab} {top} onedit={(on) => (editing = on)} />
+  <Address bind:this={address} {tab} {top} onedit={(on) => {
+    editing = on;
+    onedit(on);
+  }} />
   <button class="count" aria-label="Tabs" aria-haspopup="dialog" aria-expanded={sheet === 'switcher'} onclick={() => onsheet(sheet === 'switcher' ? '' : 'switcher')}>
     <span>{count > 99 ? ':D' : count}</span>
   </button>

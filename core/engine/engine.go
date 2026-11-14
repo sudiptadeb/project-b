@@ -198,6 +198,10 @@ type Engine interface {
 
 	// SendToShell delivers one message to a window's shell page.
 	SendToShell(w WindowID, msg []byte)
+	// SetShellBack says whether the phone's back key goes to the shell first, while it
+	// has something open that the key closes: the engine then sends {"t":"backKey"} on
+	// the shell's channel, as if the shell had, instead of going back in the page.
+	SetShellBack(w WindowID, on bool)
 
 	// OpenSettings puts the settings page over the whole of a window, in a page of its
 	// own, and gives it the keyboard; CloseSettings takes it away. SendToSettings delivers

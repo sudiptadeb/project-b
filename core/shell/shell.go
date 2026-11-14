@@ -34,6 +34,7 @@ type command struct {
 	Name      *string        `json:"name"`
 	Color     *string        `json:"color"`
 	Collapsed *bool          `json:"collapsed"`
+	On        bool           `json:"on"`
 }
 
 // requests are the names the shell uses for engine.WindowRequest.
@@ -193,6 +194,12 @@ func (m *Manager) Handle(w engine.WindowID, msg []byte) {
 		m.SwitchTabLayout(c.Text)
 	case "setAddressBarPosition":
 		m.prefs.SetAddressBarPosition(c.Text)
+	case "backCloses":
+		m.eng.SetShellBack(w, c.On)
+	case "backKey":
+		// The phone's back key, which the engine reports on this channel while the shell
+		// said it closes something: the shell hears it.
+		m.send(w, map[string]any{"t": "backKey"})
 	case "run":
 		m.run(c.Text)
 	case "relaunch":

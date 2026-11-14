@@ -14,7 +14,7 @@ to our code having it.
     python3 tools/measure.py --save              # also writes the baseline, tools/baseline/<where>.json
     python3 tools/measure.py --compare           # against that baseline; or --compare FILE
     python3 tools/measure.py --trace build/measure/trace.json   # the last start, for ui.perfetto.dev
-    python3 tools/measure.py --shell minimal-js --out build/measure/minimal-js.json   # another shell
+    python3 tools/measure.py --shell fox --out build/measure/fox.json   # another shell
 
 On a Mac every start can load another shell, by its id in core/shells/registry.json, and the
 run finds the controls by role and name (docs/shells.md, "What every shell does"), so the

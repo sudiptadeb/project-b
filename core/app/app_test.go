@@ -1382,10 +1382,10 @@ func TestViewShellSwitchesTheShellLive(t *testing.T) {
 	for len(r.got) > 0 {
 		<-r.got
 	}
-	r.e.Post(func() { r.a.MenuChosen("shells:example") })
+	r.e.Post(func() { r.a.MenuChosen("shells:minimal") })
 	r.e.Settle()
 	l := r.e.Layout(1)
-	if r.e.PageOf(1) != "shell/example" || prefs.New(dir).Shell() != "example" || len(l.Regions) != 0 || len(l.Tabs) != 1 {
+	if r.e.PageOf(1) != "shell/minimal" || prefs.New(dir).Shell() != "minimal" || len(l.Regions) != 0 || len(l.Tabs) != 1 {
 		t.Fatalf("the window loads %q, the pref is %q, the layout %+v", r.e.PageOf(1), prefs.New(dir).Shell(), l)
 	}
 	r.e.Post(func() { r.a.Shell.TabsChanged() })
@@ -1431,7 +1431,7 @@ func TestAShellsOwnDataIsKeptPerWindow(t *testing.T) {
 	if m := r.waitOn(got, func(m map[string]any) bool { return m["t"] == "snapshot" }); m["data"] != nil {
 		t.Fatalf("another window's shell has %v", m["data"])
 	}
-	r.e.Post(func() { r.a.MenuChosen("shells:example") })
+	r.e.Post(func() { r.a.MenuChosen("shells:minimal") })
 	if m := snapshot(); m["data"] != nil {
 		t.Fatalf("the next shell has %v", m["data"])
 	}

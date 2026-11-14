@@ -1295,7 +1295,7 @@ def shell_checks():
     shot("fox")
     quit_app()
 
-    for shell in ("minimal", "minimal-js"):
+    for shell in ("minimal",):
         basic_shell_checks(shell)
 
 

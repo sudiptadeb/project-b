@@ -16,9 +16,6 @@ import (
 type Shell struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	// Example is a shell that is built and can be loaded, but is offered nowhere: the one
-	// to copy to build another.
-	Example bool `json:"example,omitempty"`
 	// Phone is a shell made for a phone: a phone offers and loads only these, and a desktop
 	// offers none of them, though it loads one named outright, as the mock does for a
 	// phone-sized test.
@@ -68,12 +65,11 @@ var all = func() []Shell {
 // All is every shell, in the registry's order.
 func All() []Shell { return append([]Shell(nil), all...) }
 
-// Listed is the shells the user can choose: every one made for this kind of device, but
-// the examples.
+// Listed is the shells the user can choose: every one made for this kind of device.
 func Listed() []Shell {
 	var out []Shell
 	for _, s := range all {
-		if !s.Example && s.Phone == OnPhone {
+		if s.Phone == OnPhone {
 			out = append(out, s)
 		}
 	}
@@ -85,7 +81,7 @@ func Listed() []Shell {
 func Default() string { return Listed()[0].ID }
 
 // Fits says whether a profile whose pref names id loads it. A desktop loads any shell
-// named outright, an example or a phone's; a phone only a phone's, so the desktop's that
+// named outright, a phone's too; a phone only a phone's, so the desktop's that
 // the profile templates name loads Default there.
 func Fits(id string) bool {
 	for _, s := range all {

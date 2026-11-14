@@ -79,9 +79,9 @@ func TestTheShellIsAShellsIDAndSurvivesARestart(t *testing.T) {
 	var got []string
 	m.OnShellChanged(func(id string) { got = append(got, id) })
 	m.SetShell("no-such-shell")
-	m.SetShell("example")
-	m.SetShell("example")
-	if len(got) != 1 || got[0] != "example" || New(dir).Shell() != "example" {
+	m.SetShell("minimal")
+	m.SetShell("minimal")
+	if len(got) != 1 || got[0] != "minimal" || New(dir).Shell() != "minimal" {
 		t.Fatalf("changes %v, saved %q", got, New(dir).Shell())
 	}
 	if err := m.Apply(json.RawMessage(`{"shell":"standard"}`)); err != nil || m.Shell() != "standard" || len(got) != 2 {

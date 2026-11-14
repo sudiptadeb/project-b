@@ -3,7 +3,7 @@
 // checks. Every test prints ok or FAIL per check and ends with done().
 //
 //   const lib = require('./lib.cjs');
-//   await lib.start(['-use=example']);          // core/cmd/dev, on the built shell/dist
+//   await lib.start(['-use=minimal']);          // core/cmd/dev, on the built shell/dist
 //   const w = await lib.openWindow(browser);    // the OS window, with the shell in it
 //   lib.check('a tab shows', (await lib.regions()).visible.length === 1);
 //   lib.done();                                 // stops the server, exits 1 if any failed

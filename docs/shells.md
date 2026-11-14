@@ -32,8 +32,7 @@ the real app; "What the real app adds" lists the little the mock can't show.
 
 - **A shell is one folder,** `shell/src/apps/shell/<id>/`, with an `index.html` and a
   `main.js`, and **one line in `core/shells/registry.json`:** its id and the name the user
-  sees, `"example": true` for a shell that is built but offered nowhere, and its own
-  actions, if it has any ([below](#a-shells-own-actions)). The id is lower-case letters,
+  sees, `"phone": true` for a shell made for a phone, and its own actions, if it has any ([below](#a-shells-own-actions)). The id is lower-case letters,
   digits and dashes.
 - Each shell builds into `shell/<id>/` beside the other pages, and loads at
   `chrome://shell/<id>/` in the real app and at `/shell/<id>/` on the mock. Nothing in the
@@ -389,10 +388,13 @@ says the build has them, so a build without extensions has none of it.
    the shell wants one.
 4. Run it on the mock (below) and make the check pass.
 
-The smallest shell is the example, `shell/src/apps/shell/example/`: the one to copy. It is
-built with the others and offered nowhere (`"example": true` in the registry); `go run
-./cmd/dev -use example` loads it. Beside an `index.html` and a `main.js` of a few lines,
-its `App.vue` is the whole of it:
+The shell to read first is Minimal, `shell/src/apps/shell/minimal/`, the smallest, in
+Svelte; Standard, `shell/src/apps/shell/standard/`, in Vue, is the reference that shows
+every feature Go offers. `go run ./cmd/dev -use minimal` loads one. The SDK needs no
+framework: a shell may draw with the DOM itself and `onChange` ([The adapters](#the-adapters)).
+The owner, 2026-11-14: no hidden example shells, so none is kept for that path. In Vue,
+a shell can be as small as this `App.vue`, beside an `index.html` and a `main.js` of a few
+lines:
 
 ```vue
 <script setup>
@@ -683,7 +685,7 @@ the framework then knows what was read.
 
 ### What a shell's author writes
 
-In Vue, as the example above. In Svelte, as `minimal` does:
+In Vue, as above. In Svelte, as `minimal` does:
 
 ```svelte
 <script>
@@ -752,7 +754,7 @@ longer has `frameWidth`; the settings page had a copy it never read, which went 
 
 ### The two minimal shells
 
-`minimal` and `minimal-js` are to be, in the owner's words, a tab bar, a toolbar, a
+`minimal`, and `minimal-js` until it was dropped with the hidden shells, were to be, in the owner's words, a tab bar, a toolbar, a
 vertical list too, the simplest button placements, a simple layout, no rounding, with
 thought for many tabs. The SDK makes that easy: a shell draws `state.tabs` however it lays
 them out, marks its bars, and the SDK measures whatever moves. A strip that scrolls is
@@ -804,7 +806,7 @@ API, with every control plain.
   SDK leaves it to the shell. Recommendation: leave it there.
 - **The standard shell's tab position.** `state.tabLayout` and `setTabLayout` are only the
   standard shell's. Recommendation: they go with that pref, as "Not in this step" says.
-- **`minimal-js`'s drawing.** Recommendation: no library. `document.createElement` with a
+- **`minimal-js`'s drawing** (the shell is gone since). Recommendation: no library. `document.createElement` with a
   small helper that makes an element with its attributes and children, and the tab list
   drawn again by tab id. lit-html, about 3 KB gzipped, is the smallest library that would
   do the drawing again for it.

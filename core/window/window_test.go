@@ -336,11 +336,11 @@ func TestAnotherPageDropsWhatTheOldOneClaimed(t *testing.T) {
 	e := &recorder{}
 	m := one(e)
 	m.HandleShellLayout(1, report)
-	m.SetPage(engine.ShellPage("example"))
-	if l := e.last(); !reflect.DeepEqual(e.pages, []engine.Page{"shell/example"}) || len(l.Regions) != 0 || !reflect.DeepEqual(l.Tabs, report.Tabs) {
+	m.SetPage(engine.ShellPage("minimal"))
+	if l := e.last(); !reflect.DeepEqual(e.pages, []engine.Page{"shell/minimal"}) || len(l.Regions) != 0 || !reflect.DeepEqual(l.Tabs, report.Tabs) {
 		t.Fatalf("pages %v, layout %+v", e.pages, l)
 	}
-	if m.page != "shell/example" {
+	if m.page != "shell/minimal" {
 		t.Fatalf("a new window gets %q", m.page)
 	}
 }

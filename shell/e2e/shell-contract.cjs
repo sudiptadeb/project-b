@@ -39,8 +39,6 @@ const noMenuYet = {
   terminal: 'r4 brings it',
   fox: 'r4 brings it',
   minimal: 'r4 brings it',
-  'minimal-js': 'r4 brings it',
-  example: 'r4 brings it',
 };
 
 (async () => {

@@ -9,10 +9,10 @@ where it is carried or why it is left.
 | Class | Hooks | Carried, plain data | Carried, struct copy | Left |
 |---|---:|---:|---:|---:|
 | `WebContentsObserver` | 124 | 45 | 59 | 20 |
-| `WebContentsDelegate` | 120 | 32 | 55 | 33 |
+| `WebContentsDelegate` | 120 | 32 | 56 | 32 |
 | `ContentBrowserClient` | 347 | 77 | 84 | 186 |
 | `NavigationThrottle` | 7 | 6 | 0 | 1 |
-| **Total** | **598** | **160** | **198** | **240** |
+| **Total** | **598** | **160** | **199** | **239** |
 | `ContentRendererClient` (renderer process) | 62 | 0 | 0 | 62 |
 | `ContentUtilityClient` (utility process) | 5 | 0 | 0 | 5 |
 
@@ -20,7 +20,7 @@ Left, by group:
 
 | Group | `WebContentsObserver` | `WebContentsDelegate` | `ContentBrowserClient` | `NavigationThrottle` | Total |
 |---|---:|---:|---:|---:|---:|
-| objects without a copier | 20 | 13 | 70 | 1 | 104 |
+| objects without a copier | 20 | 12 | 70 | 1 | 103 |
 | factories and object returns | 0 | 8 | 67 | 0 | 75 |
 | callbacks | 0 | 6 | 13 | 0 | 19 |
 | off the main thread | 0 | 0 | 15 | 0 | 15 |
@@ -219,7 +219,7 @@ crossing the engine interface stays ours and generalised.
 | `WebContentsObserver` | `DidAcquireFullscreen` | carried, struct copy | `WebContentsObserverHooks::DidAcquireFullscreen` · `Hooks.Observer.OnDidAcquireFullscreen` |
 | `WebContentsObserver` | `DidActivatePreviewedPage` | carried | `WebContentsObserverHooks::DidActivatePreviewedPage` · `Hooks.Observer.OnDidActivatePreviewedPage` |
 | `WebContentsObserver` | `DidChangeThemeColor` | carried | `WebContentsObserverHooks::DidChangeThemeColor` · `Hooks.Observer.OnDidChangeThemeColor` |
-| `WebContentsObserver` | `DidChangeVerticalScrollDirection` | carried | `WebContentsObserverHooks::DidChangeVerticalScrollDirection` · `Hooks.Observer.OnDidChangeVerticalScrollDirection` |
+| `WebContentsObserver` | `DidChangeVerticalScrollDirection` | carried | `WebContentsObserverHooks::DidChangeVerticalScrollDirection` · `Hooks.Observer.OnDidChangeVerticalScrollDirection` · used by `core/content/wire.go` |
 | `WebContentsObserver` | `DidChangeVisibleSecurityState` | carried | `WebContentsObserverHooks::DidChangeVisibleSecurityState` · `Hooks.Observer.OnDidChangeVisibleSecurityState` |
 | `WebContentsObserver` | `DidCloneToNewWebContents` | carried, struct copy | `WebContentsObserverHooks::DidCloneToNewWebContents` · `Hooks.Observer.OnDidCloneToNewWebContents` |
 | `WebContentsObserver` | `DidFailLoad` | carried, struct copy | `WebContentsObserverHooks::DidFailLoad` · `Hooks.Observer.OnDidFailLoad` |
@@ -329,7 +329,7 @@ crossing the engine interface stays ours and generalised.
 | `WebContentsObserver` | `WasDiscarded` | carried | `WebContentsObserverHooks::WasDiscarded` · `Hooks.Observer.OnWasDiscarded` |
 | `WebContentsObserver` | `WebAuthnAssertionRequestSucceeded` | carried, struct copy | `WebContentsObserverHooks::WebAuthnAssertionRequestSucceeded` · `Hooks.Observer.OnWebAuthnAssertionRequestSucceeded` |
 | `WebContentsObserver` | `WebContentsDestroyed` | carried | `WebContentsObserverHooks::WebContentsDestroyed` · `Hooks.Observer.OnWebContentsDestroyed` |
-| `WebContentsDelegate` | `ActivateContents` | carried, struct copy | `WebContentsDelegateHooks::ActivateContents` · `Hooks.Delegate.OnActivateContents` |
+| `WebContentsDelegate` | `ActivateContents` | carried, struct copy | `WebContentsDelegateHooks::ActivateContents` · `Hooks.Delegate.OnActivateContents` · used by `core/content/wire.go` |
 | `WebContentsDelegate` | `AddNewContents` | left: ownership | `content/public/browser/web_contents_delegate.h:203` |
 | `WebContentsDelegate` | `AllowKeyboardLockForInnerContents` | carried, struct copy | `WebContentsDelegateHooks::AllowKeyboardLockForInnerContents` · `Hooks.Delegate.AnswerAllowKeyboardLockForInnerContents` |
 | `WebContentsDelegate` | `AllowedPrerenderingCount` | carried, struct copy | `WebContentsDelegateHooks::AllowedPrerenderingCount` · `Hooks.Delegate.AnswerAllowedPrerenderingCount` |
@@ -342,7 +342,7 @@ crossing the engine interface stays ours and generalised.
 | `WebContentsDelegate` | `CancelKeyboardLockRequest` | carried, struct copy | `WebContentsDelegateHooks::CancelKeyboardLockRequest` · `Hooks.Delegate.OnCancelKeyboardLockRequest` |
 | `WebContentsDelegate` | `CapturePaintPreviewOfSubframe` | left: no copier for base::UnguessableToken | `content/public/browser/web_contents_delegate.h:780` |
 | `WebContentsDelegate` | `CheckMediaAccessPermission` | carried, struct copy | `WebContentsDelegateHooks::CheckMediaAccessPermission` · `Hooks.Delegate.AnswerCheckMediaAccessPermission` |
-| `WebContentsDelegate` | `CloseContents` | carried, struct copy | `WebContentsDelegateHooks::CloseContents` · `Hooks.Delegate.OnCloseContents` |
+| `WebContentsDelegate` | `CloseContents` | carried, struct copy | `WebContentsDelegateHooks::CloseContents` · `Hooks.Delegate.OnCloseContents` · used by `core/content/wire.go` |
 | `WebContentsDelegate` | `ContentsMouseEvent` | left: no copier for ui::Event | `content/public/browser/web_contents_delegate.h:249` |
 | `WebContentsDelegate` | `ContentsZoomChange` | carried | `WebContentsDelegateHooks::ContentsZoomChange` · `Hooks.Delegate.OnContentsZoomChange` |
 | `WebContentsDelegate` | `CreateAudioStreamBrokerFactory` | left: returns ownership | `content/public/browser/web_contents_delegate.h:685` |
@@ -380,9 +380,9 @@ crossing the engine interface stays ours and generalised.
 | `WebContentsDelegate` | `GetWindowBoundsInScreen` | left: returns optional object | `content/public/browser/web_contents_delegate.h:806` |
 | `WebContentsDelegate` | `GetWindowShowState` | left: returns no copier for ui::mojom::WindowShowState | `content/public/browser/web_contents_delegate.h:533` |
 | `WebContentsDelegate` | `GuestSaveFrame` | carried, struct copy | `WebContentsDelegateHooks::GuestSaveFrame` · `Hooks.Delegate.AnswerGuestSaveFrame` |
-| `WebContentsDelegate` | `HandleContextMenu` | left: no copier for content::ContextMenuParams | `content/public/browser/web_contents_delegate.h:328` |
+| `WebContentsDelegate` | `HandleContextMenu` | carried, struct copy | `WebContentsDelegateHooks::HandleContextMenu` · `Hooks.Delegate.AnswerHandleContextMenu` |
 | `WebContentsDelegate` | `HandleDragEnded` | carried | `WebContentsDelegateHooks::HandleDragEnded` · `Hooks.Delegate.OnHandleDragEnded` |
-| `WebContentsDelegate` | `HandleKeyboardEvent` | carried, struct copy | `WebContentsDelegateHooks::HandleKeyboardEvent` · `Hooks.Delegate.AnswerHandleKeyboardEvent` |
+| `WebContentsDelegate` | `HandleKeyboardEvent` | carried, struct copy | `WebContentsDelegateHooks::HandleKeyboardEvent` · `Hooks.Delegate.AnswerHandleKeyboardEvent` · used by `core/content/wire.go` |
 | `WebContentsDelegate` | `IsBackForwardCacheSupported` | carried, struct copy | `WebContentsDelegateHooks::IsBackForwardCacheSupported` · `Hooks.Delegate.AnswerIsBackForwardCacheSupported` |
 | `WebContentsDelegate` | `IsContentsActive` | carried, struct copy | `WebContentsDelegateHooks::IsContentsActive` · `Hooks.Delegate.AnswerIsContentsActive` |
 | `WebContentsDelegate` | `IsDocumentPictureInPictureBlockedBySystem` | carried | `WebContentsDelegateHooks::IsDocumentPictureInPictureBlockedBySystem` · `Hooks.Delegate.AnswerIsDocumentPictureInPictureBlockedBySystem` |

@@ -76,9 +76,10 @@ it downloads.
 - **Processes.** As on the Mac: the main program holds Go, a helper with no Go runs every
   child, through content's child process path. Linux's zygote starts from the helper, so Go
   never reaches a renderer.
-- **The sandbox.** Chromium's Linux sandbox needs user namespaces. Ubuntu 23.10 and later block
-  them for unprivileged apps unless an AppArmor profile allows the app. So the package has to
-  install a profile, or a setuid sandbox helper. Running without the sandbox is not an option.
+- **The sandbox.** Chromium's Linux sandbox needs user namespaces, which Ubuntu 23.10 and later
+  block for unprivileged apps. Inside a Flatpak, zypak starts each sandboxed child through
+  Flatpak's own sandbox instead, so no AppArmor profile or setuid helper is needed
+  ([linux.md](linux.md#3-processes-and-the-sandbox)).
 - **Go.** `libcore` as a static archive, built with Chromium's clang and its sysroot, as
   Android does. The per-OS files: the single-instance socket (as on the Mac), `xdg-open`, the
   desktop's notifications over D-Bus, the file chooser through the desktop portal, printing
@@ -89,13 +90,10 @@ and the title bar follows the desktop's dark mode.
 
 **Packaging, signing, updates.**
 
-- A tarball that installs into the user's home, and a `.deb` for Ubuntu and Debian that
-  carries the AppArmor profile. Flatpak later, if at all: its sandbox fights Chromium's.
-- Linux has no code signing. The update check verifies our own signature over the download,
-  with our public key in the binary, as the Mac checks our certificate.
-- Updates: the tarball updates itself the way the Mac app does, by swapping its folder. A
-  `.deb` installed by root can't, so it updates through an apt repository, or tells the user.
-  One of the decisions below.
+- A Flatpak only, from our own repository first and Flathub later (decided 2026-11-19, below).
+  One package for every distro; zypak makes Chromium's sandbox work inside it.
+- Flatpak checks our repository's GPG signature, and updates through its update portal, which
+  Go drives. The detail is in [linux.md](linux.md#5-the-flatpak).
 
 **Testing here.**
 
@@ -353,16 +351,17 @@ release candidates came off, which left 507 GB free.
 - **Linux must work on Ubuntu, Debian, Arch and KDE** (2026-11-19: "arc and debian and kde
   should work"; "i want to be distro agnostic"). **Build and test arm64 first, here; amd64
   later on bigboy** (2026-11-19: "yes we can build and test arm64 and then later use our
-  bigboy for amd64"). Packaging is leaning to Flatpak ("flatpack seems nice one"), not
-  decided yet.
+  bigboy for amd64").
+
+- **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"): no tarball, no `.deb`.
+  The Linux spec is [linux.md](linux.md).
 
 ## Decisions for Sudipta
 
-1. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
-2. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
+1. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
    certificate?
-3. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
-4. Is there an Apple Developer Program membership to use, for iOS devices and for
+2. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
+3. Is there an Apple Developer Program membership to use, for iOS devices and for
    notarizing the Mac app?
 
 ## Sources

@@ -350,6 +350,12 @@ release candidates came off, which left 507 GB free.
   the top row. The strip is off, with a "Show menu bar" setting; Alt shows it for a moment
   and F10 opens the first menu. The Mac is unchanged. Ux keeps it in the design system.
 
+- **Linux must work on Ubuntu, Debian, Arch and KDE** (2026-11-19: "arc and debian and kde
+  should work"; "i want to be distro agnostic"). **Build and test arm64 first, here; amd64
+  later on bigboy** (2026-11-19: "yes we can build and test arm64 and then later use our
+  bigboy for amd64"). Packaging is leaning to Flatpak ("flatpack seems nice one"), not
+  decided yet.
+
 ## Decisions for Sudipta
 
 1. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?

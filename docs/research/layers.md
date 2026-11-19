@@ -76,8 +76,10 @@ Written down so OS code doesn't creep back into the adapter. Only these:
 
 1. **The window** (`window_mac.mm`). It holds Chromium's page views and shares input with
    them. On Linux and Windows the OS calls are inside Chromium's own Aura and Ozone.
-2. **Panels attached to a window**: print, Save as, Share, the page's file chooser, and
-   the folder chooser (a sheet on the window).
+2. **Panels attached to a window**: print and Share. Save as and the folder chooser move
+   to Chromium's own file dialog (`ui::SelectFileDialog`), as a page's file chooser
+   already uses, so `downloads_mac.mm`'s panel and `choose_path_mac.mm` go and Linux and
+   Windows get both for free (2026-11-19: "yes lets do that").
 3. **The Mac menu bar, and quitting from the Dock or at logout**: shortcuts go through
    Chromium's key handling, and a quit has to end Chromium's loop. Mac only.
 

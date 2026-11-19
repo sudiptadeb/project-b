@@ -12,6 +12,9 @@ agreed.
   and kde should work").
 - **arm64 built and tested here first, amd64 later on bigboy** (2026-11-19).
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"). No tarball, no `.deb`.
+- **The app id is `io.github.sudiptadeb.project-b`** (2026-11-19: "yea lets go with this").
+  Flathub reads it as github.com/sudiptadeb/project-b, which makes its GitHub check possible;
+  a dash is allowed in the last part. It never changes, or users stop getting updates.
 - **Pure Go wherever possible**: the system layer talks D-Bus through `godbus/dbus`.
 - **The shell draws the window buttons at the right; the menu strip is off by default**
   (2026-11-19, on ux's mocks: "looks good").
@@ -109,7 +112,7 @@ targets. The same calls work outside a Flatpak, which keeps headless tests simpl
 | `NotificationsAllowed`, `AskNotifications` | the portal has no ask; the user turns them off in the desktop's settings. Always allowed from our side |
 | `SetDockColor`, `OpenFullDiskAccess` | Mac only; nothing on Linux |
 | Dark mode, accent colour | Settings portal, `org.freedesktop.appearance` (`color-scheme`, `accent-color`), and its change signal |
-| Single instance (`core/instance`) | a Unix socket in `$XDG_RUNTIME_DIR/app/<app id>/`, which every copy of our Flatpak shares |
+| Single instance (`core/instance`) | a Unix socket in `$XDG_RUNTIME_DIR/app/io.github.sudiptadeb.project-b/`, which every copy of our Flatpak shares |
 | Links and files from the OS | the `.desktop` file declares `http`, `https` and HTML files, and the desktop launches us with them on the command line. A copy already running gets them through `core/instance`. So on Linux this needs no OS events and isn't an exception |
 | Relaunch (`core/relaunch`) | the Flatpak portal's `Spawn`, with the latest-version flag after an update |
 | Updates | see 5 |
@@ -207,9 +210,7 @@ and Flatpak takes the place of the `.deb` and AppArmor work.
 
 ## Open
 
-1. **The app id.** Flatpak names an app by reverse DNS, and changing it later loses users'
-   updates. A domain we own, or `io.github.sudiptadeb.<Name>`.
-2. **Printing**: GTK only for print, or our own print settings (the spike in 4).
+1. **Printing**: GTK only for print, or our own print settings (the spike in 4).
 
 ## Sources
 

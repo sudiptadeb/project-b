@@ -140,9 +140,20 @@ container with a stub portal.
   PulseAudio, which also covers PipeWire; the network; IPC; CUPS; read-only `mimeapps.list`
   and the browser profiles in 4; `xdg-download` for downloads. Nothing else: the portals
   cover the rest.
-- **Our own repository first, Flathub later.**
-  - The repository is a folder of static files (OSTree), signed with our own GPG key, sealed
-    in the kosh. Any static HTTPS host serves it.
+- **On GitHub, no server of ours** (2026-11-19: "lets use github as the source of updates").
+  The Mac already updates from GitHub Releases ([updates.md](../updates.md)).
+  - **First: our repository on GitHub Pages.** The repository is a folder of static files
+    (OSTree), signed with our own GPG key, sealed in the kosh. Release builds and signs it
+    here and attaches it to the GitHub release; a small workflow publishes it to Pages.
+    Pages through a workflow, not a branch, because git refuses files over 100 MB and the
+    main binary is one.
+  - Pages caps a site at 1 GB and asks for under 100 GB of traffic a month. The repository
+    keeps the last three releases, and updates download only what changed, so that covers
+    the early users.
+  - **Later: Flathub, with our files on GitHub Releases.** Flathub's entry holds only the
+    manifest; at install, Flatpak downloads our files from the GitHub release, as Chrome and
+    Brave do on Flathub. Flathub carries the traffic, Releases has no cap, and the Pages
+    repository can go.
   - Users install with one click from a `.flatpakref` file, in GNOME Software or KDE Discover,
     or with `flatpak install --from <url>`.
   - Ubuntu doesn't ship Flatpak, so there is one `sudo apt install flatpak` first; the install
@@ -198,9 +209,7 @@ and Flatpak takes the place of the `.deb` and AppArmor work.
 
 1. **The app id.** Flatpak names an app by reverse DNS, and changing it later loses users'
    updates. A domain we own, or `io.github.sudiptadeb.<Name>`.
-2. **Where the repository lives.** Static files, a few hundred MB per release with deltas.
-   GitHub Pages is capped at 1 GB, so our own host is likelier.
-3. **Printing**: GTK only for print, or our own print settings (the spike in 4).
+2. **Printing**: GTK only for print, or our own print settings (the spike in 4).
 
 ## Sources
 

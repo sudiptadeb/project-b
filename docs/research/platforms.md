@@ -345,6 +345,11 @@ release candidates came off, which left 507 GB free.
 - **Linux first, before Windows, aiming at Ubuntu 24.04** (2026-11-19: "yes and yes").
   x64 first, built in the container; arm64 after, the same build with one setting.
 
+- **Window buttons at the right; the menu strip off by default** (2026-11-19, on ux's mocks:
+  "looks good"). On Linux and Windows minimise, maximise and close sit at the right end of
+  the top row. The strip is off, with a "Show menu bar" setting; Alt shows it for a moment
+  and F10 opens the first menu. The Mac is unchanged. Ux keeps it in the design system.
+
 ## Decisions for Sudipta
 
 1. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?

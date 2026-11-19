@@ -22,8 +22,8 @@ on the build Mac (an M3 Ultra, 32 cores, 256 GB RAM).
   simulator here.
 - **ChromeOS comes free, untested.** Chromebooks run our Android APK, and Linux apps in their
   Linux container. There is no Chromebook image we can run on Apple silicon.
-- **Disk is the first blocker.** This Mac has 37 GB free. Each new Chromium target needs 20
-  to 40 GB more. That has to be solved before any of this starts.
+- **Disk was the first blocker, and is cleared.** This Mac had 37 GB free; each new Chromium
+  target needs 20 to 40 GB more. A cleanup on 2026-11-19 left 507 GB free.
 
 ## What carries over to every platform
 
@@ -290,7 +290,7 @@ A VM run and a desktop run still must not overlap, as for the macOS VM
 
 ## Disk
 
-This Mac has 37 GB free of 1.8 TB. Rough needs, before any tests:
+This Mac had 37 GB free of 1.8 TB. Rough needs, before any tests:
 
 | Target | Where | Extra disk |
 |---|---|---|
@@ -300,12 +300,13 @@ This Mac has 37 GB free of 1.8 TB. Rough needs, before any tests:
 | Linux VM | Tart | about 10 GB |
 | iOS | `chromium/src` on the Mac | 20 to 30 GB |
 
-So Linux alone needs space freed first. The 17 worktrees' `build/` folders hold 15 GB; the
-rest is for Sudipta to choose.
+About 170 GB for all of them. **Cleared on 2026-11-19:** unused local models, the spare macOS
+VM `pb-build` (remade by `PB_VM=pb-build tools/vm/setup.sh`) and all but the five newest
+release candidates came off, which left 507 GB free.
 
 ## Recommended order
 
-1. **Free the disk.** Nothing else starts without it.
+1. **Free the disk.** Done on 2026-11-19.
 2. **Linux x64 and arm64**, the first we can test here: built in the container we have, tested
    headless there and in a Tart VM. It writes the Aura window that Windows reuses.
 3. **Android tablets and desktop mode**, alongside, by another session: no build work, tested
@@ -318,12 +319,11 @@ rest is for Sudipta to choose.
 ## Decisions for Sudipta
 
 1. Is the order right: Linux first, Android large screens beside it, then Windows, then iOS?
-2. Disk: what may go to free 60 to 100 GB?
-3. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
-4. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
+2. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
+3. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
    certificate?
-5. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
-6. Is there an Apple Developer Program membership to use, for iOS devices and for
+4. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
+5. Is there an Apple Developer Program membership to use, for iOS devices and for
    notarizing the Mac app?
 
 ## Sources

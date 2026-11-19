@@ -1,0 +1,49 @@
+# The spike's Flatpak: stock content_shell, copied in from out/linux-<cpu> by stage.sh.
+# flatpak-builder only copies files; it never builds Chromium.
+#   flatpak-builder --user --install --force-clean build-dir io.github.sudiptadeb.project-b.yml
+app-id: io.github.sudiptadeb.project-b
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+# The Electron base app carries zypak, which runs Chromium's sandbox inside Flatpak's.
+base: org.electronjs.Electron2.BaseApp
+base-version: '26.08'
+command: project-b
+separate-locales: false
+finish-args:
+  # The window: Wayland, X11 only when there is no Wayland.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # The GPU.
+  - --device=dri
+  # Sound; PulseAudio's socket also covers PipeWire.
+  - --socket=pulseaudio
+  - --share=network
+  # Printing goes to CUPS.
+  - --socket=cups
+  - --filesystem=xdg-download
+  # Is it the default browser: read only, this one file.
+  - --filesystem=xdg-config/mimeapps.list:ro
+  # Import finds the other browsers' profiles with no chooser.
+  - --filesystem=~/.mozilla:ro
+  - --filesystem=xdg-config/google-chrome:ro
+  - --filesystem=xdg-config/chromium:ro
+  - --filesystem=xdg-config/BraveSoftware:ro
+  - --filesystem=~/.var/app/org.mozilla.firefox:ro
+modules:
+  - name: project-b
+    buildsystem: simple
+    # Chromium's build already left the symbols out; there's nothing to strip or split.
+    build-options:
+      no-debuginfo: true
+      strip: false
+    build-commands:
+      - mkdir -p /app/project-b
+      - cp -a files/. /app/project-b/
+      - install -Dm755 project-b.sh /app/bin/project-b
+      - install -Dm644 io.github.sudiptadeb.project-b.desktop /app/share/applications/io.github.sudiptadeb.project-b.desktop
+      - install -Dm644 icon.svg /app/share/icons/hicolor/scalable/apps/io.github.sudiptadeb.project-b.svg
+    sources:
+      - type: dir
+        path: stage

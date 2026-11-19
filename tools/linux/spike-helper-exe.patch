@@ -1,0 +1,27 @@
+--- a/content/shell/app/shell_main_delegate.cc	2026-11-20 05:11:48
++++ b/content/shell/app/shell_main_delegate.cc	2026-11-20 05:11:48
+@@ -221,7 +221,24 @@
+               << switches::kRunWebTests << " instead. *\n"
+               << std::string(79, '*') << "\n";
+     command_line.AppendSwitch(switches::kRunWebTests);
++  }
++
++#if BUILDFLAG(IS_LINUX)
++  // Spike only: the zygote starts from base::FILE_EXE, never from
++  // --browser-subprocess-path, so everything it forks (renderers, sandboxed
++  // utilities, the GPU process) would run the main binary. Pointing FILE_EXE at
++  // the helper in the browser process makes every child start from the helper.
++  if (!command_line.HasSwitch(switches::kProcessType)) {
++    base::FilePath helper =
++        command_line.GetSwitchValuePath(switches::kBrowserSubprocessPath);
++    if (!helper.empty()) {
++      // Override() would try to make the path a directory; this is a file.
++      bool ok = base::PathService::OverrideAndCreateIfNeeded(
++          base::FILE_EXE, helper, /*is_absolute=*/false, /*create=*/false);
++      LOG(WARNING) << "spike: FILE_EXE -> " << helper << (ok ? "" : " FAILED");
++    }
+   }
++#endif
+ 
+ #if BUILDFLAG(IS_ANDROID)
+   Compositor::Initialize();

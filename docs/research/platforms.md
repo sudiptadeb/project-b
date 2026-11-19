@@ -325,18 +325,20 @@ release candidates came off, which left 507 GB free.
   Go and 14,000 of tests with features stopped. Worth asking again only if Go's runtime
   causes a real problem on a platform, such as iOS's memory limits.
 
+- **`main` starts the Go core, then content, and nothing else** (2026-11-19: "even if we
+  need to have main.cc as the app it should just be start gocore start content and thats
+  it"). What `engine/project_b_main.cc` decides today before `ContentMain` moves into Go's
+  start: `--version`, claiming the profile, the saved flags, and the switch that leaves
+  crash signals to Go. Go hands back the command line content runs with.
+
 ## Decisions for Sudipta
 
-1. Should Go own `main` on desktop? Today `engine/app/main.cc` (C++) starts, calls Go to
-   claim the profile, then starts content, which calls Go's `PBStart`. With a Go `main`,
-   pinned to the main thread, reading starts in Go, and Go links the content library
-   through its one C function, `ProjectBMain`. Android keeps Java's start.
-2. Is the order right: Linux first, Android large screens beside it, then Windows, then iOS?
-3. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
-4. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
+1. Is the order right: Linux first, Android large screens beside it, then Windows, then iOS?
+2. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
+3. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
    certificate?
-5. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
-6. Is there an Apple Developer Program membership to use, for iOS devices and for
+4. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
+5. Is there an Apple Developer Program membership to use, for iOS devices and for
    notarizing the Mac app?
 
 ## Sources

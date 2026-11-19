@@ -342,14 +342,16 @@ release candidates came off, which left 507 GB free.
   menu bar of the OS's, the shell can draw Go's menus as a thin strip along the top, with
   the window buttons in it.
 
+- **Linux first, before Windows, aiming at Ubuntu 24.04** (2026-11-19: "yes and yes").
+  x64 first, built in the container; arm64 after, the same build with one setting.
+
 ## Decisions for Sudipta
 
-1. Is the order right: Linux first, Android large screens beside it, then Windows, then iOS?
-2. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
-3. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
+1. Linux packaging: a self-updating tarball, a `.deb` with an apt repository, or both?
+2. Windows signing: ship unsigned at first, as the Mac ships unnotarized, or buy a
    certificate?
-4. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
-5. Is there an Apple Developer Program membership to use, for iOS devices and for
+3. iOS: is an EU and Japan build interesting, or only worldwide, which means WebKit?
+4. Is there an Apple Developer Program membership to use, for iOS devices and for
    notarizing the Mac app?
 
 ## Sources

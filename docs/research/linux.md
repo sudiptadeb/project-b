@@ -59,9 +59,12 @@ The engine's one big new piece, and its first exception ([layers.md](layers.md#t
   the pages' views below, and Go's regions (`WindowLayout.At`) decide who gets each press, as
   on the Mac. Content shell's Aura path (`content/shell/browser/shell_platform_delegate_aura.cc`)
   is the smallest example. Not Views: we don't use them on the Mac either.
-- **Wayland and X11.** Ozone picks at start (`--ozone-platform-hint=auto`): Wayland on Ubuntu
-  24.04, Debian 13 and KDE Plasma 6; X11 when that's the session. One code path; Ozone hides
-  the difference.
+- **Wayland and X11.** Go picks in `PBInit` and puts `--ozone-platform=wayland` or `=x11` on
+  content's command line: Wayland when `WAYLAND_DISPLAY` is set (or `XDG_SESSION_TYPE` is
+  `wayland`), X11 otherwise. That's Wayland on Ubuntu 24.04, Debian 13 and KDE Plasma 6, and
+  X11 when that's the session. Content ignores `--ozone-platform-hint=auto`: the spike's
+  content_shell took X11 under Wayland and quit, since the hint is read only in Chrome's own
+  code. After the pick, one code path; Ozone hides the difference.
 - **No title bar of the OS's.** We ask for client-side decorations: on KDE through
   `xdg-decoration`; GNOME never draws them. The shell draws the top row with minimise,
   maximise and close at the right.
@@ -82,7 +85,16 @@ The engine's one big new piece, and its first exception ([layers.md](layers.md#t
 ## 3. Processes and the sandbox
 
 - **The same split as on the Mac.** The main program holds Go. A helper binary with no Go runs
-  every child process. Linux's zygote starts from the helper, so Go never reaches a renderer.
+  every child process, the zygote included, so Go never reaches a renderer. On Linux that takes
+  one line of ours: the zygote always starts from `base::FILE_EXE`, never from
+  `--browser-subprocess-path`, and the renderers, the sandboxed utilities and the GPU process
+  are all forked from a zygote. So `ProjectBMain`, in the browser process before
+  `ContentMain`, points `FILE_EXE` at the helper beside it, with
+  `PathService::OverrideAndCreateIfNeeded(base::FILE_EXE, helper, false, false)` (plain
+  `Override` treats the path as a folder and refuses a file). The spike proved it: every
+  child runs and maps only the helper. Nothing else of ours or content's on Linux reads
+  `FILE_EXE` for anything but the folder, which is the same; Go's relaunch uses
+  `os.Executable`.
 - **Inside Flatpak, Chromium's sandbox can't make its own namespaces**, because bubblewrap
   already did. zypak fixes that: it makes Chromium believe its setuid sandbox is there, and
   starts each sandboxed child in a new Flatpak sandbox through the Flatpak portal. Chrome,
@@ -90,9 +102,10 @@ The engine's one big new piece, and its first exception ([layers.md](layers.md#t
   Electron and Chromium base apps. We start as `zypak-wrapper project-b`.
 - **This removes Ubuntu's AppArmor problem.** Ubuntu 23.10 and later block unprivileged user
   namespaces; a Flatpak never needs them, so no AppArmor profile and no setuid helper.
-- **Proven first.** zypak expects one binary that re-runs itself for children; ours has a
-  separate helper. Its `ZYPAK_SANDBOX_FILENAME` and Chromium's `--browser-subprocess-path`
-  should cover that. The first spike shows it working, with `chrome://sandbox` all green.
+- **zypak needs nothing for the separate helper**: no `ZYPAK_SANDBOX_FILENAME`, no other
+  setting. Its spawn strategy starts each sandboxed child in a nested Flatpak sandbox (its own
+  PID namespace) whatever binary the child is. The renderers carry Chromium's seccomp-bpf
+  policy on top of Flatpak's filter. See the spike.
 - **Headless tests outside a Flatpak**, in a container, run with `--no-sandbox`. That's for
   tests only; what users run is always the Flatpak.
 
@@ -127,7 +140,9 @@ Through Chromium, not `core/system`:
   import finds them with no chooser. The chooser stays as the fallback.
 - **Print.** Chromium's Linux print dialog is GTK's, and we don't load GTK. Either we load it
   for printing only, or the shell draws the print settings and Chromium sends the job to CUPS
-  through the Flatpak's `cups` socket. A spike decides; until then Linux doesn't print.
+  through the Flatpak's `cups` socket. The spike shows the socket works from inside the
+  sandbox (CUPS answers on `/run/cups/cups.sock`); content_shell has no print dialog, so the
+  dialog itself is still to decide. Until then Linux doesn't print.
 - **Share.** Linux has no share sheet, so the shell offers Copy link instead.
 
 Tests: the fake `system.System` from the layers work. For the D-Bus side, a session bus in the
@@ -168,6 +183,11 @@ container with a stub portal.
   - `core/update/bundle.go` (the Mac's folder swap) isn't used on Linux, and our own signature
     check isn't needed, since Flatpak checks the repository's signature.
   - The runtime updates by itself, with every other Flatpak.
+- **Fonts: the host's.** Flatpak shares the system's fonts with every app at
+  `/run/host/fonts`, and the spike's pages drew Chinese from the host's Noto CJK once the
+  host had it. We ship no fonts. A desktop install of Ubuntu brings Noto CJK; where a distro
+  leaves it out (Arch installs no fonts at all), CJK shows as boxes in every app there, and
+  the fix is the distro's package (`fonts-noto-cjk`, Arch's `noto-fonts-cjk`).
 - **Size.** About 150 to 200 MB for us, plus the shared runtime, which most Linux desktops
   already have.
 
@@ -189,14 +209,21 @@ container with a stub portal.
   tree, or use only our own driver.
 - **deskrig** needs a Linux target: a small agent in the VM for screenshots, clicks and keys.
   That's deskrig's own repo, for the tester.
-- The tester hands out the container, the slots and the VMs.
+- The tester hands out the container, the slots and the VMs. The Ubuntu VM is `pb-ubuntu`
+  in the tester's Tart home: 6 CPUs, 8 GB, 60 GB disk, made by `tools/linux/vm-setup-guest.sh`
+  and started and stopped with `tools/linux/vm.sh`. It's the Linux session's slot while
+  Linux is being built; stop it when not in use.
+- No GPU in the VMs: Apple's virtualisation gives a Linux guest a 2D virtio-gpu only (no
+  virgl), so Chromium blocklists it and draws in software. A real GPU test needs real
+  hardware, such as bigboy or a laptop.
 
 ## 7. Order of work
 
 After the layers work lands, each step leaves the Mac and Android green:
 
-1. **The spike** (2 to 3 days): stock content_shell for arm64, as a Flatpak through zypak, in
-   the Ubuntu VM. Shows the cross-build, zypak with a separate helper, Wayland and the sandbox.
+1. **The spike** (done 2026-11-20, see Spike): stock content_shell for arm64, as a Flatpak
+   through zypak, in the Ubuntu VM. Shows the cross-build, zypak with a separate helper,
+   Wayland and the sandbox.
 2. **Our engine and `libcore` for Linux arm64**, headless in the arm64 container: the app
    starts, our driver runs.
 3. **The window**: the tree, the top row, move and resize, the menu strip.
@@ -208,9 +235,99 @@ After the layers work lands, each step leaves the Mac and Android green:
 About 5 weeks for one session, like the earlier estimate: the window is still the big piece,
 and Flatpak takes the place of the `.deb` and AppArmor work.
 
+## Spike (2026-11-20)
+
+Step 1 of 7: stock content_shell for Linux arm64, none of our code, as a Flatpak through
+zypak, in `pb-ubuntu` (Ubuntu 24.04 arm64, GNOME on Wayland). The scripts are in
+`tools/linux/`; the pictures are in [linux-spike/](linux-spike/).
+
+### What worked
+
+- **The arm64 cross-build** in container `pb`, with the arm64 sysroot (Debian bullseye) and the
+  `out/linux-x64` args plus `target_cpu="arm64"` (`build-content-shell.sh arm64`).
+- **The Flatpak**: runtime `org.freedesktop.Platform` 26.08, base `org.electronjs.Electron2.BaseApp`
+  26.08 with its zypak, started as `zypak-wrapper content_shell` from `/app/bin/project-b`
+  (`io.github.sudiptadeb.project-b.yml`, `stage.sh`, `project-b.sh`). The section 5
+  permissions are all in, and the dock shows our icon from the `.desktop` file.
+- **Wayland**, with `--ozone-platform=wayland` (see 2: content needs the pick made for it).
+- **A page loads** ([wayland-page](linux-spike/wayland-page.png)).
+- **The sandbox.** Every child is in Chromium's sandbox as zypak arranges it:
+
+  | Process | Runs | Seccomp filters | PID namespace |
+  |---|---|---|---|
+  | browser | main binary | 1 (Flatpak's) | the app's |
+  | zygote (unsandboxed), GPU process, network service | helper | 1 | the app's |
+  | zygote (sandboxed), renderers, storage service | helper | 2 (Flatpak's and Chromium's) | its own, nested |
+
+  `Seccomp: 2` and `NoNewPrivs: 1` everywhere. The renderers sit in a PID namespace of their
+  own, started through `bwrap` by zypak's spawn strategy. The network service is unsandboxed
+  by Chromium's design on Linux (`--service-sandbox-type=none`), as in Chrome.
+- **The separate helper**, with one line of ours (see 3). Without it, `--browser-subprocess-path`
+  moves only the directly launched children (the network service) to the helper; the zygote,
+  and so the renderers, the sandboxed utilities and the GPU process, run the main binary. With
+  `FILE_EXE` pointed at the helper (`spike-helper-exe.patch`, a spike-only change to
+  content_shell), every child's `/proc/<pid>/exe` is the helper and no child maps the main
+  binary. zypak needs nothing for it.
+- **Move, resize, maximise**: a drag on the top row moved the window, a drag on its corner
+  resized it, a double-click maximised it, all done by the compositor
+  ([moved](linux-spike/moved.png), [resized](linux-spike/resized.png),
+  [maximised](linux-spike/maximised.png)).
+- **CUPS from the sandbox**: `--socket=cups` works; CUPS answers on `/run/cups/cups.sock`.
+- **The host's fonts**: with Noto CJK on the host, the sandbox draws Chinese
+  ([host-cjk-font](linux-spike/host-cjk-font.png)).
+
+### What didn't
+
+- **The GPU, in the VM.** Apple's virtualisation gives Linux a 2D virtio-gpu with no virgl.
+  Chromium blocklists it (WebGL 1 and 2 blocklisted). With `--ignore-gpu-blocklist` the GPU
+  process loses its context and restarts in a loop. With `--enable-unsafe-swiftshader`, WebGL 2
+  runs on ANGLE, Vulkan and SwiftShader inside the sandbox
+  ([webgl-swiftshader](linux-spike/webgl-swiftshader.png)). A real GPU needs real hardware.
+- **The GPU process has no Chromium seccomp under zypak**: it logs "InitializeSandbox() called
+  with multiple threads" and keeps only Flatpak's filter. In the VM it ran on software, so
+  this is to check on real hardware (Open, 2).
+- **Printing can't be tested with content_shell**: `window.print()` returns at once with no
+  dialog ([print](linux-spike/print.png)). Only the CUPS socket is shown.
+- **`--ozone-platform-hint=auto`** is ignored by content: X11 was picked under Wayland, and
+  with no X server it quit.
+- **Rosetta**: Chromium's x64 clang died from a signal twice (exit -1, a few seconds into a
+  step) in 77,544 steps, about once every 39,000. `build-content-shell.sh` builds on with
+  `-k 0` and retries when every failure is such a crash.
+
+### Numbers
+
+| | |
+|---|---|
+| arm64 build, from nothing | 77,544 steps, 6 h 26 min over three runs (2 h 20, 2 h 16, 1 h 50), reniced to 15 beside release's Android runs; x64 took 3 h 34 |
+| `out/linux-arm64` | 14 GB |
+| A one-file change and relink | about 1 min |
+| `flatpak-builder` | 11.6 s, copying only |
+| The Flatpak | 754 MB of files, 411 MB installed: content_shell (370 MB, test code linked in) and its copy as the helper are one object in OSTree |
+| The Ubuntu VM | 12 GB on the host's disk after setup |
+
+### What changes in the spec
+
+Done above: Go picks Wayland or X11 in `PBInit` (2); `ProjectBMain` points `FILE_EXE` at the
+helper, and zypak needs nothing (3); the CUPS socket works (4); we rely on the host's fonts
+(5); the VM slot and no GPU in VMs (6). One more, for him to decide: **move every Linux build
+to bigboy**, arm64 cross-builds included, not only amd64. bigboy is native x64: no Rosetta
+crashes, and no heavy build beside release's Android runs on this Mac.
+
+### Setting up the Ubuntu VM
+
+`tools/linux/vm-setup-guest.sh` on `ghcr.io/cirruslabs/ubuntu:24.04`. Two things it fixes: our
+network lets only 443 out with no IPv6, so apt uses https over IPv4; and
+`ubuntu-desktop-minimal` without recommends leaves a netplan file that gives the network to a
+NetworkManager that isn't installed, so the VM boots with no network until it's masked.
+Pictures come from Tart's VNC server (`vm.sh vnc capture`), so no window opens on the Mac;
+`tart run --vnc` opens Screen Sharing by itself, and `vm.sh start` closes only that one.
+
 ## Open
 
-1. **Printing**: GTK only for print, or our own print settings (the spike in 4).
+1. **Printing**: GTK only for print, or our own print settings (4). The CUPS socket works
+   from the sandbox; the choice needs our engine, since content_shell has no dialog.
+2. **The GPU process's sandbox under zypak**: no Chromium seccomp in the spike's VM, on
+   software GL. Check on real hardware whether Chrome's Flatpak is the same.
 
 ## Sources
 

@@ -26,6 +26,7 @@ doesn't yet is in [daily-use.md](daily-use.md); what is decided but not built is
 - [remote-build.md](remote-build.md): compiles on a build Mac's Buildbarn, which `tools/build.sh` uses whenever it answers, and why its config is as it is.
 - [vm-testing.md](vm-testing.md): a macOS VM with real clicks and keys, and what it found.
 - [android.md](android.md): the same shell and managers on Android's content layer, built in a Linux VM on this Mac.
+- [research/platforms.md](research/platforms.md): Linux, Windows, Android large screens, ChromeOS and iOS: what each takes, how we would test it on this Mac, and an order. Research, not decided.
 - [extensions.md](extensions.md): Chrome extensions, in every build and run only with their flag on: the layers, the mock store, the build flag, and the checks left out on purpose.
 - [flags.md](flags.md): every flag in one file, `core/flags/registry.json`: the six types, build flags and `WITHOUT`, and how a flag reaches the engine.
 - [ux-comparison.md](ux-comparison.md): Standard and Mobile against Chrome, Safari, Arc, Firefox, Edge and Brave on 0.2.74, area by area with screenshots, and a ranked list of what to do.

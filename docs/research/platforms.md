@@ -331,6 +331,17 @@ release candidates came off, which left 507 GB free.
   start: `--version`, claiming the profile, the saved flags, and the switch that leaves
   crash signals to Go. Go hands back the command line content runs with.
 
+- **Pure Go wherever possible** (2026-11-19: "yes pure go where ever possible"). On Linux
+  the system layer talks D-Bus through a pure-Go library: notifications, showing a file in
+  its folder, the default browser.
+- **The shell draws the window buttons when the window has no title bar of its own**
+  (2026-11-19: "shell can draw rhe teafic lights if there is no title bar on the window").
+  The Mac keeps its native buttons; Linux and Windows get the shell's.
+- **A menu strip, as an option** (2026-11-19: "we can have an option where rhe shell drawsm
+  the menu bar like a small strip on top with the traffic loghts there"). Where there's no
+  menu bar of the OS's, the shell can draw Go's menus as a thin strip along the top, with
+  the window buttons in it.
+
 ## Decisions for Sudipta
 
 1. Is the order right: Linux first, Android large screens beside it, then Windows, then iOS?

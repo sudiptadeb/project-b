@@ -356,6 +356,38 @@ internal, links). ChromeDriver for Linux arm64 doesn't exist as a download, so
 container, shows the shell and a page, and those driver parts pass, with the Mac's app suite
 and Android's still green.
 
+### Step 2, where it stands (2026-11-20)
+
+- **Built.** `tools/build.sh linux arm64` builds `project_b` (361 MB) and `libcore.so` (19 MB)
+  in `pb`, about a minute for a change to our code. Until release's switch to amarit's updater
+  is on main, two Go files are stand-ins kept out of git: `relaunch`'s Linux wait and
+  `update_linux.go` ("no updates").
+- **Headless, the planned driver parts pass** in the arm64 container
+  (`tools/linux/headless.sh`): 256 checks, and 8 skipped as the Mac's own window parts (its
+  buttons, title bar, drag region and frame curve). One timeline check failed once in four
+  runs and now shows the spans it fails on.
+- **The one binary's four checks pass** (`tools/linux/check_one_binary.py`): no child maps
+  `libcore.so`; a `--type` process never loads it; a Go panic and a C++ fault in the browser
+  process each leave `crash.log` and the next start says so; a missing `libcore.so` is a
+  message. In the Flatpak under zypak, on Ubuntu's GNOME Wayland, the browser process alone
+  maps it: both zygotes, the GPU and utility processes and the renderers don't
+  (`spike-guest.sh core`), and the renderers are in the sandboxed zygote's own PID namespace
+  with two seccomp filters.
+- **The Mac and Android stay green** from this branch: the Mac app suite passes but for the
+  check that needs the packed app, which only release's run has; the APK builds.
+- **Found on the way:**
+  - Blink drops a page's input until its first paint, which headless Linux, drawing in
+    software, can reach after `app.ready`. The tests wait for `shell.on_screen`.
+  - `GOOS=android` counts as `linux` to Go, so the Linux-only Go files say `!android`.
+  - Settings and Quit had no keys on Linux; ux chose `Ctrl+,` and `Ctrl+Shift+Q`.
+- **Left for step 3, the window on a real desktop**, seen in the VM: on GNOME Wayland the
+  page draws, but the shell's view doesn't show, only the window's colour where it should be
+  (`linux-step2/flatpak-wayland.png`); on X11 through XWayland no window shows at all. The
+  headless runs can't see either: the driver's screenshots copy each view's own surface, not
+  the window.
+
+![Our app as a Flatpak on GNOME Wayland: the page draws, the shell doesn't yet](linux-step2/flatpak-wayland.png)
+
 ## Spike (2026-11-20)
 
 Step 1 of 7: stock content_shell for Linux arm64, none of our code, as a Flatpak through

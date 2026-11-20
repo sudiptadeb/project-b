@@ -319,6 +319,13 @@ source_set("browser") {
       "browser/window_mac.mm",
     ]
   }
+  if (is_linux) {
+    sources += [
+      "browser/driver_linux.cc",
+      "browser/printing_linux.cc",
+      "browser/window_linux.cc",
+    ]
+  }
   sources += get_target_outputs(":protocol_sources")
   deps = [
     "//ui/shell_dialogs",
@@ -369,6 +376,17 @@ source_set("browser") {
       "Cocoa.framework",
       "PDFKit.framework",
       "QuartzCore.framework",
+    ]
+  }
+  if (is_linux) {
+    # The window's Aura tree on Ozone (window_linux.cc), and the driver's events.
+    deps += [
+      "//ui/aura",
+      "//ui/compositor",
+      "//ui/events:dom_keycode_converter",
+      "//ui/platform_window",
+      "//ui/wm",
+      "//ui/wm/public",
     ]
   }
 

@@ -50,7 +50,8 @@ agreed.
 - **Go.** `libcore` as a static archive with `GOOS=linux`, cgo through Chromium's clang and
   sysroot, as Android does. `engine/build_go.py` hard-codes darwin today; the layers work's
   step 6 (the three-piece build) makes it take the platform.
-- **Priority.** A build reniced on the host and run in a slot from the tester. A build on
+- **Priority.** A build reniced on the host, run in a slot from the tester as a one-time
+  `amarit job` (never `amarit run`, which an amarit update restarts). A build on
   12 cores at full priority failed 0.2.109's Android run on 2026-11-19.
 - **Rosetta.** Clang under Rosetta crashes now and then; `build-content-shell.sh` retries
   those steps.

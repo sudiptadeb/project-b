@@ -7,6 +7,10 @@
 # resumes (ninja keeps its progress), up to 6 times. Chromium's x64 clang under Rosetta now and
 # then dies from a signal (siso reports exit=-1, after a few seconds of a step); that is retried
 # too, with -k 0 so the rest of the build goes on first. A real compile error ends it.
+# Hours long, so run it as a one-time amarit job with a new log each run, and wait for the log's
+# last line, "amarit job N: exit X":
+#   amarit job -name pb-linux-arm64 -dir "$PWD" -log "$PWD/build-arm64-$(date +%Y%m%d-%H%M%S).log" \
+#     -- caffeinate -i tools/linux/build-content-shell.sh arm64
 cpu=${1:-arm64}
 case $cpu in arm64|x64) ;; *) echo "usage: $0 [arm64|x64]"; exit 2;; esac
 out=out/linux-$cpu

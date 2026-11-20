@@ -10,7 +10,9 @@ agreed.
 - **Linux first, aiming at Ubuntu 24.04** (2026-11-19: "yes and yes").
 - **Distro-agnostic: Ubuntu, Debian, Arch and KDE must work** (2026-11-19: "arc and debian
   and kde should work").
-- **arm64 built and tested here first, amd64 later on bigboy** (2026-11-19).
+- **Every Linux build, arm64 and amd64, stays in container `pb` on this Mac** (2026-11-20:
+  "no lets keep using the vm here"). Not bigboy: it has 4 cores, 16 GB and a 64 GB disk, and
+  runs the shared services. arm64 is built and tested first.
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"). No tarball, no `.deb`.
 - **The app id is `io.github.sudiptadeb.project-b`** (2026-11-19: "yea lets go with this").
   Flathub reads it as github.com/sudiptadeb/project-b, which makes its GitHub check possible;
@@ -47,8 +49,8 @@ agreed.
   step 6 (the three-piece build) makes it take the platform.
 - **Priority.** A build reniced on the host and run in a slot from the tester. A build on
   12 cores at full priority failed 0.2.109's Android run on 2026-11-19.
-- **amd64 later, on bigboy.** A native Linux x64 host builds with no Rosetta: the same
-  scripts and `out/linux-x64`.
+- **amd64 later, in `pb` too.** The same scripts and `out/linux-x64`. Clang under Rosetta
+  crashes now and then; `build-content-shell.sh` retries those steps.
 
 ## 2. The window
 
@@ -200,10 +202,12 @@ container with a stub portal.
 | Tart VM: Ubuntu 24.04, GNOME, Wayland | the Flatpak, a real desktop | install, first run, driver, look |
 | Tart VM: Debian 13, GNOME | the same | the same |
 | Tart VM: Arch Linux ARM, KDE Plasma 6 | the same, and KDE's decorations | the same |
-| bigboy, later | amd64 builds, and an x64 Arch for real Arch | the same |
+| The same Tart VMs, later | the amd64 Flatpak, its programs through Rosetta | install, first run, driver, look |
 
-- Arch itself is x64 only; on arm64 the nearest is Arch Linux ARM, a separate project. Real
-  Arch is tested when amd64 comes, on bigboy.
+- Arch itself is x64 only; on arm64 the nearest is Arch Linux ARM, a separate project, and
+  it stands in for Arch.
+- amd64 on a real desktop: the x64 Flatpak in the arm64 VMs, its programs through Rosetta,
+  or headless in `pb`.
 - X11: Ubuntu's login screen still offers an Xorg session; one run there covers X11.
 - ChromeDriver: Chrome for Testing has none for Linux arm64, so we build it from the same
   tree, or use only our own driver.
@@ -215,7 +219,7 @@ container with a stub portal.
   Linux is being built; stop it when not in use.
 - No GPU in the VMs: Apple's virtualisation gives a Linux guest a 2D virtio-gpu only (no
   virgl), so Chromium blocklists it and draws in software. A real GPU test needs real
-  hardware, such as bigboy or a laptop.
+  hardware, such as a laptop.
 
 ## 7. Order of work
 
@@ -230,7 +234,7 @@ After the layers work lands, each step leaves the Mac and Android green:
 4. **`core/system` on Linux**, and the import permissions.
 5. **The Flatpak and our repository**, updates through the portal.
 6. **The three VMs**, the deskrig Linux target, then the release run gains Linux.
-7. **amd64 on bigboy.**
+7. **amd64**, built in `pb`, headless there and through Rosetta in the VMs.
 
 About 5 weeks for one session, like the earlier estimate: the window is still the big piece,
 and Flatpak takes the place of the `.deb` and AppArmor work.
@@ -309,9 +313,8 @@ zypak, in `pb-ubuntu` (Ubuntu 24.04 arm64, GNOME on Wayland). The scripts are in
 
 Done above: Go picks Wayland or X11 in `PBInit` (2); `ProjectBMain` points `FILE_EXE` at the
 helper, and zypak needs nothing (3); the CUPS socket works (4); we rely on the host's fonts
-(5); the VM slot and no GPU in VMs (6). One more, for him to decide: **move every Linux build
-to bigboy**, arm64 cross-builds included, not only amd64. bigboy is native x64: no Rosetta
-crashes, and no heavy build beside release's Android runs on this Mac.
+(5); the VM slot and no GPU in VMs (6); every Linux build stays in `pb`, reniced in the
+tester's slots, with Rosetta's clang crashes retried by `build-content-shell.sh` (1).
 
 ### Setting up the Ubuntu VM
 

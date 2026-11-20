@@ -349,9 +349,9 @@ release candidates came off, which left 507 GB free.
   and F10 opens the first menu. The Mac is unchanged. Ux keeps it in the design system.
 
 - **Linux must work on Ubuntu, Debian, Arch and KDE** (2026-11-19: "arc and debian and kde
-  should work"; "i want to be distro agnostic"). **Build and test arm64 first, here; amd64
-  later on bigboy** (2026-11-19: "yes we can build and test arm64 and then later use our
-  bigboy for amd64").
+  should work"; "i want to be distro agnostic"). **Every Linux build, arm64 and amd64, stays
+  in container `pb` on this Mac**, arm64 first (2026-11-20: "no lets keep using the vm here").
+  Not bigboy: it's too small and runs the shared services.
 
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"): no tarball, no `.deb`.
   The Linux spec is [linux.md](linux.md).

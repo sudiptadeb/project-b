@@ -1,3 +1,5 @@
+//go:build darwin || (linux && !android)
+
 package instance
 
 import (
@@ -53,8 +55,8 @@ func Claim(dir string, urls []string) (*Owner, error) {
 }
 
 // socketPath is where the owner of dir listens. A unix socket's path is limited to 104
-// bytes on macOS, which a profile folder's own path can pass, so the socket lives in the
-// user's temporary folder, named by a hash of the folder's real path.
+// bytes on macOS and 108 on Linux, which a profile folder's own path can pass, so the socket
+// lives in a folder of the system's (socketDir), named by a hash of the folder's real path.
 func socketPath(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -65,7 +67,7 @@ func socketPath(dir string) (string, error) {
 		return "", err
 	}
 	sum := sha256.Sum256([]byte(real))
-	return filepath.Join(os.TempDir(), "project-b-"+hex.EncodeToString(sum[:8])+".sock"), nil
+	return filepath.Join(socketDir(), "project-b-"+hex.EncodeToString(sum[:8])+".sock"), nil
 }
 
 // handOver sends urls to the owner listening at socket.

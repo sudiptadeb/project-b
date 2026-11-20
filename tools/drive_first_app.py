@@ -35,6 +35,7 @@ Results go to build/real/. Each screenshot is what content rendered, drawn shell
 page by the driver. It is not read back from the window.
 """
 
+import errno
 import http.server
 import json
 import os
@@ -343,7 +344,7 @@ class App:
         App.running.append(self)
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_reply("start", 60)
-        self.writer = open(self.fifo, "w", buffering=1)
+        self.writer = self._open_fifo()
         # The app prints app.ready once the shell shows Go's state: tests start there, once
         # the shell has also reached the screen. Blink drops a page's input until its first
         # paint, which headless Linux, drawing in software, can reach after app.ready.
@@ -362,6 +363,22 @@ class App:
             if "shell.on_screen" in timeline.marks(entries):
                 return
             time.sleep(0.05)
+
+    def _open_fifo(self, timeout=20):
+        """The driver's FIFO, for writing. A plain open waits forever for the app to open it
+        too, so a driver that never does (2026-11-20: a bad path) would hang the run: this
+        gives up after timeout."""
+        deadline = time.time() + timeout
+        while True:
+            try:
+                fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK)
+                break
+            except OSError as e:
+                if e.errno != errno.ENXIO or time.time() > deadline or self.proc.poll() is not None:
+                    raise RuntimeError(f"the app's driver never opened {self.fifo}: {e}")
+                time.sleep(0.05)
+        os.set_blocking(fd, True)
+        return os.fdopen(fd, "w", buffering=1)
 
     def _read(self):
         for line in self.proc.stdout:

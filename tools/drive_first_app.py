@@ -651,6 +651,20 @@ def mac_binary_checks(children):
     check("the library exports only ProjectBMain", [e for e in exports if e.startswith("_")] == ["_ProjectBMain"], exports[:12])
 
 
+def linux_stacking_check(app):
+    """The window's own views keep their order, the shell's over the pages', after a page has
+    had the keyboard: activating a view raises it among its siblings, and once raised the
+    pages' holder hid the shell on a real desktop while every per-view check still passed
+    (docs/research/linux.md, step 2)."""
+    page_click(app, "body")
+    time.sleep(0.3)
+    tree = json.loads(app.cmd("tree"))
+    content = next((c for c in tree.get("children", []) if c.get("name") == "content"), {})
+    order = [c.get("name") for c in content.get("children", [])]
+    check("the window's views stay in order, the shell's over the pages', after a page has the keyboard",
+          order[:3] == ["background", "pages", "shell"], order)
+
+
 def linux_binary_checks(app, children):
     """Linux's one binary (docs/research/linux.md, 3): only the browser process maps the Go
     core, libcore.so; no child does, whether started fresh or forked from a zygote."""
@@ -1520,6 +1534,8 @@ def browsing_checks():
     for row in table:
         print("process", json.dumps(row), flush=True)
     check("the main process is project_b", any(r["type"] == "main" and r["exe"] == "project_b" for r in table))
+    if LINUX:
+        linux_stacking_check(app)
     children = [r for r in table if r["type"] != "main"]
     if LINUX:
         linux_binary_checks(app, children)

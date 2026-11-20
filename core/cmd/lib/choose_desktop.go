@@ -1,3 +1,5 @@
+//go:build darwin || (linux && !android)
+
 package main
 
 /*
@@ -15,7 +17,7 @@ import (
 	"projectb/engine"
 )
 
-// ChooseFolder asks for a folder in a dialog on the window, opening at start;
+// ChooseFolder asks for a folder in Chromium's file dialog on the window, opening at start;
 // PB_EVENT_FOLDER_CHOSEN says which.
 func (e *nativeEngine) ChooseFolder(w engine.WindowID, start string) {
 	cs := C.CString(start)

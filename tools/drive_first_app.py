@@ -832,9 +832,10 @@ def timeline_checks():
     # Each click and key press is a span of its own, from the OS's time for the event to
     # our code having it, with the window getting it between.
     inputs = [s for s in timeline.spans(read()) if s["name"] in ("input.click", "input.key")]
+    through = lambda s: 0 <= s["stages"].get(s["name"] + ".window", -1) <= s["dur"] < 5e9
     check("a click and a key press are each a span from the OS's event, through the window, to the shell or Go",
-          {"input.click", "input.key"} <= {s["name"] for s in inputs} and
-          all(0 <= s["stages"].get(s["name"] + ".window", -1) <= s["dur"] < 5e9 for s in inputs), inputs[:4])
+          {"input.click", "input.key"} <= {s["name"] for s in inputs} and all(through(s) for s in inputs),
+          ({s["name"] for s in inputs}, [s for s in inputs if not through(s)][:4]))
 
     # A LOG in the engine's C++ is an entry.
     app.cmd("strayshell pages")

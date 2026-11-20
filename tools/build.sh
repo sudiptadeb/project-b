@@ -74,6 +74,11 @@ if [ "$PLATFORM" = linux ]; then
   docker exec -e REPO=/work/linux-release -e CPU="$CPU" -e WITHOUT="${WITHOUT:-extensions}" pb \
     bash /work/linux-release/tools/linux/engine-build.sh
   git -C "$ROOT" rev-parse HEAD | docker exec -i pb sh -c "cat > /work/chromium/src/out/linux-$CPU/project_b.commit"
+  # The app's files, staged for the Flatpak (tools/linux/flatpak-release.sh), while the VM is
+  # still held up, with the commit they were built from.
+  mkdir -p "$ROOT/build/linux"
+  tools/linux/stage.sh "$CPU" "$ROOT/build/linux/stage-$CPU.tar.gz" project_b
+  git -C "$ROOT" rev-parse HEAD > "$ROOT/build/linux/commit"
   echo "RESULT=ok $(date '+%F %T')"
   exit 0
 fi

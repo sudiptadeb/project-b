@@ -25,5 +25,9 @@ ls \$s/stage/files" || exit 1
 for f in project-b.sh io.github.sudiptadeb.project-b.desktop icon.svg; do
   docker cp "$here/$f" "pb:/work/linux-stage/$cpu/stage/$f"
 done
+# The metainfo carries the release: VERSION and today's date.
+meta=io.github.sudiptadeb.project-b.metainfo.xml
+sed -e "s/@VERSION@/$(tr -d '[:space:]' < "$here/../../VERSION")/" -e "s/@DATE@/$(date +%F)/" "$here/$meta" |
+  docker exec -i pb sh -c "cat > /work/linux-stage/$cpu/stage/$meta"
 docker exec pb tar -C /work/linux-stage/$cpu -czf - stage > "$dest"
 ls -l "$dest"

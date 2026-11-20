@@ -5,4 +5,4 @@ Exec=project-b %U
 Icon=io.github.sudiptadeb.project-b
 Categories=Network;WebBrowser;
 MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
-StartupWMClass=content_shell
+StartupWMClass=io.github.sudiptadeb.project-b

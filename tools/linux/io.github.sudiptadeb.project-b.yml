@@ -44,6 +44,7 @@ modules:
       - install -Dm755 project-b.sh /app/bin/project-b
       - install -Dm644 io.github.sudiptadeb.project-b.desktop /app/share/applications/io.github.sudiptadeb.project-b.desktop
       - install -Dm644 icon.svg /app/share/icons/hicolor/scalable/apps/io.github.sudiptadeb.project-b.svg
+      - install -Dm644 io.github.sudiptadeb.project-b.metainfo.xml /app/share/metainfo/io.github.sudiptadeb.project-b.metainfo.xml
     sources:
       - type: dir
         path: stage

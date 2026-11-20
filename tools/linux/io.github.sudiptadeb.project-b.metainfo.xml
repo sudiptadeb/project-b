@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What GNOME Software and KDE Discover show on the app's page as it installs. -->
+<component type="desktop-application">
+  <id>io.github.sudiptadeb.project-b</id>
+  <name>Project B</name>
+  <summary>A browser with a shell anyone can customise (preview)</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.sudiptadeb">
+    <name>sudiptadeb</name>
+  </developer>
+  <description>
+    <p>
+      An experiment in browser architecture: a web-based shell anyone can customise, over a
+      small Go core that owns every decision, and Chromium's content layer, unpatched.
+    </p>
+    <p>
+      This is a preview for Linux on arm64. The window, the system's file and notification
+      portals, and updates through the software centre are still being built.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.sudiptadeb.project-b.desktop</launchable>
+  <url type="homepage">https://github.com/sudiptadeb/project-b</url>
+  <url type="bugtracker">https://github.com/sudiptadeb/project-b/issues</url>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <releases>
+    <release version="@VERSION@" date="@DATE@" type="development">
+      <description>
+        <p>The first Linux preview.</p>
+      </description>
+    </release>
+  </releases>
+</component>

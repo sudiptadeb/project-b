@@ -281,6 +281,21 @@ def check(name, ok, detail=""):
         failures += 1
 
 
+# Linux runs these checks headless in a container (tools/linux/headless.sh): what only the
+# Mac's window, menu bar and Dock have, or what needs a display, is skipped there, saying so.
+MAC = sys.platform == "darwin"
+LINUX = sys.platform.startswith("linux")
+
+
+def check_mac(name, ok, detail=""):
+    """A check of the Mac's own window parts (its buttons, title bar, frame, menu bar): Linux
+    draws them in the shell, or will in its step 3 (docs/research/linux.md)."""
+    if MAC:
+        check(name, ok, detail)
+    else:
+        print("skip " + name + " (the Mac's own)", flush=True)
+
+
 # The line the app prints once it's ready to be used: docs/logging.md.
 READY = re.compile(r" mark +go +app\.ready$")
 
@@ -567,6 +582,45 @@ def new_tab(app, url):
     return from_box(app, url)
 
 
+def mac_binary_checks(children):
+    """The Mac's three pieces: every child is the helper; Go only in the main binary, content
+    only in the library."""
+    check("every child process is the helper", children and all(r["exe"] == "project_b_helper" for r in children), children)
+    macos = os.path.dirname(BIN)
+    helper = os.path.join(macos, "project_b_helper")
+    if not os.path.exists(helper):  # the packed app's, in an app of its own
+        helper = os.path.join(macos, "../Frameworks/Project B Helper.app/Contents/MacOS/project_b_helper")
+    library = os.path.join(macos, "../Frameworks/libproject_b_content.dylib")
+    if not os.path.exists(library):
+        library = os.path.join(macos, "libproject_b_content.dylib")
+    nm = lambda *args: subprocess.run(["nm", *args], capture_output=True, text=True).stdout
+    check("the helper has no Go", "_cgo" not in nm(helper) and "runtime." not in nm(helper))
+    check("the library has no Go", "_cgo" not in nm(library) and "runtime." not in nm(library))
+    check("the main binary has no content", "__ZN7content" not in nm(BIN) and "__ZN5blink" not in nm(BIN))
+    exports = nm("-gU", library).split()
+    check("the library exports only ProjectBMain", [e for e in exports if e.startswith("_")] == ["_ProjectBMain"], exports[:12])
+
+
+def linux_binary_checks(app, children):
+    """Linux's one binary (docs/research/linux.md, 3): only the browser process maps the Go
+    core, libcore.so; no child does, whether started fresh or forked from a zygote."""
+    def maps(pid):
+        try:
+            with open(f"/proc/{pid}/maps") as f:
+                return f.read()
+        except OSError:
+            return ""
+    check("the browser process maps the Go core", "/libcore.so" in maps(app.proc.pid))
+    live = [r for r in children if "<defunct>" not in r["exe"]]
+    mapping = [r for r in live if "/libcore.so" in maps(r["pid"])]
+    check("no child process maps the Go core", live and not mapping, mapping or live)
+    check("every child is the one binary", all(r["exe"] == "project_b" for r in live), live)
+    nm = lambda *args: subprocess.run(["nm", *args], capture_output=True, text=True).stdout
+    core = os.path.join(os.path.dirname(BIN), "libcore.so")
+    check("the binary has no Go", "runtime.main" not in nm("-D", BIN), BIN)
+    check("the Go core exports PBInit and has no content", " T PBInit" in nm("-D", core) and "_ZN7content" not in nm("-D", core))
+
+
 def process_table(pid):
     """Our process and its descendants, with thread counts and memory."""
     ps = subprocess.run(["ps", "-axo", "pid=,ppid=,rss=,command="], capture_output=True, text=True).stdout
@@ -785,7 +839,8 @@ def settings_checks():
     view, edit, tab = find(menu, "View"), find(menu, "Edit"), find(menu, "Tab")
     full = find(view["items"], "Full Screen") if view else None
     check("the menu bar is Go's tree: Edit, View, Tab", bool(view and edit and tab), [m["title"] for m in menu if isinstance(m, dict)])
-    check("View has Full Screen on Ctrl+Cmd+F", bool(full) and full["key"] == "^@f", full)
+    # Linux's keymap has F11 for it, as Chrome's on Linux.
+    check("View has Full Screen on Ctrl+Cmd+F" if MAC else "View has Full Screen on F11", bool(full) and full["key"] == ("^@f" if MAC else "F11"), full)
     check("Edit has Redo", bool(edit) and find(edit["items"], "Redo") is not None)
     check("the hidden Select Tab submenu isn't drawn", bool(tab) and find(tab["items"], "Select Tab") is None)
     check("AppKit added no Full Screen item of its own", sum(1 for m in menu for i in m.get("items", []) if isinstance(i, dict) and "Full Screen" in i["title"]) == 1)
@@ -916,7 +971,7 @@ def browsing_checks():
     window = json.loads(app.cmd("bounds"))
     print("title bar", window["titlebar"], "buttons", window["buttonsStart"], window["buttonsEnd"], "middle", window["buttonsMiddleY"], "size", window["buttonSize"], "screen", app.js("[screen.width,screen.height]"), flush=True)
     toggle_left = app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x")
-    check("the shell leaves exactly the window buttons' space, as the engine reported it", toggle_left == window["buttonsEnd"] + 8, (toggle_left, window))
+    check_mac("the shell leaves exactly the window buttons' space, as the engine reported it", toggle_left == window["buttonsEnd"] + 8, (toggle_left, window))
     gap = app.cmd("hit", (window["buttonsEnd"] + toggle_left) / 2, BAR_Y)
     check("the gap after the window buttons falls through to the window frame, which drags", gap == "frame", gap)
     right_end = app.cmd("hit", app.js("window.innerWidth") - 6, BAR_Y)
@@ -924,7 +979,7 @@ def browsing_checks():
     below_tabs = app.cmd("hit", 100, 600)
     check("the empty sidebar is shell, so it never drags the window", below_tabs == "shell", below_tabs)
     over_buttons = app.cmd("hit", window["buttonsStart"] + window["buttonSize"] / 2, BAR_Y)
-    check("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
+    check_mac("the window buttons still get their own clicks", over_buttons.startswith("native:"), over_buttons)
     print("hit over window buttons:", over_buttons, flush=True)
     # The window server moves the window by itself from whatever part of the title bar
     # AppKit gives it, without asking the app. Given the address bar, it moved the window
@@ -933,9 +988,9 @@ def browsing_checks():
     rects = served(app)
     def given(x, y):
         return any(r[0] <= x < r[0] + r[2] and r[1] <= window["content"][1] - y < r[1] + r[3] for r in rects)
-    check("the window server isn't given the address bar to drag by itself", region != "unknown" and not given(bar_x, bar_y), region)
+    check_mac("the window server isn't given the address bar to drag by itself", region != "unknown" and not given(bar_x, bar_y), region)
     gap_x = window["buttonsEnd"] + 4
-    check("the window server is given the gap right of the window buttons", given(gap_x, BAR_Y), (gap_x, region))
+    check_mac("the window server is given the gap right of the window buttons", given(gap_x, BAR_Y), (gap_x, region))
     # The toolbar drags wherever it has no control: its gaps are the frame's, and the
     # window server's, and the controls in it stay the shell's.
     tool_x, tool_y = toolbar_gap(app)
@@ -1194,7 +1249,7 @@ def browsing_checks():
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
     # The window controls stay put through resizes, so the shell's space for them does too.
-    check("the controls' space survives resizing", app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
+    check_mac("the controls' space survives resizing", app.js("document.querySelector('[aria-label$=sidebar]').getBoundingClientRect().x") == window["buttonsEnd"] + 8)
 
     # The frame colour has one owner: Go gave it to the window and to the shell. A fresh
     # profile has none picked, so both paint None's grey for the theme they show
@@ -1213,7 +1268,7 @@ def browsing_checks():
     native = lambda: json.loads(app.cmd("frame"))  # The border the window itself draws.
     windowed = radius()
     print("window corner radius", windowed, "native frame", native(), flush=True)
-    check("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": frame}, (windowed, native()))
+    check_mac("the window draws the frame's curve with its own radius and Go's width and colour", windowed > 0 and native() == {"radius": windowed, "width": 4, "color": frame}, (windowed, native()))
 
     # The shell asks Go's window manager, the manager tells the engine, and the engine
     # reports the result. Full screen is checked on a real screen: tools/check_full_screen.py.
@@ -1228,7 +1283,10 @@ def browsing_checks():
         app.wait(f"window.innerWidth==={width}", 10)
         check("and zooms it back", not state()["zoomed"], state())
     except TimeoutError as e:
-        check("the shell's zoom request zooms the window", False, f"no display? {e}")
+        if LINUX and not os.environ.get("WAYLAND_DISPLAY") and not os.environ.get("DISPLAY"):
+            print("skip the shell's zoom request zooms the window (headless: no window manager)", flush=True)
+        else:
+            check("the shell's zoom request zooms the window", False, f"no display? {e}")
 
     # Tabs. Tab 1 is on example.com here. Standard takes New Tab: Cmd+T goes to a new tab,
     # with its command box, which is the shell's; an address typed in the box with Enter
@@ -1326,7 +1384,7 @@ def browsing_checks():
     horizontal = json.loads(app.cmd("bounds"))
     check("with the tabs on top the page spans the width below two rows", horizontal["reported"][0] == 4 and horizontal["reported"][1] == 92 and horizontal["frame"][0] == 4, horizontal)
     first_tab_x = app.js("document.querySelector('[role=tab]').getBoundingClientRect().x")
-    check("the strip leaves exactly the window buttons' space", first_tab_x == window["buttonsEnd"] + 8, (first_tab_x, window))
+    check_mac("the strip leaves exactly the window buttons' space", first_tab_x == window["buttonsEnd"] + 8, (first_tab_x, window))
     check("a strip tab belongs to the shell", app.cmd("hit", first_tab_x + 20, BAR_Y) == "shell")
     strip_empty = app.cmd("hit", 1000, BAR_Y)
     check("the empty strip falls through to the frame, which drags", strip_empty == "frame", strip_empty)
@@ -1400,22 +1458,10 @@ def browsing_checks():
         print("process", json.dumps(row), flush=True)
     check("the main process is project_b", any(r["type"] == "main" and r["exe"] == "project_b" for r in table))
     children = [r for r in table if r["type"] != "main"]
-    check("every child process is the helper", children and all(r["exe"] == "project_b_helper" for r in children), children)
-
-    # Binaries: Go only in the main one, content only in the library.
-    macos = os.path.dirname(BIN)
-    helper = os.path.join(macos, "project_b_helper")
-    if not os.path.exists(helper):  # the packed app's, in an app of its own
-        helper = os.path.join(macos, "../Frameworks/Project B Helper.app/Contents/MacOS/project_b_helper")
-    library = os.path.join(macos, "../Frameworks/libproject_b_content.dylib")
-    if not os.path.exists(library):
-        library = os.path.join(macos, "libproject_b_content.dylib")
-    nm = lambda *args: subprocess.run(["nm", *args], capture_output=True, text=True).stdout
-    check("the helper has no Go", "_cgo" not in nm(helper) and "runtime." not in nm(helper))
-    check("the library has no Go", "_cgo" not in nm(library) and "runtime." not in nm(library))
-    check("the main binary has no content", "__ZN7content" not in nm(BIN) and "__ZN5blink" not in nm(BIN))
-    exports = nm("-gU", library).split()
-    check("the library exports only ProjectBMain", [e for e in exports if e.startswith("_")] == ["_ProjectBMain"], exports[:12])
+    if LINUX:
+        linux_binary_checks(app, children)
+    else:
+        mac_binary_checks(children)
     final = json.loads(app.cmd("stats", timeout=60))
     print("stats", json.dumps(final), flush=True)
 

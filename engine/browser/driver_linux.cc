@@ -106,7 +106,8 @@ std::string Classify(Window* window, aura::Window* hit) {
     return "popup";
   }
 #endif
-  if (hit == RootOf(window)) {
+  // The window's own view, under the holders, takes what no holder does: a drag area.
+  if (hit == RootOf(window) || hit->GetName() == "content") {
     return "frame";
   }
   return "container";
@@ -365,10 +366,20 @@ double ContentWidth(Window* window) {
   return RootOf(window)->bounds().width();
 }
 
-// The window's first child is its colour (window_linux.cc).
+// The window's colour is its view named background (window_linux.cc).
 uint32_t BackgroundColor(Window* window) {
-  const SkColor c =
-      RootOf(window)->children().front()->layer()->AsSolidColor()->GetTargetColor().toSkColor();
+  aura::Window* background = nullptr;
+  for (aura::Window* content : RootOf(window)->children()) {
+    for (aura::Window* child : content->children()) {
+      if (child->GetName() == "background") {
+        background = child;
+      }
+    }
+  }
+  if (!background) {
+    return 0;
+  }
+  const SkColor c = background->layer()->AsSolidColor()->GetTargetColor().toSkColor();
   return SkColorGetR(c) << 16 | SkColorGetG(c) << 8 | SkColorGetB(c);
 }
 

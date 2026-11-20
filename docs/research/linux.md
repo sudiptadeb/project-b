@@ -134,7 +134,7 @@ targets. The same calls work outside a Flatpak, which keeps headless tests simpl
 | Dark mode, accent colour | Settings portal, `org.freedesktop.appearance` (`color-scheme`, `accent-color`), and its change signal |
 | Single instance (`core/instance`) | a Unix socket in `$XDG_RUNTIME_DIR/app/io.github.sudiptadeb.project-b/`, which every copy of our Flatpak shares |
 | Links and files from the OS | the `.desktop` file declares `http`, `https` and HTML files, and the desktop launches us with them on the command line. A copy already running gets them through `core/instance`. So on Linux this needs no OS events and isn't an exception |
-| Relaunch (`core/relaunch`) | the Flatpak portal's `Spawn`, with the latest-version flag after an update |
+| Relaunch (`core/relaunch`) | the Flatpak portal's `Spawn`; after an update, amarit's, with the latest-version flag (see 5) |
 | Updates | see 5 |
 
 Through Chromium, not `core/system`:
@@ -184,9 +184,22 @@ container with a stub portal.
   - Ubuntu doesn't ship Flatpak, so there is one `sudo apt install flatpak` first; the install
     page says so. Debian, Arch and KDE's own distros have it or one command away.
 - **Updates.**
-  - The app's own: Flatpak's update portal. Go makes an update monitor and hears
-    `UpdateAvailable`. The shell shows "Update ready", Go calls `Update` and shows its
-    progress, and a relaunch starts the new version through `Spawn`.
+  - **amarit owns them** (agreed with amarit, 2026-11-20): appupdate gets a Flatpak source,
+    the module `amarit/flatpak`, with `godbus` in a module of its own, driving Flatpak's
+    update portal. The plan is in amarit's `docs/design.md`, "Flatpak source for appupdate".
+    The shell sees the same states and commands as on the Mac:
+    - `UpdateAvailable` is ready to download; `Update` with its progress is downloading.
+    - An update GNOME Software or `flatpak update` made while we run goes straight to ready.
+    - An update that asks for new permissions fails with kind `needs-user`: it goes through
+      the software centre.
+    - The relaunch after an update is the Flatpak portal's `Spawn` with the latest-version
+      flag, inside `amarit/flatpak`; the new copy waits for our single-instance socket.
+    - A notification through the Notification portal offers Relaunch.
+  - **The split.** amarit owns updates and the relaunch after an update; `core/relaunch`'s
+    `After` and the kqueue wait (`wait_darwin.go`) leave once project-b switches to it.
+    project-b keeps `core/instance`, and `core/relaunch`'s `Copy`, `Self` and `Copies`.
+  - amarit builds it at step 5 of 7, when our repository can raise `UpdateAvailable`, and
+    tests it with us in the VM slot.
   - `core/update/bundle.go` (the Mac's folder swap) isn't used on Linux, and our own signature
     check isn't needed, since Flatpak checks the repository's signature.
   - The runtime updates by itself, with every other Flatpak.
@@ -341,6 +354,11 @@ Pictures come from Tart's VNC server (`vm.sh vnc capture`), so no window opens o
    from the sandbox; the choice needs our engine, since content_shell has no dialog.
 2. **The GPU process's sandbox under zypak**: no Chromium seccomp in the spike's VM, on
    software GL. Check on real hardware whether Chrome's Flatpak is the same.
+3. **Dev and Stable on Linux**, for Sudipta. The proposal: two branches of the app,
+   `//stable` and `//dev`, in the same repository; switching opens the other branch's
+   `.flatpakref`.
+4. **Release notes**, for Sudipta: whether the shell reads them from `releases.json`, as on
+   the Mac, with no `min_version` on Linux.
 
 ## Sources
 

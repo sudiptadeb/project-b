@@ -6,12 +6,24 @@
           "keys": "Cmd+Q",
           "reserve": "always"
         }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+Shift+Q",
+          "reserve": "always"
+        }
       ]
     },
     "app.settings": {
       "mac": [
         {
           "keys": "Cmd+,",
+          "reserve": "always"
+        }
+      ],
+      "linux": [
+        {
+          "keys": "Ctrl+,",
           "reserve": "always"
         }
       ]

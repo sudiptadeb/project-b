@@ -380,13 +380,20 @@ and Android's still green.
     software, can reach after `app.ready`. The tests wait for `shell.on_screen`.
   - `GOOS=android` counts as `linux` to Go, so the Linux-only Go files say `!android`.
   - Settings and Quit had no keys on Linux; ux chose `Ctrl+,` and `Ctrl+Shift+Q`.
-- **Left for step 3, the window on a real desktop**, seen in the VM: on GNOME Wayland the
-  page draws, but the shell's view doesn't show, only the window's colour where it should be
-  (`linux-step2/flatpak-wayland.png`); on X11 through XWayland no window shows at all. The
-  headless runs can't see either: the driver's screenshots copy each view's own surface, not
-  the window.
+- **Seen in the VM at the end of step 2**, and found in step 3:
+  - On GNOME Wayland the page drew but the shell didn't (`linux-step2/flatpak-wayland.png`).
+    Aura raises a window it activates over its siblings: the pages' holder, activated when a
+    page took the keyboard, rose over the shell's. The holders now sit under one view of their
+    own, which is all that activation raises. The headless runs couldn't see it: the driver's
+    screenshots copy each view's surface, not the window.
+  - On X11 through XWayland no window showed. That was the Flatpak, not the window:
+    `--socket=fallback-x11` gives the app X11 only when there's no Wayland, so a Wayland
+    session's Flatpak run told to use X11 had no X server to reach. Outside the Flatpak, and
+    in an Xorg session, X11 works.
 
-![Our app as a Flatpak on GNOME Wayland: the page draws, the shell doesn't yet](linux-step2/flatpak-wayland.png)
+| GNOME Wayland, a page opened at start | X11 through XWayland: the OS's title bar is still on |
+|---|---|
+| ![](linux-step3/wayland-shell-and-page.png) | ![](linux-step3/x11-os-title-bar.png) |
 
 ## Spike (2026-11-20)
 

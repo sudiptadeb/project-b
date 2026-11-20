@@ -389,6 +389,7 @@ source_set("browser") {
       "//ui/compositor",
       "//ui/events:dom_keycode_converter",
       "//ui/platform_window",
+      "//ui/platform_window/wm",
       "//ui/wm",
       "//ui/wm/public",
     ]

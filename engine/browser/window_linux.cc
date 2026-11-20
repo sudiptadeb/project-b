@@ -35,6 +35,10 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/platform_window/platform_window.h"
 #include "ui/platform_window/platform_window_init_properties.h"
+#include "ui/platform_window/wm/wm_move_resize_handler.h"
+#include "ui/base/hit_test.h"
+#include "ui/events/event_handler.h"
+#include "ui/gfx/geometry/point_conversions.h"
 #include "ui/wm/core/base_focus_rules.h"
 #include "ui/wm/core/focus_controller.h"
 #include "ui/wm/public/activation_client.h"
@@ -53,6 +57,9 @@ namespace project_b {
 namespace {
 
 constexpr gfx::Rect kFirstBounds(80, 120, 1280, 720);
+
+// The invisible border, inside the window's edge, that resizes it.
+constexpr int kResizeBorder = 6;
 
 SkColor4f Hex(uint32_t rgb) {
   return SkColor4f::FromColor(SkColorSetRGB((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff));
@@ -126,6 +133,56 @@ struct Window::Impl {
     raw_ptr<Impl> impl_;
   };
 
+  // The top row's own parts, as a frame of the OS's would have them (docs/research/linux.md, 2):
+  // a press in a drag area hands the window to the compositor to move, one on the border to
+  // resize, a double-click in a drag area maximises or restores, and a right-click there
+  // opens the desktop's window menu. Before anything else sees the press.
+  class FrameHandler : public ui::EventHandler {
+   public:
+    explicit FrameHandler(Impl* impl) : impl_(impl) {}
+
+    void OnMouseEvent(ui::MouseEvent* event) override {
+      if (event->type() != ui::EventType::kMousePressed || !impl_->host->platform()) {
+        return;
+      }
+      const int hit = impl_->FrameHit(event->root_location_f());
+      if (hit == HTNOWHERE) {
+        return;
+      }
+      ui::PlatformWindow* platform = impl_->host->platform();
+      const float scale = impl_->host->device_scale_factor();
+      const gfx::Point in_window = gfx::ToRoundedPoint(gfx::ScalePoint(event->root_location_f(), scale));
+      if (event->IsRightMouseButton()) {
+        if (hit == HTCAPTION) {
+          platform->ShowWindowControlsMenu(in_window);
+          event->SetHandled();
+        }
+        return;
+      }
+      if (!event->IsLeftMouseButton()) {
+        return;
+      }
+      if (hit == HTCAPTION && (event->flags() & ui::EF_IS_DOUBLE_CLICK)) {
+        if (platform->GetPlatformWindowState() == ui::PlatformWindowState::kMaximized) {
+          platform->Restore();
+        } else {
+          platform->Maximize();
+        }
+        event->SetHandled();
+        return;
+      }
+      if (ui::WmMoveResizeHandler* handler = ui::GetWmMoveResizeHandler(*platform)) {
+        // X11 wants where the press is on screen; Wayland goes by the press itself.
+        handler->DispatchHostWindowDragMovement(
+            hit, impl_->host->GetBoundsInPixels().origin() + in_window.OffsetFromOrigin());
+        event->SetHandled();
+      }
+    }
+
+   private:
+    raw_ptr<Impl> impl_;
+  };
+
   // Lets an event into a holder only where the layout gives the point to it.
   class Targeter : public aura::WindowTargeter {
    public:
@@ -162,6 +219,27 @@ struct Window::Impl {
       }
     }
     return Area::kPage;
+  }
+
+  // What a press at p, in the window, does to the window: resize from the border (not when
+  // maximised or full screen), move from a drag area, or nothing, HTNOWHERE.
+  int FrameHit(const gfx::PointF& p) const {
+    const ui::PlatformWindowState state = PlatformState();
+    if (state != ui::PlatformWindowState::kMaximized &&
+        state != ui::PlatformWindowState::kFullScreen) {
+      const gfx::Size size = root()->bounds().size();
+      const bool left = p.x() < kResizeBorder, right = p.x() >= size.width() - kResizeBorder;
+      const bool top = p.y() < kResizeBorder, bottom = p.y() >= size.height() - kResizeBorder;
+      if (top && left) return HTTOPLEFT;
+      if (top && right) return HTTOPRIGHT;
+      if (bottom && left) return HTBOTTOMLEFT;
+      if (bottom && right) return HTBOTTOMRIGHT;
+      if (top) return HTTOP;
+      if (bottom) return HTBOTTOM;
+      if (left) return HTLEFT;
+      if (right) return HTRIGHT;
+    }
+    return AreaAt(p) == Area::kDrag ? HTCAPTION : HTNOWHERE;
   }
 
   // The holders cover the window. Each page keeps its four margins, as the Mac's do through
@@ -271,6 +349,7 @@ struct Window::Impl {
   std::unique_ptr<wm::FocusController> focus;
   std::unique_ptr<aura::client::DefaultCaptureClient> capture;
   std::unique_ptr<ParentingClient> parenting;
+  std::unique_ptr<FrameHandler> frame;
   // The holders, owned by the tree: the window's colour, the pages and the shell.
   raw_ptr<aura::Window> content = nullptr;
   raw_ptr<aura::Window> background = nullptr;
@@ -351,12 +430,19 @@ Window::Window(base::OnceClosure on_close,
   properties.wayland_app_id = "io.github.sudiptadeb.project-b";
   impl_->host = std::make_unique<Impl::Host>(std::move(properties), impl_.get());
   impl_->host->InitHost();
+  // No frame of the OS's: the shell draws the top row and the buttons (2). On Wayland this
+  // asks for client-side decorations; on X11 it tells the window manager to draw none.
+  if (impl_->host->platform()) {
+    impl_->host->platform()->SetUseNativeFrame(false);
+  }
 
   aura::Window* root = impl_->root();
   impl_->focus = std::make_unique<wm::FocusController>(new FocusRules());
   aura::client::SetFocusClient(root, impl_->focus.get());
   wm::SetActivationClient(root, impl_->focus.get());
   root->AddPreTargetHandler(impl_->focus.get());
+  impl_->frame = std::make_unique<Impl::FrameHandler>(impl_.get());
+  root->AddPreTargetHandler(impl_->frame.get(), ui::EventTarget::Priority::kSystem);
   impl_->capture = std::make_unique<aura::client::DefaultCaptureClient>(root);
   impl_->parenting = std::make_unique<ParentingClient>(root);
 
@@ -384,6 +470,7 @@ Window::~Window() {
   impl_->on_state.Reset();
   aura::Window* root = impl_->root();
   root->RemovePreTargetHandler(impl_->focus.get());
+  root->RemovePreTargetHandler(impl_->frame.get());
   // Content's views are content's: those still here leave the tree before it goes.
   if (aura::Window* shell = impl_->Shell()) {
     impl_->shell_holder->RemoveChild(shell);

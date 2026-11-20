@@ -1,12 +1,17 @@
 <script setup>
+import { computed } from 'vue';
 // A picture of the browser as the style step's choices make it: tabs on the side, on top,
 // or Glide, or a phone with its address bar on top or at the foot. The desktop's three are
 // drawn as those shells draw themselves (shell/src/apps/shell/standard and glide): the
 // address bar and its buttons, New Tab, tabs with their titles, the workspace switcher or
 // Glide's Space and its dots, and a page. It is drawn, not a picture, in the page's own
 // tones, so it takes the colour and the theme as the page does; sized by its own width, so
-// a choice's small one is the same picture as the large one.
-defineProps({ layout: String, top: Boolean });
+// a choice's small one is the same picture as the large one. The window's buttons are the
+// platform's: the Mac's lights at the left, or on Linux and Windows a small copy of
+// ui/WindowButtons.vue at the right end of the top row. New Tab shows the keymap's key for
+// it, as the platform writes it, newTab, and none when it has none.
+const props = defineProps({ layout: String, top: Boolean, platform: { type: String, default: 'mac' }, newTab: String });
+const mac = computed(() => props.platform === 'mac');
 const tabs = ['Morning news', 'Project notes', 'Lentil soup', 'Inbox'];
 const rows = [
   ['Team update', 'Here is what moved this week…'],
@@ -28,10 +33,11 @@ const rows = [
     <div class="w">
       <template v-if="layout === 'top'">
         <div class="strip">
-          <span class="lights"><i></i><i></i><i></i></span>
+          <span v-if="mac" class="lights"><i></i><i></i><i></i></span>
           <span class="ws"><b class="d1"></b><b class="d2"></b>All workspaces</span>
           <span v-for="(t, i) in tabs" :key="t" class="htab" :class="{ on: i === 3 }">{{ t }}</span>
           <span class="plus">+</span>
+          <span v-if="!mac" class="window-buttons"><svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg><svg viewBox="0 0 16 16"><rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1"/></svg><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
         </div>
         <div class="bar">
           <span class="icon">‹</span><span class="icon">›</span><span class="icon">↻</span>
@@ -39,18 +45,19 @@ const rows = [
         </div>
       </template>
       <div v-else-if="layout === 'side'" class="bar">
-        <span class="lights"><i></i><i></i><i></i></span>
+        <span v-if="mac" class="lights"><i></i><i></i><i></i></span>
         <span class="icon">▯</span><span class="icon">‹</span><span class="icon">›</span><span class="icon">↻</span>
         <span class="field"><span class="slot"></span>mail.example.com</span>
+        <span v-if="!mac" class="window-buttons"><svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg><svg viewBox="0 0 16 16"><rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1"/></svg><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
       </div>
       <div class="body">
         <div v-if="layout === 'side'" class="rail">
-          <span class="vtab new">+ New Tab<em>⌘T</em></span>
+          <span class="vtab new">+ New Tab<em v-if="newTab">{{ newTab }}</em></span>
           <span v-for="(t, i) in tabs" :key="t" class="vtab" :class="{ on: i === 3 }">{{ t }}</span>
           <span class="ws foot"><b class="d1"></b><b class="d2"></b>All workspaces</span>
         </div>
         <div v-if="layout === 'glide'" class="rail glide-rail">
-          <span class="lights"><i></i><i></i><i></i></span>
+          <span v-if="mac" class="lights"><i></i><i></i><i></i></span>
           <span class="pill">mail.example.com</span>
           <span class="space"><b class="d2"></b>Work</span>
           <span class="vtab new">+ New Tab</span>
@@ -58,6 +65,7 @@ const rows = [
           <span class="dots"><b class="d1"></b><b class="d2 on"></b></span>
         </div>
         <div class="page">
+          <template v-if="layout === 'glide'"><span v-if="!mac" class="window-buttons"><svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg><svg viewBox="0 0 16 16"><rect x="3.75" y="3.75" width="8.5" height="8.5" rx="1"/></svg><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></template>
           <small>INBOX</small>
           <strong>Good morning</strong>
           <span v-for="r in rows" :key="r[0]" class="row"><i></i><span><b>{{ r[0] }}</b>{{ r[1] }}</span></span>
@@ -112,6 +120,30 @@ const rows = [
 
 .lights i:nth-child(3) {
   background: #61c554;
+}
+
+/* The window's own buttons, as ui/WindowButtons.vue draws them, at the picture's size. */
+.window-buttons {
+  display: flex;
+  gap: calc(var(--u) * 4);
+  flex: none;
+  margin-left: auto;
+  color: var(--icon);
+}
+
+.window-buttons svg {
+  width: calc(var(--u) * 10);
+  height: calc(var(--u) * 10);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+/* Glide's frame has no place for them yet: the page area's top right. */
+.page .window-buttons {
+  position: absolute;
+  top: calc(var(--u) * 6);
+  right: calc(var(--u) * 6);
 }
 
 .strip,
@@ -283,6 +315,7 @@ const rows = [
   padding: calc(var(--u) * 18) calc(var(--u) * 48);
   background: var(--surface);
   overflow: hidden;
+  position: relative;
 }
 
 .glide .page {

@@ -117,6 +117,47 @@ const bars = async (w) => (await w.ui.getByRole('tab').first().isVisible()) || (
     const r = await regions();
     return welcomeTab(r) && r.active === welcomeTab(r).id && !(await bars(w));
   }));
+
+  // The picture of the browser has the platform's window buttons: the Mac's lights at the
+  // left, or Linux's own three at the right end of the top row; and New Tab's key as the
+  // platform writes it.
+  const picture = async (wn, platform) => {
+    const at = wn.page.frameLocator('iframe.our-page[data-page="welcome"]');
+    const win = at.locator('.window').first();
+    await win.waitFor();
+    const n = (sel) => win.locator(sel).count();
+    const key = await win.locator('.vtab.new em').innerText();
+    if (platform === 'mac') {
+      check('on the Mac the picture has the lights and no window buttons', (await n('.lights')) === 1 && (await n('.window-buttons')) === 0);
+      check('and New Tab reads ⌘T', key === '⌘T', key);
+      return;
+    }
+    const bar = await win.locator('.bar').boundingBox();
+    const buttons = win.locator('.window-buttons');
+    const box = await buttons.boundingBox();
+    check(`on ${platform} the picture has no lights`, (await n('.lights')) === 0);
+    check('and three window buttons at the right end of the top row', (await buttons.locator('svg').count()) === 3 && box && box.x + box.width > bar.x + bar.width * 0.9, JSON.stringify({ bar, box }));
+    check('and New Tab reads Ctrl+T', key === 'Ctrl+T', key);
+  };
+  await picture(w, 'mac');
+  await w.page.close();
+  await lib.stop();
+  await lib.start(['-use=standard', '-platform=linux']);
+  w = await lib.openWindow(browser, { viewport: { width: 1280, height: 800 } });
+  await until(async () => welcomeTab(await regions()));
+  await picture(w, 'linux');
+  await settle(w.page);
+  await w.page.screenshot({ path: path.join(lib.out, 'welcome-linux-hello.png') });
+  const lw = w.page.frameLocator('iframe.our-page[data-page="welcome"]');
+  await lw.getByRole('button', { name: 'Get started' }).click();
+  await lw.getByRole('heading', { name: 'Bring your things over' }).waitFor();
+  await lw.getByRole('button', { name: 'Continue' }).click();
+  for (const [name, shot] of [['Tabs on the side', 'side'], ['Tabs on top', 'top'], ['Glide', 'glide']]) {
+    await lw.getByRole('radio', { name }).click();
+    await settle(w.page);
+    await w.page.screenshot({ path: path.join(lib.out, `welcome-linux-${shot}.png`) });
+  }
+  check('it logged no errors on Linux', w.errors.length === 0, w.errors.join(' | '));
   await w.page.close();
   await browser.close();
   await lib.done();

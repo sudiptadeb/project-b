@@ -91,6 +91,11 @@ const cheats = [
   ['bookmarks.show', 'Bookmarks'],
   ['dev.viewSource', 'Page source'],
 ];
+// New Tab's key in the picture of the browser, as this platform writes it.
+const newTabKey = computed(() => {
+  const k = (state.keymaps[state.keymap] || {})['tab.new'];
+  return k ? shown(k, state.platform) : '';
+});
 const cheatSheet = computed(() => {
   const keys = state.keymaps[state.keymap] || {};
   return cheats.filter(([id]) => keys[id]).map(([id, label]) => ({ id, label, keys: shown(keys[id], state.platform) }));
@@ -135,7 +140,7 @@ onMounted(() => heading.value?.focus());
           <button type="button" class="text-button quiet" @click="finish">Skip setup</button>
         </div>
         <div class="waiting" aria-hidden="true" :style="{ '--frame': cycle[turn], '--accent-soft': 'var(--line)' }">
-          <Preview :layout="state.phone ? 'phone' : 'side'" />
+          <Preview :platform="state.platform" :new-tab="newTabKey" :layout="state.phone ? 'phone' : 'side'" />
         </div>
       </section>
 
@@ -149,7 +154,7 @@ onMounted(() => heading.value?.focus());
         <h1 id="style" ref="heading" tabindex="-1">Pick your style</h1>
         <div class="split">
           <div class="picture">
-            <Preview :layout="state.phone ? 'phone' : layout" :top="state.prefs.addressBarPosition === 'top'" />
+            <Preview :platform="state.platform" :new-tab="newTabKey" :layout="state.phone ? 'phone' : layout" :top="state.prefs.addressBarPosition === 'top'" />
           </div>
           <div class="choices">
             <div v-if="!state.phone" class="choice">
@@ -164,7 +169,7 @@ onMounted(() => heading.value?.focus());
                   :aria-checked="layout === l.id"
                   @click="chooseLayout(l.id)"
                 >
-                  <Preview :layout="l.id" />
+                  <Preview :platform="state.platform" :new-tab="newTabKey" :layout="l.id" />
                   <span>{{ l.name }}</span>
                 </button>
               </div>
@@ -192,7 +197,7 @@ onMounted(() => heading.value?.focus());
         <p class="sub">Workspaces keep sets of tabs apart, each with its own sign-ins. Start with these, or add your own.</p>
         <div class="split">
           <div class="picture switcher" aria-hidden="true">
-            <Preview layout="side" />
+            <Preview :platform="state.platform" :new-tab="newTabKey" layout="side" />
             <div class="menu">
               <span class="item"><i class="tick">✓</i>All workspaces</span>
               <span v-for="w in starters.filter((x) => x.on)" :key="w.name" class="item"><i class="dot" :style="{ background: paint(starterColor(w)) }"></i>{{ w.name }}</span>

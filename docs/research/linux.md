@@ -12,7 +12,10 @@ agreed.
   and kde should work").
 - **Every Linux build, arm64 and amd64, stays in container `pb` on this Mac** (2026-11-20:
   "no lets keep using the vm here"). Not bigboy: it has 4 cores, 16 GB and a 64 GB disk, and
-  runs the shared services. arm64 is built and tested first.
+  runs the shared services.
+- **Only arm64 for now; amd64 builds and tests come later** (2026-11-20: "we can run amd64
+  tests later... for now lets only focus on arm64 builds"). Nothing amd64 happens before
+  step 7 of the order of work.
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"). No tarball, no `.deb`.
 - **The app id is `io.github.sudiptadeb.project-b`** (2026-11-19: "yea lets go with this").
   Flathub reads it as github.com/sudiptadeb/project-b, which makes its GitHub check possible;
@@ -42,15 +45,16 @@ agreed.
 - **Proved on 2026-11-19.** Stock content_shell for Linux x64 built in `pb` with no new sync,
   no new deps and the sysroot that was already there: 37,961 steps in 3 hours 34 minutes.
   It ran headless and loaded a page.
-- **Our output.** `out/linux-arm64`, then `out/linux-x64`, beside the Android tree in the
-  container's `/work`. About 15 GB each.
+- **Our output.** `out/linux-arm64` beside the Android tree in the container's `/work`,
+  about 15 GB. `out/linux-x64` comes with amd64, in step 7.
 - **Go.** `libcore` as a static archive with `GOOS=linux`, cgo through Chromium's clang and
   sysroot, as Android does. `engine/build_go.py` hard-codes darwin today; the layers work's
   step 6 (the three-piece build) makes it take the platform.
 - **Priority.** A build reniced on the host and run in a slot from the tester. A build on
   12 cores at full priority failed 0.2.109's Android run on 2026-11-19.
-- **amd64 later, in `pb` too.** The same scripts and `out/linux-x64`. Clang under Rosetta
-  crashes now and then; `build-content-shell.sh` retries those steps.
+- **Rosetta.** Clang under Rosetta crashes now and then; `build-content-shell.sh` retries
+  those steps.
+- **amd64 in step 7, in `pb` too.** The same scripts, into `out/linux-x64`.
 
 ## 2. The window
 
@@ -197,17 +201,17 @@ container with a stub portal.
 
 | Where | What | Runs |
 |---|---|---|
-| Container `pb`, amd64 | the x64 build, headless | `tools/test.sh app` with our driver, Ozone headless |
-| An arm64 container | the arm64 build, headless, at native speed | the same |
+| An arm64 container | the arm64 build, headless, at native speed | `tools/test.sh app` with our driver, Ozone headless |
 | Tart VM: Ubuntu 24.04, GNOME, Wayland | the Flatpak, a real desktop | install, first run, driver, look |
 | Tart VM: Debian 13, GNOME | the same | the same |
 | Tart VM: Arch Linux ARM, KDE Plasma 6 | the same, and KDE's decorations | the same |
-| The same Tart VMs, later | the amd64 Flatpak, its programs through Rosetta | install, first run, driver, look |
+| Step 7: container `pb`, amd64 | the x64 build, headless | as the arm64 container |
+| Step 7: the same Tart VMs | the amd64 Flatpak, its programs through Rosetta | install, first run, driver, look |
 
 - Arch itself is x64 only; on arm64 the nearest is Arch Linux ARM, a separate project, and
   it stands in for Arch.
-- amd64 on a real desktop: the x64 Flatpak in the arm64 VMs, its programs through Rosetta,
-  or headless in `pb`.
+- amd64 is tested only from step 7: the x64 Flatpak in the arm64 VMs, its programs through
+  Rosetta, or headless in `pb`.
 - X11: Ubuntu's login screen still offers an Xorg session; one run there covers X11.
 - ChromeDriver: Chrome for Testing has none for Linux arm64, so we build it from the same
   tree, or use only our own driver.
@@ -234,7 +238,8 @@ After the layers work lands, each step leaves the Mac and Android green:
 4. **`core/system` on Linux**, and the import permissions.
 5. **The Flatpak and our repository**, updates through the portal.
 6. **The three VMs**, the deskrig Linux target, then the release run gains Linux.
-7. **amd64**, built in `pb`, headless there and through Rosetta in the VMs.
+7. **amd64**, the first amd64 work: built in `pb`, tested headless there and through
+   Rosetta in the VMs. Steps 1 to 6 are arm64 only.
 
 About 5 weeks for one session, like the earlier estimate: the window is still the big piece,
 and Flatpak takes the place of the `.deb` and AppArmor work.

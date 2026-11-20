@@ -253,7 +253,8 @@ After the layers work lands, each step leaves the Mac and Android green:
    starts, our driver runs. It needs the window's tree, so that comes here (see the plan below).
 3. **The window** on a real desktop: the top row, move and resize, the menu strip.
 4. **`core/system` on Linux**, and the import permissions.
-5. **The Flatpak and our repository**, updates through the portal.
+5. **The Flatpak and our repository**, updates through the portal. Done when, among the rest,
+   no profile keeps its key in a file: step 4's Secret portal holds it.
 6. **The four deskrig VMs** (they and deskrig's Linux target are ready), then the release run
    gains Linux.
 7. **amd64**, the first amd64 work: built in `pb`, tested headless there and through
@@ -281,12 +282,16 @@ Nothing here changes the Mac or Android; each piece is its own commit.
   sysroot GN already uses (GN passes both, as Android's passes clang and the NDK). Chromium's
   version goes in with `-X main.chromiumVersion`, as on the Mac. The Go is `pb`'s own
   `/usr/local/go`, x64, cross-compiling.
-- `tools/build.sh linux arm64` does what `android arm64` does: the Mac's lock, the tree
-  copied into `pb`'s `/work/tree` under `/work/.android-build.lock` (one build at a time, as the
-  tree and `//project_b` links are shared), then `gn gen out/linux-arm64` with
+- `tools/build.sh linux arm64` does what `android arm64` does: its files staged in
+  `/work/linux-release`, then copied into `pb`'s `/work/tree` under `/work/.android-build.lock`,
+  then `gn gen out/linux-arm64` with
   `root_extra_deps = [ "//project_b/engine" ]` and `autoninja`. Run as an `amarit job`,
   reniced, in a slot from the tester. The spike's `out/linux-arm64` is reused: content is
   already built there.
+- Linux and APK builds take turns on that lock: the tree and the `//project_b` links are
+  shared, and two builds at once ran the VM out of memory on 2026-11-20. An APK build may wait
+  for a Linux build, which can take hours, so Linux doesn't take the Mac's APK lock, whose
+  wait gives up after 2 hours ([android.md](../android.md)).
 
 **The engine's Mac-only C++, and what Linux gets.**
 
@@ -310,15 +315,18 @@ except two gaps (`instance.Quit`, `relaunch`'s wait). Linux gets:
 - `core/cmd/lib`: `switches_linux.go` adds the Ozone pick: `--ozone-platform=wayland` when
   `WAYLAND_DISPLAY` is set, `x11` when `DISPLAY` is, else `headless`; with the Mac's
   `--disable-in-process-stack-traces` (Go owns the crash signals there too) and the saved
-  flags. `keys_linux.go`: no keychain, so a profile keeps its own key in its folder (the
-  Secret portal is step 4). `choose`, `exit`, `print`, `download_files` as the Mac's;
+  flags. `keys_linux.go`: no keychain, so a profile keeps its own key in a file in its
+  folder. That is for development and tests only: step 4's Secret portal replaces it before
+  any Flatpak reaches a user. `choose`, `exit`, `print`, `download_files` as the Mac's;
   `update_linux.go`: no updates yet (amarit's Flatpak source comes at step 5).
 - `core/instance`: the Mac's flock and Unix socket work on Linux as they are, so
   `instance_darwin.go` becomes `instance_unix.go`; the socket goes in
   `$XDG_RUNTIME_DIR/app/io.github.sudiptadeb.project-b/` inside the Flatpak (3), the user's
   temporary folder outside it.
-- `core/relaunch`: a `wait_linux.go` beside the kqueue one, waiting with `pidfd_open` and
-  `poll`. After and the kqueue wait stay as they are.
+- Relaunch: release is moving project-b to amarit's `amarit/relaunch` (`After`,
+  `WaitExited`), keeping only `core/relaunch`'s `Copies`. So Linux's wait, `pidfd_open` and
+  `poll`, goes in amarit, and `update_linux.go` ("no installer") follows the new
+  `update_android.go` once that switch is on main.
 - `core/system/platform`: `platform_linux.go`, every call answering as "not on this system",
   so the managers run; the portals are step 4. Import finds no browsers yet (`browserdata`'s
   `_other.go`), also step 4.

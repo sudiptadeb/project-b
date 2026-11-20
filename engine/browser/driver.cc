@@ -334,6 +334,19 @@ void Run(const std::string& line) {
       driver::SendKey(TheWindow(), key);
     }
     Reply(id, "ok");
+  } else if (cmd == "regions") {
+    // The layout's regions the window holds, in order: [x, y, w, h, area], area 0 the page,
+    // 1 the shell, 2 a drag area.
+    base::ListValue out;
+    for (const Window::Region& r : TheWindow()->regions()) {
+      out.Append(base::ListValue()
+                     .Append(r.rect.x())
+                     .Append(r.rect.y())
+                     .Append(r.rect.width())
+                     .Append(r.rect.height())
+                     .Append(static_cast<int>(r.area)));
+    }
+    Reply(id, base::WriteJson(out).value_or("[]"));
   } else if (cmd == "focused") {
     // Which view the OS sends keys to now.
     Reply(id, driver::Focused(TheWindow()));

@@ -201,6 +201,8 @@ class Window {
   // moves the window by itself.
   bool MovesFromApp(const gfx::PointF& in_window) const;
   size_t ignored_stale_bounds() const;
+  // The layout's regions the window holds now, which decide who gets each press.
+  std::vector<Region> regions() const;
   // The colour the window painted when Show put it on screen, 0xRRGGBB.
   uint32_t shown_rgb() const;
 #endif

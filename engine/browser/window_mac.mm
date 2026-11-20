@@ -158,6 +158,7 @@ NSColor* Hex(uint32_t rgb) {
 // Runs when the window turns light or dark, by its theme or the system's.
 @property(nonatomic, copy) void (^onAppearance)(void);
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions;
+- (const std::vector<project_b::Window::Region>&)regions;
 @end
 
 @implementation PBContainerView {
@@ -177,6 +178,10 @@ NSColor* Hex(uint32_t rgb) {
   if (_onAppearance) {
     _onAppearance();
   }
+}
+
+- (const std::vector<project_b::Window::Region>&)regions {
+  return _regions;
 }
 
 - (void)setRegions:(std::vector<project_b::Window::Region>)regions {
@@ -980,6 +985,10 @@ bool Window::MovesFromApp(const gfx::PointF& in_window) const {
 
 size_t Window::ignored_stale_bounds() const {
   return impl_->ignored_stale_bounds;
+}
+
+std::vector<Window::Region> Window::regions() const {
+  return [impl_->container regions];
 }
 
 uint32_t Window::shown_rgb() const {

@@ -684,6 +684,10 @@ size_t Window::ignored_stale_bounds() const {
   return impl_->ignored_stale_bounds;
 }
 
+std::vector<Window::Region> Window::regions() const {
+  return impl_->regions;
+}
+
 uint32_t Window::shown_rgb() const {
   return impl_->shown_rgb;
 }

@@ -305,10 +305,14 @@ source_set("browser") {
     "browser_main_delegate.cc",
     "browser_main_delegate.h",
   ]
+  sources += [
+    "browser/browser_main_parts_desktop.cc",
+    "browser/driver.cc",
+    "browser/driver_platform.h",
+  ]
   if (is_mac) {
     sources += [
-      "browser/browser_main_parts.mm",
-      "browser/driver.mm",
+      "browser/driver_mac.mm",
       "browser/mac_app.h",
       "browser/mac_app.mm",
       "browser/printing_mac.mm",

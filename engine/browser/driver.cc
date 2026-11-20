@@ -1,8 +1,9 @@
+// The driver's commands, the same on every desktop: what each needs of the OS's windows and
+// input is driver_platform.h's, driver_mac.mm on the Mac and driver_linux.cc on Linux.
+
 #include "project_b/engine/browser/driver.h"
 
-#import <Cocoa/Cocoa.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include <memory>
 #include <set>
@@ -21,8 +22,8 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
-#include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -34,12 +35,12 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "project_b/engine/browser/choose_path.h"
+#include "project_b/engine/browser/driver_platform.h"
 #include "project_b/engine/browser/engine.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/hooks_gen.h"
-#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/window.h"
@@ -56,19 +57,9 @@
 #include "project_b/engine/extensions/browser/extensions.h"
 #endif
 
-// Private, for the driver only: AppKit's description of the window's drag region.
-@interface NSWindow (PBDriverPrivate)
-- (id)_lastDragRegionDataDescription;
-@end
-
 namespace project_b {
 
 namespace {
-
-// The menu bar as the user sees it: each menu's title and its items' titles, with the
-// key each shows ("^~$@" then the key, as macOS writes them), whether it is enabled and
-// whether it is checked.
-std::string MenuJson(NSMenu* menu);
 
 void Reply(const std::string& id, const std::string& text) {
   printf("PBDRIVER %s %s\n", id.c_str(), text.c_str());
@@ -94,8 +85,8 @@ void UseWindow(int64_t id) {
   Current()->window->ForceKeyForDriver(true);
 }
 
-NSWindow* TheWindow() {
-  return Current()->window->native_window().GetNativeNSWindow();
+Window* TheWindow() {
+  return Current()->window.get();
 }
 
 // The tab the driver's window has the keyboard in, which "page" commands act on.
@@ -123,156 +114,6 @@ gfx::RectF FocusedBounds() {
     }
   }
   return gfx::RectF();
-}
-
-NSTimeInterval Now() {
-  return NSProcessInfo.processInfo.systemUptime;
-}
-
-// The view AppKit would send a mouse event at this point to, asked the way AppKit asks:
-// from the window's frame view, which holds the title bar and its buttons above our
-// content view. x and y are shell coordinates, y from the top.
-NSView* HitFromFrame(double x, double y) {
-  NSWindow* window = TheWindow();
-  NSView* content = window.contentView;
-  NSView* frame = content.superview;
-  NSPoint in_window = [content convertPoint:NSMakePoint(x, content.bounds.size.height - y)
-                                     toView:nil];
-  return [frame hitTest:in_window];
-}
-
-// What a hit view is, as the driver reports it.
-std::string Classify(NSView* hit) {
-  if (!hit) {
-    return "nil";
-  }
-  NSView* shell =
-      Current()->shell->contents()->GetNativeView().GetNativeNSView();
-  if ([hit isDescendantOf:shell]) {
-    return "shell";
-  }
-  for (const Engine::VisibleTab& v : Current()->visible) {
-    if ([hit isDescendantOf:Engine::Get()
-                                ->tab(v.tab)
-                                ->contents()
-                                ->GetNativeView()
-                                .GetNativeNSView()]) {
-      return "page";
-    }
-  }
-#if BUILDFLAG(PB_EXTENSIONS)
-  content::WebContents* popup =
-      Extensions::Get() ? Extensions::Get()->popup_contents() : nullptr;
-  if (popup && [hit isDescendantOf:popup->GetNativeView().GetNativeNSView()]) {
-    return "popup";
-  }
-#endif
-  if (hit == TheWindow().contentView) {
-    return "container";
-  }
-  if (hit == TheWindow().contentView.superview) {
-    return "frame";
-  }
-  return std::string("native:") + hit.className.UTF8String;
-}
-
-// In a session with no real GUI, [window sendEvent:] doesn't deliver anything, so this
-// does what AppKit's routing does: ask the frame's hitTest:, make the answer first
-// responder on mouse down, and hand it the event. Only our own views get events here;
-// a native area (the frame, a window button) is reported and left alone, because
-// AppKit's own handling of it would start a tracking loop that never ends without a
-// display.
-std::string SendMouse(NSEventType type, double x, double y, int clicks) {
-  NSWindow* window = TheWindow();
-  static NSInteger number = 0;
-  NSView* content = window.contentView;
-  NSPoint p = NSMakePoint(x, content.bounds.size.height - y);
-  NSEvent* event = [NSEvent mouseEventWithType:type
-                                      location:p
-                                 modifierFlags:0
-                                     timestamp:Now()
-                                  windowNumber:window.windowNumber
-                                       context:nil
-                                   eventNumber:++number
-                                    clickCount:clicks
-                                      pressure:clicks ? 1.0 : 0.0];
-  NSView* hit = HitFromFrame(x, y);
-  const std::string kind = Classify(hit);
-  if (kind != "shell" && kind != "page" && kind != "popup") {
-    return kind;
-  }
-  switch (type) {
-    case NSEventTypeMouseMoved:
-      [hit mouseMoved:event];
-      break;
-    case NSEventTypeLeftMouseDown:
-      if (hit.acceptsFirstResponder) {
-        [window makeFirstResponder:hit];
-      }
-      [hit mouseDown:event];
-      break;
-    case NSEventTypeLeftMouseUp:
-      // What the window's sendEvent: does, which nothing calls here.
-      if (kind == "shell") {
-        timeline::Input("input.click",
-                        base::TimeTicks() + base::Seconds(event.timestamp));
-      }
-      [hit mouseUp:event];
-      break;
-    default:
-      break;
-  }
-  return kind;
-}
-
-void SendKey(NSString* chars, unsigned short code, NSEventModifierFlags flags) {
-  NSWindow* window = TheWindow();
-  for (NSEventType type : {NSEventTypeKeyDown, NSEventTypeKeyUp}) {
-    NSEvent* event = [NSEvent keyEventWithType:type
-                                      location:NSZeroPoint
-                                 modifierFlags:flags
-                                     timestamp:Now()
-                                  windowNumber:window.windowNumber
-                                       context:nil
-                                    characters:chars
-                   charactersIgnoringModifiers:chars
-                                     isARepeat:NO
-                                       keyCode:code];
-    NSResponder* responder = window.firstResponder;
-    if (type == NSEventTypeKeyDown) {
-      timeline::Input("input.key",
-                      base::TimeTicks() + base::Seconds(event.timestamp));
-      if ((flags & NSEventModifierFlagCommand) &&
-          [responder performKeyEquivalent:event]) {
-        continue;
-      }
-      [responder keyDown:event];
-    } else {
-      [responder keyUp:event];
-    }
-  }
-}
-
-// Virtual key codes for what tests type. Blink takes the text from the characters.
-unsigned short CodeForChar(unichar c) {
-  static const struct {
-    const char* chars;
-    unsigned short code;
-  } kCodes[] = {
-      {"a", 0},  {"s", 1},  {"d", 2},  {"f", 3},  {"h", 4},  {"g", 5},
-      {"z", 6},  {"x", 7},  {"c", 8},  {"v", 9},  {"b", 11}, {"q", 12},
-      {"w", 13}, {"e", 14}, {"r", 15}, {"y", 16}, {"t", 17}, {"1", 18},
-      {"2", 19}, {"3", 20}, {"4", 21}, {"6", 22}, {"5", 23}, {"9", 25},
-      {"7", 26}, {"8", 28}, {"0", 29}, {"o", 31}, {"u", 32}, {"i", 34},
-      {"p", 35}, {"l", 37}, {"j", 38}, {"k", 40}, {"n", 45}, {"m", 46},
-      {".", 47}, {"/", 44}, {":", 41}, {"-", 27}, {",", 43},
-  };
-  for (const auto& entry : kCodes) {
-    if (entry.chars[0] == c) {
-      return entry.code;
-    }
-  }
-  return 49;
 }
 
 void Capture(const std::string& id, const std::string& path);
@@ -328,10 +169,8 @@ void AskStrayShell(std::string id, int tries) {
   content::WebContents* contents = Stray().get();
   if (tries > 0 && (contents->IsLoading() ||
                     contents->GetLastCommittedURL() != GURL("chrome://shell/standard/"))) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
-                   dispatch_get_main_queue(), ^{
-                     AskStrayShell(id, tries - 1);
-                   });
+    base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, base::BindOnce(&AskStrayShell, id, tries - 1), base::Milliseconds(50));
     return;
   }
   contents->GetPrimaryMainFrame()->ExecuteJavaScriptForTests(
@@ -339,9 +178,8 @@ void AskStrayShell(std::string id, int tries) {
       base::BindOnce(
           [](const std::string& id, base::Value value) {
             Reply(id, value.is_string() ? value.GetString() : "no answer");
-            dispatch_async(dispatch_get_main_queue(), ^{
-              Stray().reset();
-            });
+            base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE, base::BindOnce([] { Stray().reset(); }));
           },
           id),
       /*world_id=*/0);
@@ -381,16 +219,12 @@ void Stats(const std::string& id) {
   std::string go_stats(go);
   free(go);
 
-  NSWindow* window = TheWindow();
   Reply(id, base::StringPrintf(
                 "{\"cgoCallNs\":%.1f,\"hookOffNs\":%.1f,\"hookOnNs\":%.1f,"
-                "\"go\":%s,"
-                "\"key\":%d,\"main\":%d,\"visible\":%d,\"occlusionVisible\":%d,"
+                "\"go\":%s,%s,"
                 "\"ignoredStaleBounds\":%zu}",
-                ns, hook_off_ns, hook_on_ns,
-                go_stats.c_str(), window.isKeyWindow, window.isMainWindow,
-                window.isVisible,
-                (window.occlusionState & NSWindowOcclusionStateVisible) != 0,
+                ns, hook_off_ns, hook_on_ns, go_stats.c_str(),
+                driver::Flags(TheWindow()).c_str(),
                 Current()->window->ignored_stale_bounds()));
 }
 
@@ -434,7 +268,7 @@ void Run(const std::string& line) {
     // screen, its title, whether it is the key window, and the tabs it shows.
     base::ListValue out;
     for (const auto& [wid, w] : Engine::Get()->windows()) {
-      NSWindow* window = w->window->native_window().GetNativeNSWindow();
+      Window* window = w->window.get();
       const gfx::Rect frame = w->window->GetBounds();
       base::ListValue tabs;
       for (const Engine::VisibleTab& v : w->visible) {
@@ -447,110 +281,72 @@ void Run(const std::string& line) {
                                        .Append(frame.y())
                                        .Append(frame.width())
                                        .Append(frame.height()))
-                     .Set("title", base::SysNSStringToUTF8(window.title))
-                     .Set("key", static_cast<bool>(window.isKeyWindow))
-                     .Set("visible", static_cast<bool>(window.visible))
+                     .Set("title", driver::Title(window))
+                     .Set("key", driver::IsKey(window))
+                     .Set("visible", driver::IsVisible(window))
                      .Set("tabs", std::move(tabs)));
     }
     Reply(id, base::WriteJson(out).value_or("[]"));
   } else if (cmd == "move") {
-    Reply(id, SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0));
+    Reply(id, driver::SendMouse(TheWindow(), driver::Mouse::kMove, number(2), number(3), 0));
   } else if (cmd == "click") {
-    SendMouse(NSEventTypeMouseMoved, number(2), number(3), 0);
-    SendMouse(NSEventTypeLeftMouseDown, number(2), number(3), 1);
-    Reply(id, SendMouse(NSEventTypeLeftMouseUp, number(2), number(3), 1));
+    driver::SendMouse(TheWindow(), driver::Mouse::kMove, number(2), number(3), 0);
+    driver::SendMouse(TheWindow(), driver::Mouse::kDown, number(2), number(3), 1);
+    Reply(id, driver::SendMouse(TheWindow(), driver::Mouse::kUp, number(2), number(3), 1));
   } else if (cmd == "hit") {
-    // Who would get a mouse event here: shell, page, container, frame (AppKit drags the
+    // Who would get a mouse event here: shell, page, container, frame (the OS drags the
     // window), or a native view such as a window button.
-    Reply(id, Classify(HitFromFrame(number(2), number(3))));
+    Reply(id, driver::Hit(TheWindow(), number(2), number(3)));
   } else if (cmd == "press") {
     // What a press here does to the window: "moves" when the window hands it to the
     // window server to move, below the title bar; "titlebar" when it falls through to
     // the frame inside the title bar, where the window server moves the window by itself
     // from what "dragregion" lists; otherwise who gets it, as "hit" says.
-    NSWindow* window = TheWindow();
-    NSView* content = window.contentView;
-    const NSPoint p = [content
-        convertPoint:NSMakePoint(number(2), content.bounds.size.height - number(3))
-              toView:nil];
-    const std::string kind = Classify(HitFromFrame(number(2), number(3)));
-    if (Current()->window->MovesFromApp(gfx::PointF(p.x, p.y))) {
-      Reply(id, "moves");
-    } else if (kind == "frame" && !NSPointInRect(p, window.contentLayoutRect)) {
-      Reply(id, "titlebar");
-    } else {
-      Reply(id, kind);
-    }
+    Reply(id, driver::Press(TheWindow(), number(2), number(3)));
   } else if (cmd == "dragregion") {
     // What AppKit last told the window server it may drag by itself, as AppKit
     // describes it: rectangles in window points, y from the bottom.
-    NSString* text =
-        [TheWindow() respondsToSelector:@selector(_lastDragRegionDataDescription)]
-            ? [[TheWindow() _lastDragRegionDataDescription] description]
-            : @"unknown";
-    Reply(id, base::SysNSStringToUTF8(
-                  [text stringByReplacingOccurrencesOfString:@"\n" withString:@" | "]));
+    Reply(id, driver::DragRegion(TheWindow()));
   } else if (cmd == "type") {
-    NSString* text = base::SysUTF8ToNSString(rest(2));
-    for (NSUInteger i = 0; i < text.length; i++) {
-      SendKey([text substringWithRange:NSMakeRange(i, 1)],
-              CodeForChar([text characterAtIndex:i]), 0);
+    for (char16_t c : base::UTF8ToUTF16(rest(2))) {
+      driver::SendKey(TheWindow(), {.character = std::u16string(1, c)});
     }
     Reply(id, "ok");
   } else if (cmd == "key") {
-    const std::string name = parts[2];
-    if (name == "enter") {
-      SendKey(@"\r", 36, 0);
-    } else if (name == "escape") {
-      SendKey(@"\x1b", 53, 0);
-    } else if (name == "tab") {
-      SendKey(@"\t", 48, 0);
-    } else if (name == "up") {
-      unichar c = NSUpArrowFunctionKey;
-      SendKey([NSString stringWithCharacters:&c length:1], 126,
-              NSEventModifierFlagFunction | NSEventModifierFlagNumericPad);
-    } else if (name == "down") {
-      unichar c = NSDownArrowFunctionKey;
-      SendKey([NSString stringWithCharacters:&c length:1], 125,
-              NSEventModifierFlagFunction | NSEventModifierFlagNumericPad);
-    } else {
-      // cmd+<char>, ctrl+tab, ctrl+shift+tab.
-      NSEventModifierFlags flags = 0;
-      std::string key = name;
-      for (size_t plus = key.find('+'); plus != std::string::npos;
-           plus = key.find('+')) {
-        const std::string mod = key.substr(0, plus);
-        key = key.substr(plus + 1);
-        if (mod == "cmd") {
-          flags |= NSEventModifierFlagCommand;
-        } else if (mod == "ctrl") {
-          flags |= NSEventModifierFlagControl;
-        } else if (mod == "shift") {
-          flags |= NSEventModifierFlagShift;
-        } else if (mod == "opt") {
-          flags |= NSEventModifierFlagOption;
-        }
-      }
-      if (key == "tab") {
-        SendKey(@"\t", 48, flags);
-      } else if (key.size() == 1) {
-        SendKey(base::SysUTF8ToNSString(key), CodeForChar(key[0]), flags);
-      }
+    // enter, escape, tab, up, down, or modifiers and a key: cmd+<char>, ctrl+tab,
+    // ctrl+shift+tab.
+    driver::Key key;
+    std::string name = parts[2];
+    for (size_t plus = name.find('+'); plus != std::string::npos; plus = name.find('+')) {
+      const std::string mod = name.substr(0, plus);
+      name = name.substr(plus + 1);
+      key.cmd |= mod == "cmd";
+      key.ctrl |= mod == "ctrl";
+      key.shift |= mod == "shift";
+      key.opt |= mod == "opt";
+    }
+    if (name == "enter" || name == "escape" || name == "tab" || name == "up" ||
+        name == "down") {
+      key.name = name;
+      driver::SendKey(TheWindow(), key);
+    } else if (name.size() == 1) {
+      key.character = base::UTF8ToUTF16(name);
+      driver::SendKey(TheWindow(), key);
     }
     Reply(id, "ok");
   } else if (cmd == "resize") {
-    [TheWindow() setContentSize:NSMakeSize(number(2), number(3))];
+    driver::ResizeContent(TheWindow(), number(2), number(3));
     Reply(id, "ok");
   } else if (cmd == "state") {
-    // What the native window is now, as AppKit says.
-    NSWindow* window = TheWindow();
+    // What the native window is now, as the OS says.
+    Window* window = TheWindow();
     Reply(id, base::StringPrintf(
                   "{\"fullScreen\":%s,\"zoomed\":%s,\"miniaturized\":%s}",
-                  (window.styleMask & NSWindowStyleMaskFullScreen) ? "true" : "false",
-                  window.zoomed ? "true" : "false",
-                  window.miniaturized ? "true" : "false"));
+                  window->IsFullscreen() ? "true" : "false",
+                  window->IsMaximized() ? "true" : "false",
+                  window->IsMinimized() ? "true" : "false"));
   } else if (cmd == "fullscreen") {
-    [TheWindow() toggleFullScreen:nil];
+    TheWindow()->ToggleFullScreen();
     Reply(id, "ok");
   } else if (cmd == "eval") {
     Eval(id, Current()->shell->contents(), rest(2));
@@ -586,20 +382,17 @@ void Run(const std::string& line) {
     // The tabs the window shows: each one's id, where its view is in shell
     // coordinates, and whether content was told it is visible.
     base::ListValue out;
-    const CGFloat height = TheWindow().contentView.bounds.size.height;
     for (const Engine::VisibleTab& v : Current()->visible) {
       content::WebContents* contents = Engine::Get()->tab(v.tab)->contents();
-      NSView* view = contents->GetNativeView().GetNativeNSView();
-      const NSRect f = [view.superview convertRect:view.frame
-                                            toView:TheWindow().contentView];
+      const gfx::RectF f = driver::ViewFrame(TheWindow(), contents->GetNativeView());
       out.Append(base::DictValue()
                      .Set("tab", static_cast<int>(v.tab))
                      .Set("frame", base::ListValue()
-                                       .Append(f.origin.x)
-                                       .Append(height - NSMaxY(f))
-                                       .Append(f.size.width)
-                                       .Append(f.size.height))
-                     .Set("hidden", static_cast<bool>(view.hidden))
+                                       .Append(f.x())
+                                       .Append(f.y())
+                                       .Append(f.width())
+                                       .Append(f.height()))
+                     .Set("hidden", driver::ViewHidden(contents->GetNativeView()))
                      .Set("shown", contents->GetVisibility() ==
                                        content::Visibility::VISIBLE));
     }
@@ -642,37 +435,19 @@ void Run(const std::string& line) {
     Reply(id, "ok");
   } else if (cmd == "mods") {
     // What the app reports when the modifiers change; "mods 0" lets go of them all.
-    ReportModifiers(static_cast<uint64_t>(number(2)));
+    driver::SendModifiers(static_cast<uint64_t>(number(2)));
     Reply(id, "ok");
   } else if (cmd == "menu") {
-    Reply(id, MenuJson(NSApp.mainMenu));
+    Reply(id, driver::MenuJson());
   } else if (cmd == "choosemenu") {
     // "choosemenu <menu> <item>": chooses the item, as a click on it does, each menu read
     // as it opens. An item in a submenu is "<submenu> > <item>".
-    NSMenu* menu = [NSApp.mainMenu itemWithTitle:base::SysUTF8ToNSString(parts[2])].submenu;
-    NSMenuItem* item = nil;
-    for (const std::string& title : base::SplitStringUsingSubstr(
-             rest(3), " > ", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
-      [menu.delegate menuNeedsUpdate:menu];
-      item = [menu itemWithTitle:base::SysUTF8ToNSString(title)];
-      menu = item.submenu;
-    }
-    [NSApp sendAction:item.action to:item.target from:item];
-    Reply(id, item ? "ok" : "no such item");
+    Reply(id, driver::ChooseMenu(parts[2], rest(3)) ? "ok" : "no such item");
   } else if (cmd == "dockdot") {
     // The colour at the middle of the Dock icon's dot, or of where it goes: a tenth in from
     // the right and the bottom, and half the dot's quarter across. The bitmap counts y
     // down from the top. Its pixels are sRGB already, so they are read as they are.
-    NSRect rect = NSMakeRect(0, 0, 200, 200);
-    NSBitmapImageRep* rep = [[NSBitmapImageRep alloc]
-        initWithCGImage:[NSApp.applicationIconImage CGImageForProposedRect:&rect
-                                                                   context:nil
-                                                                     hints:nil]];
-    NSColor* c = [rep colorAtX:rep.pixelsWide * 155 / 200
-                             y:rep.pixelsHigh * 155 / 200];
-    Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
-                                 int(c.greenComponent * 255 + 0.5),
-                                 int(c.blueComponent * 255 + 0.5)));
+    Reply(id, driver::DockDot());
   } else if (cmd == "capture") {
     Capture(id, parts[2]);
   } else if (cmd == "stats") {
@@ -695,50 +470,21 @@ void Run(const std::string& line) {
     hooks::Ask(PB_EVENT_DEVTOOLS_COMMAND, args, &result);
     Reply(id, hooks::TakeString(result));
   } else if (cmd == "color") {
-    NSColor* c = [TheWindow().backgroundColor
-        colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
-    Reply(id, base::StringPrintf("#%02x%02x%02x", int(c.redComponent * 255 + 0.5),
-                                 int(c.greenComponent * 255 + 0.5),
-                                 int(c.blueComponent * 255 + 0.5)));
+    Reply(id, base::StringPrintf("#%06x", driver::BackgroundColor(TheWindow())));
   } else if (cmd == "showncolor") {
     // What the window painted when it first went on screen.
     Reply(id, base::StringPrintf("#%06x", Current()->window->shown_rgb()));
   } else if (cmd == "frame") {
     // The band the window's content view draws over everything, and its curve.
-    CALayer* layer = TheWindow().contentView.layer;
-    NSColor* c = [[NSColor colorWithCGColor:layer.borderColor]
-        colorUsingColorSpace:NSColorSpace.sRGBColorSpace];
-    Reply(id, base::StringPrintf("{\"radius\":%g,\"width\":%g,\"color\":\"#%02x%02x%02x\"}",
-                                 layer.cornerRadius, layer.borderWidth,
-                                 int(c.redComponent * 255 + 0.5),
-                                 int(c.greenComponent * 255 + 0.5),
-                                 int(c.blueComponent * 255 + 0.5)));
+    Reply(id, driver::Frame(TheWindow()));
   } else if (cmd == "title") {
-    Reply(id, base::SysNSStringToUTF8(TheWindow().title));
+    Reply(id, driver::Title(TheWindow()));
   } else if (cmd == "bounds") {
-    gfx::RectF b = FocusedBounds();
-    // The focused page's frame in the window's content view, where the layout put it.
-    NSView* page_view = Focused()->contents()->GetNativeView().GetNativeNSView();
-    NSRect f = [page_view.superview convertRect:page_view.frame
-                                         toView:TheWindow().contentView];
-    NSSize c = TheWindow().contentView.bounds.size;
-    NSButton* close_button = [TheWindow() standardWindowButton:NSWindowCloseButton];
-    NSRect zoom = [TheWindow() standardWindowButton:NSWindowZoomButton].frame;
-    NSRect close_frame = close_button.frame;
-    const double from_top =
-        close_button.superview.bounds.size.height - NSMidY(close_frame);
-    Reply(id, base::StringPrintf(
-                  "{\"reported\":[%g,%g,%g,%g],\"frame\":[%g,%g,%g,%g],"
-                  "\"content\":[%g,%g],\"titlebar\":%g,\"buttonsStart\":%g,"
-                  "\"buttonsEnd\":%g,\"buttonsMiddleY\":%g,\"buttonSize\":%g}",
-                  b.x(), b.y(), b.width(), b.height(), f.origin.x, f.origin.y,
-                  f.size.width, f.size.height, c.width, c.height,
-                  c.height - TheWindow().contentLayoutRect.size.height,
-                  NSMinX(close_frame), NSMaxX(zoom), from_top,
-                  close_frame.size.width));
+    // The focused page's frame in the window, where the layout put it, and the window's
+    // buttons.
+    Reply(id, driver::Bounds(TheWindow(), FocusedBounds(), Focused()->contents()));
   } else if (cmd == "shellhidden") {
-    Current()->shell->contents()->GetNativeView().GetNativeNSView().hidden =
-        parts[2] == "1";
+    driver::SetViewHidden(Current()->shell->contents()->GetNativeView(), parts[2] == "1");
     Reply(id, "ok");
   } else if (cmd == "pids") {
     Reply(id, base::StringPrintf(
@@ -801,7 +547,7 @@ void Run(const std::string& line) {
     Reply(id, "ok");
   } else if (cmd == "close") {
     Reply(id, "ok");
-    [TheWindow() performClose:nil];
+    driver::PressClose(TheWindow());
   } else {
     Reply(id, "unknown");
   }
@@ -838,7 +584,7 @@ void FinishCapture(scoped_refptr<CaptureState> state) {
   SkCanvas canvas(out);
   canvas.clear(SK_ColorWHITE);
   const float scale =
-      state->shell.width() / std::max(1.0f, float(TheWindow().contentView.bounds.size.width));
+      state->shell.width() / std::max(1.0f, float(driver::ContentWidth(TheWindow())));
   if (!state->page.empty()) {
     canvas.drawImage(state->page.asImage(), state->bounds.x() * scale,
                      state->bounds.y() * scale);
@@ -916,80 +662,14 @@ void StartDriver(const base::FilePath& fifo) {
   // A driver that exits or dies without closing the app would leave it running, its
   // window on the screen, with nothing to drive it. So the app quits, as Cmd+Q does, once
   // the process that started it is gone.
-  static dispatch_source_t driver_process = nil;
-  const pid_t driver = getppid();
-  driver_process = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, driver,
-                                          DISPATCH_PROC_EXIT, dispatch_get_main_queue());
-  dispatch_source_set_event_handler(driver_process, ^{
-    fprintf(stderr, "driver: the process that started the app is gone; quitting\n");
-    if (Engine* engine = Engine::Get()) {
-      engine->Quit();
-    }
-  });
-  dispatch_resume(driver_process);
-  const std::string path = fifo.value();
-  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-    // Opened read-write so it doesn't see end-of-file between writers.
-    FILE* file = fopen(path.c_str(), "r+");
-    if (!file) {
-      fprintf(stderr, "driver: cannot open %s\n", path.c_str());
-      return;
-    }
-    char* buffer = nullptr;
-    size_t capacity = 0;
-    while (getline(&buffer, &capacity, file) >= 0) {
-      std::string line(buffer);
-      base::TrimString(line, "\r\n", &line);
-      dispatch_async(dispatch_get_main_queue(), ^{
-        Run(line);
-      });
-    }
-  });
+  driver::StartReading(fifo.value(), base::BindRepeating(&Run), base::BindOnce([] {
+                         fprintf(stderr,
+                                 "driver: the process that started the app is gone; quitting\n");
+                         if (Engine* engine = Engine::Get()) {
+                           engine->Quit();
+                         }
+                       }));
   Reply("start", "ready");
 }
-
-namespace {
-
-// A menu's items as it shows them when it opens: its lists read then, and nothing hidden.
-base::ListValue MenuItems(NSMenu* menu) {
-  if ([menu.delegate respondsToSelector:@selector(menuNeedsUpdate:)]) {
-    [menu.delegate menuNeedsUpdate:menu];
-  }
-  base::ListValue items;
-  for (NSMenuItem* item in menu.itemArray) {
-    if (item.hidden) {
-      continue;
-    }
-    if (item.separatorItem) {
-      items.Append("-");
-      continue;
-    }
-    std::string key;
-    NSEventModifierFlags m = item.keyEquivalentModifierMask;
-    if (item.keyEquivalent.length) {
-      key = std::string(m & NSEventModifierFlagControl ? "^" : "") +
-            (m & NSEventModifierFlagOption ? "~" : "") +
-            (m & NSEventModifierFlagShift ? "$" : "") +
-            (m & NSEventModifierFlagCommand ? "@" : "") +
-            base::SysNSStringToUTF8(item.keyEquivalent);
-    }
-    base::DictValue d;
-    d.Set("title", base::SysNSStringToUTF8(item.title));
-    d.Set("key", key);
-    d.Set("enabled", static_cast<bool>(item.enabled));
-    d.Set("checked", item.state == NSControlStateValueOn);
-    if (item.submenu) {
-      d.Set("items", MenuItems(item.submenu));
-    }
-    items.Append(std::move(d));
-  }
-  return items;
-}
-
-std::string MenuJson(NSMenu* menu) {
-  return base::WriteJson(MenuItems(menu)).value_or("[]");
-}
-
-}  // namespace
 
 }  // namespace project_b

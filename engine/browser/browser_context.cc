@@ -8,7 +8,7 @@
 #include "services/network/public/cpp/network_quality_tracker.h"
 #include "url/gurl.h"
 #include "project_b/engine/browser/downloads.h"
-#if BUILDFLAG(IS_MAC)
+#if !BUILDFLAG(IS_ANDROID)
 #include "project_b/engine/browser/notifications.h"
 #endif
 
@@ -58,7 +58,7 @@ storage::SpecialStoragePolicy* BrowserContext::GetSpecialStoragePolicy() {
 // (docs/daily-driver.md).
 content::PlatformNotificationService*
 BrowserContext::GetPlatformNotificationService() {
-#if BUILDFLAG(IS_MAC)
+#if !BUILDFLAG(IS_ANDROID)
   if (!notifications_ && !path_.empty()) {
     notifications_ = std::make_unique<Notifications>(this);
   }

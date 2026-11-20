@@ -8,13 +8,17 @@
 #include "base/files/file_path.h"
 #include "base/process/process.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "content/public/app/content_main.h"
 #include "project_b/engine/browser/browser_main_parts.h"
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser_main_delegate.h"
 #include "project_b/engine/common/main_delegate.h"
+
+#if BUILDFLAG(IS_MAC)
 #include "sandbox/mac/seatbelt_exec.h"
+#endif
 
 int ProjectBMain(const char** argv, const PBGoCalls* go) {
   // NULL-terminated, as C gives main its argv.
@@ -40,6 +44,7 @@ int ProjectBMain(const char** argv, const PBGoCalls* go) {
     return content::ContentMain(std::move(params));
   }
 
+#if BUILDFLAG(IS_MAC)
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   sandbox::SeatbeltExecServer::CreateFromArgumentsResult seatbelt =
       sandbox::SeatbeltExecServer::CreateFromArguments(
@@ -48,6 +53,7 @@ int ProjectBMain(const char** argv, const PBGoCalls* go) {
   if (seatbelt.sandbox_required) {
     CHECK(seatbelt.server->InitializeSandbox());
   }
+#endif
 
   project_b::MainDelegate delegate;
   content::ContentMainParams params(&delegate);

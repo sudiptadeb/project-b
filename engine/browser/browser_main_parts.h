@@ -60,6 +60,8 @@ class BrowserMainParts : public content::BrowserMainParts {
 
 #if BUILDFLAG(IS_MAC)
   std::unique_ptr<display::ScopedNativeScreen> screen_;
+#elif BUILDFLAG(IS_LINUX)
+  std::unique_ptr<display::Screen> screen_;
 #endif
 #if !BUILDFLAG(IS_ANDROID)
   // Our pages' context, made first, and the profile's.

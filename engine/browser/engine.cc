@@ -49,11 +49,13 @@
 #if BUILDFLAG(IS_ANDROID)
 #include "project_b/engine/android/passkeys_android.h"
 #else
-#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/notifications.h"
 #include "project_b/engine/browser/passkeys.h"
 #endif
 #include "project_b/engine/browser/shell_page.h"
+#if BUILDFLAG(IS_MAC)
+#include "project_b/engine/browser/mac_app.h"
+#endif
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
@@ -373,7 +375,7 @@ void CallSendToPage(int64_t tab, const char* json, size_t length) {
 
 void CallSetMenu(const char* json, size_t length) {
   CheckMainThread();
-#if !BUILDFLAG(IS_ANDROID)  // A phone has no menu bar.
+#if BUILDFLAG(IS_MAC)  // A phone has no menu bar; Linux's is the shell's strip (step 3).
   SetMainMenu(std::string(json, length));
 #endif
 }
@@ -384,7 +386,7 @@ void CallAppCommand(int32_t command) {
     g_engine->Quit();
     return;
   }
-#if !BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_MAC)
   RunAppCommand(command);
 #endif
 }

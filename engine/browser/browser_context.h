@@ -66,7 +66,7 @@ class BrowserContext : public content::BrowserContext {
   // the app for a browser that may not be secure.
   std::unique_ptr<network::NetworkQualityTracker> network_quality_tracker_;
   std::unique_ptr<client_hints::InMemoryClientHintsControllerDelegate> client_hints_;
-#if BUILDFLAG(IS_MAC)
+#if !BUILDFLAG(IS_ANDROID)
   // A profile's notifications, made when content first asks.
   std::unique_ptr<Notifications> notifications_;
 #endif

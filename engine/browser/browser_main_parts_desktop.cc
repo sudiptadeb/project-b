@@ -1,5 +1,8 @@
+// The desktop's startup, the Mac's and Linux's; Android's is android/browser_main_parts_android.cc.
+
 #include "project_b/engine/browser/browser_main_parts.h"
 
+#include "build/build_config.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
@@ -19,7 +22,6 @@
 #include "project_b/engine/browser/go.h"
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/hooks_gen.h"
-#include "project_b/engine/browser/mac_app.h"
 #include "project_b/engine/browser/page_tab.h"
 #include "project_b/engine/browser/shell_page.h"
 #include "project_b/engine/browser/timeline.h"
@@ -28,6 +30,13 @@
 
 #if BUILDFLAG(PB_EXTENSIONS)
 #include "project_b/engine/extensions/browser/extensions.h"
+#endif
+
+#if BUILDFLAG(IS_MAC)
+#include "project_b/engine/browser/mac_app.h"
+#endif
+#if BUILDFLAG(IS_LINUX)
+#include "ui/aura/screen_ozone.h"
 #endif
 
 namespace project_b {
@@ -70,7 +79,12 @@ int BrowserMainParts::PreMainMessageLoopRun() {
       base::CommandLine::ForCurrentProcess();
   timeline::Mark("content.ready");
 
+#if BUILDFLAG(IS_MAC)
   screen_ = std::make_unique<display::ScopedNativeScreen>();
+#else
+  // The displays, as Ozone reports them, once content has started Ozone.
+  screen_ = std::make_unique<aura::ScreenOzone>();
+#endif
   // Our pages' context comes first, and only it can load them. The profile's comes when
   // Go opens the profile: at once, or once the picker has chosen it.
   pages_context_ = std::make_unique<BrowserContext>();
@@ -89,7 +103,9 @@ int BrowserMainParts::PreMainMessageLoopRun() {
   Go().start(Engine::Calls(),
              command_line->GetSwitchValueASCII("block").c_str(),
              command_line->HasSwitch("skip-welcome"));
+#if BUILDFLAG(IS_MAC)
   WatchOSKeyBindings();
+#endif
   child_processes_ = std::make_unique<ChildProcesses>();
   StartRemoteDebugging();
 

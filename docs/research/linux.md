@@ -16,6 +16,11 @@ agreed.
 - **Only arm64 for now; amd64 builds and tests come later** (2026-11-20: "we can run amd64
   tests later... for now lets only focus on arm64 builds"). Nothing amd64 happens before
   step 7 of the order of work.
+- **Linux releases only when he asks, and no Dev channel** (2026-11-20: "linux we can only
+  build releases that too only when asked.."). One Flatpak branch, stable; the shell shows no
+  channel switch on Linux. A Linux release isn't part of every release run: release runs one
+  when he asks for it. Our own dev and test builds on the branch carry on in the tester's
+  slots.
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"). No tarball, no `.deb`.
 - **The app id is `io.github.sudiptadeb.project-b`** (2026-11-19: "yea lets go with this").
   Flathub reads it as github.com/sudiptadeb/project-b, which makes its GitHub check possible;
@@ -263,8 +268,9 @@ After the layers work lands, each step leaves the Mac and Android green:
 4. **`core/system` on Linux**, and the import permissions.
 5. **The Flatpak and our repository**, updates through the portal. Done when, among the rest,
    no profile keeps its key in a file: step 4's Secret portal holds it.
-6. **The four deskrig VMs** (they and deskrig's Linux target are ready), then the release run
-   gains Linux.
+6. **The four deskrig VMs** (they and deskrig's Linux target are ready), then a Linux release
+   run, which release runs only when he asks: the build, the four deskrig VMs, and the Flatpak
+   into our repository.
 7. **amd64**, the first amd64 work: built in `pb`, tested headless there and through
    Rosetta in the VMs. Steps 1 to 6 are arm64 only.
 
@@ -507,10 +513,7 @@ Pictures come from Tart's VNC server (`vm.sh vnc capture`), so no window opens o
    from the sandbox; the choice needs our engine, since content_shell has no dialog.
 2. **The GPU process's sandbox under zypak**: no Chromium seccomp in the spike's VM, on
    software GL. Check on real hardware whether Chrome's Flatpak is the same.
-3. **Dev and Stable on Linux**, for Sudipta. The proposal: two branches of the app,
-   `//stable` and `//dev`, in the same repository; switching opens the other branch's
-   `.flatpakref`.
-4. **Release notes**, for Sudipta: whether the shell reads them from `releases.json`, as on
+3. **Release notes**, for Sudipta: whether the shell reads them from `releases.json`, as on
    the Mac, with no `min_version` on Linux.
 
 ## Sources

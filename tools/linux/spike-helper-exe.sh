@@ -13,7 +13,7 @@ colima start -p pb-android --activate=false >/dev/null 2>&1
 "$here/renice-vm.sh" colima-pb-android/
 docker start pb >/dev/null
 docker cp "$here/spike-helper-exe.patch" pb:/work/linux-stage/spike-helper-exe.patch
-docker exec pb flock /work/.vm-in-use.lock bash -c '
+docker exec pb flock -s /work/.vm-in-use.lock flock /work/.android-build.lock bash -c '
 cd /work/chromium/src && export PATH=/work/depot_tools:$PATH GODEBUG=asyncpreemptoff=1 DEPOT_TOOLS_UPDATE=0
 p=/work/linux-stage/spike-helper-exe.patch
 git apply -R --check "$p" 2>/dev/null && { git apply -R "$p" && echo "=== took back a patch left applied"; }

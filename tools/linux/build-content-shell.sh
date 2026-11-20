@@ -2,8 +2,8 @@
 # Builds stock content_shell for Linux in container pb: tools/linux/build-content-shell.sh [arm64|x64]
 # Writes out/linux-<cpu> only. Installs the sysroot and runs gn gen the first time.
 # Starts the colima VM itself and renices its host process (renice-vm.sh), since nice inside the
-# guest doesn't lower the VM on macOS. Holds /work/.vm-in-use.lock while building, so the APK
-# script doesn't stop the VM under it. If the VM is stopped anyway, it starts it again and
+# guest doesn't lower the VM on macOS. Holds /work/.vm-in-use.lock shared while building, so no
+# build's end stops the VM under it, and takes its turn on the container's build lock. If the VM is stopped anyway, it starts it again and
 # resumes (ninja keeps its progress), up to 6 times. Chromium's x64 clang under Rosetta now and
 # then dies from a signal (siso reports exit=-1, after a few seconds of a step); that is retried
 # too, with -k 0 so the rest of the build goes on first. A real compile error ends it.
@@ -32,7 +32,9 @@ for try in 1 2 3 4 5 6; do
   colima start -p pb-android --activate=false >/dev/null 2>&1
   "$here/renice-vm.sh" colima-pb-android/
   docker start pb >/dev/null
-  docker exec pb flock /work/.vm-in-use.lock bash -c "$inner"
+  # The VM is in use (the lock shared, as every build holds it), and builds take turns on the
+  # container's build lock (docs/android.md).
+  docker exec pb flock -s /work/.vm-in-use.lock flock /work/.android-build.lock bash -c "$inner"
   rc=$?
   echo "=== try $try end $(date '+%F %T') exit=$rc"
   [ $rc -eq 0 ] && break

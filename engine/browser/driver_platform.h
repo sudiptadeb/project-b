@@ -50,6 +50,8 @@ std::string Press(Window* window, double x, double y);
 std::string DragRegion(Window* window);
 // Presses and lets go of the key, at the window's focused view.
 void SendKey(Window* window, const Key& key);
+// Which view of the window the OS sends keys to: shell, page, popup, or what it is.
+std::string Focused(Window* window);
 
 // The window's own parts, as the OS has them.
 std::string Title(Window* window);

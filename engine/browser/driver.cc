@@ -334,6 +334,9 @@ void Run(const std::string& line) {
       driver::SendKey(TheWindow(), key);
     }
     Reply(id, "ok");
+  } else if (cmd == "focused") {
+    // Which view the OS sends keys to now.
+    Reply(id, driver::Focused(TheWindow()));
   } else if (cmd == "resize") {
     driver::ResizeContent(TheWindow(), number(2), number(3));
     Reply(id, "ok");

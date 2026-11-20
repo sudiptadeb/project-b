@@ -351,6 +351,14 @@ void SendKey(Window* w, const Key& key) {
   }
 }
 
+std::string Focused(Window* w) {
+  NSResponder* responder = NativeOf(w).firstResponder;
+  if ([responder isKindOfClass:[NSView class]]) {
+    return Classify(w, static_cast<NSView*>(responder));
+  }
+  return responder ? std::string("native:") + responder.className.UTF8String : "nil";
+}
+
 std::string Title(Window* window) {
   return base::SysNSStringToUTF8(NativeOf(window).title);
 }

@@ -38,9 +38,11 @@
 #include "project_b/engine/browser/window.h"
 #include "project_b/engine/buildflags/buildflags.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/aura/client/focus_client.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_targeter.h"
 #include "ui/aura/window_tree_host.h"
+#include "ui/base/ime/input_method.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_solid_color.h"
 #include "ui/events/event.h"
@@ -288,6 +290,16 @@ void SendKey(Window* window, const Key& key) {
   Dispatch(window, &down);
   ui::KeyEvent up(ui::EventType::kKeyReleased, key_code, code, flags, dom_key, now);
   Dispatch(window, &up);
+}
+
+std::string Focused(Window* window) {
+  aura::client::FocusClient* focus = aura::client::GetFocusClient(RootOf(window));
+  aura::Window* focused = focus ? focus->GetFocusedWindow() : nullptr;
+  // Which view, by the name content or we gave it, and whether the input method has a text
+  // field to put characters in: a key with no client there gives none.
+  ui::InputMethod* ime = RootOf(window)->GetHost()->GetInputMethod();
+  return Classify(window, focused) + ":" + (focused ? focused->GetName() : "") +
+         (ime && ime->GetTextInputClient() ? " ime:client" : " ime:none");
 }
 
 std::string Title(Window* window) {

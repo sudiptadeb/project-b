@@ -307,9 +307,10 @@ namespace {
 
 // A holder: an Aura window of ours that draws nothing (or one colour) and holds others. Its
 // parent owns it.
-aura::Window* AddHolder(aura::Window* parent, ui::LayerType type) {
+aura::Window* AddHolder(aura::Window* parent, ui::LayerType type, const char* name) {
   aura::Window* window = new aura::Window(nullptr);
   window->Init(type);
+  window->SetName(name);
   window->Show();
   parent->AddChild(window);
   return window;
@@ -357,16 +358,16 @@ Window::Window(base::OnceClosure on_close,
   impl_->capture = std::make_unique<aura::client::DefaultCaptureClient>(root);
   impl_->parenting = std::make_unique<ParentingClient>(root);
 
-  impl_->background = AddHolder(root, ui::LAYER_SOLID_COLOR);
+  impl_->background = AddHolder(root, ui::LAYER_SOLID_COLOR, "background");
   impl_->background->SetEventTargetingPolicy(aura::EventTargetingPolicy::kNone);
-  impl_->pages = AddHolder(root, ui::LAYER_NOT_DRAWN);
+  impl_->pages = AddHolder(root, ui::LAYER_NOT_DRAWN, "pages");
   impl_->pages->SetEventTargeter(std::make_unique<Impl::Targeter>(impl_.get(), Area::kPage));
-  impl_->page_background = AddHolder(impl_->pages, ui::LAYER_SOLID_COLOR);
+  impl_->page_background = AddHolder(impl_->pages, ui::LAYER_SOLID_COLOR, "page background");
   impl_->page_background->SetEventTargetingPolicy(aura::EventTargetingPolicy::kNone);
   // Unseen until ShowPages. Transparent rather than hidden: content takes a page in a hidden
   // window as hidden, and it would only begin to draw once shown.
   impl_->pages->layer()->SetOpacity(0);
-  impl_->shell_holder = AddHolder(root, ui::LAYER_NOT_DRAWN);
+  impl_->shell_holder = AddHolder(root, ui::LAYER_NOT_DRAWN, "shell");
   impl_->shell_holder->SetEventTargeter(
       std::make_unique<Impl::Targeter>(impl_.get(), Area::kShell));
   impl_->Relayout(gfx::Size());

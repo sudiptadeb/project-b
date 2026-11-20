@@ -6,6 +6,7 @@
 # results come back out to build/real-linux/.
 #   tools/linux/headless.sh [driver parts...]     e.g. tools/linux/headless.sh driver browsing
 # Each part runs as its own drive_first_app.py, one after another; none named runs them all.
+#   tools/linux/headless.sh --script tools/linux/check_one_binary.py   runs that script instead
 # A container gives no user namespaces, so the app runs with --no-sandbox; the sandbox is the
 # Flatpak's, tested in the VMs. It holds /work/.android-build.lock while it runs, so a build
 # doesn't replace the app under it. Ask the tester for a slot first.
@@ -57,6 +58,7 @@ git -C "$root" archive HEAD | docker run -i --platform linux/arm64 --name pb-lin
   -v pb-work:/work:ro \
   -e PB_BIN=/work/chromium/src/out/linux-$CPU/project_b -e PB_ARGS=--no-sandbox \
   "$IMAGE" sh -c 'mkdir -p /repo && tar -x -C /repo && cd /repo || exit 2
+    [ "${1:-}" = --script ] && exec python3 "$2"
     [ $# -gt 0 ] || exec python3 tools/drive_first_app.py
     rc=0
     for part in "$@"; do python3 tools/drive_first_app.py "$part" || rc=1; done

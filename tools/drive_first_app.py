@@ -1079,7 +1079,10 @@ def browsing_checks():
     check("a suggestion has the real page's title", app.js("[...document.querySelectorAll('[role=option]')].some(o => o.innerText.includes('Example'))"))
     x, y, w, h = box(app)
     check("the box belongs to the shell", app.cmd("hit", x + 30, y + h - 6) == "shell")
-    check("below the box belongs to the page", app.cmd("hit", x + 30, y + h + 40) == "page")
+    # Below the box over the page: where the box starts depends on the window buttons, at the
+    # left on the Mac and the right on Linux, so the point is inside the page's span too.
+    page_x = json.loads(app.cmd("bounds"))["reported"][0]
+    check("below the box belongs to the page", app.cmd("hit", max(x, page_x) + 30, y + h + 40) == "page")
 
     # Bar and list behave as one UI.
     app.cmd("key", "down")

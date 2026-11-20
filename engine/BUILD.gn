@@ -27,17 +27,23 @@ declare_args() {
   }
 }
 
-# The Go core as a static archive. Only the main binary links it, so child processes
-# never start a Go runtime. It holds the shell's pages (core/shellfiles), so it comes after
-# them, and a change to the shell rebuilds it. Linux's pages are built on the Mac first
+# The Go core: on the Mac a static archive only the main binary links, so child processes
+# never start a Go runtime; on Linux libcore.so beside the binary, which only the browser
+# process loads. It holds the shell's pages (core/shellfiles), so it comes after them, and a
+# change to the shell rebuilds it. Linux's pages are built on the Mac first
 # (tools/build.sh linux), as Android's are, so there it waits on no action.
+if (is_mac) {
+  _core = "$target_gen_dir/libcore.a"
+} else {
+  _core = "$root_out_dir/libcore.so"
+}
 action("core") {
   script = "build_go.py"
-  outputs = [ "$target_gen_dir/libcore.a" ]
+  outputs = [ _core ]
   depfile = "$target_gen_dir/core.d"
   args = [
     project_b_go,
-    rebase_path("$target_gen_dir/libcore.a", root_build_dir),
+    rebase_path(_core, root_build_dir),
     rebase_path(depfile, root_build_dir),
     target_os,
     target_cpu,
@@ -76,16 +82,17 @@ if (is_mac) {
   }
 }
 
-source_set("core_lib") {
-  public_deps = [ ":core" ]
-  libs = [ "$target_gen_dir/libcore.a" ]
-
-  # What the archive's cgo needs, which a c-archive leaves to the binary that links it.
-  if (is_mac) {
+if (is_mac) {
+  source_set("core_lib") {
+    public_deps = [ ":core" ]
+    # What the archive's cgo needs, which a c-archive leaves to the binary that links it:
     # browserdata reads other browsers' databases with macOS's own SQLite, and core/system
     # asks AppKit for the Dock, Finder and the default browser, and the notification centre
     # for a page's notifications.
-    libs += [ "sqlite3" ]
+    libs = [
+      "$target_gen_dir/libcore.a",
+      "sqlite3",
+    ]
     frameworks = [
       "AppKit.framework",
       "CoreFoundation.framework",
@@ -93,9 +100,6 @@ source_set("core_lib") {
       "Security.framework",
       "UserNotifications.framework",
     ]
-  } else {
-    # Go's resolver through the C library.
-    libs += [ "resolv" ]
   }
 }
 
@@ -487,78 +491,104 @@ repack("pak") {
 # The app is three pieces (docs/layers.md): the wrapper, project_b, which starts the other
 # two; the Go core, :core; and the engine, project_b_content.
 group("engine") {
-  deps = [
-    ":project_b",
-    ":project_b_helper",
-  ]
+  deps = [ ":project_b" ]
+  if (is_mac) {
+    deps += [ ":project_b_helper" ]
+  }
 }
 
-# The engine: content and the C++ adapter. Both binaries link this at load time and call its one
-# export, ProjectBMain. Everything else in it stays hidden.
-shared_library("project_b_content") {
-  sources = [
-    "abi/pb_main.h",
-    "project_b_main.cc",
-  ]
-  deps = [
-    ":browser",
-    ":common",
-    ":pak",
-    "//base",
-    "//content/public/app",
-    "//content/public/common",
-  ]
-  data_deps = [ "//tools/v8_context_snapshot" ]
-  if (is_mac) {
-    deps += [ "//sandbox/mac:seatbelt" ]
+if (is_mac) {
+  # The engine: content and the C++ adapter. Both binaries link this at load time and call
+  # its one export, ProjectBMain. Everything else in it stays hidden.
+  shared_library("project_b_content") {
+    sources = [
+      "abi/pb_main.h",
+      "project_b_main.cc",
+    ]
+    deps = [
+      ":browser",
+      ":common",
+      ":pak",
+      "//base",
+      "//content/public/app",
+      "//content/public/common",
+      "//sandbox/mac:seatbelt",
+    ]
+    data_deps = [ "//tools/v8_context_snapshot" ]
     ldflags = [
       "-Wl,-exported_symbol,_ProjectBMain",
       "-Wl,-install_name,@rpath/libproject_b_content.dylib",
     ]
   }
-}
 
-# Where the binaries find the library: Contents/Frameworks in the app, or beside them in
-# the build folder; on Linux, always beside them.
-config("finds_content_library") {
-  if (is_mac) {
+  # Where the binaries find the library: Contents/Frameworks in the app, or beside them in
+  # the build folder.
+  config("finds_content_library") {
     ldflags = [
       "-Wl,-rpath,@executable_path/../Frameworks",
       "-Wl,-rpath,@executable_path",
     ]
-  } else {
-    ldflags = [ "-Wl,-rpath,\$ORIGIN" ]
   }
-}
 
-# The wrapper, the main process: it starts the Go core, then the engine.
-executable("project_b") {
-  sources = [
-    "abi/pb_exports.h",
-    "app/main.cc",
-  ]
-  configs += [ ":finds_content_library" ]
-  deps = [
-    ":core_lib",
-    ":project_b_content",
-  ]
-  data_deps = [ ":project_b_helper" ]
-}
+  # The wrapper, the main process: it starts the Go core, then the engine.
+  executable("project_b") {
+    sources = [
+      "abi/pb_exports.h",
+      "app/main.cc",
+    ]
+    configs += [ ":finds_content_library" ]
+    deps = [
+      ":core_lib",
+      ":project_b_content",
+    ]
+    data_deps = [ ":project_b_helper" ]
+  }
 
-# The helper, packed in an app of its own inside the app's Frameworks
-# (Project B Helper.app/Contents/MacOS), finds the library three folders up.
-config("helper_finds_content_library") {
-  if (is_mac) {
+  # The helper, packed in an app of its own inside the app's Frameworks
+  # (Project B Helper.app/Contents/MacOS), finds the library three folders up.
+  config("helper_finds_content_library") {
     ldflags = [ "-Wl,-rpath,@executable_path/../../.." ]
   }
-}
 
-# Child processes: the library, no Go.
-executable("project_b_helper") {
-  sources = [ "app/helper_main.cc" ]
-  configs += [
-    ":finds_content_library",
-    ":helper_finds_content_library",
-  ]
-  deps = [ ":project_b_content" ]
+  # Child processes: the library, no Go.
+  executable("project_b_helper") {
+    sources = [ "app/helper_main.cc" ]
+    configs += [
+      ":finds_content_library",
+      ":helper_finds_content_library",
+    ]
+    deps = [ ":project_b_content" ]
+  }
+} else {
+  # Linux: one binary, the wrapper with the engine linked in, as Blink and V8 can't go in a
+  # shared library outside a component build; and the Go core beside it, libcore.so, which
+  # only the browser process loads (app/main_linux.cc). A child, started with --type, never
+  # loads it, so no child maps Go (docs/research/linux.md, 3).
+  source_set("project_b_content") {
+    sources = [
+      "abi/pb_main.h",
+      "project_b_main.cc",
+    ]
+    deps = [
+      ":browser",
+      ":common",
+      ":pak",
+      "//base",
+      "//content/public/app",
+      "//content/public/common",
+    ]
+  }
+
+  executable("project_b") {
+    sources = [
+      "abi/pb_exports.h",
+      "app/main_linux.cc",
+    ]
+    deps = [ ":project_b_content" ]
+    data_deps = [
+      ":core",
+      "//tools/v8_context_snapshot",
+    ]
+    libs = [ "dl" ]
+  }
 }

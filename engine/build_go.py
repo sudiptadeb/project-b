@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds the Go core (core/) for the target GN builds, and writes a depfile: libcore.a, a
-c-archive the desktop's main binary links, or libcore.so for Android, built with Chromium's own
-clang and the NDK's sysroot, as Chromium's copy of the NDK has no compilers of its own.
+c-archive the Mac's main binary links, or libcore.so, which Linux's browser process loads
+(engine/app/main_linux.cc) and Android's library links, built with Chromium's own clang and
+the target's sysroot (the NDK's for Android, as Chromium's copy of it has no compilers).
 
     build_go.py <go> <out> <depfile> <target_os> <target_cpu> <the target's own arguments...>
 
@@ -81,6 +82,8 @@ def main():
             "CGO_CFLAGS": "-O2",
             "HOME": build_dir,
         })
+        mode = "c-shared"
+        ldflags += " -extldflags '-fuse-ld=lld -Wl,-soname,libcore.so'"
     else:
         clang, ndk, min_sdk, version = rest
         # The phone's part of shell/dist, which tools/build.sh android built: the APK

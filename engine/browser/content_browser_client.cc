@@ -77,6 +77,12 @@ void ContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
 // one whose Info.plist says LSUIElement, so no child process ever shows in the Dock, as a
 // capture service that touches the camera would otherwise.
 base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
+#if BUILDFLAG(IS_LINUX)
+  // Linux has one binary: a child is this one with --type, and never loads Go (app/main_linux.cc).
+  base::FilePath exe;
+  CHECK(base::PathService::Get(base::FILE_EXE, &exe));
+  return exe;
+#else
 #if BUILDFLAG(IS_MAC)
   if (base::apple::AmIBundled()) {
     return base::apple::OuterBundlePath()
@@ -87,6 +93,7 @@ base::FilePath ContentBrowserClient::GetChildProcessPath(int flags) {
   base::FilePath dir;
   CHECK(base::PathService::Get(base::DIR_EXE, &dir));
   return dir.Append(FILE_PATH_LITERAL("project_b_helper"));
+#endif
 }
 
 std::unique_ptr<content::DevToolsManagerDelegate>

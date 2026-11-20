@@ -137,6 +137,10 @@ func (m *Manager) Template() string { return m.keys.Template }
 // Platform is the keymap's name for this platform.
 func (m *Manager) Platform() string { return m.platform }
 
+// WriteFor makes the keys and menus another platform's (Mac, Windows or Linux) in place of
+// this one's, before anything is read: the mock's -platform, so tests see Linux's on a Mac.
+func (m *Manager) WriteFor(platform string) { m.platform = platform }
+
 // Register adds an action. Call it for every action before Load.
 func (m *Manager) Register(a Action) { m.actions[a.ID] = &a }
 

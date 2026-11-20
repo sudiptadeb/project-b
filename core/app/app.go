@@ -53,6 +53,9 @@ type Config struct {
 	// SkipWelcome is --skip-welcome: a start that would open the welcome notes it finished
 	// instead, as its Skip setup does, so a test starts past it.
 	SkipWelcome bool
+	// Platform is the platform the keys and the pages are written for, "mac", "windows" or
+	// "linux"; this one's when empty. The mock's -platform sets it for tests.
+	Platform string
 	// BrowserHome is the home folder whose browsers Import finds: the user's when "", a
 	// test's own folder of browsers in the mock.
 	BrowserHome string
@@ -253,6 +256,9 @@ func Start(e engine.Engine, cfg Config) *App {
 		a.quit()
 	}
 	a.Commands = commands.New(e, cfg.ProfileDir, func() bool { return a.Window.FullScreen(a.Tabs.Front()) })
+	if cfg.Platform != "" {
+		a.Commands.WriteFor(cfg.Platform)
+	}
 	a.Commands.RegisterList(a.profileList(cfg))
 	a.Commands.RegisterList(a.workspaceList())
 	a.Commands.RegisterList(a.shellList())

@@ -67,6 +67,7 @@ func main() {
 	keychain := flag.String("keychain", "", "the secret the login keychain gives for any browser's passwords, in place of the Mac's keychain")
 	keychainItems := flag.String("keychain-items", "", "with -keychain, the comma-separated names whose \"<name> Safe Storage\" items the keychain lists, none by default")
 	passwordStore := flag.Bool("password-store", false, "let an import bring passwords into the profile's saved logins: off unless asked, as the tests' made-up browsers have passwords, and bringing them without -keychain would ask the Mac's own keychain")
+	platform := flag.String("platform", "", "the platform the keys and the pages are written for, mac, windows or linux; this one's by default")
 	skipWelcome := flag.Bool("skip-welcome", false, "a start that would open the welcome notes it finished instead, as its Skip setup does")
 	// The updater runs for real against a manifest when given a version to be, the bundle
 	// it is "installed" as, and the manifest. Without a version it stays off, as it does
@@ -128,6 +129,7 @@ func main() {
 			Profile:       id,
 			BlockedHosts:  strings.Split(*block, ","),
 			SkipWelcome:   *skipWelcome,
+			Platform:      *platform,
 			BrowserHome:   *browserHome,
 			Keychain:      keychainOf(*keychain, *keychainItems),
 			KeychainItems: keychainItemsOf(*keychain, *keychainItems),

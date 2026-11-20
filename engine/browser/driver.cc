@@ -347,6 +347,8 @@ void Run(const std::string& line) {
                      .Append(static_cast<int>(r.area)));
     }
     Reply(id, base::WriteJson(out).value_or("[]"));
+  } else if (cmd == "tree") {
+    Reply(id, driver::Tree(TheWindow()));
   } else if (cmd == "focused") {
     // Which view the OS sends keys to now.
     Reply(id, driver::Focused(TheWindow()));

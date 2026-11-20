@@ -302,6 +302,37 @@ std::string Focused(Window* window) {
          (ime && ime->GetTextInputClient() ? " ime:client" : " ime:none");
 }
 
+namespace {
+
+base::DictValue TreeOf(aura::Window* w) {
+  base::DictValue d;
+  const gfx::Rect b = w->bounds();
+  d.Set("name", w->GetName());
+  d.Set("bounds", base::ListValue().Append(b.x()).Append(b.y()).Append(b.width()).Append(b.height()));
+  d.Set("visible", w->IsVisible());
+  d.Set("shown", w->TargetVisibility());
+  if (ui::Layer* layer = w->layer()) {
+    d.Set("layer", layer->name());
+    d.Set("type", static_cast<int>(layer->type()));
+    d.Set("opacity", layer->opacity());
+    d.Set("layerVisible", layer->visible());
+  }
+  base::ListValue children;
+  for (aura::Window* child : w->children()) {
+    children.Append(TreeOf(child));
+  }
+  if (!children.empty()) {
+    d.Set("children", std::move(children));
+  }
+  return d;
+}
+
+}  // namespace
+
+std::string Tree(Window* window) {
+  return base::WriteJson(TreeOf(RootOf(window))).value_or("{}");
+}
+
 std::string Title(Window* window) {
   return base::UTF16ToUTF8(RootOf(window)->GetTitle());
 }

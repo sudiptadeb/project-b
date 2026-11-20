@@ -183,6 +183,7 @@ struct Window::Impl {
       }
     }
     const gfx::Rect all(now);
+    content->SetBounds(all);
     background->SetBounds(all);
     pages->SetBounds(all);
     page_background->SetBounds(all);
@@ -271,6 +272,7 @@ struct Window::Impl {
   std::unique_ptr<aura::client::DefaultCaptureClient> capture;
   std::unique_ptr<ParentingClient> parenting;
   // The holders, owned by the tree: the window's colour, the pages and the shell.
+  raw_ptr<aura::Window> content = nullptr;
   raw_ptr<aura::Window> background = nullptr;
   raw_ptr<aura::Window> pages = nullptr;
   raw_ptr<aura::Window> page_background = nullptr;
@@ -358,16 +360,21 @@ Window::Window(base::OnceClosure on_close,
   impl_->capture = std::make_unique<aura::client::DefaultCaptureClient>(root);
   impl_->parenting = std::make_unique<ParentingClient>(root);
 
-  impl_->background = AddHolder(root, ui::LAYER_SOLID_COLOR, "background");
+  // One view under the root holds the rest in their order. Activating a window raises it
+  // among its siblings, so were the holders the root's own children, the pages would rise over
+  // the shell the moment a page took the keyboard; this way only the whole rises, over an
+  // extension's popup at most, which goes back on top as it's placed.
+  impl_->content = AddHolder(root, ui::LAYER_NOT_DRAWN, "content");
+  impl_->background = AddHolder(impl_->content, ui::LAYER_SOLID_COLOR, "background");
   impl_->background->SetEventTargetingPolicy(aura::EventTargetingPolicy::kNone);
-  impl_->pages = AddHolder(root, ui::LAYER_NOT_DRAWN, "pages");
+  impl_->pages = AddHolder(impl_->content, ui::LAYER_NOT_DRAWN, "pages");
   impl_->pages->SetEventTargeter(std::make_unique<Impl::Targeter>(impl_.get(), Area::kPage));
   impl_->page_background = AddHolder(impl_->pages, ui::LAYER_SOLID_COLOR, "page background");
   impl_->page_background->SetEventTargetingPolicy(aura::EventTargetingPolicy::kNone);
   // Unseen until ShowPages. Transparent rather than hidden: content takes a page in a hidden
   // window as hidden, and it would only begin to draw once shown.
   impl_->pages->layer()->SetOpacity(0);
-  impl_->shell_holder = AddHolder(root, ui::LAYER_NOT_DRAWN, "shell");
+  impl_->shell_holder = AddHolder(impl_->content, ui::LAYER_NOT_DRAWN, "shell");
   impl_->shell_holder->SetEventTargeter(
       std::make_unique<Impl::Targeter>(impl_.get(), Area::kShell));
   impl_->Relayout(gfx::Size());
@@ -655,7 +662,8 @@ void Window::ForceKeyForDriver(bool key) {
     // The keyboard goes back to the view of this window that last had it, else the shell's,
     // as a click on the window gives it.
     aura::Window* focused = impl_->focus->GetFocusedWindow();
-    const bool ours = focused == impl_->root() || focused == impl_->shell_holder ||
+    const bool ours = focused == impl_->root() || focused == impl_->content ||
+                      focused == impl_->shell_holder ||
                       focused == impl_->pages;
     aura::Window* to = focused && !ours && impl_->root()->Contains(focused)
                            ? focused
@@ -663,7 +671,7 @@ void Window::ForceKeyForDriver(bool key) {
     if (to) {
       impl_->focus->FocusWindow(to);
     } else {
-      impl_->focus->ActivateWindow(impl_->shell_holder);
+      impl_->focus->ActivateWindow(impl_->content);
     }
     impl_->on_key.Run();
   } else if (const aura::Window* active = impl_->focus->GetActiveWindow()) {

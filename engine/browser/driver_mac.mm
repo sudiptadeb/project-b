@@ -359,6 +359,10 @@ std::string Focused(Window* w) {
   return responder ? std::string("native:") + responder.className.UTF8String : "nil";
 }
 
+std::string Tree(Window* window) {
+  return "";
+}
+
 std::string Title(Window* window) {
   return base::SysNSStringToUTF8(NativeOf(window).title);
 }

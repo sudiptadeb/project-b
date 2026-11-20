@@ -52,6 +52,10 @@ std::string DragRegion(Window* window);
 void SendKey(Window* window, const Key& key);
 // Which view of the window the OS sends keys to: shell, page, popup, or what it is.
 std::string Focused(Window* window);
+// The window's views as the OS holds them, for finding why one doesn't show: each one's
+// name, place, whether it is shown, and its layer's opacity and kind. "" where the OS has no
+// such tree to give.
+std::string Tree(Window* window);
 
 // The window's own parts, as the OS has them.
 std::string Title(Window* window);

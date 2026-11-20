@@ -15,6 +15,12 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/no_destructor.h"
+#include "base/strings/string_split.h"
+#include "base/values.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -351,8 +357,10 @@ void SetViewHidden(gfx::NativeView view, bool hidden) {
 
 // The shell draws the window buttons on Linux, so the window has none of its own.
 std::string Bounds(Window* window, const gfx::RectF& b, content::WebContents* page) {
-  const gfx::RectF f = ViewFrame(window, page->GetNativeView());
+  // The frame as the Mac's driver gives it, y up from the bottom, which the tests read.
+  gfx::RectF f = ViewFrame(window, page->GetNativeView());
   const gfx::Size c = RootOf(window)->bounds().size();
+  f.set_y(c.height() - f.bottom());
   return base::StringPrintf(
       "{\"reported\":[%g,%g,%g,%g],\"frame\":[%g,%g,%g,%g],"
       "\"content\":[%d,%d],\"titlebar\":0,\"buttonsStart\":0,"
@@ -384,13 +392,128 @@ void SendModifiers(uint64_t flags) {
   hooks::Fire(PB_EVENT_MODS_CHANGED, args);
 }
 
-// No menu bar and no Dock on Linux.
-std::string MenuJson() {
-  return "[]";
+namespace {
+
+std::string& Menu() {
+  static base::NoDestructor<std::string> menu;
+  return *menu;
 }
 
+// The item titled title among items, or null.
+const base::DictValue* Titled(const base::ListValue* items, const std::string& title) {
+  if (!items) {
+    return nullptr;
+  }
+  for (const base::Value& item : *items) {
+    if (item.is_dict() && item.GetDict().FindString("title") &&
+        *item.GetDict().FindString("title") == title) {
+      return &item.GetDict();
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+void KeepMenu(const std::string& json) {
+  Menu() = json;
+}
+
+namespace {
+
+// A key as the Mac's menu writes it, which the tests read: "^~$@" for Ctrl, Option, Shift and
+// Cmd, then the key's character, from Go's {code, mods}.
+// A function key is its name, F1 to F24.
+std::string KeyText(const base::DictValue& key) {
+  const int mods = key.FindInt("mods").value_or(0);
+  const auto code = static_cast<ui::KeyboardCode>(key.FindInt("code").value_or(0));
+  std::string name;
+  if (code >= ui::VKEY_F1 && code <= ui::VKEY_F24) {
+    name = "F" + base::NumberToString(code - ui::VKEY_F1 + 1);
+  } else if (const char16_t c =
+                 ui::DomCodeToUsLayoutCharacter(ui::UsLayoutKeyboardCodeToDomCode(code), 0)) {
+    name = base::UTF16ToUTF8(std::u16string(1, c));
+  } else {
+    return "";
+  }
+  return std::string(mods & PB_MOD_CTRL ? "^" : "") + (mods & PB_MOD_ALT ? "~" : "") +
+         (mods & PB_MOD_SHIFT ? "$" : "") + (mods & PB_MOD_CMD ? "@" : "") + name;
+}
+
+// A menu's items as the Mac's driver reports them: each one's title, key, whether it is
+// enabled and checked, and its submenu's items; "-" for a separator; a list's items, asked
+// of Go as the menu opens, in its place.
+base::ListValue Items(const base::ListValue& from) {
+  base::ListValue items;
+  for (const base::Value& value : from) {
+    if (!value.is_dict()) {
+      continue;
+    }
+    const base::DictValue& item = value.GetDict();
+    if (item.FindBool("separator").value_or(false)) {
+      items.Append("-");
+      continue;
+    }
+    if (const std::string* list = item.FindString("list")) {
+      hooks::Args args;
+      args.Str(*list);
+      PBValue result;
+      if (hooks::Ask(PB_EVENT_MENU_LIST, args, &result)) {
+        std::optional<base::Value> listed = base::JSONReader::Read(hooks::TakeString(result), 0);
+        if (listed && listed->is_list()) {
+          for (base::Value& one : Items(listed->GetList())) {
+            items.Append(std::move(one));
+          }
+        }
+      }
+      continue;
+    }
+    const std::string* title = item.FindString("title");
+    const base::DictValue* key = item.FindDict("key");
+    base::DictValue d;
+    d.Set("title", title ? *title : "");
+    d.Set("key", key ? KeyText(*key) : "");
+    d.Set("enabled", item.FindBool("enabled").value_or(false));
+    d.Set("checked", item.FindBool("checked").value_or(false));
+    if (const base::ListValue* sub = item.FindList("items")) {
+      d.Set("items", Items(*sub));
+    }
+    items.Append(std::move(d));
+  }
+  return items;
+}
+
+}  // namespace
+
+// Go's menu, in the Mac's driver's terms; Linux has no menu bar of its own.
+std::string MenuJson() {
+  std::optional<base::Value> bar = base::JSONReader::Read(Menu(), 0);
+  if (!bar || !bar->is_list()) {
+    return "[]";
+  }
+  return base::WriteJson(Items(bar->GetList())).value_or("[]");
+}
+
+// Finds the item by its titles in Go's menu and tells Go it was chosen, as a click on the
+// Mac's menu bar does.
 bool ChooseMenu(const std::string& menu, const std::string& path) {
-  return false;
+  std::optional<base::Value> bar = base::JSONReader::Read(Menu(), 0);
+  if (!bar || !bar->is_list()) {
+    return false;
+  }
+  const base::DictValue* item = Titled(&bar->GetList(), menu);
+  for (const std::string& title :
+       base::SplitStringUsingSubstr(path, " > ", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+    item = item ? Titled(item->FindList("items"), title) : nullptr;
+  }
+  const std::string* action = item ? item->FindString("action") : nullptr;
+  if (!action || !item->FindBool("enabled").value_or(false)) {
+    return false;
+  }
+  hooks::Args args;
+  args.Str(*action);
+  hooks::Fire(PB_EVENT_MENU_CHOSEN, args);
+  return true;
 }
 
 std::string DockDot() {

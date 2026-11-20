@@ -56,6 +56,9 @@
 #if BUILDFLAG(IS_MAC)
 #include "project_b/engine/browser/mac_app.h"
 #endif
+#if BUILDFLAG(IS_LINUX)
+#include "project_b/engine/browser/driver_platform.h"
+#endif
 #include "project_b/engine/browser/timeline.h"
 #include "project_b/engine/browser/window.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
@@ -377,6 +380,8 @@ void CallSetMenu(const char* json, size_t length) {
   CheckMainThread();
 #if BUILDFLAG(IS_MAC)  // A phone has no menu bar; Linux's is the shell's strip (step 3).
   SetMainMenu(std::string(json, length));
+#elif BUILDFLAG(IS_LINUX)
+  driver::KeepMenu(std::string(json, length));
 #endif
 }
 

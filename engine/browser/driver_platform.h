@@ -6,6 +6,7 @@
 
 #include "base/functional/callback.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/native_ui_types.h"
 
@@ -82,6 +83,12 @@ void SendModifiers(uint64_t flags);
 std::string MenuJson();
 bool ChooseMenu(const std::string& menu, const std::string& path);
 std::string DockDot();
+
+#if BUILDFLAG(IS_LINUX)
+// Go's menu, as it sends it, which Linux draws no bar for: kept for ChooseMenu, which runs an
+// item as a click on it would (the shell's menu strip, in step 3, draws it).
+void KeepMenu(const std::string& json);
+#endif
 
 }  // namespace driver
 }  // namespace project_b

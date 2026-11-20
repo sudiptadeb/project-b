@@ -1280,10 +1280,17 @@ def browsing_checks():
     for i in range(30):
         app.cmd("resize", 1000 + i * 7, 650 + i * 5)
     final_frame = json.loads(app.cmd("bounds"))
+    # Where it ends, not how soon: headless Linux, drawing in software, catches up in about
+    # half a second where the Mac takes a frame or two.
+    right = lambda b: b["frame"] == [b["reported"][0], b["content"][1] - b["reported"][1] - b["reported"][3], b["reported"][2], b["reported"][3]] \
+        and b["reported"][0] == 224 and b["reported"][2] == b["content"][0] - 228
+    deadline = time.time() + 3
     time.sleep(0.3)
     settled = json.loads(app.cmd("bounds"))
-    r = settled["reported"]
-    check("a burst of resizes ends in the right place", settled["frame"] == [r[0], settled["content"][1] - r[1] - r[3], r[2], r[3]] and r[0] == 224 and r[2] == settled["content"][0] - 228, settled)
+    while not right(settled) and time.time() < deadline:
+        time.sleep(0.1)
+        settled = json.loads(app.cmd("bounds"))
+    check("a burst of resizes ends in the right place", right(settled), settled)
     print("stale bounds ignored", json.loads(app.cmd("stats", timeout=60))["ignoredStaleBounds"] - before, flush=True)
 
     # The window controls stay put through resizes, so the shell's space for them does too.

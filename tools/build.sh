@@ -25,9 +25,58 @@ SRC=$ROOT/chromium/src
 PLATFORM=${1:-mac}
 CPU=${2:-arm64}
 case "$PLATFORM $CPU" in
-  "mac arm64" | "android arm64") ;;
-  *) echo "RESULT=failed there is no $PLATFORM $CPU build yet: tools/build.sh [mac|android] [arm64]"; exit 1 ;;
+  "mac arm64" | "android arm64" | "linux arm64") ;;
+  *) echo "RESULT=failed there is no $PLATFORM $CPU build yet: tools/build.sh [mac|android|linux] [arm64]"; exit 1 ;;
 esac
+
+if [ "$PLATFORM" = linux ]; then
+  # The Linux app of this checkout, built in container pb like the APK
+  # (tools/linux/engine-build.sh), into its out/linux-<cpu>, which the headless run uses where
+  # it is (tools/linux/headless.sh). It takes the container's build lock, so it and an APK
+  # build take turns; it takes no lock of the Mac's APK build, whose wait gives up after two
+  # hours. Run it as an amarit job, in a slot from the tester (docs/research/linux.md).
+  set -e
+  if [ -z "${PB_LINUX_LOCKED:-}" ]; then
+    mkdir -p "$HOME/.cache"
+    exec env PB_LINUX_LOCKED=1 /usr/bin/lockf "$HOME/.cache/project-b-linux-build.lock" "$0" "$@"
+  fi
+  export PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH
+  export DOCKER_HOST=unix://$HOME/.colima/pb-android/docker.sock
+  cd "$ROOT"
+  # Linux carries every desktop shell, built here: the container has no Node.
+  echo "=== $(date '+%F %T') build the shell"
+  (cd shell && npm run build --silent)
+
+  echo "=== $(date '+%F %T') start the VM"
+  colima start -p pb-android --activate=false
+  if [ ! -S "$HOME/.colima/pb-android/docker.sock" ]; then
+    colima stop -p pb-android
+    colima start -p pb-android --activate=false
+  fi
+  # Nice inside the guest doesn't lower the VM on macOS: its host process, found by its disk.
+  tools/linux/renice-vm.sh colima-pb-android/ || true
+  # Held up from starting the container to this build's end, /work/.vm-in-use.lock shared, as
+  # the APK build does (its note below): another build ending meanwhile leaves the VM up.
+  hold=vm-hold-$$
+  trap 'docker exec pb sh -c "kill \$(cat /tmp/$hold) 2>/dev/null; rm -f /tmp/$hold"; docker exec pb flock -n /work/.android-build.lock true && docker exec pb flock -n /work/.vm-in-use.lock true && colima stop -p pb-android' EXIT
+  docker start pb >/dev/null
+  echo "=== $(date '+%F %T') hold the VM up (waits while a job holds /work/.vm-in-use.lock alone)"
+  docker exec -d pb flock -s /work/.vm-in-use.lock sh -c "echo \$\$ > /tmp/$hold; exec sleep 86400"
+  until docker exec pb test -s "/tmp/$hold"; do sleep 1; done
+
+  echo "=== $(date '+%F %T') copy the tree in"
+  docker exec pb sh -c 'rm -rf /work/linux-release && mkdir /work/linux-release'
+  { git ls-files -z core browserdata engine tools/linux/engine-build.sh VERSION; find shell/dist -type f -print0; } |
+    COPYFILE_DISABLE=1 tar -c --no-xattrs --no-mac-metadata --null -T - |
+    docker exec -i pb tar -x -C /work/linux-release
+
+  echo "=== $(date '+%F %T') build"
+  docker exec -e REPO=/work/linux-release -e CPU="$CPU" -e WITHOUT="${WITHOUT:-extensions}" pb \
+    bash /work/linux-release/tools/linux/engine-build.sh
+  git -C "$ROOT" rev-parse HEAD | docker exec -i pb sh -c "cat > /work/chromium/src/out/linux-$CPU/project_b.commit"
+  echo "RESULT=ok $(date '+%F %T')"
+  exit 0
+fi
 
 if [ "$PLATFORM" = android ]; then
   # The APK of this checkout: the files git tracks in the trees the APK takes, and the built

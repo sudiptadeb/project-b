@@ -1,7 +1,12 @@
-# The first app: one library holding content and the C++ adapter, and two thin binaries
-# that load it. See docs/first-app.md.
+# The desktop app, on the Mac and Linux: one library holding content and the C++ adapter, and
+# two thin binaries that load it. See docs/first-app.md. Android's is android/BUILD.gn.
 
-import("//build/config/mac/mac_sdk.gni")
+if (is_mac) {
+  import("//build/config/mac/mac_sdk.gni")
+}
+if (is_linux) {
+  import("//build/config/sysroot.gni")
+}
 import("//project_b/engine/flags.gni")
 import("//third_party/inspector_protocol/inspector_protocol.gni")
 import("//tools/grit/repack.gni")
@@ -10,30 +15,43 @@ if (project_b_extensions) {
   import("//tools/json_schema_compiler/json_schema_api.gni")
 }
 
-assert(is_mac, "The first app is Mac only so far")
+assert(is_mac || is_linux, "The desktop app is the Mac's and Linux's")
 
 declare_args() {
-  project_b_go = "/opt/homebrew/bin/go"
-  project_b_node = "/opt/homebrew/bin/node"
+  if (is_mac) {
+    project_b_go = "/opt/homebrew/bin/go"
+    project_b_node = "/opt/homebrew/bin/node"
+  } else {
+    # Container pb's Go, an x64 one that cross-builds (docs/research/linux.md).
+    project_b_go = "/usr/local/go/bin/go"
+  }
 }
 
 # The Go core as a static archive. Only the main binary links it, so child processes
 # never start a Go runtime. It holds the shell's pages (core/shellfiles), so it comes after
-# them, and a change to the shell rebuilds it.
+# them, and a change to the shell rebuilds it. Linux's pages are built on the Mac first
+# (tools/build.sh linux), as Android's are, so there it waits on no action.
 action("core") {
   script = "build_go.py"
   outputs = [ "$target_gen_dir/libcore.a" ]
   depfile = "$target_gen_dir/core.d"
-  inputs = [ "$root_out_dir/shell/.stamp" ]
-  deps = [ ":shell" ]
   args = [
     project_b_go,
     rebase_path("$target_gen_dir/libcore.a", root_build_dir),
     rebase_path(depfile, root_build_dir),
     target_os,
     target_cpu,
-    mac_deployment_target,
   ]
+  if (is_mac) {
+    inputs = [ "$root_out_dir/shell/.stamp" ]
+    deps = [ ":shell" ]
+    args += [ mac_deployment_target ]
+  } else {
+    args += [
+      rebase_path("//third_party/llvm-build/Release+Asserts/bin/clang", root_build_dir),
+      rebase_path(sysroot, root_build_dir),
+    ]
+  }
 
   # Each build flag the build has is a Go build tag of the same name.
   args += project_b_built
@@ -42,37 +60,43 @@ action("core") {
 # The shell's pages, one folder per app: shell/settings/, shell/picker/, and a folder per
 # shell in shell/shell/. build_go.py puts them inside Go (core/shellfiles), and the engine
 # serves each from there as chrome://<app>/, a shell as chrome://shell/<id>/.
-action("shell") {
-  script = "build_shell.py"
-  outputs = [ "$root_out_dir/shell/.stamp" ]
-  depfile = "$target_gen_dir/shell.d"
-  args = [
-    project_b_node,
-    rebase_path(outputs[0], root_build_dir),
-    rebase_path(depfile, root_build_dir),
-  ]
+if (is_mac) {
+  action("shell") {
+    script = "build_shell.py"
+    outputs = [ "$root_out_dir/shell/.stamp" ]
+    depfile = "$target_gen_dir/shell.d"
+    args = [
+      project_b_node,
+      rebase_path(outputs[0], root_build_dir),
+      rebase_path(depfile, root_build_dir),
+    ]
 
-  # The build flags left out, as WITHOUT for vite.
-  args += filter_exclude(string_split(project_b_without, ","), [ "" ])
+    # The build flags left out, as WITHOUT for vite.
+    args += filter_exclude(string_split(project_b_without, ","), [ "" ])
+  }
 }
 
 source_set("core_lib") {
   public_deps = [ ":core" ]
-  # What the archive's cgo needs, which a c-archive leaves to the binary that links it:
-  # browserdata reads other browsers' databases with macOS's own SQLite, and core/system
-  # asks AppKit for the Dock, Finder and the default browser, and the notification centre
-  # for a page's notifications.
-  libs = [
-    "$target_gen_dir/libcore.a",
-    "sqlite3",
-  ]
-  frameworks = [
-    "AppKit.framework",
-    "CoreFoundation.framework",
-    "LocalAuthentication.framework",
-    "Security.framework",
-    "UserNotifications.framework",
-  ]
+  libs = [ "$target_gen_dir/libcore.a" ]
+
+  # What the archive's cgo needs, which a c-archive leaves to the binary that links it.
+  if (is_mac) {
+    # browserdata reads other browsers' databases with macOS's own SQLite, and core/system
+    # asks AppKit for the Dock, Finder and the default browser, and the notification centre
+    # for a page's notifications.
+    libs += [ "sqlite3" ]
+    frameworks = [
+      "AppKit.framework",
+      "CoreFoundation.framework",
+      "LocalAuthentication.framework",
+      "Security.framework",
+      "UserNotifications.framework",
+    ]
+  } else {
+    # Go's resolver through the C library.
+    libs += [ "resolv" ]
+  }
 }
 
 # What every process needs from the adapter.
@@ -237,10 +261,8 @@ source_set("browser") {
     "browser/permissions.cc",
     "browser/printing.cc",
     "browser/printing.h",
-    "browser/printing_mac.mm",
     "browser/browser_context.h",
     "browser/browser_main_parts.h",
-    "browser/browser_main_parts.mm",
     "browser/child_processes.cc",
     "browser/child_processes.h",
     "browser/content_browser_client.cc",
@@ -255,7 +277,6 @@ source_set("browser") {
     "browser/downloads.h",
     "browser/downloads_desktop.cc",
     "browser/driver.h",
-    "browser/driver.mm",
     "browser/engine.cc",
     "browser/engine.h",
     "browser/events.cc",
@@ -268,8 +289,6 @@ source_set("browser") {
     "browser/hooks.h",
     "browser/hooks_gen.cc",
     "browser/hooks_gen.h",
-    "browser/mac_app.h",
-    "browser/mac_app.mm",
     "browser/page_tab.cc",
     "browser/page_tab.h",
     "browser/passkeys.cc",
@@ -283,10 +302,19 @@ source_set("browser") {
     "browser/timeline.cc",
     "browser/timeline.h",
     "browser/window.h",
-    "browser/window_mac.mm",
     "browser_main_delegate.cc",
     "browser_main_delegate.h",
   ]
+  if (is_mac) {
+    sources += [
+      "browser/browser_main_parts.mm",
+      "browser/driver.mm",
+      "browser/mac_app.h",
+      "browser/mac_app.mm",
+      "browser/printing_mac.mm",
+      "browser/window_mac.mm",
+    ]
+  }
   sources += get_target_outputs(":protocol_sources")
   deps = [
     "//ui/shell_dialogs",
@@ -331,12 +359,14 @@ source_set("browser") {
     "//ui/latency",
     "//url",
   ]
-  frameworks = [
-    "AppKit.framework",
-    "Cocoa.framework",
-    "PDFKit.framework",
-    "QuartzCore.framework",
-  ]
+  if (is_mac) {
+    frameworks = [
+      "AppKit.framework",
+      "Cocoa.framework",
+      "PDFKit.framework",
+      "QuartzCore.framework",
+    ]
+  }
 
   # The extension runtime: Chromium's //extensions, and our embedder for it.
   if (project_b_extensions) {
@@ -384,7 +414,9 @@ source_set("browser") {
       "//extensions/common/api",
       "//extensions/common:mojom",
     ]
-    frameworks += [ "UniformTypeIdentifiers.framework" ]
+    if (is_mac) {
+      frameworks += [ "UniformTypeIdentifiers.framework" ]
+    }
   }
   configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
@@ -453,22 +485,28 @@ shared_library("project_b_content") {
     "//base",
     "//content/public/app",
     "//content/public/common",
-    "//sandbox/mac:seatbelt",
   ]
   data_deps = [ "//tools/v8_context_snapshot" ]
-  ldflags = [
-    "-Wl,-exported_symbol,_ProjectBMain",
-    "-Wl,-install_name,@rpath/libproject_b_content.dylib",
-  ]
+  if (is_mac) {
+    deps += [ "//sandbox/mac:seatbelt" ]
+    ldflags = [
+      "-Wl,-exported_symbol,_ProjectBMain",
+      "-Wl,-install_name,@rpath/libproject_b_content.dylib",
+    ]
+  }
 }
 
 # Where the binaries find the library: Contents/Frameworks in the app, or beside them in
-# the build folder.
+# the build folder; on Linux, always beside them.
 config("finds_content_library") {
-  ldflags = [
-    "-Wl,-rpath,@executable_path/../Frameworks",
-    "-Wl,-rpath,@executable_path",
-  ]
+  if (is_mac) {
+    ldflags = [
+      "-Wl,-rpath,@executable_path/../Frameworks",
+      "-Wl,-rpath,@executable_path",
+    ]
+  } else {
+    ldflags = [ "-Wl,-rpath,\$ORIGIN" ]
+  }
 }
 
 # The wrapper, the main process: it starts the Go core, then the engine.
@@ -488,7 +526,9 @@ executable("project_b") {
 # The helper, packed in an app of its own inside the app's Frameworks
 # (Project B Helper.app/Contents/MacOS), finds the library three folders up.
 config("helper_finds_content_library") {
-  ldflags = [ "-Wl,-rpath,@executable_path/../../.." ]
+  if (is_mac) {
+    ldflags = [ "-Wl,-rpath,@executable_path/../../.." ]
+  }
 }
 
 # Child processes: the library, no Go.

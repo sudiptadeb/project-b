@@ -395,6 +395,24 @@ and Android's still green.
 |---|---|
 | ![](linux-step3/wayland-shell-and-page.png) | ![](linux-step3/x11-os-title-bar.png) |
 
+### Step 3, the plan
+
+The window on a real desktop: GNOME Wayland (`deskrig-ub`), GNOME on Xorg (`deskrig-ubx`),
+Debian 13 GNOME (`deskrig-deb`), and KDE Plasma on Arch Linux ARM (`deskrig-kde`).
+
+- **Done in the code, to check on each desktop:** the window's holders under one view of their
+  own, so activation never lifts the pages over the shell; no frame of the OS's
+  (`SetUseNativeFrame(false)`: client-side decorations on Wayland, none from the window manager
+  on X11); a drag area moves the window through the compositor, a 6 px border resizes it, a
+  double-click maximises or restores, and a right-click opens the desktop's window menu.
+- **Checks:** headless, the window's views stay in order once a page has the keyboard
+  (`drive_first_app.py`, Linux). On a desktop, `tools/linux/check_real_window.py` installs the
+  Flatpak bundle through deskrig, runs `real_window_guest.py` in the session, and compares a
+  deskrig shot of the window with the driver's composed view: blank, or different past a limit,
+  fails.
+- **Then:** the top row's look and the buttons at the right, and the menu strip, to ux's mocks
+  and the design system, reviewed by ux; shots from all four desktops to platforms.
+
 ## Spike (2026-11-20)
 
 Step 1 of 7: stock content_shell for Linux arm64, none of our code, as a Flatpak through

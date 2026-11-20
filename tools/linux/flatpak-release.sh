@@ -15,7 +15,7 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 app=io.github.sudiptadeb.project-b
-url=${PB_FLATPAK_URL:-https://sudiptadeb.github.io/project-b}
+url=${PB_FLATPAK_URL:-https://projectb.debkosh.com}
 key=${KEYKOSH_ROOT:-$HOME/mykeykosh}/project-b/flatpak-repo-signing.asc
 out=$root/build/linux
 stage=$out/stage-arm64.tar.gz

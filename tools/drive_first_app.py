@@ -327,8 +327,24 @@ class App:
         threading.Thread(target=self._read, daemon=True).start()
         self.wait_reply("start", 60)
         self.writer = open(self.fifo, "w", buffering=1)
-        # The app prints app.ready once the shell shows Go's state: tests start there.
+        # The app prints app.ready once the shell shows Go's state: tests start there, once
+        # the shell has also reached the screen. Blink drops a page's input until its first
+        # paint, which headless Linux, drawing in software, can reach after app.ready.
         self.wait_reply("app.ready", 60)
+        self.wait_painted()
+
+    def wait_painted(self, timeout=10):
+        """Waits for the timeline's shell.on_screen, the shell's first frame on screen."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            reply = self.cmd("timeline", 0)
+            try:
+                entries = json.loads(reply)["result"]["entries"]
+            except (ValueError, KeyError, TypeError):
+                return  # No timeline to wait on, as the profile picker's copy has.
+            if "shell.on_screen" in timeline.marks(entries):
+                return
+            time.sleep(0.05)
 
     def _read(self):
         for line in self.proc.stdout:

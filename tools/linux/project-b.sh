@@ -1,7 +1,11 @@
 #!/bin/sh
-# Starts content_shell through zypak. With PB_HELPER=1 the children start from a separate
-# helper binary, as our app's do, instead of from content_shell re-running itself.
+# Starts the app through zypak: our project_b, which picks the display itself (PBInit), or the
+# spike's content_shell. With PB_HELPER=1 content_shell's children started from a separate
+# helper binary.
 dir=/app/project-b
+if [ -x "$dir/project_b" ]; then
+  exec zypak-wrapper "$dir/project_b" "$@"
+fi
 if [ "$PB_HELPER" = 1 ]; then
   set -- --browser-subprocess-path="$dir/project-b-helper" "$@"
 fi

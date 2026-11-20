@@ -5,6 +5,7 @@
 #   spike-guest.sh procs                  each of its processes: type, seccomp, PID namespace
 #   spike-guest.sh exes                   each process's binary, and whether it maps the main
 #                                         binary or the helper (the separate-helper check)
+#   spike-guest.sh core                   our app's processes, and which map the Go core
 #   spike-guest.sh stop
 # PB_HELPER=1 with run starts the children from project-b-helper (see project-b.sh).
 set -u
@@ -37,10 +38,25 @@ run)
     $app "$@"
   sleep "${PB_WAIT:-8}"; tail -30 "$HOME/pb-run.log"
   ;;
+core)
+  # Our app's one binary (docs/research/linux.md, 3): which processes map the Go core. Only
+  # the browser process may; a child is known by its threads, as a zygote's keep its
+  # command line.
+  printf '%-7s %-12s %-6s %s\n' PID KIND GO THREADS
+  for p in $(pgrep -f '/app/project-b/project_b'); do
+    [ -r /proc/$p/maps ] || continue
+    case $(readlink /proc/$p/exe 2>/dev/null) in */bwrap|*/bash|*/sh|*zypak*) continue;; esac
+    names=$(cat /proc/$p/task/*/comm 2>/dev/null | sort -u | tr '\n' ' ')
+    type=$(tr '\0' ' ' < /proc/$p/cmdline | grep -o -- '--type=[a-z-]*' | head -1 | cut -d= -f2)
+    case " $names" in *" VizCompositorTh "*) type=gpu-process;; *" Compositor "*) type=renderer;; esac
+    go=no; grep -q '/libcore.so' /proc/$p/maps && go=yes
+    printf '%-7s %-12s %-6s %s\n' "$p" "${type:-browser}" "$go" "$(echo "$names" | cut -c1-60)"
+  done
+  ;;
 procs)
   self_ns=$(readlink /proc/self/ns/pid)
   printf '%-7s %-22s %-8s %-7s %-22s %-22s %s\n' PID BINARY TYPE SECCOMP PIDNS USERNS NSPID
-  for p in $(pgrep -f '/app/project-b/(content_shell|project-b-helper)'); do
+  for p in $(pgrep -f '/app/project-b/(content_shell|project-b-helper|project_b)'); do
     [ -r /proc/$p/status ] || continue
     cmd=$(tr '\0' ' ' < /proc/$p/cmdline)
     bin=$(basename "$(echo "$cmd" | awk '{print $1}')")

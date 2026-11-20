@@ -4,6 +4,7 @@
 #include <optional>
 #include <utility>
 
+#include "build/build_config.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
@@ -279,11 +280,16 @@ void Downloads::DownloadURL(content::WebContents* contents, const GURL& url, boo
   if (!manager_) {
     return;
   }
+  // Linux and Windows want every request to say why it is made; the Mac doesn't yet.
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
+  const net::NetworkTrafficAnnotationTag annotation = MISSING_TRAFFIC_ANNOTATION;
+#else
+  const net::NetworkTrafficAnnotationTag annotation = NO_TRAFFIC_ANNOTATION_YET;
+#endif
   std::unique_ptr<download::DownloadUrlParameters> params =
       contents ? content::DownloadRequestUtils::CreateDownloadForWebContentsMainFrame(
-                     contents, url, NO_TRAFFIC_ANNOTATION_YET)
-               : std::make_unique<download::DownloadUrlParameters>(
-                     url, NO_TRAFFIC_ANNOTATION_YET);
+                     contents, url, annotation)
+               : std::make_unique<download::DownloadUrlParameters>(url, annotation);
   params->set_prompt(save_as);
   manager_->DownloadUrl(std::move(params));
 }

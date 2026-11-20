@@ -4,11 +4,11 @@
 #include <map>
 #include <utility>
 
+#include "build/build_config.h"
 #include "base/base64url.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
-#include "base/mac/mac_util.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -36,6 +36,10 @@
 #include "project_b/engine/browser/hooks.h"
 #include "project_b/engine/browser/timeline.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "base/mac/mac_util.h"
+#endif
 
 namespace project_b {
 
@@ -307,8 +311,10 @@ void PasskeyRequest::Answered(const std::string& action, const std::string& text
       bluetooth_on_.Run();
     }
   } else if (action == "bluetoothSettings") {
+#if BUILDFLAG(IS_MAC)
     base::mac::OpenSystemSettingsPane(
         base::mac::SystemSettingsPane::kPrivacySecurity_Bluetooth);
+#endif
   } else if (action == "own") {
     // The person chose our own passkeys: content sends ours the request.
     if (own_ && send_) {

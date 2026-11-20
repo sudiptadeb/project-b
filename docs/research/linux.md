@@ -250,8 +250,8 @@ After the layers work lands, each step leaves the Mac and Android green:
    through zypak, in the Ubuntu VM. Shows the cross-build, zypak with a separate helper,
    Wayland and the sandbox.
 2. **Our engine and `libcore` for Linux arm64**, headless in the arm64 container: the app
-   starts, our driver runs.
-3. **The window**: the tree, the top row, move and resize, the menu strip.
+   starts, our driver runs. It needs the window's tree, so that comes here (see the plan below).
+3. **The window** on a real desktop: the top row, move and resize, the menu strip.
 4. **`core/system` on Linux**, and the import permissions.
 5. **The Flatpak and our repository**, updates through the portal.
 6. **The four deskrig VMs** (they and deskrig's Linux target are ready), then the release run
@@ -261,6 +261,79 @@ After the layers work lands, each step leaves the Mac and Android green:
 
 About 5 weeks for one session, like the earlier estimate: the window is still the big piece,
 and Flatpak takes the place of the `.deb` and AppArmor work.
+
+### Step 2, the plan
+
+Our engine and `libcore` for Linux arm64, built in `pb`, started headless, our driver running.
+Nothing here changes the Mac or Android; each piece is its own commit.
+
+**The build.**
+- `engine/BUILD.gn` serves the Mac and Linux, the desktops: the `assert(is_mac)` goes, and
+  what is the Mac's moves under `if (is_mac)`: the `.mm` files, the frameworks, `sqlite3`,
+  `//sandbox/mac:seatbelt`, and the `-exported_symbol`/`install_name` and `@executable_path`
+  link flags. Linux's are `$ORIGIN` for the rpath; `ProjectBMain` is already exported by its
+  visibility attribute. Android keeps its own `engine/android/BUILD.gn`.
+- The shell's pages: Linux builds no shell in `pb` (no Node there), as Android doesn't.
+  `tools/build.sh linux arm64` builds `shell/dist` on the Mac first, and `build_go.py` copies
+  all of it, the desktop's shells, into `core/shellfiles/dist`.
+- `build_go.py` gains `linux`: `GOOS=linux`, `GOARCH=arm64`, `CGO_ENABLED=1`, a c-archive as on
+  the Mac, `CC` Chromium's clang with `--target=aarch64-linux-gnu` and `--sysroot` the arm64
+  sysroot GN already uses (GN passes both, as Android's passes clang and the NDK). Chromium's
+  version goes in with `-X main.chromiumVersion`, as on the Mac. The Go is `pb`'s own
+  `/usr/local/go`, x64, cross-compiling.
+- `tools/build.sh linux arm64` does what `android arm64` does: the Mac's lock, the tree
+  copied into `pb`'s `/work/tree` under `/work/.android-build.lock` (one build at a time, as the
+  tree and `//project_b` links are shared), then `gn gen out/linux-arm64` with
+  `root_extra_deps = [ "//project_b/engine" ]` and `autoninja`. Run as an `amarit job`,
+  reniced, in a slot from the tester. The spike's `out/linux-arm64` is reused: content is
+  already built there.
+
+**The engine's Mac-only C++, and what Linux gets.**
+
+| Mac | Linux in step 2 |
+|---|---|
+| `window_mac.mm` | `window_linux.cc`: the Aura tree, the shell's view over the pages' views, Go's regions for each press. No top row, move or resize yet (step 3) |
+| `browser_main_parts.mm` | `browser_main_parts_linux.cc`: Aura's screen on Ozone, then the shared startup |
+| `driver.mm` | its commands and screenshots move to `driver.cc`, shared; `driver_mac.mm` keeps the NSEvents; `driver_linux.cc` sends `ui::Event`s into the Aura tree the same way |
+| `mac_app.mm` | nothing: no menu bar (the strip is step 3), no Dock |
+| `printing_mac.mm` | a stub that says printing isn't there yet (open item 1) |
+| `ProjectBMain`'s Seatbelt | nothing: the zygote's sandbox is content's own |
+
+- `ProjectBMain`, the main binary's branch, on Linux: points `base::FILE_EXE` at
+  `project_b_helper` beside it with `OverrideAndCreateIfNeeded(..., false, false)` before
+  `ContentMain`, as the spike proved, so no child maps the binary with Go in it.
+- Headless needs no window of the OS's: Ozone's headless platform gives Aura a surface, and
+  the driver's screenshots are what content rendered, as on the Mac.
+
+**The Go core.** Built for Linux with cgo off, everything but `core/cmd/lib` compiles today
+except two gaps (`instance.Quit`, `relaunch`'s wait). Linux gets:
+- `core/cmd/lib`: `switches_linux.go` adds the Ozone pick: `--ozone-platform=wayland` when
+  `WAYLAND_DISPLAY` is set, `x11` when `DISPLAY` is, else `headless`; with the Mac's
+  `--disable-in-process-stack-traces` (Go owns the crash signals there too) and the saved
+  flags. `keys_linux.go`: no keychain, so a profile keeps its own key in its folder (the
+  Secret portal is step 4). `choose`, `exit`, `print`, `download_files` as the Mac's;
+  `update_linux.go`: no updates yet (amarit's Flatpak source comes at step 5).
+- `core/instance`: the Mac's flock and Unix socket work on Linux as they are, so
+  `instance_darwin.go` becomes `instance_unix.go`; the socket goes in
+  `$XDG_RUNTIME_DIR/app/io.github.sudiptadeb.project-b/` inside the Flatpak (3), the user's
+  temporary folder outside it.
+- `core/relaunch`: a `wait_linux.go` beside the kqueue one, waiting with `pidfd_open` and
+  `poll`. After and the kqueue wait stay as they are.
+- `core/system/platform`: `platform_linux.go`, every call answering as "not on this system",
+  so the managers run; the portals are step 4. Import finds no browsers yet (`browserdata`'s
+  `_other.go`), also step 4.
+
+**Where it runs.** An arm64 Ubuntu 24.04 container in `pb`'s colima VM, native speed, no
+Rosetta: `pb`'s `/work` mounted read-only, Chromium's runtime libraries and fonts installed,
+`--no-sandbox` (a container gives no user namespaces; the Flatpak's sandbox is the VMs').
+`tools/test.sh app` there runs `drive_first_app.py`'s parts that aren't the Mac's own
+(driver, browsing, settings, timeline, cookies, visible, windows, empty, move, shells,
+internal, links). ChromeDriver for Linux arm64 doesn't exist as a download, so
+`drive_chromedriver.py` waits for one built from the tree, after the milestone.
+
+**Done when** `tools/build.sh linux arm64` builds the app, it starts headless in the arm64
+container, shows the shell and a page, and those driver parts pass, with the Mac's app suite
+and Android's still green.
 
 ## Spike (2026-11-20)
 

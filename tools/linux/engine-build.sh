@@ -51,7 +51,7 @@ for d, _, fs in os.walk(dst):
 PY
 
 mkdir -p "$SRC/project_b"
-for part in engine core browserdata shell; do
+for part in engine core browserdata shell VERSION; do
   ln -sfn "$TREE/$part" "$SRC/project_b/$part"
 done
 

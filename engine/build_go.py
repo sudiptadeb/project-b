@@ -75,6 +75,10 @@ def main():
         for root, _, files in os.walk(shell_dist):
             deps += [os.path.join(link, os.path.relpath(os.path.join(root, name), repo))
                      for name in files]
+        # The release this build is, for --version, About and the release notes.
+        version_path = os.path.join(repo, "VERSION")
+        ldflags += " -X main.version=" + open(version_path).read().strip()
+        deps.append(os.path.join(link, "VERSION"))
         triple = {"arm64": "aarch64-linux-gnu", "x64": "x86_64-linux-gnu"}[target_cpu]
         env.update({
             "CC": " ".join([os.path.abspath(clang), "--target=" + triple,

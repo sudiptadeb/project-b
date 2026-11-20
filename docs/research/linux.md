@@ -202,9 +202,10 @@ container with a stub portal.
 | Where | What | Runs |
 |---|---|---|
 | An arm64 container | the arm64 build, headless, at native speed | `tools/test.sh app` with our driver, Ozone headless |
-| Tart VM: Ubuntu 24.04, GNOME, Wayland | the Flatpak, a real desktop | install, first run, driver, look |
-| Tart VM: Debian 13, GNOME | the same | the same |
-| Tart VM: Arch Linux ARM, KDE Plasma 6 | the same, and KDE's decorations | the same |
+| `deskrig-ub`: Ubuntu 24.04, GNOME, Wayland | the Flatpak, a real desktop | install, first run, driver, look |
+| `deskrig-ubx`: the same on Xorg | the same, on X11 | the same |
+| `deskrig-deb`: Debian 13, GNOME | the same | the same |
+| `deskrig-kde`: Arch Linux ARM, KDE Plasma 6.8, Wayland | the same, and KDE's decorations | the same |
 | Step 7: container `pb`, amd64 | the x64 build, headless | as the arm64 container |
 | Step 7: the same Tart VMs | the amd64 Flatpak, its programs through Rosetta | install, first run, driver, look |
 
@@ -212,11 +213,13 @@ container with a stub portal.
   it stands in for Arch.
 - amd64 is tested only from step 7: the x64 Flatpak in the arm64 VMs, its programs through
   Rosetta, or headless in `pb`.
-- X11: Ubuntu's login screen still offers an Xorg session; one run there covers X11.
+- X11: `deskrig-ubx` is Ubuntu's Xorg session; runs there cover X11.
 - ChromeDriver: Chrome for Testing has none for Linux arm64, so we build it from the same
   tree, or use only our own driver.
-- **deskrig** needs a Linux target: a small agent in the VM for screenshots, clicks and keys.
-  That's deskrig's own repo, for the tester.
+- **deskrig** has Linux targets since v0.2.0: the four `deskrig-*` VMs above, in the tester's
+  Tart home. A test script changes only `--target`. What differs is in deskrig's
+  `docs/linux.md` ("As built"): no fling on X11, `cmd` means Super, `type` knows only the US
+  keyboard, and there's no record on Linux yet, only frames.
 - The tester hands out the container, the slots and the VMs. The Ubuntu VM is `pb-ubuntu`
   in the tester's Tart home: 6 CPUs, 8 GB, 60 GB disk, made by `tools/linux/vm-setup-guest.sh`
   and started and stopped with `tools/linux/vm.sh`. It's the Linux session's slot while
@@ -237,7 +240,8 @@ After the layers work lands, each step leaves the Mac and Android green:
 3. **The window**: the tree, the top row, move and resize, the menu strip.
 4. **`core/system` on Linux**, and the import permissions.
 5. **The Flatpak and our repository**, updates through the portal.
-6. **The three VMs**, the deskrig Linux target, then the release run gains Linux.
+6. **The four deskrig VMs** (they and deskrig's Linux target are ready), then the release run
+   gains Linux.
 7. **amd64**, the first amd64 work: built in `pb`, tested headless there and through
    Rosetta in the VMs. Steps 1 to 6 are arm64 only.
 

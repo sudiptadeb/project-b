@@ -21,6 +21,9 @@ agreed.
   channel switch on Linux. A Linux release isn't part of every release run: release runs one
   when he asks for it. Our own dev and test builds on the branch carry on in the tester's
   slots.
+- **Release notes as the Mac's** (2026-11-20: "yes to same release notes as mac"). Flatpak owns
+  versions and delivery; the notes are the Mac's `release-notes.md`, built into the shell, so a
+  Linux build shows them with no change; no `min_version` on Linux.
 - **Flatpak is the only Linux package** (2026-11-19: "flatpak itis"). No tarball, no `.deb`.
 - **The app id is `io.github.sudiptadeb.project-b`** (2026-11-19: "yea lets go with this").
   Flathub reads it as github.com/sudiptadeb/project-b, which makes its GitHub check possible;
@@ -216,6 +219,10 @@ container with a stub portal.
   - `core/update/bundle.go` (the Mac's folder swap) isn't used on Linux, and our own signature
     check isn't needed, since Flatpak checks the repository's signature.
   - The runtime updates by itself, with every other Flatpak.
+  - **Release notes as the Mac's** (2026-11-20: "yes to same release notes as mac"): Flatpak
+    owns versions and delivery; the notes are `release-notes.md`, built into the shell, so a
+    Linux build shows the Mac's with no change. No `min_version` on Linux: Flatpak always
+    offers the latest.
 - **Fonts: the host's.** Flatpak shares the system's fonts with every app at
   `/run/host/fonts`, and the spike's pages drew Chinese from the host's Noto CJK once the
   host had it. We ship no fonts. A desktop install of Ubuntu brings Noto CJK; where a distro
@@ -513,8 +520,6 @@ Pictures come from Tart's VNC server (`vm.sh vnc capture`), so no window opens o
    from the sandbox; the choice needs our engine, since content_shell has no dialog.
 2. **The GPU process's sandbox under zypak**: no Chromium seccomp in the spike's VM, on
    software GL. Check on real hardware whether Chrome's Flatpak is the same.
-3. **Release notes**, for Sudipta: whether the shell reads them from `releases.json`, as on
-   the Mac, with no `min_version` on Linux.
 
 ## Sources
 

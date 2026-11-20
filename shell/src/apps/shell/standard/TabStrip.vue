@@ -8,6 +8,7 @@ import { dragEnd, dragOver, dragStart, drop, dropClass } from './drag.js';
 import { openMenu } from './menu.js';
 import { toNewTab, view, waiting, workspaces } from './state.js';
 import WorkspaceButton from './WorkspaceButton.vue';
+import WindowButtons from '@/ui/WindowButtons.vue';
 
 // The strip, flat: the pins and a rule after them, then a group's chip and its tabs, which
 // carry the group for their rule.
@@ -92,11 +93,18 @@ const items = computed(() =>
     <button class="new-tab" type="button" aria-label="New Tab" :title="state.keys['tab.new'] ? `New Tab (${shown(state.keys['tab.new'], state.platform)})` : 'New Tab'" @click="toNewTab">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.44.75v11.39M.75 6.19h11.39"/></svg>
     </button>
+    <!-- With the tabs on top the strip is the title bar: the window's own buttons end it where
+         the frame is ours. -->
+    <WindowButtons class="window-end" />
     <div class="space end" :style="{ width: controls.right }"></div>
   </div>
 </template>
 
 <style scoped>
+.window-end {
+  margin-left: auto;
+}
+
 /* The bar's colour inside the window's band: the band is the strip's padding, in the
    frame colour. */
 .strip {

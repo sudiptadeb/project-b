@@ -4,6 +4,7 @@ import AddressBar from './AddressBar.vue';
 import AppMenu from './AppMenu.vue';
 import Downloads from '@/ui/Downloads.vue';
 import NavButtons from './NavButtons.vue';
+import WindowButtons from '@/ui/WindowButtons.vue';
 import { ExtensionsToolbar } from '@extensions';
 import { activeTab, controlSpace as controls, send, state } from '@/sdk/vue.js';
 import { tabsOnTop, view } from './state.js';
@@ -56,6 +57,8 @@ function switchLayout() {
       <svg v-else width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x=".65" y=".65" width="12.7" height="10.7" rx="1.5"/><path d="M4.6.65v10.7"/></svg>
     </button>
     <AppMenu />
+    <!-- As the title bar, the window's own buttons end it where the frame is ours. -->
+    <WindowButtons v-if="titleBar" />
     <div class="space" :style="{ width: titleBar ? controls.right : '8px' }"></div>
     <!-- The page's real load progress. Shown while loading; the width stays so a test can read it. -->
     <div class="progress" :class="{ on: activeTab.loading }" :style="{ width: activeTab.progress * 100 + '%' }"></div>

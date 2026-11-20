@@ -287,6 +287,23 @@ MAC = sys.platform == "darwin"
 LINUX = sys.platform.startswith("linux")
 
 
+# The app's own modifier in a menu item's key, as the Mac's menu writes it: Command there,
+# Ctrl on Linux, whose keymap has Ctrl where the Mac's has Command.
+CMD = "@" if MAC else "^"
+
+
+def press_settings(app):
+    """The key that opens Settings: Cmd+, on the Mac, Ctrl+, on Linux, which the driver's cmd
+    is there."""
+    app.cmd("key", "cmd+,")
+
+
+def press_quit(app):
+    """The key that quits: Cmd+Q on the Mac; Ctrl+Shift+Q on Linux, whose Shift guards
+    against a quit by accident, as in Chrome."""
+    app.cmd("key", "cmd+q" if MAC else "cmd+shift+q")
+
+
 def check_mac(name, ok, detail=""):
     """A check of the Mac's own window parts (its buttons, title bar, frame, menu bar): Linux
     draws them in the shell, or will in its step 3 (docs/research/linux.md)."""
@@ -864,7 +881,7 @@ def settings_checks():
     # Cmd+, opens the settings tab, beside the active tab, and shows it.
     settings = lambda expr: json.loads(app.cmd("evalsettings", expr))
     rows = app.js(ROWS)
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     try:
         deadline = time.time() + 10
         while True:
@@ -893,11 +910,13 @@ def settings_checks():
     settings("[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Add key').click()")
     time.sleep(0.3)
     app.cmd("key", "cmd+shift+k")
+    # How the keymap writes that key: the Mac's order and Command; Ctrl first on Linux.
+    RECORDED = "Shift+Cmd+K" if MAC else "Ctrl+Shift+K"
     keymap = os.path.join(profile, "keymap.json")
     deadline = time.time() + 5
-    while time.time() < deadline and not (os.path.exists(keymap) and "Shift+Cmd+K" in open(keymap).read()):
+    while time.time() < deadline and not (os.path.exists(keymap) and RECORDED in open(keymap).read()):
         time.sleep(0.1)
-    check("a key pressed while recording is added to keymap.json", os.path.exists(keymap) and "Shift+Cmd+K" in open(keymap).read(),
+    check("a key pressed while recording is added to keymap.json", os.path.exists(keymap) and RECORDED in open(keymap).read(),
           (os.listdir(profile), app.cmd("evalsettings", "[document.activeElement.className, document.querySelector('[aria-label=File]').textContent.slice(0,80)]")))
     print(app.cmd("capture", os.path.join(OUT, "settings-keyboard.png")), flush=True)
 
@@ -1570,7 +1589,7 @@ def window_checks():
     check("it opens a little down and right of the first, the same size",
           0 < sx - fx <= 60 and 0 < sy - fy <= 60 and (sw, sh) == (fw, fh), (first["frame"], second["frame"]))
     file = next(m for m in json.loads(app.cmd("menu")) if m["title"] == "File")
-    check("the File menu has New Window on Cmd+N", {"title": "New Window", "key": "@n"} in
+    check("the File menu has New Window on Cmd+N", {"title": "New Window", "key": CMD + "n"} in
           [{"title": i["title"], "key": i["key"]} for i in file["items"] if i != "-"], file["items"])
 
     app.cmd("window", 2)
@@ -1699,7 +1718,7 @@ def move_checks():
         time.sleep(0.05)
     check("a window whose last tab moves away closes", [w["id"] for w in windows()] == [2, 3], windows())
     app.cmd("window", 2)
-    app.cmd("key", "cmd+q")
+    press_quit(app)
     check("Cmd+Q ends the app with both windows, cleanly", app.proc.wait(timeout=20) == 0)
     App.running.remove(app)
 
@@ -1818,7 +1837,7 @@ def copies_checks():
         time.sleep(0.1)
     b = App(None, [f"--root={root}", "--profile=work"])
     b.wait("!!document.querySelector('input')", 30)
-    a.cmd("key", "cmd+q")
+    press_quit(a)
     check("Quit ends this profile's copy only", a.proc.wait(timeout=20) == 0 and b.proc.poll() is None)
     App.running.remove(a)
     b.close()
@@ -1916,7 +1935,7 @@ def picker_checks():
     app = App(None, [f"--root={fresh}"])
     app.wait(f"{rows}.length===1", 30)
     check("with no profile named and none used yet, the start shows the picker", app.js("location.href") == "chrome://picker/")
-    app.cmd("key", "cmd+q")
+    press_quit(app)
     check("and Quit there ends it, cleanly", app.proc.wait(timeout=20) == 0)
     App.running.remove(app)
 
@@ -2335,7 +2354,7 @@ def workspace_menu_checks():
     check("a new profile's Tab, New Tab in Workspace lists Main", item()["enabled"] and [i["title"] for i in item()["items"]] == ["Main"], item())
 
     settings = lambda expr: json.loads(app.cmd("evalsettings", expr))
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     deadline = time.time() + 10
     while app.cmd("evalsettings", "!!document.querySelector('h1')") != "true":
         if time.time() > deadline:
@@ -2406,7 +2425,7 @@ def delete_workspace(app, workspace, close=True):
     workspace. Without, it stays, as it must when the window has no other tab left."""
     row = json.dumps(f'[data-workspace="{workspace}"]')
     click = "(b=>b&&(b.click(),1))"
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     # Workspaces is a section of its own.
     in_settings(app, click + "(document.querySelector('[data-section=\"workspaces\"]'))")
     in_settings(app, click + f"(document.querySelector({row}+' .ui-row-menu > button'))")
@@ -2495,7 +2514,7 @@ def workspace_delete_checks():
     check("a window whose tabs were all in the workspace deleted gets a new tab, and stays open",
           2 in [w["id"] for w in windows()] and app.js(ROWS) == 1 and holds(app, f"!!{BOX}", 5), (windows(), app.js(ROWS)))
     # Both windows go at once, as Cmd+Q does.
-    app.cmd("key", "cmd+q")
+    press_quit(app)
     check("Cmd+Q ends the app with both windows, cleanly", app.proc.wait(timeout=20) == 0)
     App.running.remove(app)
 
@@ -2517,7 +2536,7 @@ def site_data_checks():
     keep(open_in(app, work, STORE), "work")
     click = "(b=>b&&(b.click(),1))"
     button = lambda words: click + f"([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==={json.dumps(words)}))"
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     # Sites is a row of Privacy that opens it as a page of its own.
     in_settings(app, click + "(document.querySelector('[data-section=\"privacy\"]'))")
     in_settings(app, click + "(document.querySelector('[data-section=\"sites\"]'))")
@@ -3207,7 +3226,7 @@ def internal_checks():
     app.wait(f"document.querySelector('[role=tab][data-tab=\"{first}\"]').getAttribute('aria-selected')==='true'")
     click(app, f'[role=tab][data-tab="{in_work}"]')
     app.wait(f"document.querySelector('[role=tab][data-tab=\"{in_work}\"]').getAttribute('aria-selected')==='true'")
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     settings_ready()
     found = ours()
     settings = found[0]["id"] if found else 0
@@ -3217,7 +3236,7 @@ def internal_checks():
     check("its page is ours, with the settings page's channel", app.cmd("evalsettings", "typeof chrome.send") == '"function"')
     click(app, f'[role=tab][data-tab="{first}"]')
     app.wait(f"document.querySelector('[role=tab][data-tab=\"{first}\"]').getAttribute('aria-selected')==='true'")
-    app.cmd("key", "cmd+,")
+    press_settings(app)
     app.wait(f"document.querySelector('[role=tab][data-tab=\"{settings}\"]').getAttribute('aria-selected')==='true'")
     check("Settings again shows the window's settings tab, and opens no other", [t["id"] for t in ours()] == [settings] and tabs_of(app)["active"] == settings, tabs_of(app))
 

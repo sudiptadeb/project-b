@@ -39,6 +39,7 @@ import http.server
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -59,6 +60,9 @@ from drive_chromedriver import cdp, ws_open  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BIN = os.environ.get("PB_BIN") or os.path.join(ROOT, "build/pb/project_b")
+# More switches for every start, as Linux's headless container needs --no-sandbox
+# (tools/linux/headless.sh).
+ARGS = shlex.split(os.environ.get("PB_ARGS", ""))
 OUT = os.path.join(ROOT, "build/real")
 BAR_Y = 26  # The middle of the top row, where the window buttons centre.
 BLOCKED = "blocked.test"
@@ -301,7 +305,7 @@ class App:
             [bin or BIN, *([f"--user-data-dir={profile}"] if profile else []), f"--block={BLOCKED},{BLOCKED_LOCAL}", f"--pb-driver={self.fifo}", "--disable-backgrounding-occluded-windows",
              # A first start would open the welcome over the window (docs/onboarding.md):
              # these checks start past it, as its Skip setup does.
-             "--skip-welcome", *extra],
+             "--skip-welcome", *ARGS, *extra],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1,
         )
         App.running.append(self)

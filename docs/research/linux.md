@@ -28,11 +28,11 @@ agreed.
 
 | | Today on the Mac | On Linux |
 |---|---|---|
-| Wrapper | `main.cc`, a Mac app bundle | the same `main.cc`, an ELF binary |
+| Wrapper | `main.cc`, a Mac app bundle | `main_linux.cc`, one ELF binary with the engine linked in |
 | Window | `window_mac.mm`, an `NSWindow` | an Aura window tree on Ozone (Wayland, or X11) |
 | Window buttons | macOS's own | the shell's, top right |
 | OS calls | `core/system` darwin (after layers) | `core/system` linux: portals over D-Bus |
-| Child processes | the helper app | the same helper binary, started through zypak |
+| Child processes | the helper app | the same binary with `--type`, which never loads Go, started through zypak |
 | Package | `.app` in a DMG | a Flatpak, from our own repository |
 | Updates | Go swaps the bundle | Flatpak updates it; Go asks through the portal |
 
@@ -91,17 +91,25 @@ The engine's one big new piece, and its first exception ([layers.md](layers.md#t
 
 ## 3. Processes and the sandbox
 
-- **The same split as on the Mac.** The main program holds Go. A helper binary with no Go runs
-  every child process, the zygote included, so Go never reaches a renderer. On Linux that takes
-  one line of ours: the zygote always starts from `base::FILE_EXE`, never from
-  `--browser-subprocess-path`, and the renderers, the sandboxed utilities and the GPU process
-  are all forked from a zygote. So `ProjectBMain`, in the browser process before
-  `ContentMain`, points `FILE_EXE` at the helper beside it, with
-  `PathService::OverrideAndCreateIfNeeded(base::FILE_EXE, helper, false, false)` (plain
-  `Override` treats the path as a folder and refuses a file). The spike proved it: every
-  child runs and maps only the helper. Nothing else of ours or content's on Linux reads
-  `FILE_EXE` for anything but the folder, which is the same; Go's relaunch uses
-  `os.Executable`.
+- **Go only in the browser process, by another road than the Mac's** (decided 2026-11-20,
+  with platforms). Linux has one binary, `project_b`: the wrapper with content and our
+  adapter linked in. The Go core is `libcore.so` beside it, built c-shared as Android's is.
+  `main` looks for `--type` first: a child process, which content always starts with it, goes
+  straight into `ProjectBMain` and never loads Go. Only the browser process `dlopen`s
+  `libcore.so`, fills `PBGoCalls` from it and calls `PBInit`, then content: main → `PBInit` →
+  content, as on the Mac and Android. Every child is either this binary started fresh or
+  forked from a zygote that was itself started fresh, so none maps Go. A `libcore.so` that
+  won't load ends the start with a message saying which file and why.
+- **Why not the Mac's layout.** The Mac's engine is a shared library that a main binary and a
+  helper both load. On Linux that library doesn't link: Blink and V8 build their
+  thread-locals for a program (`local-exec`), which a shared library outside a component build
+  can't hold (19,005 references to `blink::g_thread_specific_`, 1,464 to V8's isolate ones,
+  in the first link). Chromium's way out is GN arguments meant for CEF
+  (`blink_heap_inside_shared_library`, and V8's monolithic build, which wants its startup
+  snapshot inside the binary): every file that includes V8 or Blink built again, about 6 hours
+  under Rosetta, and not certain to work. Linking content into both a main binary and a helper
+  works, but the Flatpak would carry the engine twice, about 400 MB. The spike's own way, a
+  helper with `FILE_EXE` pointed at it, worked only because content_shell is one binary.
 - **Inside Flatpak, Chromium's sandbox can't make its own namespaces**, because bubblewrap
   already did. zypak fixes that: it makes Chromium believe its setuid sandbox is there, and
   starts each sandboxed child in a new Flatpak sandbox through the Flatpak portal. Chrome,
@@ -109,9 +117,9 @@ The engine's one big new piece, and its first exception ([layers.md](layers.md#t
   Electron and Chromium base apps. We start as `zypak-wrapper project-b`.
 - **This removes Ubuntu's AppArmor problem.** Ubuntu 23.10 and later block unprivileged user
   namespaces; a Flatpak never needs them, so no AppArmor profile and no setuid helper.
-- **zypak needs nothing for the separate helper**: no `ZYPAK_SANDBOX_FILENAME`, no other
-  setting. Its spawn strategy starts each sandboxed child in a nested Flatpak sandbox (its own
-  PID namespace) whatever binary the child is. The renderers carry Chromium's seccomp-bpf
+- **zypak needs nothing for this**: no `ZYPAK_SANDBOX_FILENAME`, no other setting. Its spawn
+  strategy starts each sandboxed child in a nested Flatpak sandbox (its own PID namespace)
+  whatever binary the child is. The renderers carry Chromium's seccomp-bpf
   policy on top of Flatpak's filter. See the spike.
 - **Headless tests outside a Flatpak**, in a container, run with `--no-sandbox`. That's for
   tests only; what users run is always the Flatpak.
@@ -298,15 +306,20 @@ Nothing here changes the Mac or Android; each piece is its own commit.
 | Mac | Linux in step 2 |
 |---|---|
 | `window_mac.mm` | `window_linux.cc`: the Aura tree, the shell's view over the pages' views, Go's regions for each press. No top row, move or resize yet (step 3) |
-| `browser_main_parts.mm` | `browser_main_parts_linux.cc`: Aura's screen on Ozone, then the shared startup |
+| `browser_main_parts.mm` | `browser_main_parts_desktop.cc`, shared: Aura's screen on Ozone in place of the Mac's, then the same startup |
 | `driver.mm` | its commands and screenshots move to `driver.cc`, shared; `driver_mac.mm` keeps the NSEvents; `driver_linux.cc` sends `ui::Event`s into the Aura tree the same way |
 | `mac_app.mm` | nothing: no menu bar (the strip is step 3), no Dock |
 | `printing_mac.mm` | a stub that says printing isn't there yet (open item 1) |
 | `ProjectBMain`'s Seatbelt | nothing: the zygote's sandbox is content's own |
 
-- `ProjectBMain`, the main binary's branch, on Linux: points `base::FILE_EXE` at
-  `project_b_helper` beside it with `OverrideAndCreateIfNeeded(..., false, false)` before
-  `ContentMain`, as the spike proved, so no child maps the binary with Go in it.
+- One binary, and Go as `libcore.so` that only the browser process loads (3): the engine
+  can't be a shared library on Linux. `engine/app/main_linux.cc` is the wrapper; children are
+  the same binary with `--type`; `build_go.py` builds the Go core c-shared on Linux.
+- Proved by four checks before step 2 is done: no child maps `libcore.so`, headless and
+  under zypak in the Flatpak, for both zygotes, the renderers, the GPU process and the
+  utilities; a `--type` process never loads it; a forced Go panic and a forced C++ crash in
+  the browser process both end in our crash report, as on the Mac; and a missing
+  `libcore.so` ends the start with a clear message, not a crash.
 - Headless needs no window of the OS's: Ozone's headless platform gives Aura a surface, and
   the driver's screenshots are what content rendered, as on the Mac.
 
@@ -370,7 +383,8 @@ zypak, in `pb-ubuntu` (Ubuntu 24.04 arm64, GNOME on Wayland). The scripts are in
   `Seccomp: 2` and `NoNewPrivs: 1` everywhere. The renderers sit in a PID namespace of their
   own, started through `bwrap` by zypak's spawn strategy. The network service is unsandboxed
   by Chromium's design on Linux (`--service-sandbox-type=none`), as in Chrome.
-- **The separate helper**, with one line of ours (see 3). Without it, `--browser-subprocess-path`
+- **The separate helper**, with one line of ours. (Step 2 then found our engine can't be a
+  shared library on Linux, so it has one binary instead: see 3.) Without it, `--browser-subprocess-path`
   moves only the directly launched children (the network service) to the helper; the zygote,
   and so the renderers, the sandboxed utilities and the GPU process, run the main binary. With
   `FILE_EXE` pointed at the helper (`spike-helper-exe.patch`, a spike-only change to
@@ -415,8 +429,9 @@ zypak, in `pb-ubuntu` (Ubuntu 24.04 arm64, GNOME on Wayland). The scripts are in
 
 ### What changes in the spec
 
-Done above: Go picks Wayland or X11 in `PBInit` (2); `ProjectBMain` points `FILE_EXE` at the
-helper, and zypak needs nothing (3); the CUPS socket works (4); we rely on the host's fonts
+Done above: Go picks Wayland or X11 in `PBInit` (2); zypak needs nothing for our children (3),
+though step 2 then found the Mac's helper layout can't link on Linux, so Linux has one binary
+and Go loaded only in the browser process (3); the CUPS socket works (4); we rely on the host's fonts
 (5); the VM slot and no GPU in VMs (6); every Linux build stays in `pb`, reniced in the
 tester's slots, with Rosetta's clang crashes retried by `build-content-shell.sh` (1).
 

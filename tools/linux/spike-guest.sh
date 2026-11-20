@@ -1,6 +1,7 @@
 #!/bin/bash
 # The spike's steps inside the Ubuntu VM, as the desktop user (over ssh is fine):
-#   spike-guest.sh build <stage.tar.gz>   unpack beside the manifest, flatpak-builder, install
+#   spike-guest.sh build <stage.tar.gz>   unpack beside the manifest, flatpak-builder, install, and
+#                                         a bundle, ~/pb-flatpak/<app id>.flatpak
 #   spike-guest.sh run [args...]          start it in the user's GNOME session, log in ~/pb-run.log
 #   spike-guest.sh procs                  each of its processes: type, seccomp, PID namespace
 #   spike-guest.sh exes                   each process's binary, and whether it maps the main
@@ -21,8 +22,10 @@ build)
   mkdir -p "$work" && rm -rf "${work:?}/stage" "${work:?}/build-dir"
   tar -C "$work" -xzf "$tarball"
   cp "$(dirname "$0")/$app.yml" "$work/"
-  cd "$work" && time flatpak-builder --user --install --force-clean build-dir $app.yml
+  cd "$work" && time flatpak-builder --user --install --force-clean --repo=repo build-dir $app.yml
   flatpak info --user $app | head -20
+  # A single-file bundle too, which deskrig installs on its targets (check_real_window.py).
+  flatpak build-bundle repo "$work/$app.flatpak" $app && ls -l "$work/$app.flatpak"
   du -sh "$work/stage/files"
   ;;
 run)
